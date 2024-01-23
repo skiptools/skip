@@ -82,7 +82,7 @@ class KotlinStatement: KotlinSyntaxNode {
 
 /// Additional requirements for type members to handle extensions and companion objects in Kotlin.
 protocol KotlinMemberDeclaration: AnyObject {
-    var extends: (TypeSignature, Generics)? { get set }
+    var extends: (TypeSignature, KotlinCompanionType, Generics)? { get set }
     var isStatic: Bool { get }
     var visibility: Modifiers.Visibility { get set }
 }
@@ -92,14 +92,20 @@ extension KotlinMemberDeclaration {
         guard let extends else {
             return
         }
-        output.append(extends.0.withGenerics([]).kotlin)
-        if !isStatic {
-            extends.1.append(to: output, indentation: indentation)
+        switch extends.1 {
+        case .none:
+            output.append(extends.0.withGenerics([]).kotlin)
+            extends.2.append(to: output, indentation: indentation)
+        case .object:
+            output.append(extends.0.withGenerics([]).kotlin)
+            output.append(".Companion")
+        case .class(let signature):
+            output.append(signature.kotlin)
+        case .interface(let signature):
+            output.append(signature.withGenerics([]).kotlin)
+            extends.2.append(to: output, indentation: indentation)
         }
         output.append(".")
-        if isStatic {
-            output.append("Companion.")
-        }
     }
 }
 

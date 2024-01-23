@@ -65,6 +65,7 @@ final class KotlinRawRepresentableTransformer: KotlinTransformer {
 
         if let parentClassDeclaration = classDeclaration.parent as? KotlinClassDeclaration {
             factory.modifiers.isStatic = true
+            factory.modifiers.isFinal = true
             parentClassDeclaration.members.append(factory)
             factory.parent = parentClassDeclaration
         } else if let parentStatement = classDeclaration.parent as? KotlinStatement {

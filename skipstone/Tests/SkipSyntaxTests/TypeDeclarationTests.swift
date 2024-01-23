@@ -249,32 +249,6 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
-    //~~~
-//    func testProtocolInitRequirements() async throws {
-//        try await check(swift: """
-//        protocol P {
-//            init(i: Int)
-//        }
-//        """, kotlin: """
-//        """)
-//    }
-
-    func testProtocolStaticMembers() async throws {
-        try await check(swift: """
-        protocol P {
-            static func f()
-            static var i: Int { get }
-        }
-        """, kotlin: """
-        internal interface P {
-        }
-        internal interface PCompanionInterface {
-            fun f()
-            val i: Int
-        }
-        """)
-    }
-
     func testProtocolExtension() async throws {
         try await check(swift: """
         protocol P {

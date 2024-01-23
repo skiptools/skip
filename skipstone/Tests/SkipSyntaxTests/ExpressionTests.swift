@@ -72,11 +72,6 @@ final class ExpressionTests: XCTestCase {
         """)
     }
 
-    func testProtocolInit() async throws {
-        //~~~
-        //~~~ Also need to add inits for every matching constructor
-    }
-
     func testStaticProtocolMember() async throws {
         try await check(supportingSwift: """
         func type<T>(of: T) -> T.Type {

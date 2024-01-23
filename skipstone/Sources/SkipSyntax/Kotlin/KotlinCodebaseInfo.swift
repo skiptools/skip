@@ -206,10 +206,10 @@ extension CodebaseInfo.Context {
                 return hasCompanion ? .object : .none
             }
             guard !hasCompanion else {
-                return .class(.member(type, .named("CompanionClass", [])))
+                return .class(.member(type.withGenerics([]), .named("CompanionClass", [])))
             }
             if let firstInherits = classInfo.inherits.first, case .class = companionType(of: firstInherits) {
-                return .class(.member(type, .named("CompanionClass", [])))
+                return .class(.member(type.withGenerics([]), .named("CompanionClass", [])))
             } else {
                 return .none
             }

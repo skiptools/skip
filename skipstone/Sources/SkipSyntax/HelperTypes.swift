@@ -750,6 +750,7 @@ struct Modifiers: PrettyPrintable, Codable {
                 }
             case "static":
                 isStatic = true
+                isFinal = true
             case "class":
                 isStatic = true
             case "mutating":

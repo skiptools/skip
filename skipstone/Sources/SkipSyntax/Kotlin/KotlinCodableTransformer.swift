@@ -193,6 +193,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
 
             if let parentClassDeclaration = classDeclaration.parent as? KotlinClassDeclaration {
                 decode.modifiers.isStatic = true
+                decode.modifiers.isFinal = true
                 parentClassDeclaration.members.append(decode)
                 decode.parent = parentClassDeclaration
             } else if let parentStatement = classDeclaration.parent as? KotlinStatement {

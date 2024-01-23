@@ -92,6 +92,7 @@ final class KotlinOptionSetTransformer: KotlinTransformer {
     private func addOptionSetVarargsFactory(to classDeclaration: KotlinClassDeclaration, rawValueType: TypeSignature) {
         let factory = KotlinFunctionDeclaration(name: "of")
         factory.modifiers.isStatic = true
+        factory.modifiers.isFinal = true
         if classDeclaration.members.contains(where: { ($0 as? KotlinMemberDeclaration)?.isStatic == true }) {
             factory.extras = .singleNewline
         }

@@ -65,7 +65,8 @@ extension TypeSignature {
         case .int64:
             return "Long"
         case .member(let baseType, let type):
-            return "\(baseType.kotlin).\(type.kotlin)"
+            // Erase generics of outer type because Kotlin inner types do not inherit them
+            return "\(baseType.withGenerics([]).kotlin).\(type.kotlin)"
         case .metaType(let baseType):
             if baseType == .any {
                 return "KClass<*>"

@@ -539,7 +539,7 @@ class KotlinEmpty: KotlinStatement, KotlinMemberDeclaration {
         super.init(type: .empty, statement: statement)
     }
 
-    var extends: (TypeSignature, Generics)?
+    var extends: (TypeSignature, KotlinCompanionType, Generics)?
     let isStatic = false
     var visibility: Modifiers.Visibility = .private
 }
@@ -1465,6 +1465,7 @@ struct KotlinExtensionDeclaration {
     }
 
     static func translateExtensionMembers(_ members: [Statement], of extends: TypeSignature, visibility: Modifiers.Visibility, generics: Generics, declarationType: StatementType?, translator: KotlinTranslator, extensionPlacement: KotlinExtensionPlacement? = nil) -> [KotlinStatement] {
+        let companionType = translator.codebaseInfo?.companionType(of: extends) ?? .object
         var canAddStaticMembers = declarationType != .protocolDeclaration || extensionPlacement?.isInModule != false || translator.codebaseInfo == nil
         if !canAddStaticMembers, case .interface = translator.codebaseInfo!.companionType(of: extends) {
             canAddStaticMembers = true
@@ -1512,8 +1513,7 @@ struct KotlinExtensionDeclaration {
                 if let kfunctionDeclaration = kmember as? KotlinFunctionDeclaration {
                     extendsGenerics = extendsGenerics.merge(overrides: kfunctionDeclaration.generics, addNew: false)
                 }
-                //~~~ companion protocols
-                memberDeclaration.extends = (extends, extendsGenerics)
+                memberDeclaration.extends = (extends, memberDeclaration.isStatic ? companionType : .none, extendsGenerics)
                 kstatements.append(kmember)
             }
         }
@@ -1607,7 +1607,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if let convertedGenerics {
                 return convertedGenerics
             }
-            guard let extendsGenerics = extends?.1, !extendsGenerics.isEmpty else {
+            guard let extendsGenerics = extends?.2, !extendsGenerics.isEmpty else {
                 return generics
             }
             guard !generics.isEmpty else {
@@ -1634,7 +1634,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     // KotlinMemberDeclaration
-    var extends: (TypeSignature, Generics)? {
+    var extends: (TypeSignature, KotlinCompanionType, Generics)? {
         didSet {
             if extends != nil {
                 isOpen = false
@@ -2466,7 +2466,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     // KotlinMemberDeclaration
-    var extends: (TypeSignature, Generics)? {
+    var extends: (TypeSignature, KotlinCompanionType, Generics)? {
         didSet {
             if extends != nil {
                 isOpen = false
@@ -2701,7 +2701,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         } else {
             output.append("var ")
         }
-        if let generics = extends?.1.filterWhereEqual(), !generics.isEmpty {
+        if let generics = extends?.2.filterWhereEqual(), !generics.isEmpty {
             generics.append(to: output, indentation: indentation)
             output.append(" ")
         }
@@ -2725,7 +2725,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if (!apiFlags.contains(.async) || isAsyncLet) && storage == nil {
             appendInitialValue(to: output, indentation: indentation)
         }
-        extends?.1.appendWhere(to: output, indentation: indentation)
+        extends?.2.appendWhere(to: output, indentation: indentation)
     }
 
     private func appendAsFunctionDefinition(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
