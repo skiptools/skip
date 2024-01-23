@@ -34,12 +34,13 @@ final class MemberDeclarationTests: XCTestCase {
 
             internal open var i = 1
 
-            companion object {
+            open class CompanionClass {
                 internal val staticLet = 1
                 internal var staticVar = 10
 
                 internal fun staticFunc(): Int = 20
             }
+            companion object: CompanionClass()
         }
         """)
 
@@ -65,7 +66,7 @@ final class MemberDeclarationTests: XCTestCase {
 
             internal open fun f(): T = Unit
 
-            companion object {
+            open class CompanionClass {
                 internal val staticLet = 1
 
                 internal fun staticFunc(): Int = 20
@@ -74,6 +75,7 @@ final class MemberDeclarationTests: XCTestCase {
 
                 internal fun <T, U> staticFunc3(p1: T, p2: U): T = Unit
             }
+            companion object: CompanionClass()
         }
         """)
 
@@ -989,10 +991,11 @@ final class MemberDeclarationTests: XCTestCase {
             override var i = 0
             override fun f() = Unit
 
-            companion object: PCompanion {
+            open class CompanionClass: PCompanionInterface {
                 override var si = 0
                 override fun sf() = Unit
             }
+            companion object: CompanionClass()
         }
         """)
 
@@ -1056,7 +1059,7 @@ final class MemberDeclarationTests: XCTestCase {
             val i: Int
             fun f()
         }
-        internal interface PCompanion {
+        internal interface PCompanionInterface {
             fun sf()
         }
         internal interface Q: P {
@@ -1066,7 +1069,7 @@ final class MemberDeclarationTests: XCTestCase {
 
             override fun f() = Unit
         }
-        internal interface QCompanion: PCompanion {
+        internal interface QCompanionInterface: PCompanionInterface {
 
             override fun sf() = Unit
         }
@@ -1087,7 +1090,7 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         internal interface P {
         }
-        internal interface PCompanion {
+        internal interface PCompanionInterface {
 
             val x: Int
                 get() = 1
@@ -1255,8 +1258,9 @@ final class MemberDeclarationTests: XCTestCase {
             open fun f(a: Int) = Unit
             internal open fun f(b: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null) = Unit
 
-            companion object {
+            open class CompanionClass {
             }
+            companion object: CompanionClass()
         }
         """)
 
@@ -1433,31 +1437,19 @@ final class MemberDeclarationTests: XCTestCase {
         internal interface P1 {
             fun f(a: Int)
         }
-        internal interface P1Companion {
-        }
         internal interface P2 {
             fun f(a: Double)
-        }
-        internal interface P2Companion {
         }
         internal interface P3: P1, P2 {
             fun f(b: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null)
         }
-        internal interface P3Companion: P1Companion, P2Companion {
-        }
         internal open class A: P1 {
             override fun f(a: Int) = Unit
-
-            companion object: P1Companion {
-            }
         }
         internal open class B: P2, P3 {
             override fun f(a: Int) = Unit
             override fun f(a: Double) = Unit
             override fun f(b: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing?) = Unit
-
-            companion object: P2Companion, P3Companion {
-            }
         }
         """)
 
@@ -1640,14 +1632,15 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         internal interface P<T> {
         }
-        internal interface PCompanion<T> {
+        internal interface PCompanionInterface<T> {
             fun f(p: T)
         }
         internal open class C: P<Int> {
 
-            companion object: PCompanion<Int> {
+            open class CompanionClass: PCompanionInterface<Int> {
                 override fun f(p: Int) = Unit
             }
+            companion object: CompanionClass()
         }
         """)
 
@@ -1667,15 +1660,16 @@ final class MemberDeclarationTests: XCTestCase {
         internal interface P<T> {
             fun f(p: T)
         }
-        internal interface PCompanion<T> {
+        internal interface PCompanionInterface<T> {
             fun sf(p: Int)
         }
         internal open class C<T>: P<T> {
             override fun f(p: T) = Unit
 
-            companion object: PCompanion<Any> {
+            open class CompanionClass: PCompanionInterface<Any> {
                 override fun sf(p: Int) = Unit
             }
+            companion object: CompanionClass()
         }
         """)
 
@@ -2107,8 +2101,9 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         open class C<T, U> {
 
-            companion object {
+            open class CompanionClass {
             }
+            companion object: CompanionClass()
         }
 
         internal val <U> C<Int, U>.v: U? where U: P

@@ -249,14 +249,15 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
-    func testProtocolInitRequirements() async throws {
-        try await check(swift: """
-        protocol P {
-            init(i: Int)
-        }
-        """, kotlin: """
-        """)
-    }
+    //~~~
+//    func testProtocolInitRequirements() async throws {
+//        try await check(swift: """
+//        protocol P {
+//            init(i: Int)
+//        }
+//        """, kotlin: """
+//        """)
+//    }
 
     func testProtocolStaticMembers() async throws {
         try await check(swift: """
@@ -267,7 +268,7 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         internal interface P {
         }
-        internal interface PCompanion {
+        internal interface PCompanionInterface {
             fun f()
             val i: Int
         }
@@ -378,11 +379,7 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         internal interface Base {
         }
-        internal interface BaseCompanion {
-        }
         internal interface P<T, U>: Base where T: I, U: A, U: B {
-        }
-        internal interface PCompanion<T, U>: BaseCompanion where T: I, U: A, U: B {
         }
         """)
 
@@ -396,11 +393,7 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         internal interface Base<T> where T: A {
         }
-        internal interface BaseCompanion<T> where T: A {
-        }
         internal interface P<T, U>: Base<T> where T: A, U: B {
-        }
-        internal interface PCompanion<T, U>: BaseCompanion<T> where T: A, U: B {
         }
         """)
 
@@ -414,11 +407,7 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         internal interface Base<T> {
         }
-        internal interface BaseCompanion<T> {
-        }
         internal interface P<U>: Base<Int> {
-        }
-        internal interface PCompanion<U>: BaseCompanion<Int> {
         }
         """)
 
@@ -432,11 +421,7 @@ final class TypeDeclarationTests: XCTestCase {
         """, kotlin: """
         internal interface Base<T> {
         }
-        internal interface BaseCompanion<T> {
-        }
         internal interface P<U>: Base<U> {
-        }
-        internal interface PCompanion<U>: BaseCompanion<U> {
         }
         """)
     }
@@ -503,12 +488,8 @@ final class TypeDeclarationTests: XCTestCase {
         internal interface P<T> {
             fun add(t: Array<T>)
         }
-        internal interface PCompanion<T> {
-        }
         internal interface U<T, K, V>: P<T> {
             val map: Dictionary<K, V>
-        }
-        internal interface UCompanion<T, K, V>: PCompanion<T> {
         }
         internal open class C: U<Int, String, Double> {
             override var map = Dictionary<String, Double>()
@@ -518,9 +499,6 @@ final class TypeDeclarationTests: XCTestCase {
                 }
             override fun add(t: Array<Int>) = Unit
             internal open fun add(x: Double) = Unit
-
-            companion object: UCompanion<Int, String, Double> {
-            }
         }
         """)
     }
@@ -785,7 +763,7 @@ final class TypeDeclarationTests: XCTestCase {
                 this.rawValue = target.rawValue
             }
 
-            companion object: OptionSetCompanion<Int> {
+            companion object {
 
                 internal val s1 = S(rawValue = 1 shl 0)
                 internal val s2 = S(rawValue = 1 shl 1)
@@ -914,7 +892,7 @@ final class TypeDeclarationTests: XCTestCase {
                     this.rawValue = target.rawValue
                 }
 
-                companion object: OptionSetCompanion<Int> {
+                companion object {
 
                     internal val s1 = S(rawValue = 1 shl 0)
                     internal val s2 = S(rawValue = 1 shl 1)

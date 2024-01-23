@@ -62,10 +62,11 @@ final class ObservationTests: XCTestCase {
                 _e.track()
             }
 
-            companion object {
+            open class CompanionClass {
 
                 internal var s = 1
             }
+            companion object: CompanionClass()
         }
         """)
     }

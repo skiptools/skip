@@ -315,6 +315,16 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
+    /// The name of this type without package, outer types, generics, and optionals.
+    var unqualifiedName: String {
+        let name = self.name
+        if let dotIndex = name.lastIndex(of: ".") {
+            return String(name.suffix(from: name.index(after: dotIndex)))
+        } else {
+            return name
+        }
+    }
+
     /// The element type of this sequence.
     var elementType: TypeSignature {
         switch self {

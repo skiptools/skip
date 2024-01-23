@@ -579,8 +579,9 @@ open class C2_1 {
         open fun i2_f1() = Unit
         open fun i2_f2() = Unit
 
-        companion object {
+        open class CompanionClass {
         }
+        companion object: CompanionClass()
     }
     open class Inner2_2 {
         open var i2_3 = 1
@@ -588,8 +589,9 @@ open class C2_1 {
         open fun if2_3() = Unit
         open fun if2_4() = Unit
 
-        companion object {
+        open class CompanionClass {
         }
+        companion object: CompanionClass()
     }
 
     open var v2_5 = 1
@@ -597,8 +599,9 @@ open class C2_1 {
     open fun f2_5() = Unit
     open fun f2_6() = Unit
 
-    companion object {
+    open class CompanionClass {
     }
+    companion object: CompanionClass()
 }
 open class C2_2 {
     open var v2_4 = 1
@@ -611,8 +614,9 @@ open class C2_2 {
     open var v2_8 = 1
     open var v2_7 = 1
 
-    companion object {
+    open class CompanionClass {
     }
+    companion object: CompanionClass()
 }
 
 interface P2_1 {
@@ -621,15 +625,11 @@ interface P2_1 {
     val p2_1: Int
     val p2_2: Int
 }
-interface P2_1Companion {
-}
 interface P2_2 {
     val p2_3: Int
     val p2_4: Int
     fun p2_5() = Unit
     fun p2_6() = Unit
-}
-interface P2_2Companion {
 }
 
 package tmp.test
@@ -679,8 +679,9 @@ open class C1 {
         open fun if1() = Unit
         open fun if2() = Unit
 
-        companion object {
+        open class CompanionClass {
         }
+        companion object: CompanionClass()
     }
     open class Inner2 {
         open var i3 = 1
@@ -688,8 +689,9 @@ open class C1 {
         open fun if3() = Unit
         open fun if4() = Unit
 
-        companion object {
+        open class CompanionClass {
         }
+        companion object: CompanionClass()
     }
 
     open var v5 = 1
@@ -703,8 +705,9 @@ open class C1 {
     open var v1_3 = 1
     open var v1_4 = 1
 
-    companion object {
+    open class CompanionClass {
     }
+    companion object: CompanionClass()
 }
 open class C2 {
     open var v4 = 1
@@ -717,8 +720,9 @@ open class C2 {
     open var v8 = 1
     open var v7 = 1
 
-    companion object {
+    open class CompanionClass {
     }
+    companion object: CompanionClass()
 }
 
 interface P1 {
@@ -727,15 +731,11 @@ interface P1 {
     val p1: Int
     val p2: Int
 }
-interface P1Companion {
-}
 interface P2 {
     val p3: Int
     val p4: Int
     fun p5() = Unit
     fun p6() = Unit
-}
-interface P2Companion {
 }
 
 package tmp.test
@@ -779,8 +779,9 @@ open class C3_1 {
         open fun i3_f1() = Unit
         open fun i3_f2() = Unit
 
-        companion object {
+        open class CompanionClass {
         }
+        companion object: CompanionClass()
     }
     open class Inner3_2 {
         open var i3_3 = 1
@@ -788,8 +789,9 @@ open class C3_1 {
         open fun if3_3() = Unit
         open fun if3_4() = Unit
 
-        companion object {
+        open class CompanionClass {
         }
+        companion object: CompanionClass()
     }
 
     open var v3_5 = 1
@@ -797,8 +799,9 @@ open class C3_1 {
     open fun f3_5() = Unit
     open fun f3_6() = Unit
 
-    companion object {
+    open class CompanionClass {
     }
+    companion object: CompanionClass()
 }
 open class C3_2 {
     open var v3_4 = 1
@@ -811,8 +814,9 @@ open class C3_2 {
     open var v3_8 = 1
     open var v3_7 = 1
 
-    companion object {
+    open class CompanionClass {
     }
+    companion object: CompanionClass()
 }
 
 interface P3_1 {
@@ -821,15 +825,11 @@ interface P3_1 {
     val p3_1: Int
     val p3_2: Int
 }
-interface P3_1Companion {
-}
 interface P3_2 {
     val p3_3: Int
     val p3_4: Int
     fun p3_5() = Unit
     fun p3_6() = Unit
-}
-interface P3_2Companion {
 }
 """
 

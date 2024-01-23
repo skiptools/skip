@@ -220,11 +220,12 @@ final class TypeInferenceTests: XCTestCase {
             internal open fun returnEnum(): DuplicateE = DuplicateE.case1
             internal open fun instanceContext(): Boolean = returnEnum() == DuplicateE.case1
 
-            companion object {
+            open class CompanionClass {
                 internal fun returnEnum(): E = E.case1
 
                 internal fun staticContext(): Boolean = returnEnum() == E.case1
             }
+            companion object: CompanionClass()
         }
         """)
     }
@@ -839,10 +840,11 @@ final class TypeInferenceTests: XCTestCase {
             internal constructor(name: String) {
             }
 
-            companion object {
+            open class CompanionClass {
                 internal val c: C
                     get() = C(name = "c")
             }
+            companion object: CompanionClass()
         }
         """)
     }
@@ -1083,9 +1085,6 @@ final class TypeInferenceTests: XCTestCase {
 
             constructor(data: Int) {
                 this.data = data
-            }
-
-            companion object: PCompanion<Int> {
             }
         }
         internal fun f(p: P<*>): Unit = p.doSomething()

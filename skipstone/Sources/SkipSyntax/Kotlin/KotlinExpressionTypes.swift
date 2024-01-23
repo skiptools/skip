@@ -1842,7 +1842,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
         // Now that we've ruled out a type literal, any other non-Identifier must be represented by a KClass
         guard let identifier = expression as? Identifier else {
             let resolvedType = type.resolvingSelf(in: expression)
-            return (resolvedType, companionType(for: resolvedType, codebaseInfo: codebaseInfo))
+            return (resolvedType, codebaseInfo?.companionType(of: resolvedType) ?? .object)
         }
         guard identifier.name != "Self" && identifier.name != "self" else {
             return nil
@@ -1867,17 +1867,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
             return nil
         }
         let resolvedType = type.resolvingSelf(in: expression)
-        return (resolvedType, companionType(for: resolvedType, codebaseInfo: codebaseInfo))
-    }
-
-    private static func companionType(for type: TypeSignature, codebaseInfo: CodebaseInfo.Context?) -> KotlinCompanionType {
-        if let companionClass = codebaseInfo?.companionClass(of: type) {
-            return .class(companionClass)
-        } else if let companionInterface = codebaseInfo?.companionInterface(of: type) {
-            return .interface(companionInterface)
-        } else {
-            return .object
-        }
+        return (resolvedType, codebaseInfo.companionType(of: resolvedType))
     }
 
     init(base: KotlinExpression, member: String) {
@@ -2050,7 +2040,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
                     output.append(companionClass.kotlin)
                 case .interface(let companionInterface):
                     output.append(companionInterface.withGenerics(baseKClass.0.generics).kotlin)
-                case .object:
+                case .object, .none:
                     output.append(baseKClass.0.withGenerics([]).kotlin).append(".Companion")
                 }
                 output.append(")")

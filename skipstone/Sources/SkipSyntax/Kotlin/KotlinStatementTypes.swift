@@ -924,8 +924,8 @@ class KotlinClassDeclaration: KotlinStatement {
     var name: String
     var signature: TypeSignature
     var inherits: [TypeSignature] = []
-    var companionClass: TypeSignature?
-    var companionInherits: [TypeSignature] = []
+    var companionType: KotlinCompanionType? = nil
+    var companionInherits: [KotlinCompanionType] = []
     var superclassCall: String?
     var annotations: [String] = []
     var attributes = Attributes()
@@ -987,9 +987,17 @@ class KotlinClassDeclaration: KotlinStatement {
                 kstatement.movedExtensionImportModulePaths += extImportModulePaths
             }
 
-            kstatement.companionClass = codebaseInfo.companionClass(of: statement.signature)
-            //~~~ need to check if the first one is a companion class
-            kstatement.companionInherits = kstatement.inherits.compactMap { codebaseInfo.companionInterface(of: $0)?.constrainedTypeWithGenerics(kstatement.generics) }
+            kstatement.companionType = codebaseInfo.companionType(of: statement.signature)
+            kstatement.companionInherits = kstatement.inherits.compactMap {
+                switch codebaseInfo.companionType(of: $0) {
+                case .none, .object:
+                    return nil
+                case .class(let signature):
+                    return .class(signature)
+                case .interface(let signature):
+                    return .interface(signature.constrainedTypeWithGenerics(kstatement.generics))
+                }
+            }
         }
         kstatement.members = kmembers
         if statement.type == .enumDeclaration {
@@ -1176,25 +1184,56 @@ class KotlinClassDeclaration: KotlinStatement {
             output.append(memberIndentation).append("private var \(suppressSideEffectsPropertyName) = false\n")
         }
 
-        // Always add a companion object to public types in case another module extends it with static members
-        if !staticMembers.isEmpty || modifiers.visibility == .public || modifiers.visibility == .open || isSealedClassesEnum || !companionInherits.isEmpty {
-            output.append("\n")
-            output.append(memberIndentation).append("companion object")
-            if !companionInherits.isEmpty {
-                output.append(": \(companionInherits.map(\.kotlin).joined(separator: ", "))")
+        let needsCompanion = !staticMembers.isEmpty || modifiers.visibility == .public || modifiers.visibility == .open || isSealedClassesEnum
+        let effectiveCompanionType: KotlinCompanionType
+        if let companionType {
+            if case .none = companionType, needsCompanion {
+                effectiveCompanionType = .object
+            } else {
+                effectiveCompanionType = companionType
             }
-            output.append(" {\n")
-            let companionMemberIndentation = memberIndentation.inc()
-            if isSealedClassesEnum {
-                enumCases.forEach { $0.appendSealedClassFactory(to: output, forEnum: name, alwaysCreateNewInstances: alwaysCreateNewSealedClassInstances, indentation: companionMemberIndentation) }
-                if !staticMembers.isEmpty {
-                    output.append("\n")
-                }
-            }
-            staticMembers.forEach { output.append($0, indentation: companionMemberIndentation) }
-            output.append(memberIndentation).append("}\n")
+        } else if needsCompanion {
+            effectiveCompanionType = .object
+        } else {
+            effectiveCompanionType = .none
         }
+        appendCompanion(to: output, indentation: memberIndentation, type: effectiveCompanionType, staticMembers: staticMembers, enumCases: enumCases)
         output.append(indentation).append("}\n")
+    }
+
+    private func appendCompanion(to output: OutputGenerator, indentation: Indentation, type: KotlinCompanionType, staticMembers: [KotlinStatement], enumCases: [KotlinEnumCaseDeclaration]) {
+        if case .none = type {
+            return
+        }
+        output.append("\n")
+        output.append(indentation)
+        if case .class(let signature) = type {
+            output.append("open class ").append(signature.unqualifiedName)
+        } else {
+            output.append("companion object")
+        }
+        for i in 0..<companionInherits.count {
+            output.append(i == 0 ? ": " : ", ")
+            if case .class(let signature) = companionInherits[i] {
+                output.append(signature.kotlin).append("()")
+            } else if case .interface(let signature) = companionInherits[i] {
+                output.append(signature.kotlin)
+            }
+        }
+        output.append(" {\n")
+        let memberIndentation = indentation.inc()
+        if isSealedClassesEnum {
+            enumCases.forEach { $0.appendSealedClassFactory(to: output, forEnum: name, alwaysCreateNewInstances: alwaysCreateNewSealedClassInstances, indentation: memberIndentation) }
+            if !staticMembers.isEmpty {
+                output.append("\n")
+            }
+        }
+        staticMembers.forEach { output.append($0, indentation: memberIndentation) }
+        output.append(indentation).append("}\n")
+
+        if case .class(let signature) = type {
+            output.append(indentation).append("companion object: ").append(signature.unqualifiedName).append("()\n")
+        }
     }
 }
 
@@ -1426,7 +1465,10 @@ struct KotlinExtensionDeclaration {
     }
 
     static func translateExtensionMembers(_ members: [Statement], of extends: TypeSignature, visibility: Modifiers.Visibility, generics: Generics, declarationType: StatementType?, translator: KotlinTranslator, extensionPlacement: KotlinExtensionPlacement? = nil) -> [KotlinStatement] {
-        let canAddStaticMembers = declarationType != .protocolDeclaration || extensionPlacement?.isInModule != false || translator.codebaseInfo == nil || translator.codebaseInfo?.companionInterface(of: extends) != nil
+        var canAddStaticMembers = declarationType != .protocolDeclaration || extensionPlacement?.isInModule != false || translator.codebaseInfo == nil
+        if !canAddStaticMembers, case .interface = translator.codebaseInfo!.companionType(of: extends) {
+            canAddStaticMembers = true
+        }
         var kstatements: [KotlinStatement] = []
         for member in members {
             if let extensionPlacement, !extensionPlacement.canMove {
@@ -2139,7 +2181,9 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
             return [kstatement]
         }
-        kstatement.companionInterface = codebaseInfo.companionInterface(of: statement.signature)
+        if case .interface(let signature) = codebaseInfo.companionType(of: statement.signature) {
+            kstatement.companionInterface = signature
+        }
 
         if let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: statement.signature) {
             // Type info contains full resolved generics
@@ -2174,7 +2218,13 @@ class KotlinInterfaceDeclaration: KotlinStatement {
 
         // Kotlin interfaces cannot extend Any
         kstatement.inherits = kstatement.inherits.filter { $0 != .any && $0 != .anyObject }
-        kstatement.companionInherits = kstatement.inherits.compactMap { codebaseInfo.companionInterface(of: $0) }
+        kstatement.companionInherits = kstatement.inherits.compactMap {
+            return if case .interface(let signature) = codebaseInfo.companionType(of: $0) {
+                signature
+            } else {
+                nil
+            }
+        }
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
 
         let kextensionMembers = KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, generics: kstatement.generics, declarationType: .protocolDeclaration, translator: translator)
@@ -2266,20 +2316,24 @@ class KotlinInterfaceDeclaration: KotlinStatement {
             }
         }
         output.append(indentation).append("}\n")
+        appendCompanion(to: output, indentation: indentation, staticMembers: staticMembers)
+    }
 
-        // Always add a companion interface to public types in case another module extends it with static members
-        if let companionInterface {
-            output.append(indentation)
-            output.append(visibilityDeclaration).append("interface ").append(companionInterface.name)
-            generics.append(to: output, indentation: indentation)
-            if !companionInherits.isEmpty {
-                output.append(": ").append(companionInherits.map(\.kotlin).joined(separator: ", "))
-            }
-            generics.appendWhere(to: output, indentation: indentation)
-            output.append(" {\n")
-            staticMembers.forEach { output.append($0, indentation: memberIndentation) }
-            output.append(indentation).append("}\n")
+    private func appendCompanion(to output: OutputGenerator, indentation: Indentation, staticMembers: [KotlinStatement]) {
+        guard let companionInterface else {
+            return
         }
+        output.append(indentation)
+        output.append(visibilityDeclaration).append("interface ").append(companionInterface.unqualifiedName)
+        generics.append(to: output, indentation: indentation)
+        if !companionInherits.isEmpty {
+            output.append(": ").append(companionInherits.map(\.kotlin).joined(separator: ", "))
+        }
+        generics.appendWhere(to: output, indentation: indentation)
+        output.append(" {\n")
+        let memberIndentation = indentation.inc()
+        staticMembers.forEach { output.append($0, indentation: memberIndentation) }
+        output.append(indentation).append("}\n")
     }
 
     private var visibilityDeclaration: String {

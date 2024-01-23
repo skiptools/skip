@@ -19,6 +19,7 @@ struct KotlinBindingVariable {
 }
 
 enum KotlinCompanionType {
+    case none
     case object
     case `class`(TypeSignature)
     case interface(TypeSignature)

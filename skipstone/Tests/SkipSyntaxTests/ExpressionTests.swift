@@ -14,12 +14,13 @@ final class ExpressionTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-        
+
             internal open fun f(): Int = Companion.staticf()
 
-            companion object {
+            open class CompanionClass {
                 internal fun staticf(): Int = 10
             }
+            companion object: CompanionClass()
         }
         """)
 
@@ -101,21 +102,21 @@ final class ExpressionTests: XCTestCase {
 
         internal interface P {
         }
-        internal interface PCompanion {
+        internal interface PCompanionInterface {
             val i: Int
             fun f()
         }
         internal interface Q: P {
         }
-        internal interface QCompanion: PCompanion {
+        internal interface QCompanionInterface: PCompanionInterface {
         }
         internal fun <T> g(ptype: KClass<T>) where T: P {
-            val i = (ptype.companionObjectInstance as PCompanion).i
-            (ptype.companionObjectInstance as PCompanion).f()
+            val i = (ptype.companionObjectInstance as PCompanionInterface).i
+            (ptype.companionObjectInstance as PCompanionInterface).f()
         }
         internal fun <T> h(p: T, q: Q) where T: P {
-            val i = (type(of = p).companionObjectInstance as PCompanion).i
-            (type(of = q).companionObjectInstance as QCompanion).f()
+            val i = (type(of = p).companionObjectInstance as PCompanionInterface).i
+            (type(of = q).companionObjectInstance as QCompanionInterface).f()
         }
         """)
     }
@@ -146,11 +147,12 @@ final class ExpressionTests: XCTestCase {
 
         internal open class C {
 
-            companion object {
+            open class CompanionClass {
                 internal val typeVar = C::class
 
                 internal fun staticFunc() = Unit
             }
+            companion object: CompanionClass()
         }
         internal typealias X = C
 
@@ -159,7 +161,7 @@ final class ExpressionTests: XCTestCase {
             g(c = C.typeVar)
             C.staticFunc()
             C.staticFunc()
-            (C.typeVar.companionObjectInstance as C.Companion).staticFunc()
+            (C.typeVar.companionObjectInstance as C.CompanionClass).staticFunc()
         }
 
         internal fun g(c: KClass<C>) = Unit
@@ -179,9 +181,10 @@ final class ExpressionTests: XCTestCase {
             open class Bar {
                 open class Baz {
 
-                    companion object {
+                    open class CompanionClass {
                         val prop = "ABC"
                     }
+                    companion object: CompanionClass()
                 }
             }
         }
@@ -205,9 +208,10 @@ final class ExpressionTests: XCTestCase {
             internal open class B {
                 internal open class C {
 
-                    companion object {
+                    open class CompanionClass {
                         internal var a = 100
                     }
+                    companion object: CompanionClass()
                 }
             }
             internal open fun f() {

@@ -446,9 +446,10 @@ final class ConstructorDestructorTests: XCTestCase {
                 print("double")
             }
 
-            companion object {
+            open class CompanionClass {
                 internal val s = 100
             }
+            companion object: CompanionClass()
         }
         """)
 

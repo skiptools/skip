@@ -6,67 +6,71 @@ final class AttributeAndModifierTests: XCTestCase {
         try await check(swift: """
         class A {
         }
-        open class A {
+        open class B {
         }
-        public class A {
+        public class C {
         }
-        internal class A {
+        internal class D {
         }
-        fileprivate class A {
+        fileprivate class E {
         }
-        private class A {
+        private class F {
         }
         """, kotlin: """
         internal open class A {
         }
-        open class A {
+        open class B {
 
-            companion object {
+            open class CompanionClass {
             }
+            companion object: CompanionClass()
         }
-        open class A {
+        open class C {
 
-            companion object {
+            open class CompanionClass {
             }
+            companion object: CompanionClass()
         }
-        internal open class A {
+        internal open class D {
         }
-        private open class A {
+        private open class E {
         }
-        private open class A {
+        private open class F {
         }
         """)
 
         try await check(swift: """
         class A {
-            open class A {
+            open class B {
             }
-            public class A {
+            public class C {
             }
-            internal class A {
+            internal class D {
             }
-            fileprivate class A {
+            fileprivate class E {
             }
-            private class A {
+            private class F {
             }
         }
         """, kotlin: """
         internal open class A {
-            open class A {
+            open class B {
 
-                companion object {
+                open class CompanionClass {
                 }
+                companion object: CompanionClass()
             }
-            open class A {
+            open class C {
 
-                companion object {
+                open class CompanionClass {
                 }
+                companion object: CompanionClass()
             }
-            internal open class A {
+            internal open class D {
             }
-            internal open class A {
+            internal open class E {
             }
-            private open class A {
+            private open class F {
             }
         }
         """)

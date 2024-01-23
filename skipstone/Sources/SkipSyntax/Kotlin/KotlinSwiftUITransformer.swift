@@ -162,7 +162,7 @@ private class TranslateVisitor {
         defaultValueDeclaration.modifiers.isOverride = true
         defaultValueDeclaration.modifiers.visibility = .public
         classDeclaration.inherits[environmentKeyIndex] = .named("EnvironmentKey", [defaultValueDeclaration.propertyType])
-        classDeclaration.companionInherits.append(.named("EnvironmentKeyCompanion", [defaultValueDeclaration.propertyType]))
+        classDeclaration.companionInherits.append(.interface(.named("EnvironmentKeyCompanion", [defaultValueDeclaration.propertyType])))
     }
 
     private func translateConstructorDeclaration(_ functionDeclaration: KotlinFunctionDeclaration) {

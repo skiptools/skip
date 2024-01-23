@@ -191,41 +191,58 @@ extension CodebaseInfo.Context {
         return items.contains { $0.declarationType == .functionDeclaration && $0.declaringType?.name == owningType?.name }
     }
 
-    //~~~ Change to single function that returns KotlinCompanionType
-
-    /// If the given class has a companion object class, return it.
-    func companionClass(of cls: TypeSignature) -> TypeSignature? {
-        guard let primaryTypeInfo = primaryTypeInfo(forNamed: cls) else {
-            return nil
+    /// The companion object type of the given type.
+    func companionType(of type: TypeSignature) -> KotlinCompanionType {
+        let typeInfos = typeInfos(forNamed: type)
+        if let classInfo = typeInfos.first(where: { $0.declarationType == .classDeclaration }) {
+            // Classes that need companion objects:
+            // - Is public/open (so that static extensions from other modules work)
+            // - Has static members
+            // Classes that need companion classes:
+            // - Is non-final and has a companion object
+            // - Is non-final and extends a class with a companion class (so additional subclasses know what to extend)
+            let hasCompanion = classInfo.modifiers.visibility == .public || classInfo.modifiers.visibility == .open || hasStaticMembers(typeInfos: typeInfos)
+            guard !classInfo.modifiers.isFinal else {
+                return hasCompanion ? .object : .none
+            }
+            guard !hasCompanion else {
+                return .class(.member(type, .named("CompanionClass", [])))
+            }
+            if let firstInherits = classInfo.inherits.first, case .class = companionType(of: firstInherits) {
+                return .class(.member(type, .named("CompanionClass", [])))
+            } else {
+                return .none
+            }
+        } else if let interfaceInfo = typeInfos.first(where: { $0.declarationType == .protocolDeclaration }) {
+            // Protocols that need companion interfaces:
+            // - Has static members
+            // - Has initializer members
+            // - Extends a protocol with a companion interface
+            guard !hasStaticMembers(typeInfos: typeInfos, includeInits: true) else {
+                return .interface(.named(type.name + "CompanionInterface", type.generics))
+            }
+            for inherit in interfaceInfo.inherits {
+                if case .interface = companionType(of: inherit) {
+                    return .interface(.named(type.name + "CompanionInterface", type.generics))
+                }
+            }
+            return .none
+        } else if let typeInfo = typeInfos.first(where: { $0.declarationType == .actorDeclaration || $0.declarationType == .enumDeclaration || $0.declarationType == .structDeclaration }) {
+            let hasCompanion = typeInfo.modifiers.visibility == .public || typeInfo.modifiers.visibility == .open || hasStaticMembers(typeInfos: typeInfos)
+            return hasCompanion ? .object : .none
+        } else {
+            // Unknown: default to object
+            return .object
         }
-        // Use a companion class for any non-final class so that subclasses can inherit their static members by
-        // subclassing the companion class in their own companion object
-        guard primaryTypeInfo.declarationType == .classDeclaration, !primaryTypeInfo.modifiers.isFinal else {
-            return nil
-        }
-        //~~~ need a companion class if it extends something with a companion class
-        guard primaryTypeInfo.modifiers.visibility == .public || primaryTypeInfo.modifiers.visibility == .open ||
-        return TypeSignature.named(cls.name + "CompanionClass", [])
     }
 
-    /// If the given interface has a companion object interface, return it.
-    func companionInterface(of interface: TypeSignature) -> TypeSignature? {
-        let typeInfos = typeInfos(forNamed: interface)
-        guard let primaryTypeInfo = typeInfos.first(where: { $0.declarationType == .protocolDeclaration }) else {
-            return nil
-        }
-        // Use a companion interface for any protocol that has static or init members, or that inherits from
-        // a protocol with static or init members
-        let companionInterface: TypeSignature = .named(interface.name + "CompanionInterface", interface.generics)
-        if typeInfos.contains(where: { $0.members.contains(where: { $0.declarationType == .initDeclaration || ($0.declarationType == .variableDeclaration && $0.isStatic) || ($0.declarationType == .functionDeclaration && $0.isStatic) }) }) {
-            return companionInterface
-        }
-        for inherit in primaryTypeInfo.inherits {
-            if self.companionInterface(of: inherit) != nil {
-                return companionInterface
+    private func hasStaticMembers(typeInfos: [CodebaseInfo.TypeInfo], includeInits: Bool = false) -> Bool {
+        return typeInfos.contains { typeInfo in
+            typeInfo.members.contains { member in
+                (includeInits && member.declarationType == .initDeclaration)
+                || (member.isStatic && (member.declarationType == .variableDeclaration || (member.declarationType == .functionDeclaration && member.name != "==" && member.name != "<")))
             }
         }
-        return nil
     }
 }
 

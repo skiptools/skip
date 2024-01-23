@@ -25,10 +25,11 @@ final class TransformerTests: XCTestCase {
             @Test
             internal open fun testSomeOtherTest() = Unit
 
-            companion object {
+            open class CompanionClass {
 
                 internal fun testDoNotTestStatic() = Unit
             }
+            companion object: CompanionClass()
         }
         """)
     }

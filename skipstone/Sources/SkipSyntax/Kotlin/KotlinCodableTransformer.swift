@@ -246,7 +246,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
     }
 
     private func synthesizeDecodableCompanion(for classDeclaration: KotlinClassDeclaration) {
-        classDeclaration.companionInherits.append(.named("DecodableCompanion", [classDeclaration.signature]))
+        classDeclaration.companionInherits.append(.interface(.named("DecodableCompanion", [classDeclaration.signature])))
 
         let factory = KotlinFunctionDeclaration(name: "init")
         factory.modifiers.isStatic = true
