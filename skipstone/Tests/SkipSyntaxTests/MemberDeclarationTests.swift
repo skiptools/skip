@@ -826,28 +826,17 @@ final class MemberDeclarationTests: XCTestCase {
         protocol P {
             var i: Int { get }
             func f()
-            static var si: Int { get }
-            static func sf()
         }
         """, swift: """
         class PImpl: P {
             var i = 0
             func f() {
             }
-            static var si = 0
-            static func sf() {
-            }
         }
         """, kotlin: """
         internal open class PImpl: P {
             override var i = 0
             override fun f() = Unit
-
-            open class CompanionClass: PCompanionInterface {
-                override var si = 0
-                override fun sf() = Unit
-            }
-            companion object: CompanionClass()
         }
         """)
 
@@ -911,7 +900,7 @@ final class MemberDeclarationTests: XCTestCase {
             val i: Int
             fun f()
         }
-        internal interface PCompanionInterface {
+        internal interface PCompanion {
             fun sf()
         }
         internal interface Q: P {
@@ -921,7 +910,7 @@ final class MemberDeclarationTests: XCTestCase {
 
             override fun f() = Unit
         }
-        internal interface QCompanionInterface: PCompanionInterface {
+        internal interface QCompanion: PCompanion {
 
             override fun sf() = Unit
         }
@@ -942,7 +931,7 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         internal interface P {
         }
-        internal interface PCompanionInterface {
+        internal interface PCompanion {
 
             val x: Int
                 get() = 1

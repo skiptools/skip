@@ -926,9 +926,16 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExp
             (kfunction as? KotlinIdentifier)?.isTypealiasFor = .none
             (kfunction as? KotlinMemberAccess)?.isTypealiasFor = .none
         }
-        // Give Optional function names the 'optional' prefix to avoid conflicts with other API, e.g. T?.optionalmap(...)
-        if expression.isCallOnOptional, let memberAccess = kexpression.function as? KotlinMemberAccess, !memberAccess.member.hasPrefix("optional") {
-            memberAccess.member = "optional" + memberAccess.member
+        if let memberAccess = kexpression.function as? KotlinMemberAccess {
+            // Give Optional function names the 'optional' prefix to avoid conflicts with other API, e.g. T?.optionalmap(...)
+            if expression.isCallOnOptional, !memberAccess.member.hasPrefix("optional") {
+                memberAccess.member = "optional" + memberAccess.member
+            }
+            // Warn if the user is invoking init on a protocol companion without casting the result, because the typical pattern is
+            // to use a generic type, but the resulting Kotlin will return an instance of the protocol instead
+            if memberAccess.baseKClass != nil, memberAccess.member == "init", (expression.parent as? BinaryOperator)?.op.precedence != .cast {
+                kexpression.messages.append(.kotlinConstructorCastStaticInitResult(kexpression, source: translator.syntaxTree.source))
+            }
         }
         return kexpression
     }
@@ -2051,7 +2058,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
             if member == "self" {
                 // Must be Type.self
                 output.append("::class")
-            } else if member != "init" {
+            } else if member != "init" || baseKClass != nil {
                 if isFunctionReference {
                     // To refer to a function rather than call it, Kotlin uses ::
                     output.append("::")

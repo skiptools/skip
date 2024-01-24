@@ -203,7 +203,7 @@ final class StaticTests: XCTestCase {
         """, kotlin: """
         internal interface P {
         }
-        internal interface PCompanionInterface {
+        internal interface PCompanion {
             fun f()
             val i: Int
         }
@@ -232,27 +232,50 @@ final class StaticTests: XCTestCase {
         """, kotlin: """
         internal interface P {
         }
-        internal interface PCompanionInterface {
+        internal interface PCompanion {
             fun f()
             val i: Int
         }
         internal interface Q: P {
         }
-        internal interface QCompanionInterface: PCompanionInterface {
+        internal interface QCompanion: PCompanion {
         }
         internal interface R: P {
         }
-        internal interface RCompanionInterface: PCompanionInterface {
+        internal interface RCompanion: PCompanion {
             fun g()
         }
 
         internal class S: R {
 
-            companion object: RCompanionInterface {
+            companion object: RCompanion {
                 override fun f() = Unit
                 override val i = 10
                 override fun g() = Unit
             }
+        }
+        """)
+    }
+
+    func testProtocolStaticRequirementOverride() async throws {
+        try await check(supportingSwift: """
+        protocol P {
+            static var si: Int { get }
+            static func sf()
+        }
+        """, swift: """
+        class PImpl: P {
+            static var si = 0
+            static func sf() {
+        }
+        """, kotlin: """
+        internal open class PImpl: P {
+
+            open class CompanionClass: PCompanion {
+                override var si = 0
+                override fun sf() = Unit
+            }
+            companion object: CompanionClass()
         }
         """)
     }
@@ -274,19 +297,19 @@ final class StaticTests: XCTestCase {
         """, kotlin: """
         internal interface P<T> {
         }
-        internal interface PCompanionInterface<T> {
+        internal interface PCompanion<T> {
             fun f(p: T)
         }
         internal open class C: P<Int> {
 
-            open class CompanionClass: PCompanionInterface<Int> {
+            open class CompanionClass: PCompanion<Int> {
                 override fun f(p: Int) = Unit
             }
             companion object: CompanionClass()
         }
         internal class S: P<Int> {
 
-            companion object: PCompanionInterface<Int> {
+            companion object: PCompanion<Int> {
                 override fun f(p: Int) = Unit
             }
         }
@@ -314,13 +337,13 @@ final class StaticTests: XCTestCase {
         internal interface P<T> {
             fun f(p: T)
         }
-        internal interface PCompanionInterface<T> {
+        internal interface PCompanion<T> {
             fun sf(p: Int)
         }
         internal open class C<T>: P<T> {
             override fun f(p: T) = Unit
 
-            open class CompanionClass: PCompanionInterface<Any> {
+            open class CompanionClass: PCompanion<Any> {
                 override fun sf(p: Int) = Unit
             }
             companion object: CompanionClass()
@@ -328,7 +351,7 @@ final class StaticTests: XCTestCase {
         internal class S<T>: P<T> {
             override fun f(p: T) = Unit
 
-            companion object: PCompanionInterface<Any> {
+            companion object: PCompanion<Any> {
                 override fun sf(p: Int) = Unit
             }
         }
@@ -344,6 +367,310 @@ final class StaticTests: XCTestCase {
             func f(p: T) {
             }
             static func sf(p: T) {
+            }
+        }
+        """)
+    }
+
+    func testProtocolInitRequirements() async throws {
+        try await check(swift: """
+        protocol P {
+            init(i: Int)
+        }
+        """, kotlin: """
+        internal interface P {
+        }
+        internal interface PCompanion {
+            fun init(i: Int): P
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        protocol P {
+            init(i: Int)
+        }
+        extension P {
+            init(x: Double) {
+                self.init(i: Int(x))
+            }
+        }
+        """)
+
+        try await check(swift: """
+        protocol P {
+            init(i: Int)
+        }
+        class A: P {
+            let i: Int
+            init(i: Int) {
+                self.i = i
+            }
+        }
+        class B: A {
+        }
+        """, kotlin: """
+        internal interface P {
+        }
+        internal interface PCompanion {
+            fun init(i: Int): P
+        }
+        internal open class A: P {
+            internal val i: Int
+            internal constructor(i: Int) {
+                this.i = i
+            }
+
+            open class CompanionClass: PCompanion {
+                override fun init(i: Int): A {
+                    return A(i = i)
+                }
+            }
+            companion object: CompanionClass()
+        }
+        internal open class B: A {
+
+            internal constructor(i: Int): super(i) {
+            }
+
+            open class CompanionClass: A.CompanionClass() {
+                override fun init(i: Int): B {
+                    return B(i = i)
+                }
+            }
+            companion object: CompanionClass()
+        }
+        """)
+    }
+
+    func testGenericProtocolInitRequirements() async throws {
+        try await check(swift: """
+        protocol P {
+            associatedtype T
+            init(p: T)
+        }
+        protocol Q: P {
+        }
+        struct S: Q {
+            let i: Int
+            init(p: Int) {
+                self.i = p
+            }
+        }
+        """, kotlin: """
+        internal interface P<T> {
+        }
+        internal interface PCompanion<T> {
+            fun init(p: T): P<T>
+        }
+        internal interface Q<T>: P<T> {
+        }
+        internal interface QCompanion<T>: PCompanion<T> {
+        }
+        internal class S: Q<Int> {
+            internal val i: Int
+            internal constructor(p: Int) {
+                this.i = p
+            }
+
+            companion object: QCompanion<Int> {
+                override fun init(p: Int): S {
+                    return S(p = p)
+                }
+            }
+        }
+        """)
+    }
+
+    func testProtocolInitRequirementsGenericType() async throws {
+        try await checkProducesMessage(swift: """
+        protocol P {
+            associatedtype T
+            init(p: T)
+        }
+        struct S<I>: P {
+            let i: I
+            init(p: I) {
+                self.i = p
+            }
+        }
+        """)
+    }
+
+    func testStaticProtocolMember() async throws {
+        try await check(supportingSwift: """
+        func type<T>(of: T) -> T.Type {
+        }
+        """, swift: """
+        protocol P {
+            static var i: Int { get }
+            static func f()
+        }
+        protocol Q: P {
+        }
+        func g<T>(ptype: T.Type) where T: P {
+            let i = ptype.i
+            ptype.f()
+        }
+        func h<T>(p: T, q: any Q) where T: P {
+            let i = type(of: p).i
+            type(of: q).f()
+        }
+        """, kotlin: """
+        import kotlin.reflect.KClass
+        import kotlin.reflect.full.companionObjectInstance
+
+        internal interface P {
+        }
+        internal interface PCompanion {
+            val i: Int
+            fun f()
+        }
+        internal interface Q: P {
+        }
+        internal interface QCompanion: PCompanion {
+        }
+        internal fun <T> g(ptype: KClass<T>) where T: P {
+            val i = (ptype.companionObjectInstance as PCompanion).i
+            (ptype.companionObjectInstance as PCompanion).f()
+        }
+        internal fun <T> h(p: T, q: Q) where T: P {
+            val i = (type(of = p).companionObjectInstance as PCompanion).i
+            (type(of = q).companionObjectInstance as QCompanion).f()
+        }
+        """)
+    }
+
+    func testInitProtocolMember() async throws {
+        try await check(swift: """
+        protocol P {
+            init(i: Int)
+        }
+        protocol Q: P {
+        }
+        func f<T>(type: T.Type) -> T where T: Q {
+            return type.init(i: 100) as T
+        }
+        """, kotlin: """
+        import kotlin.reflect.KClass
+        import kotlin.reflect.full.companionObjectInstance
+
+        internal interface P {
+        }
+        internal interface PCompanion {
+            fun init(i: Int): P
+        }
+        internal interface Q: P {
+        }
+        internal interface QCompanion: PCompanion {
+        }
+        internal fun <T> f(type: KClass<T>): T where T: Q = ((type.companionObjectInstance as QCompanion).init(i = 100) as T).sref()
+        """)
+
+        try await checkProducesMessage(swift: """
+        protocol P {
+            init(i: Int)
+        }
+        func f<T>(type: T.Type) -> T where T: P {
+            return type.init(i: 100)
+        }
+        """)
+    }
+
+    func testStaticMemberUsingClassReference() async throws {
+        try await check(swift: """
+        class C {
+            static let typeVar = C.self
+
+            static func staticFunc() {
+            }
+        }
+        typealias X = C
+
+        func f() {
+            g(c: C.self)
+            g(c: C.typeVar)
+            C.staticFunc()
+            X.staticFunc()
+            C.typeVar.staticFunc()
+        }
+
+        func g(c: C.Type) {
+        }
+        """, kotlin: """
+        import kotlin.reflect.KClass
+        import kotlin.reflect.full.companionObjectInstance
+
+        internal open class C {
+
+            open class CompanionClass {
+                internal val typeVar = C::class
+
+                internal fun staticFunc() = Unit
+            }
+            companion object: CompanionClass()
+        }
+        internal typealias X = C
+
+        internal fun f() {
+            g(c = C::class)
+            g(c = C.typeVar)
+            C.staticFunc()
+            C.staticFunc()
+            (C.typeVar.companionObjectInstance as C.CompanionClass).staticFunc()
+        }
+
+        internal fun g(c: KClass<C>) = Unit
+        """)
+
+        try await check(compiler: nil, swiftCode: {
+            class Foo {
+                class Bar {
+                    class Baz {
+                        static let prop = "ABC"
+                    }
+                }
+            }
+            return Foo.Bar.Baz.prop
+        }, kotlin: """
+        open class Foo {
+            open class Bar {
+                open class Baz {
+
+                    open class CompanionClass {
+                        val prop = "ABC"
+                    }
+                    companion object: CompanionClass()
+                }
+            }
+        }
+        return Foo.Bar.Baz.prop
+        """)
+
+        // Test nested type that is not fully qualified
+        try await check(swift: """
+        class A {
+            class B {
+                class C {
+                    static var a = 100
+                }
+            }
+            func f() {
+                let x = B.C.a
+            }
+        }
+        """, kotlin: """
+        internal open class A {
+            internal open class B {
+                internal open class C {
+
+                    open class CompanionClass {
+                        internal var a = 100
+                    }
+                    companion object: CompanionClass()
+                }
+            }
+            internal open fun f() {
+                val x = B.C.a
             }
         }
         """)

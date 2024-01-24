@@ -198,42 +198,65 @@ extension CodebaseInfo.Context {
             // Classes that need companion objects:
             // - Is public/open (so that static extensions from other modules work)
             // - Has static members
+            // - Extends a type with a companion class or companion interface
             // Classes that need companion classes:
             // - Is non-final and has a companion object
-            // - Is non-final and extends a class with a companion class (so additional subclasses know what to extend)
-            let hasCompanion = classInfo.modifiers.visibility == .public || classInfo.modifiers.visibility == .open || hasStaticMembers(typeInfos: typeInfos)
-            guard !classInfo.modifiers.isFinal else {
-                return hasCompanion ? .object : .none
-            }
-            guard !hasCompanion else {
-                return .class(.member(type.withGenerics([]), .named("CompanionClass", [])))
-            }
-            if let firstInherits = classInfo.inherits.first, case .class = companionType(of: firstInherits) {
-                return .class(.member(type.withGenerics([]), .named("CompanionClass", [])))
-            } else {
+            let hasCompanion = classInfo.modifiers.visibility == .public || classInfo.modifiers.visibility == .open || hasStaticMembers(typeInfos: typeInfos) || hasCompanionInherits(classInfo.inherits)
+            guard hasCompanion else {
                 return .none
             }
+            guard !classInfo.modifiers.isFinal else {
+                return .object
+            }
+            return .class(.member(type.withGenerics([]), .named("CompanionClass", [])))
         } else if let interfaceInfo = typeInfos.first(where: { $0.declarationType == .protocolDeclaration }) {
             // Protocols that need companion interfaces:
             // - Has static members
             // - Has initializer members
             // - Extends a protocol with a companion interface
-            guard !hasStaticMembers(typeInfos: typeInfos, includeInits: true) else {
-                return .interface(.named(type.name + "CompanionInterface", type.generics))
+            guard hasStaticMembers(typeInfos: typeInfos, includeInits: true) || hasCompanionInherits(interfaceInfo.inherits) else {
+                return .none
             }
-            for inherit in interfaceInfo.inherits {
-                if case .interface = companionType(of: inherit) {
-                    return .interface(.named(type.name + "CompanionInterface", type.generics))
-                }
-            }
-            return .none
+            return .interface(.named(type.name + "Companion", type.generics))
         } else if let typeInfo = typeInfos.first(where: { $0.declarationType == .actorDeclaration || $0.declarationType == .enumDeclaration || $0.declarationType == .structDeclaration }) {
-            let hasCompanion = typeInfo.modifiers.visibility == .public || typeInfo.modifiers.visibility == .open || hasStaticMembers(typeInfos: typeInfos)
+            let hasCompanion = typeInfo.modifiers.visibility == .public || typeInfo.modifiers.visibility == .open || hasStaticMembers(typeInfos: typeInfos) || hasCompanionInherits(typeInfo.inherits)
             return hasCompanion ? .object : .none
         } else {
             // Unknown: default to object
             return .object
         }
+    }
+
+    /// Return the function signatures of all init methods in inherited protocols of the given type.
+    func companionInits(of type: TypeSignature, for sourceDerived: SourceDerived, source: Source) -> ([TypeSignature], [Message]) {
+        let protocolSignatures = global.protocolSignatures(forNamed: type)
+        var messages: [Message] = []
+        let initSignatures = protocolSignatures.flatMap { (protocolSignature: TypeSignature) -> [TypeSignature] in
+            guard let primaryTypeInfo = primaryTypeInfo(forNamed: protocolSignature) else {
+                return []
+            }
+            let initSignatures = primaryTypeInfo.members.compactMap {
+                return $0.declarationType == .initDeclaration ? $0.signature : nil
+            }
+            let generics = protocolSignature.generics
+            guard !initSignatures.isEmpty && !generics.isEmpty else {
+                return initSignatures
+            }
+            // If the protocol has any generics, we have to find the implementation of each init to get the actual types used
+            let nones = generics.map { _ in TypeSignature.none }
+            return initSignatures.compactMap {
+                let match = matchFunction(name: "init", inConstrained: type, arguments: $0.parameters.map {
+                    LabeledValue(label: $0.label, value: ArgumentValue(type: $0.type.mappingTypes(from: generics, to: nones)))
+                }).first?.signature
+                if match == nil {
+                    messages.append(.kotlinConstructorMatchProtocolInit(sourceDerived, protocolSignature: protocolSignature, source: source))
+                } else if type.generics.contains(where: { match?.referencesType($0) == true }) {
+                    messages.append(.kotlinConstructorStaticInitGenerics(sourceDerived, protocolSignature: protocolSignature, source: source))
+                }
+                return match
+            }
+        }
+        return (Self.dedupe(initSignatures), messages)
     }
 
     private func hasStaticMembers(typeInfos: [CodebaseInfo.TypeInfo], includeInits: Bool = false) -> Bool {
@@ -243,6 +266,18 @@ extension CodebaseInfo.Context {
                 || (member.isStatic && (member.declarationType == .variableDeclaration || (member.declarationType == .functionDeclaration && member.name != "==" && member.name != "<")))
             }
         }
+    }
+
+    private func hasCompanionInherits(_ inherits: [TypeSignature]) -> Bool {
+        for inherit in inherits {
+            switch companionType(of: inherit) {
+            case .class, .interface:
+                return true
+            case .object, .none:
+                break
+            }
+        }
+        return false
     }
 }
 

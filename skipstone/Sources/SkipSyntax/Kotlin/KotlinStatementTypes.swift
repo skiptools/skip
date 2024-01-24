@@ -926,6 +926,7 @@ class KotlinClassDeclaration: KotlinStatement {
     var inherits: [TypeSignature] = []
     var companionType: KotlinCompanionType? = nil
     var companionInherits: [KotlinCompanionType] = []
+    var companionInits: [TypeSignature] = []
     var superclassCall: String?
     var annotations: [String] = []
     var attributes = Attributes()
@@ -988,15 +989,24 @@ class KotlinClassDeclaration: KotlinStatement {
             }
 
             kstatement.companionType = codebaseInfo.companionType(of: statement.signature)
+            var hasCompanionInherits = false
             kstatement.companionInherits = kstatement.inherits.compactMap {
                 switch codebaseInfo.companionType(of: $0) {
                 case .none, .object:
                     return nil
                 case .class(let signature):
+                    hasCompanionInherits = true
                     return .class(signature)
                 case .interface(let signature):
+                    hasCompanionInherits = true
                     return .interface(signature.constrainedTypeWithGenerics(kstatement.generics))
                 }
+            }
+            // Any companion init has to be inherited, so save the additional work when possible
+            if hasCompanionInherits {
+                let (companionInits, messages) = codebaseInfo.companionInits(of: statement.signature, for: kstatement, source: translator.syntaxTree.source)
+                kstatement.companionInits = companionInits
+                kstatement.messages += messages
             }
         }
         kstatement.members = kmembers
@@ -1229,10 +1239,43 @@ class KotlinClassDeclaration: KotlinStatement {
             }
         }
         staticMembers.forEach { output.append($0, indentation: memberIndentation) }
+        for i in 0..<companionInits.count {
+            if i > 0 || isSealedClassesEnum || !staticMembers.isEmpty {
+                output.append("\n")
+            }
+            let companionInit = companionInits[i]
+            output.append(memberIndentation).append("override fun init(")
+            appendParameters(of: companionInit, to: output, isFunctionCall: false)
+            output.append("): \(signature.kotlin) {\n")
+            output.append(memberIndentation.inc()).append("return \(name)(")
+            appendParameters(of: companionInit, to: output, isFunctionCall: true)
+            output.append(")\n")
+            output.append(memberIndentation).append("}\n")
+        }
         output.append(indentation).append("}\n")
 
         if case .class(let signature) = type {
             output.append(indentation).append("companion object: ").append(signature.unqualifiedName).append("()\n")
+        }
+    }
+
+    private func appendParameters(of functionSignature: TypeSignature, to output: OutputGenerator, isFunctionCall: Bool) {
+        let parameters = functionSignature.parameters
+        for i in 0..<parameters.count {
+            if i > 0 {
+                output.append(", ")
+            }
+            if let label = parameters[i].label {
+                output.append(label)
+                if isFunctionCall {
+                    output.append(" = ").append(label)
+                }
+            } else {
+                output.append("p_\(i)")
+            }
+            if !isFunctionCall {
+                output.append(": ").append(parameters[i].type.kotlin)
+            }
         }
     }
 }
@@ -1429,24 +1472,32 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
 
 struct KotlinExtensionDeclaration {
     static func translate(statement: ExtensionDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
+        var kstatements: [KotlinStatement] = []
+        let declarationType = translator.codebaseInfo?.declarationType(forNamed: statement.extends)
+        if declarationType?.type == .protocolDeclaration {
+            for member in statement.members {
+                if member.type == .initDeclaration {
+                    kstatements.append(KotlinMessageStatement(message: .kotlinExtensionAddConstructorProtocolMember(member, source: translator.syntaxTree.source), statement: member))
+                }
+            }
+        }
+
         // If the extension can't move into its extended type or is on a type outside this module, use Kotlin extension
         // functions. Otherwise do not translate the extension - instead we'll move its members into the extended type
         let isInSameFile = statement.isInSameFileAsExtendedType
         var placement = KotlinExtensionPlacement()
         placement.canMove = statement.canMoveIntoExtendedType
         placement.visibilityAllowsMove = isInSameFile || statement.visibilityAllowsMoveIntoExtendedType
-        let declarationType = translator.codebaseInfo?.declarationType(forNamed: statement.extends)
         placement.isInModule = translator.codebaseInfo == nil ? nil : declarationType?.isInModule == true
         guard !placement.canMove || !placement.visibilityAllowsMove || placement.isInModule != true else {
             if !isInSameFile && mayUseFilePrivateAPI(statement: statement, in: translator.syntaxTree) {
                 let message: Message = .kotlinExtensionUsingFileprivateAPI(statement, source: translator.syntaxTree.source)
-                return [KotlinMessageStatement(message: message, statement: statement)]
+                return kstatements + [KotlinMessageStatement(message: message, statement: statement)]
             } else {
-                return []
+                return kstatements
             }
         }
 
-        var kstatements: [KotlinStatement] = []
         if !statement.inherits.isEmpty, let message = Message.kotlinExtensionAddProtocols(statement, extensionPlacement: placement, source: translator.syntaxTree.source) {
             kstatements.append(KotlinMessageStatement(message: message, statement: statement))
         }
@@ -1465,24 +1516,31 @@ struct KotlinExtensionDeclaration {
     }
 
     static func translateExtensionMembers(_ members: [Statement], of extends: TypeSignature, visibility: Modifiers.Visibility, generics: Generics, declarationType: StatementType?, translator: KotlinTranslator, extensionPlacement: KotlinExtensionPlacement? = nil) -> [KotlinStatement] {
-        let companionType = translator.codebaseInfo?.companionType(of: extends) ?? .object
-        var canAddStaticMembers = declarationType != .protocolDeclaration || extensionPlacement?.isInModule != false || translator.codebaseInfo == nil
-        if !canAddStaticMembers, case .interface = translator.codebaseInfo!.companionType(of: extends) {
-            canAddStaticMembers = true
+        var companionType: KotlinCompanionType? = nil
+        var canAddStaticMembers: Bool? = nil
+        if let extensionPlacement, !extensionPlacement.canMove {
+            canAddStaticMembers = declarationType != .protocolDeclaration || extensionPlacement.isInModule != false || translator.codebaseInfo == nil
+            if canAddStaticMembers == false {
+                companionType = translator.codebaseInfo?.companionType(of: extends) ?? .object
+                if case .interface = companionType {
+                    canAddStaticMembers = true
+                }
+            }
         }
+
         var kstatements: [KotlinStatement] = []
         for member in members {
             if let extensionPlacement, !extensionPlacement.canMove {
                 // Check that an extension that will be implemented as extension functions because it has generic constraints, etc is not
                 // attempting to override member functions. Kotlin extension functions can never override members
                 if let variableDeclaration = member as? VariableDeclaration {
-                    if variableDeclaration.modifiers.isStatic && !canAddStaticMembers {
+                    if variableDeclaration.modifiers.isStatic && canAddStaticMembers == false {
                         kstatements.append(KotlinMessageStatement(message: .kotlinExtensionAddStaticProtocolMember(member, source: translator.syntaxTree.source), statement: member))
                     } else if translator.codebaseInfo?.isImplementingKotlinMember(declaration: variableDeclaration, inExtension: extends, withConstrainingGenerics: generics) == true, let message = Message.kotlinExtensionImplementMember(member, extensionPlacement: extensionPlacement, source: translator.syntaxTree.source) {
                         kstatements.append(KotlinMessageStatement(message: message, statement: member))
                     }
                 } else if let functionDeclaration = member as? FunctionDeclaration {
-                    if functionDeclaration.modifiers.isStatic && !canAddStaticMembers {
+                    if functionDeclaration.modifiers.isStatic && canAddStaticMembers == false {
                         kstatements.append(KotlinMessageStatement(message: .kotlinExtensionAddStaticProtocolMember(member, source: translator.syntaxTree.source), statement: member))
                     } else if translator.codebaseInfo?.isImplementingKotlinMember(declaration: functionDeclaration, inExtension: extends, withConstrainingGenerics: generics) == true, let message = Message.kotlinExtensionImplementMember(member, extensionPlacement: extensionPlacement, source: translator.syntaxTree.source) {
                         kstatements.append(KotlinMessageStatement(message: message, statement: member))
@@ -1513,7 +1571,10 @@ struct KotlinExtensionDeclaration {
                 if let kfunctionDeclaration = kmember as? KotlinFunctionDeclaration {
                     extendsGenerics = extendsGenerics.merge(overrides: kfunctionDeclaration.generics, addNew: false)
                 }
-                memberDeclaration.extends = (extends, memberDeclaration.isStatic ? companionType : .none, extendsGenerics)
+                if companionType == nil {
+                    companionType = translator.codebaseInfo?.companionType(of: extends) ?? .object
+                }
+                memberDeclaration.extends = (extends, memberDeclaration.isStatic ? companionType! : .none, extendsGenerics)
                 kstatements.append(kmember)
             }
         }
@@ -1729,7 +1790,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         let owningDeclarationPrimaryTypeInfo = translator.codebaseInfo?.primaryTypeInfo(forNamed: owningTypeDeclaration.signature)
         let owningSignature = owningDeclarationPrimaryTypeInfo?.signature ?? owningTypeDeclaration.signature
 
-        if statement.type == .initDeclaration {
+        if statement.type == .initDeclaration && owningDeclarationType != .protocolDeclaration {
             kstatement.isOpen = false
             kstatement.modifiers.isOverride = false // Kotlin does not override constructors
             if (statement as? FunctionDeclaration)?.asyncBehavior == .async {
@@ -1751,6 +1812,14 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 if let owningDeclarationPrimaryTypeInfo, modifiers.visibility < owningDeclarationPrimaryTypeInfo.modifiers.visibility {
                     kstatement.messages.append(.kotlinProtocolMemberVisibility(statement, source: translator.syntaxTree.source))
                 }
+                // Constructors in an interface will be moved into the interface's Companion interface, where
+                // it should be called 'init' and return an instance of the interface
+                if kstatement.type == .constructorDeclaration {
+                    kstatement.type = .functionDeclaration
+                    kstatement.name = "init"
+                    kstatement.returnType = owningSignature
+                    kstatement.modifiers.isStatic = true
+                }
             }
             if !kstatement.modifiers.isOverride && translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningSignature) == true {
                 kstatement.modifiers.isOverride = true
@@ -1758,7 +1827,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if owningDeclarationType != .protocolDeclaration {
                 kstatement.isOpen = !kstatement.modifiers.isOverride && !modifiers.isFinal && modifiers.visibility != .private && owningDeclarationType == .classDeclaration && !owningTypeDeclaration.modifiers.isFinal
             }
-            // Kotlin does not all you to decrease visibility when overriding a member, so we simply make all overrides public to prevent errors
+            // Kotlin does not allow you to decrease visibility when overriding a member, so we simply make all overrides public to prevent errors
             if kstatement.modifiers.isOverride {
                 kstatement.modifiers.visibility = .public
             }
@@ -2309,7 +2378,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         var staticMembers: [KotlinStatement] = []
         let memberIndentation = indentation.inc()
         for member in members {
-            if (member as? KotlinMemberDeclaration)?.isStatic == true {
+            if member.type == .constructorDeclaration || (member as? KotlinMemberDeclaration)?.isStatic == true {
                 staticMembers.append(member)
             } else {
                 output.append(member, indentation: memberIndentation)

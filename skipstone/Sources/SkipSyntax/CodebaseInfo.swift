@@ -913,7 +913,7 @@ public class CodebaseInfo {
         }
 
         // Maintain order rather than dumping in a Set for consistent output
-        private static func dedupe<T: Hashable>(_ array: [T]) -> [T] {
+        static func dedupe<T: Hashable>(_ array: [T]) -> [T] {
             if array.count <= 1 {
                 return array
             }

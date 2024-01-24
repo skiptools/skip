@@ -83,6 +83,10 @@ extension Message {
         return Message(kind: .error, message: "Cannot infer property type. Declare the property type explicitly to generate a valid Kotlin constructor for this struct", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinConstructorCastStaticInitResult(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "The Kotlin translation of this static init may not evaluate to the expected type. Consider casting the result, as in 'T.init(...) as T'", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinConstructorDelegatingStatementArguments(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "In Kotlin, delegating calls to 'self' or 'super' constructors can not use local variables other than the parameters passed to this constructor", sourceDerived: sourceDerived, source: source)
     }
@@ -92,8 +96,16 @@ extension Message {
         return Message(kind: .error, message: "Kotlin constructors cannot introduce additional generics. Only use generics from the owning type declaration", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinConstructorMatchProtocolInit(_ sourceDerived: SourceDerived, protocolSignature: TypeSignature, source: Source) -> Message {
+        return Message(kind: .error, message: "Skip is unable to match an init requirement from protocol \(protocolSignature) to a constructor", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinConstructorSingleDelegatingStatement(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "A Kotlin constructor can only include a single top-level call to another 'this' or 'super' constructor", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinConstructorStaticInitGenerics(_ sourceDerived: SourceDerived, protocolSignature: TypeSignature, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin cannot satisfy a protocol init requirement with a generic constructor", sourceDerived: sourceDerived, source: source)
     }
 
     // Idea: automatically re-map uses of this case
@@ -135,6 +147,10 @@ extension Message {
             return nil
         }
         return Message(kind: .error, message: "\(unmovableExplanation) Therefore it cannot add additional constructors", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinExtensionAddConstructorProtocolMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "You cannot add constructors to a protocol extension", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinExtensionAddStaticProtocolMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
