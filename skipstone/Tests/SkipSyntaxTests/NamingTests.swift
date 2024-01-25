@@ -176,9 +176,8 @@ final class NamingTests: XCTestCase {
 
         internal open class C: module.two.B() {
 
-            open class CompanionClass: module.two.B.CompanionClass() {
+            companion object: module.two.B.CompanionClass() {
             }
-            companion object: CompanionClass()
         }
 
         internal fun f(obj: module.one.A): Int = obj.f()

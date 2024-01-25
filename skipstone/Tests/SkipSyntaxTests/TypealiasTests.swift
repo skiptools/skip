@@ -46,10 +46,9 @@ final class TypealiasTests: XCTestCase {
         """, kotlin: """
         internal open class A {
 
-            open class CompanionClass {
+            companion object {
                 internal val a = A()
             }
-            companion object: CompanionClass()
         }
         internal open class B {
             internal val b = A.a

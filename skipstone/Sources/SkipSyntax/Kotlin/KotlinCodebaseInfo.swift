@@ -200,12 +200,13 @@ extension CodebaseInfo.Context {
             // - Has static members
             // - Extends a type with a companion class or companion interface
             // Classes that need companion classes:
-            // - Is non-final and has a companion object
-            let hasCompanion = classInfo.modifiers.visibility == .public || classInfo.modifiers.visibility == .open || hasStaticMembers(typeInfos: typeInfos) || hasCompanionInherits(classInfo.inherits)
+            // - Is non-final and has a companion object and is public/open or has subclasses
+            let isPublicOrOpen = classInfo.modifiers.visibility == .public || classInfo.modifiers.visibility == .open
+            let hasCompanion = isPublicOrOpen || hasStaticMembers(typeInfos: typeInfos) || hasCompanionInherits(classInfo.inherits)
             guard hasCompanion else {
                 return .none
             }
-            guard !classInfo.modifiers.isFinal else {
+            guard !classInfo.modifiers.isFinal && (isPublicOrOpen || global.kotlin?.subclassedTypeNames.contains(classInfo.signature.name) == true) else {
                 return .object
             }
             return .class(.member(type.withGenerics([]), .named("CompanionClass", [])))
@@ -286,8 +287,17 @@ public class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseInfoLang
     /// The package being generated.
     public let packageName: String?
 
+    // Warning: for performance, this set may contain interface names as well as the intended class names
+    fileprivate var subclassedTypeNames: Set<String> = []
+
     init(packageName: String? = nil) {
         self.packageName = packageName
+    }
+
+    func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: TypeDeclaration, syntaxTree: SyntaxTree) {
+        if typeInfo.declarationType == .classDeclaration, let firstInherits = typeInfo.inherits.first {
+            subclassedTypeNames.insert(firstInherits.name)
+        }
     }
 
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration, syntaxTree: SyntaxTree) {

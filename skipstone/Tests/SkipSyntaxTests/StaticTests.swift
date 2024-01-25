@@ -18,13 +18,12 @@ final class StaticTests: XCTestCase {
 
             internal open var i = 1
 
-            open class CompanionClass {
+            companion object {
                 internal val staticLet = 1
                 internal var staticVar = 10
 
                 internal fun staticFunc(): Int = 20
             }
-            companion object: CompanionClass()
         }
         """)
 
@@ -50,7 +49,7 @@ final class StaticTests: XCTestCase {
 
             internal open fun f(): T = Unit
 
-            open class CompanionClass {
+            companion object {
                 internal val staticLet = 1
 
                 internal fun staticFunc(): Int = 20
@@ -59,7 +58,6 @@ final class StaticTests: XCTestCase {
 
                 internal fun <T, U> staticFunc3(p1: T, p2: U): T = Unit
             }
-            companion object: CompanionClass()
         }
         """)
 
@@ -185,12 +183,11 @@ final class StaticTests: XCTestCase {
         """, kotlin: """
         internal open class C<T, U> {
 
-            open class CompanionClass {
+            companion object {
             }
-            companion object: CompanionClass()
         }
 
-        internal fun <T> C.CompanionClass.staticFunc(p: T): T = Unit
+        internal fun <T> C.Companion.staticFunc(p: T): T = Unit
         """)
     }
 
@@ -271,11 +268,10 @@ final class StaticTests: XCTestCase {
         """, kotlin: """
         internal open class PImpl: P {
 
-            open class CompanionClass: PCompanion {
+            companion object: PCompanion {
                 override var si = 0
                 override fun sf() = Unit
             }
-            companion object: CompanionClass()
         }
         """)
     }
@@ -302,10 +298,9 @@ final class StaticTests: XCTestCase {
         }
         internal open class C: P<Int> {
 
-            open class CompanionClass: PCompanion<Int> {
+            companion object: PCompanion<Int> {
                 override fun f(p: Int) = Unit
             }
-            companion object: CompanionClass()
         }
         internal class S: P<Int> {
 
@@ -343,10 +338,9 @@ final class StaticTests: XCTestCase {
         internal open class C<T>: P<T> {
             override fun f(p: T) = Unit
 
-            open class CompanionClass: PCompanion<Any> {
+            companion object: PCompanion<Any> {
                 override fun sf(p: Int) = Unit
             }
-            companion object: CompanionClass()
         }
         internal class S<T>: P<T> {
             override fun f(p: T) = Unit
@@ -432,12 +426,11 @@ final class StaticTests: XCTestCase {
             internal constructor(i: Int): super(i) {
             }
 
-            open class CompanionClass: A.CompanionClass() {
+            companion object: A.CompanionClass() {
                 override fun init(i: Int): B {
                     return B(i = i)
                 }
             }
-            companion object: CompanionClass()
         }
         """)
     }
@@ -602,12 +595,11 @@ final class StaticTests: XCTestCase {
 
         internal open class C {
 
-            open class CompanionClass {
+            companion object {
                 internal val typeVar = C::class
 
                 internal fun staticFunc() = Unit
             }
-            companion object: CompanionClass()
         }
         internal typealias X = C
 
@@ -616,7 +608,7 @@ final class StaticTests: XCTestCase {
             g(c = C.typeVar)
             C.staticFunc()
             C.staticFunc()
-            (C.typeVar.companionObjectInstance as C.CompanionClass).staticFunc()
+            (C.typeVar.companionObjectInstance as C.Companion).staticFunc()
         }
 
         internal fun g(c: KClass<C>) = Unit
@@ -636,10 +628,9 @@ final class StaticTests: XCTestCase {
             open class Bar {
                 open class Baz {
 
-                    open class CompanionClass {
+                    companion object {
                         val prop = "ABC"
                     }
-                    companion object: CompanionClass()
                 }
             }
         }
@@ -663,10 +654,9 @@ final class StaticTests: XCTestCase {
             internal open class B {
                 internal open class C {
 
-                    open class CompanionClass {
+                    companion object {
                         internal var a = 100
                     }
-                    companion object: CompanionClass()
                 }
             }
             internal open fun f() {

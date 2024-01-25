@@ -17,10 +17,9 @@ final class ExpressionTests: XCTestCase {
 
             internal open fun f(): Int = Companion.staticf()
 
-            open class CompanionClass {
+            companion object {
                 internal fun staticf(): Int = 10
             }
-            companion object: CompanionClass()
         }
         """)
 
