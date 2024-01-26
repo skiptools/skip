@@ -579,9 +579,10 @@ open class C2_1 {
         open fun i2_f1() = Unit
         open fun i2_f2() = Unit
 
+        companion object: CompanionClass() {
+        }
         open class CompanionClass {
         }
-        companion object: CompanionClass()
     }
     open class Inner2_2 {
         open var i2_3 = 1
@@ -589,9 +590,10 @@ open class C2_1 {
         open fun if2_3() = Unit
         open fun if2_4() = Unit
 
+        companion object: CompanionClass() {
+        }
         open class CompanionClass {
         }
-        companion object: CompanionClass()
     }
 
     open var v2_5 = 1
@@ -599,9 +601,10 @@ open class C2_1 {
     open fun f2_5() = Unit
     open fun f2_6() = Unit
 
+    companion object: CompanionClass() {
+    }
     open class CompanionClass {
     }
-    companion object: CompanionClass()
 }
 open class C2_2 {
     open var v2_4 = 1
@@ -614,9 +617,10 @@ open class C2_2 {
     open var v2_8 = 1
     open var v2_7 = 1
 
+    companion object: CompanionClass() {
+    }
     open class CompanionClass {
     }
-    companion object: CompanionClass()
 }
 
 interface P2_1 {
@@ -679,9 +683,10 @@ open class C1 {
         open fun if1() = Unit
         open fun if2() = Unit
 
+        companion object: CompanionClass() {
+        }
         open class CompanionClass {
         }
-        companion object: CompanionClass()
     }
     open class Inner2 {
         open var i3 = 1
@@ -689,9 +694,10 @@ open class C1 {
         open fun if3() = Unit
         open fun if4() = Unit
 
+        companion object: CompanionClass() {
+        }
         open class CompanionClass {
         }
-        companion object: CompanionClass()
     }
 
     open var v5 = 1
@@ -705,9 +711,10 @@ open class C1 {
     open var v1_3 = 1
     open var v1_4 = 1
 
+    companion object: CompanionClass() {
+    }
     open class CompanionClass {
     }
-    companion object: CompanionClass()
 }
 open class C2 {
     open var v4 = 1
@@ -720,9 +727,10 @@ open class C2 {
     open var v8 = 1
     open var v7 = 1
 
+    companion object: CompanionClass() {
+    }
     open class CompanionClass {
     }
-    companion object: CompanionClass()
 }
 
 interface P1 {
@@ -779,9 +787,10 @@ open class C3_1 {
         open fun i3_f1() = Unit
         open fun i3_f2() = Unit
 
+        companion object: CompanionClass() {
+        }
         open class CompanionClass {
         }
-        companion object: CompanionClass()
     }
     open class Inner3_2 {
         open var i3_3 = 1
@@ -789,9 +798,10 @@ open class C3_1 {
         open fun if3_3() = Unit
         open fun if3_4() = Unit
 
+        companion object: CompanionClass() {
+        }
         open class CompanionClass {
         }
-        companion object: CompanionClass()
     }
 
     open var v3_5 = 1
@@ -799,9 +809,10 @@ open class C3_1 {
     open fun f3_5() = Unit
     open fun f3_6() = Unit
 
+    companion object: CompanionClass() {
+    }
     open class CompanionClass {
     }
-    companion object: CompanionClass()
 }
 open class C3_2 {
     open var v3_4 = 1
@@ -814,9 +825,10 @@ open class C3_2 {
     open var v3_8 = 1
     open var v3_7 = 1
 
+    companion object: CompanionClass() {
+    }
     open class CompanionClass {
     }
-    companion object: CompanionClass()
 }
 
 interface P3_1 {

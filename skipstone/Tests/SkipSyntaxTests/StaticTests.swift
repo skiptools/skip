@@ -84,9 +84,21 @@ final class StaticTests: XCTestCase {
     func testStaticMembersInheritance() async throws {
         try await check(swift: """
         class A {
+            private static var privateVar = 1
+            private static func privateFunc() -> Int {
+                return 20
+            }
+            static let staticLet = 0
             static var staticVar = 10
             class func staticFunc() -> Int {
-                return 20
+                return privateFunc()
+            }
+            static private(set) var privateSetVar = 99
+            static var asyncVar: Int {
+                get async {
+                    return 100
+                }
+            static func asyncFunc() async {
             }
         }
         class B: A {
@@ -99,17 +111,40 @@ final class StaticTests: XCTestCase {
         """, kotlin: """
         internal open class A {
 
-            open class CompanionClass {
-                internal var staticVar = 10
-                internal open fun staticFunc(): Int = 20
+            companion object: CompanionClass() {
+                private var privateVar = 1
+                private fun privateFunc(): Int = 20
+                override val staticLet = 0
+                override var staticVar = 10
+                override fun staticFunc(): Int = privateFunc()
+                override var privateSetVar = 99
+                    private set
+                override suspend fun asyncVar(): Int = Async.run l@{
+                    return@l 100
+                }
+                override suspend fun asyncFunc(): Unit = Unit
             }
-            companion object: CompanionClass()
+            open class CompanionClass {
+                internal open val staticLet
+                    get() = A.staticLet
+                internal open var staticVar
+                    get() = A.staticVar
+                    set(newValue) {
+                        A.staticVar = newValue
+                    }
+                internal open fun staticFunc(): Int = A.staticFunc()
+                internal open val privateSetVar
+                    get() = A.privateSetVar
+                internal open suspend fun asyncVar(): Int = A.asyncVar()
+                internal open suspend fun asyncFunc(): Unit = A.asyncFunc()
+            }
         }
         internal open class B: A() {
 
+            companion object: CompanionClass() {
+            }
             open class CompanionClass: A.CompanionClass() {
             }
-            companion object: CompanionClass()
         }
         internal class C: B() {
 
@@ -414,12 +449,13 @@ final class StaticTests: XCTestCase {
                 this.i = i
             }
 
+            companion object: CompanionClass() {
+            }
             open class CompanionClass: PCompanion {
                 override fun init(i: Int): A {
                     return A(i = i)
                 }
             }
-            companion object: CompanionClass()
         }
         internal open class B: A {
 

@@ -21,15 +21,17 @@ final class AttributeAndModifierTests: XCTestCase {
         }
         open class B {
 
+            companion object: CompanionClass() {
+            }
             open class CompanionClass {
             }
-            companion object: CompanionClass()
         }
         open class C {
 
+            companion object: CompanionClass() {
+            }
             open class CompanionClass {
             }
-            companion object: CompanionClass()
         }
         internal open class D {
         }
@@ -56,15 +58,17 @@ final class AttributeAndModifierTests: XCTestCase {
         internal open class A {
             open class B {
 
+                companion object: CompanionClass() {
+                }
                 open class CompanionClass {
                 }
-                companion object: CompanionClass()
             }
             open class C {
 
+                companion object: CompanionClass() {
+                }
                 open class CompanionClass {
                 }
-                companion object: CompanionClass()
             }
             internal open class D {
             }

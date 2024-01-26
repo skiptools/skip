@@ -53,6 +53,12 @@ final class KotlinEnumTransformer: KotlinTransformer {
         guard codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature).contains(where: { $0.isNamed("CaseIterable", moduleName: "Swift", generics: []) }) else {
             return
         }
+        let inherit: TypeSignature = .named("CaseIterableCompanion", [classDeclaration.signature])
+        if let caseIterableIndex = classDeclaration.companionInherits.firstIndex(where: { $0.signature?.isNamed("CaseIterableCompanion", moduleName: "Swift") == true }) {
+            classDeclaration.companionInherits[caseIterableIndex] = .interface(inherit)
+        } else {
+            classDeclaration.companionInherits.append(.interface(inherit))
+        }
         let typeInfos = codebaseInfo.typeInfos(forNamed: classDeclaration.signature)
         guard !typeInfos.contains(where: { $0.members.contains(where: \.isAllCasesVar) }) else {
             return
@@ -61,7 +67,9 @@ final class KotlinEnumTransformer: KotlinTransformer {
 
         let allCasesVar = KotlinVariableDeclaration(names: ["allCases"], variableTypes: [.array(classDeclaration.signature)])
         allCasesVar.modifiers.isStatic = true
-        allCasesVar.modifiers.isFinal = true
+        allCasesVar.modifiers.isOverride = true
+        allCasesVar.modifiers.visibility = .public
+        allCasesVar.role = .property
         if classDeclaration.members.contains(where: { ($0 as? KotlinMemberDeclaration)?.isStatic == true }) {
             allCasesVar.extras = .singleNewline
         }

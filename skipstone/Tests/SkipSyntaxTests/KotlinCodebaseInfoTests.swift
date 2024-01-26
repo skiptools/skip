@@ -41,21 +41,21 @@ final class KotlinCodebaseInfoTests: XCTestCase {
 
     func testProtocolTypeHasMember() async throws {
         let context = try await setUpContext()
-        XCTAssertEqual(false, context.isKotlinInterfaceMember(name: "protocolVar", parameters: nil, isStatic: false, in: .named("NonExistantTypeName", [])))
+        XCTAssertEqual(false, context.isKotlinUnconstrainedInterfaceMember(name: "protocolVar", parameters: nil, isStatic: false, in: .named("NonExistantTypeName", [])))
 
-        XCTAssertEqual(false, context.isKotlinInterfaceMember(name: "baseProtocolVar", parameters: nil, isStatic: false, in: .named("TestsNonAnyObjectRestrictedProtocol", [])))
-        XCTAssertEqual(true, context.isKotlinInterfaceMember(name: "baseProtocolVar", parameters: nil, isStatic: false, in: .named("TestsAnyObjectRestrictedProtocol", [])))
+        XCTAssertEqual(false, context.isKotlinUnconstrainedInterfaceMember(name: "baseProtocolVar", parameters: nil, isStatic: false, in: .named("TestsNonAnyObjectRestrictedProtocol", [])))
+        XCTAssertEqual(true, context.isKotlinUnconstrainedInterfaceMember(name: "baseProtocolVar", parameters: nil, isStatic: false, in: .named("TestsAnyObjectRestrictedProtocol", [])))
 
         let functionParameters: [TypeSignature.Parameter] = [.init(label: "i", type: .int)]
-        XCTAssertEqual(false, context.isKotlinInterfaceMember(name: "baseProtocolFunc", parameters: functionParameters, isStatic: false, in: .named("TestsNonAnyObjectRestrictedProtocol", [])))
-        XCTAssertEqual(true, context.isKotlinInterfaceMember(name: "baseProtocolFunc", parameters: functionParameters, isStatic: false, in: .named("TestsAnyObjectRestrictedProtocol", [])))
-        XCTAssertEqual(false, context.isKotlinInterfaceMember(name: "baseProtocolFunc", parameters: [.init(label: "j", type: .int)], isStatic: false, in: .named("TestsAnyObjectRestrictedProtocol", [])))
+        XCTAssertEqual(false, context.isKotlinUnconstrainedInterfaceMember(name: "baseProtocolFunc", parameters: functionParameters, isStatic: false, in: .named("TestsNonAnyObjectRestrictedProtocol", [])))
+        XCTAssertEqual(true, context.isKotlinUnconstrainedInterfaceMember(name: "baseProtocolFunc", parameters: functionParameters, isStatic: false, in: .named("TestsAnyObjectRestrictedProtocol", [])))
+        XCTAssertEqual(false, context.isKotlinUnconstrainedInterfaceMember(name: "baseProtocolFunc", parameters: [.init(label: "j", type: .int)], isStatic: false, in: .named("TestsAnyObjectRestrictedProtocol", [])))
 
-        XCTAssertEqual(true, context.isKotlinInterfaceMember(name: "baseProtocolVar", parameters: nil, isStatic: false, in: .named("TestsTransitiveAnyObjectRestrictedProtocol", [])))
-        XCTAssertEqual(true, context.isKotlinInterfaceMember(name: "baseProtocolFunc", parameters: functionParameters, isStatic: false, in: .named("TestsTransitiveAnyObjectRestrictedProtocol", [])))
+        XCTAssertEqual(true, context.isKotlinUnconstrainedInterfaceMember(name: "baseProtocolVar", parameters: nil, isStatic: false, in: .named("TestsTransitiveAnyObjectRestrictedProtocol", [])))
+        XCTAssertEqual(true, context.isKotlinUnconstrainedInterfaceMember(name: "baseProtocolFunc", parameters: functionParameters, isStatic: false, in: .named("TestsTransitiveAnyObjectRestrictedProtocol", [])))
 
-        XCTAssertEqual(true, context.isKotlinInterfaceMember(name: "baseProtocolVar", parameters: nil, isStatic: false, in: .named("TestsProtocolImpl", [])))
-        XCTAssertEqual(true, context.isKotlinInterfaceMember(name: "baseProtocolFunc", parameters: functionParameters, isStatic: false, in: .named("TestsProtocolImpl", [])))
+        XCTAssertEqual(true, context.isKotlinUnconstrainedInterfaceMember(name: "baseProtocolVar", parameters: nil, isStatic: false, in: .named("TestsProtocolImpl", [])))
+        XCTAssertEqual(true, context.isKotlinUnconstrainedInterfaceMember(name: "baseProtocolFunc", parameters: functionParameters, isStatic: false, in: .named("TestsProtocolImpl", [])))
     }
 }
 

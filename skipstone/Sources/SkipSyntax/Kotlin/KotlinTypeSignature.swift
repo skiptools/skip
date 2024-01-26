@@ -367,6 +367,26 @@ extension TypeSignature {
             return .recurse(nil)
         }
     }
+
+    /// Append the parameters of this function as a declaration or function call.
+    func appendParameters(to output: OutputGenerator, isFunctionCall: Bool) {
+        for (i, parameter) in parameters.enumerated() {
+            if i > 0 {
+                output.append(", ")
+            }
+            if let label = parameter.label {
+                output.append(label)
+                if isFunctionCall {
+                    output.append(" = ").append(label)
+                }
+            } else {
+                output.append("p_\(i)")
+            }
+            if !isFunctionCall {
+                output.append(": ").append(parameter.type.kotlin)
+            }
+        }
+    }
 }
 
 extension TypeSignature.Parameter {

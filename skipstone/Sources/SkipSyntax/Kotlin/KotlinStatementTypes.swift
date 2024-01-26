@@ -539,7 +539,8 @@ class KotlinEmpty: KotlinStatement, KotlinMemberDeclaration {
         super.init(type: .empty, statement: statement)
     }
 
-    var extends: (TypeSignature, KotlinCompanionType, Generics)?
+    var extends: (TypeSignature, Generics)?
+    var companion: (TypeSignature, KotlinCompanionType)?
     let isStatic = false
     var visibility: Modifiers.Visibility = .private
 }
@@ -933,7 +934,11 @@ class KotlinClassDeclaration: KotlinStatement {
     var modifiers = Modifiers()
     var generics = Generics()
     var declarationType: StatementType
-    var members: [KotlinStatement] = []
+    var members: [KotlinStatement] = [] {
+        didSet {
+            members.forEach { ($0 as? KotlinMemberDeclaration)?.companion = (signature, companionType ?? .object) }
+        }
+    }
     var movedExtensionImportModulePaths: [[String]] = []
     var suppressSideEffectsPropertyName: String?
     var enumInheritedRawValueType: TypeSignature {
@@ -1009,7 +1014,7 @@ class KotlinClassDeclaration: KotlinStatement {
                 kstatement.messages += messages
             }
         }
-        kstatement.members = kmembers
+        kstatement.members = kmembers // Setting assigns companion information on members
         if statement.type == .enumDeclaration {
             kstatement.processEnumCaseDeclarations(messagesSource: translator.syntaxTree.source)
         }
@@ -1019,7 +1024,7 @@ class KotlinClassDeclaration: KotlinStatement {
             kstatement.inherits.append(.named("Actor", []))
         }
 
-        let kextensionMembers = KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, generics: kstatement.generics, declarationType: .classDeclaration, translator: translator)
+        let kextensionMembers = KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, generics: kstatement.generics, declarationType: .classDeclaration, companionType: kstatement.companionType ?? .object, translator: translator)
         kextensionMembers.first?.ensureLeadingNewlines(1)
         return [kstatement] + kextensionMembers
     }
@@ -1197,11 +1202,7 @@ class KotlinClassDeclaration: KotlinStatement {
         let needsCompanion = !staticMembers.isEmpty || modifiers.visibility == .public || modifiers.visibility == .open || isSealedClassesEnum
         let effectiveCompanionType: KotlinCompanionType
         if let companionType {
-            if case .none = companionType, needsCompanion {
-                effectiveCompanionType = .object
-            } else {
-                effectiveCompanionType = companionType
-            }
+            effectiveCompanionType = companionType.isNone && needsCompanion ? .object : companionType
         } else if needsCompanion {
             effectiveCompanionType = .object
         } else {
@@ -1212,16 +1213,58 @@ class KotlinClassDeclaration: KotlinStatement {
     }
 
     private func appendCompanion(to output: OutputGenerator, indentation: Indentation, type: KotlinCompanionType, staticMembers: [KotlinStatement], enumCases: [KotlinEnumCaseDeclaration]) {
-        if case .none = type {
+        if type.isNone {
             return
         }
         output.append("\n")
-        output.append(indentation)
+
+        // Output companion object with all static members
+        output.append(indentation).append("companion object")
         if case .class(let signature) = type {
-            output.append("open class ").append(signature.unqualifiedName)
+            output.append(": ").append(signature.unqualifiedName).append("()")
         } else {
-            output.append("companion object")
+            appendCompanionInherits(to: output)
         }
+        output.append(" {\n")
+        let memberIndentation = indentation.inc()
+        var hasMembers = false
+        if isSealedClassesEnum {
+            enumCases.forEach { $0.appendSealedClassFactory(to: output, forEnum: name, alwaysCreateNewInstances: alwaysCreateNewSealedClassInstances, indentation: memberIndentation) }
+            hasMembers = true
+        }
+        if !type.isClass && !companionInits.isEmpty {
+            if hasMembers {
+                output.append("\n")
+            }
+            appendCompanionInits(to: output, indentation: memberIndentation)
+            hasMembers = true
+        }
+        if !staticMembers.isEmpty {
+            if hasMembers {
+                output.append("\n")
+            }
+            staticMembers.forEach { output.append($0, indentation: memberIndentation) }
+        }
+        output.append(indentation).append("}\n")
+        guard case .class(let signature) = type else {
+            return
+        }
+
+        // Output companion class with non-private API and companion inits
+        output.append(indentation).append("open class ").append(signature.unqualifiedName)
+        appendCompanionInherits(to: output)
+        output.append(" {\n")
+        appendCompanionInits(to: output, indentation: memberIndentation)
+        if !staticMembers.isEmpty {
+            if !companionInits.isEmpty {
+                output.append("\n")
+            }
+            staticMembers.forEach { ($0 as? KotlinMemberDeclaration)?.appendCompanionClassDelegatingMember(to: output, indentation: memberIndentation) }
+        }
+        output.append(indentation).append("}\n")
+    }
+
+    private func appendCompanionInherits(to output: OutputGenerator) {
         for i in 0..<companionInherits.count {
             output.append(i == 0 ? ": " : ", ")
             if case .class(let signature) = companionInherits[i] {
@@ -1230,52 +1273,21 @@ class KotlinClassDeclaration: KotlinStatement {
                 output.append(signature.kotlin)
             }
         }
-        output.append(" {\n")
-        let memberIndentation = indentation.inc()
-        if isSealedClassesEnum {
-            enumCases.forEach { $0.appendSealedClassFactory(to: output, forEnum: name, alwaysCreateNewInstances: alwaysCreateNewSealedClassInstances, indentation: memberIndentation) }
-            if !staticMembers.isEmpty {
-                output.append("\n")
-            }
-        }
-        staticMembers.forEach { output.append($0, indentation: memberIndentation) }
+    }
+
+    private func appendCompanionInits(to output: OutputGenerator, indentation: Indentation) {
         for i in 0..<companionInits.count {
-            if i > 0 || isSealedClassesEnum || !staticMembers.isEmpty {
+            if i > 0 {
                 output.append("\n")
             }
             let companionInit = companionInits[i]
-            output.append(memberIndentation).append("override fun init(")
-            appendParameters(of: companionInit, to: output, isFunctionCall: false)
+            output.append(indentation).append("override fun init(")
+            companionInit.appendParameters(to: output, isFunctionCall: false)
             output.append("): \(signature.kotlin) {\n")
-            output.append(memberIndentation.inc()).append("return \(name)(")
-            appendParameters(of: companionInit, to: output, isFunctionCall: true)
+            output.append(indentation.inc()).append("return \(name)(")
+            companionInit.appendParameters(to: output, isFunctionCall: true)
             output.append(")\n")
-            output.append(memberIndentation).append("}\n")
-        }
-        output.append(indentation).append("}\n")
-
-        if case .class(let signature) = type {
-            output.append(indentation).append("companion object: ").append(signature.unqualifiedName).append("()\n")
-        }
-    }
-
-    private func appendParameters(of functionSignature: TypeSignature, to output: OutputGenerator, isFunctionCall: Bool) {
-        let parameters = functionSignature.parameters
-        for i in 0..<parameters.count {
-            if i > 0 {
-                output.append(", ")
-            }
-            if let label = parameters[i].label {
-                output.append(label)
-                if isFunctionCall {
-                    output.append(" = ").append(label)
-                }
-            } else {
-                output.append("p_\(i)")
-            }
-            if !isFunctionCall {
-                output.append(": ").append(parameters[i].type.kotlin)
-            }
+            output.append(indentation).append("}\n")
         }
     }
 }
@@ -1492,10 +1504,9 @@ struct KotlinExtensionDeclaration {
         guard !placement.canMove || !placement.visibilityAllowsMove || placement.isInModule != true else {
             if !isInSameFile && mayUseFilePrivateAPI(statement: statement, in: translator.syntaxTree) {
                 let message: Message = .kotlinExtensionUsingFileprivateAPI(statement, source: translator.syntaxTree.source)
-                return kstatements + [KotlinMessageStatement(message: message, statement: statement)]
-            } else {
-                return kstatements
+                kstatements.append(KotlinMessageStatement(message: message, statement: statement))
             }
+            return kstatements
         }
 
         if !statement.inherits.isEmpty, let message = Message.kotlinExtensionAddProtocols(statement, extensionPlacement: placement, source: translator.syntaxTree.source) {
@@ -1510,22 +1521,16 @@ struct KotlinExtensionDeclaration {
             generics = extendedTypeInfo.generics.merge(extension: statement.extends, generics: statement.generics).resolvingSelf(in: statement)
             visibility = extendedTypeInfo.modifiers.visibility
         }
-        let kextensionMembers = translateExtensionMembers(statement.members, of: extends, visibility: visibility, generics: generics, declarationType: declarationType?.type, translator: translator, extensionPlacement: placement)
+        let companionType = translator.codebaseInfo?.companionType(of: extends) ?? .object
+        let kextensionMembers = translateExtensionMembers(statement.members, of: extends, visibility: visibility, generics: generics, declarationType: declarationType?.type, companionType: companionType, translator: translator, extensionPlacement: placement)
         kextensionMembers.first?.ensureLeadingNewlines(1)
         return kstatements + kextensionMembers
     }
 
-    static func translateExtensionMembers(_ members: [Statement], of extends: TypeSignature, visibility: Modifiers.Visibility, generics: Generics, declarationType: StatementType?, translator: KotlinTranslator, extensionPlacement: KotlinExtensionPlacement? = nil) -> [KotlinStatement] {
-        var companionType: KotlinCompanionType? = nil
+    static func translateExtensionMembers(_ members: [Statement], of extends: TypeSignature, visibility: Modifiers.Visibility, generics: Generics, declarationType: StatementType?, companionType: KotlinCompanionType, translator: KotlinTranslator, extensionPlacement: KotlinExtensionPlacement? = nil) -> [KotlinStatement] {
         var canAddStaticMembers: Bool? = nil
         if let extensionPlacement, !extensionPlacement.canMove {
-            canAddStaticMembers = declarationType != .protocolDeclaration || extensionPlacement.isInModule != false || translator.codebaseInfo == nil
-            if canAddStaticMembers == false {
-                companionType = translator.codebaseInfo?.companionType(of: extends) ?? .object
-                if case .interface = companionType {
-                    canAddStaticMembers = true
-                }
-            }
+            canAddStaticMembers = declarationType != .protocolDeclaration || extensionPlacement.isInModule != false || translator.codebaseInfo == nil || companionType.isInterface
         }
 
         var kstatements: [KotlinStatement] = []
@@ -1571,10 +1576,8 @@ struct KotlinExtensionDeclaration {
                 if let kfunctionDeclaration = kmember as? KotlinFunctionDeclaration {
                     extendsGenerics = extendsGenerics.merge(overrides: kfunctionDeclaration.generics, addNew: false)
                 }
-                if companionType == nil {
-                    companionType = translator.codebaseInfo?.companionType(of: extends) ?? .object
-                }
-                memberDeclaration.extends = (extends, memberDeclaration.isStatic ? companionType! : .none, extendsGenerics)
+                memberDeclaration.extends = (extends, extendsGenerics)
+                memberDeclaration.companion = (extends, companionType)
                 kstatements.append(kmember)
             }
         }
@@ -1668,7 +1671,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             if let convertedGenerics {
                 return convertedGenerics
             }
-            guard let extendsGenerics = extends?.2, !extendsGenerics.isEmpty else {
+            guard let extendsGenerics = extends?.1, !extendsGenerics.isEmpty else {
                 return generics
             }
             guard !generics.isEmpty else {
@@ -1695,13 +1698,14 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     // KotlinMemberDeclaration
-    var extends: (TypeSignature, KotlinCompanionType, Generics)? {
+    var extends: (TypeSignature, Generics)? {
         didSet {
             if extends != nil {
                 isOpen = false
             }
         }
     }
+    var companion: (TypeSignature, KotlinCompanionType)?
     var isStatic: Bool {
         return modifiers.isStatic && !isEqualImplementation && !isLessThanImplementation
     }
@@ -1943,7 +1947,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
             } else if isLessThanImplementation {
                 appendLessThanDeclaration(to: output, indentation: indentation)
             } else {
-                hasExplicitReturnType = appendFunctionDeclaration(to: output, indentation: indentation)
+                hasExplicitReturnType = appendFunctionDeclaration(to: output, indentation: indentation, isDelegatingToCompanion: false)
             }
         }
         if !isExternal, let body {
@@ -1959,18 +1963,46 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
     }
 
-    private func appendFunctionDeclaration(to output: OutputGenerator, indentation: Indentation) -> Bool {
+    func appendCompanionClassDelegatingMember(to output: OutputGenerator, indentation: Indentation) {
+        guard isStatic && visibility != .private, let companion else {
+            return
+        }
+        attributes.append(to: output, indentation: indentation)
+        annotations.appendLines(to: output, indentation: indentation)
+        output.append(indentation)
+        let _ = appendFunctionDeclaration(to: output, indentation: indentation, isDelegatingToCompanion: true)
+        output.append(" = ").append(companion.0.name).append(".").append(name).append("(")
+        for (i, parameter) in parameters.enumerated() {
+            if i > 0 {
+                output.append(", ")
+            }
+            if let label = parameter.externalLabel {
+                output.append(label).append(" = ").append(label)
+            } else {
+                output.append(parameter.internalLabel)
+            }
+        }
+        output.append(")\n")
+    }
+
+    private func appendFunctionDeclaration(to output: OutputGenerator, indentation: Indentation, isDelegatingToCompanion: Bool) -> Bool {
+        var forceOverride = false
         if role != .local {
-            output.append(modifiers.kotlinMemberString(isGlobal: role == .global, isOpen: isOpen, suffix: " "))
+            forceOverride = !isDelegatingToCompanion && isStatic && modifiers.visibility != .private && companion?.1.isClass == true
+            if forceOverride {
+                output.append("override ")
+            } else {
+                output.append(modifiers.kotlinMemberString(isGlobal: role == .global, isOpen: isOpen || isDelegatingToCompanion, suffix: " "))
+            }
         }
         if apiFlags.contains(.async) {
             output.append("suspend ")
         }
 
         let generics = functionGenerics.filterWhereEqual()
-        let isInline = attributes.contains(.inlineAlways) && !isOpen
+        let isInline = !isDelegatingToCompanion && attributes.contains(.inlineAlways) && !isOpen
         if type != .constructorDeclaration {
-            if isExternal {
+            if !isDelegatingToCompanion && isExternal {
                 output.append("external ")
             }
             if isInline {
@@ -2002,7 +2034,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(">")
             }
             // Kotlin does not allow default values to override functions
-            if let defaultValue = parameter.defaultValue, !modifiers.isOverride {
+            if let defaultValue = parameter.defaultValue, !modifiers.isOverride && !forceOverride {
                 output.append(" = ").append(defaultValue, indentation: indentation)
             }
             if index != parameters.count - 1 || disambiguatingParameterCount > 0 {
@@ -2296,7 +2328,8 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         }
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
 
-        let kextensionMembers = KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, generics: kstatement.generics, declarationType: .protocolDeclaration, translator: translator)
+        let companionType: KotlinCompanionType = kstatement.companionInterface == nil ? .none : .interface(kstatement.companionInterface!)
+        let kextensionMembers = KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, generics: kstatement.generics, declarationType: .protocolDeclaration, companionType: companionType, translator: translator)
         kextensionMembers.first?.ensureLeadingNewlines(1)
         return [kstatement] + kextensionMembers
     }
@@ -2535,13 +2568,14 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 
     // KotlinMemberDeclaration
-    var extends: (TypeSignature, KotlinCompanionType, Generics)? {
+    var extends: (TypeSignature, Generics)? {
         didSet {
             if extends != nil {
                 isOpen = false
             }
         }
     }
+    var companion: (TypeSignature, KotlinCompanionType)?
     var isStatic: Bool {
         return modifiers.isStatic
     }
@@ -2731,7 +2765,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
                 output.append(indentation).append(value, indentation: indentation)
             }
         } else {
-            appendDeclaration(to: output, indentation: indentation, storage: storage)
+            appendDeclaration(to: output, indentation: indentation, storage: storage, isDelegatingToCompanion: false)
         }
 
         if apiFlags.contains(.viewBuilder) || apiFlags.contains(.async), let getterBody = getter?.body {
@@ -2751,26 +2785,51 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         }
     }
 
-    private func appendDeclaration(to output: OutputGenerator, indentation: Indentation, storage: KotlinVariableStorage?) {
+    func appendCompanionClassDelegatingMember(to output: OutputGenerator, indentation: Indentation) {
+        guard isStatic && visibility != .private, let companion else {
+            return
+        }
+        appendDeclaration(to: output, indentation: indentation, isDelegatingToCompanion: true)
+        if isAppendAsFunction {
+            output.append(" = ").append(companion.0.name).append(".").append(propertyName).append("()")
+        } else {
+            let variableIndentation = indentation.inc()
+            output.append("\n")
+            output.append(variableIndentation).append("get() = ").append(companion.0.name).append(".").append(propertyName)
+            if apiFlags.contains(.writeable) && modifiers.setVisibility != .private {
+                output.append("\n")
+                output.append(variableIndentation).append("set(newValue) {\n")
+                output.append(variableIndentation.inc()).append(companion.0.name).append(".").append(propertyName).append(" = newValue\n")
+                output.append(variableIndentation).append("}")
+            }
+        }
+        output.append("\n")
+    }
+
+    private func appendDeclaration(to output: OutputGenerator, indentation: Indentation, storage: KotlinVariableStorage? = nil, isDelegatingToCompanion: Bool) {
         attributes.append(to: output, indentation: indentation)
         annotations.appendLines(to: output, indentation: indentation)
         output.append(indentation)
         if role.isProperty || role == .global {
-            output.append(modifiers.kotlinMemberString(isGlobal: role == .global, isOpen: isOpen, suffix: " "))
+            if !isDelegatingToCompanion && isStatic && visibility != .private && companion?.1.isClass == true {
+                output.append("override ")
+            } else {
+                output.append(modifiers.kotlinMemberString(isGlobal: role == .global, isOpen: isOpen || isDelegatingToCompanion, suffix: " "))
+            }
             if apiFlags.contains(.async) {
                 output.append("suspend ")
-            } else if storage == nil && role != .superclassOverrideProperty && declaredType.isUnwrappedOptional {
+            } else if !isDelegatingToCompanion && storage == nil && role != .superclassOverrideProperty && declaredType.isUnwrappedOptional {
                 output.append("lateinit ")
             }
         }
-        if apiFlags.contains(.viewBuilder) || (apiFlags.contains(.async) && !isAsyncLet) {
+        if isAppendAsFunction {
             output.append("fun ")
-        } else if !apiFlags.contains(.writeable) && !isAssignFromWriteable {
+        } else if (!apiFlags.contains(.writeable) && !isAssignFromWriteable) || (isDelegatingToCompanion && modifiers.setVisibility == .private) {
             output.append("val ")
         } else {
             output.append("var ")
         }
-        if let generics = extends?.2.filterWhereEqual(), !generics.isEmpty {
+        if let generics = extends?.1.filterWhereEqual(), !generics.isEmpty {
             generics.append(to: output, indentation: indentation)
             output.append(" ")
         }
@@ -2782,7 +2841,7 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         if names.count > 1 {
             output.append(")")
         }
-        if apiFlags.contains(.viewBuilder) || (apiFlags.contains(.async) && !isAsyncLet) {
+        if isAppendAsFunction {
             output.append("()")
         }
 
@@ -2791,10 +2850,10 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
         } else if storage != nil && propertyType != .none {
             output.append(": ").append(propertyType.kotlin)
         }
-        if (!apiFlags.contains(.async) || isAsyncLet) && storage == nil {
+        if !isDelegatingToCompanion && (!apiFlags.contains(.async) || isAsyncLet) && storage == nil {
             appendInitialValue(to: output, indentation: indentation)
         }
-        extends?.2.appendWhere(to: output, indentation: indentation)
+        extends?.1.appendWhere(to: output, indentation: indentation)
     }
 
     private func appendAsFunctionDefinition(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
@@ -3020,6 +3079,10 @@ class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
             appendValue()
             output.append("\n")
         }
+    }
+
+    private var isAppendAsFunction: Bool {
+        return apiFlags.contains(.viewBuilder) || (apiFlags.contains(.async) && !isAsyncLet)
     }
 
     private func initializeStorage() -> KotlinVariableStorage? {

@@ -1822,8 +1822,8 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
         guard type != .any else {
             return nil
         }
-        // Type.self is allowed
-        guard accessingMember != "self" else {
+        // Type.self is allowed, and <TypeExpression>.java is common in Kotlin to get the Java class
+        guard accessingMember != "self" && accessingMember != "java" else {
             return nil
         }
         // A type literal is not the same as KClass<Type>

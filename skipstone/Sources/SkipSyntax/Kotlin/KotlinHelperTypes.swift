@@ -23,6 +23,49 @@ enum KotlinCompanionType {
     case object
     case `class`(TypeSignature)
     case interface(TypeSignature)
+
+    var isClass: Bool {
+        if case .class = self {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    var isInterface: Bool {
+        if case .interface = self {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    var isObject: Bool {
+        if case .object = self {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    var isNone: Bool {
+        if case .none = self {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    var signature: TypeSignature? {
+        switch self {
+        case .class(let signature):
+            return signature
+        case .interface(let signature):
+            return signature
+        default:
+            return nil
+        }
+    }
 }
 
 enum KotlinDirectiveAttribute: String {
@@ -244,6 +287,7 @@ extension Generics {
     }
 
     func append(to output: OutputGenerator, indentation: Indentation, modifier: String? = nil) {
+        let entries = self.entries.filter { $0.name != "Self" } // Can't append Self constraints
         if entries.isEmpty {
             return
         }

@@ -1099,9 +1099,10 @@ final class MemberDeclarationTests: XCTestCase {
             open fun f(a: Int) = Unit
             internal open fun f(b: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null) = Unit
 
+            companion object: CompanionClass() {
+            }
             open class CompanionClass {
             }
-            companion object: CompanionClass()
         }
         """)
 
@@ -1873,9 +1874,10 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         open class C<T, U> {
 
+            companion object: CompanionClass() {
+            }
             open class CompanionClass {
             }
-            companion object: CompanionClass()
         }
 
         internal val <U> C<Int, U>.v: U? where U: P

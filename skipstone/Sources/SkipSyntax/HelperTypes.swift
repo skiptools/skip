@@ -564,6 +564,10 @@ struct Generics: Equatable, Codable {
                     result.entries[i].whereEqual = extensionGenerics[i]
                 }
             }
+            // Special case for Self generics that won't appear in signature
+            if let entry = generics.entries.first(where: { $0.name == "Self" }), !result.entries.contains(where: { $0.name == "Self" }) {
+                result.entries.append(entry)
+            }
         } else {
             result = result.merge(overrides: generics, addNew: true)
         }

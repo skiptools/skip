@@ -499,7 +499,11 @@ final class EnumTests: XCTestCase {
 
     func testCaseIterable() async throws {
         // Tests don't have access to SkipLib protocols
-        let supportingSwift = "protocol CaseIterable {}"
+        let supportingSwift = """
+        protocol CaseIterable {
+            static var allCases: [Self] { get }
+        }
+        """
 
         try await check(supportingSwift: supportingSwift, swift: """
         enum E: CaseIterable {
@@ -515,8 +519,8 @@ final class EnumTests: XCTestCase {
             two,
             three;
 
-            companion object {
-                val allCases: Array<E>
+            companion object: CaseIterableCompanion<E> {
+                override val allCases: Array<E>
                     get() = arrayOf(one, two, three)
             }
         }
@@ -535,15 +539,15 @@ final class EnumTests: XCTestCase {
         }
         """, kotlin: """
         import skip.lib.Array
-        
+
         internal enum class E: CaseIterable {
             one,
             two,
             three;
 
-            companion object {
-        
-                internal val allCases: Array<E>
+            companion object: CaseIterableCompanion<E> {
+
+                override val allCases: Array<E>
                     get() = arrayOf(E.one, E.two, E.three)
             }
         }
@@ -567,13 +571,13 @@ final class EnumTests: XCTestCase {
                 override fun hashCode(): Int = "TwoCase".hashCode()
             }
 
-            companion object {
+            companion object: CaseIterableCompanion<E> {
                 val one: E
                     get() = OneCase()
                 val two: E
                     get() = TwoCase()
 
-                val allCases: Array<E>
+                override val allCases: Array<E>
                     get() = arrayOf(one, two)
             }
         }
@@ -584,7 +588,6 @@ final class EnumTests: XCTestCase {
         // Make CaseIterable part of supportSwift because we don't have access to SkipLib in tests
         try await check(supportingSwift: """
         protocol CaseIterable {
-            // SKIP NOWARN
             static var allCases: [Self] { get }
         }
         enum E: CaseIterable {

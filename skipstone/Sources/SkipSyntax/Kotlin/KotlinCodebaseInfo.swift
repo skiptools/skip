@@ -81,24 +81,24 @@ extension CodebaseInfo.Context {
         return !matches.isEmpty
     }
 
-    /// Whether this declaration is implementing a protocol property.
+    /// Whether this declaration is implementing a protocol property, excluding constrained properties.
     func isImplementingKotlinInterfaceMember(declaration: Statement, in type: TypeSignature) -> Bool {
         if let variableDeclaration = declaration as? VariableDeclaration {
             guard !variableDeclaration.names.isEmpty, let name = variableDeclaration.names[0] else {
                 return false
             }
-            return isKotlinInterfaceMember(name: name, parameters: nil, isStatic: variableDeclaration.modifiers.isStatic, in: type, includeDeclaringType: false)
+            return isKotlinUnconstrainedInterfaceMember(name: name, parameters: nil, isStatic: variableDeclaration.modifiers.isStatic, in: type, includeDeclaringType: false)
         } else if let functionDeclaration = declaration as? FunctionDeclaration {
-            return isKotlinInterfaceMember(name: functionDeclaration.name, parameters: functionDeclaration.functionType.parameters, isStatic: functionDeclaration.modifiers.isStatic, in: type, includeDeclaringType: false)
+            return isKotlinUnconstrainedInterfaceMember(name: functionDeclaration.name, parameters: functionDeclaration.functionType.parameters, isStatic: functionDeclaration.modifiers.isStatic, in: type, includeDeclaringType: false)
         } else if let subscriptDeclaration = declaration as? SubscriptDeclaration {
-            return isKotlinInterfaceMember(name: "subscript", parameters: subscriptDeclaration.getterType.parameters, isStatic: subscriptDeclaration.modifiers.isStatic, in: type, includeDeclaringType: false)
+            return isKotlinUnconstrainedInterfaceMember(name: "subscript", parameters: subscriptDeclaration.getterType.parameters, isStatic: subscriptDeclaration.modifiers.isStatic, in: type, includeDeclaringType: false)
         } else {
             return false
         }
     }
 
     /// Whether the given member is declared by a protocol of the given type.
-    func isKotlinInterfaceMember(name: String, parameters: [TypeSignature.Parameter]?, isStatic: Bool, in owningType: TypeSignature, includeDeclaringType: Bool = true) -> Bool {
+    func isKotlinUnconstrainedInterfaceMember(name: String, parameters: [TypeSignature.Parameter]?, isStatic: Bool, in owningType: TypeSignature, includeDeclaringType: Bool = true) -> Bool {
         assert(global.kotlin != nil)
         let protocolSignatures = global.protocolSignatures(forNamed: owningType)
         let parameterLabels = parameters?.map(\.label) ?? []
@@ -109,6 +109,10 @@ extension CodebaseInfo.Context {
                 continue
             }
             for protocolInfo in typeInfos(forNamed: protocolSignature) {
+                // You can't override a constrained protocol because its members are implemented as extension functions
+                if protocolInfo.declarationType == .extensionDeclaration && protocolInfo.generics.entries.contains(where: { !$0.inherits.isEmpty || $0.whereEqual != nil }) {
+                    continue
+                }
                 if parameters != nil {
                     if name == "subscript" {
                         if protocolInfo.subscripts.contains(where: { $0.isStatic == isStatic && $0.signature.parameters.map(\.label) == parameterLabels && isCompatibleParameterTypes(candidates: parameterTypes, in: owningType, targets: $0.signature.parameters.map(\.type), in: protocolInfo.signature) }) {

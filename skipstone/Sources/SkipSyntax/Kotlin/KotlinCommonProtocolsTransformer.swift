@@ -30,7 +30,7 @@ final class KotlinCommonProtocolsTransformer: KotlinTransformer {
             enumCaseDeclaration.enumGenerics = fixupGenerics(enumCaseDeclaration.enumGenerics)
         }
         if let memberDeclaration = node as? KotlinMemberDeclaration, let extends = memberDeclaration.extends {
-            memberDeclaration.extends = (extends.0, extends.1, fixupGenerics(extends.2))
+            memberDeclaration.extends = (extends.0, fixupGenerics(extends.1))
         }
         return .recurse(nil)
     }

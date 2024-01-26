@@ -82,9 +82,16 @@ class KotlinStatement: KotlinSyntaxNode {
 
 /// Additional requirements for type members to handle extensions and companion objects in Kotlin.
 protocol KotlinMemberDeclaration: AnyObject {
-    var extends: (TypeSignature, KotlinCompanionType, Generics)? { get set }
+    var extends: (TypeSignature, Generics)? { get set }
+    var companion: (TypeSignature, KotlinCompanionType)? { get set }
     var isStatic: Bool { get }
     var visibility: Modifiers.Visibility { get set }
+
+    /// Append an equivalent member that delegates from the companion class to the companion object.
+    ///
+    /// Every companion class contains all non-private static members, each of which delegates to the companion object. This way
+    /// all the logic and property storage is on the companion object, but any subclass of the companion class inherits the functionality.
+    func appendCompanionClassDelegatingMember(to output: OutputGenerator, indentation: Indentation)
 }
 
 extension KotlinMemberDeclaration {
@@ -92,10 +99,15 @@ extension KotlinMemberDeclaration {
         guard let extends else {
             return
         }
-        switch extends.1 {
+        // All private members go on the companion object
+        var companionType = !isStatic ? .none : (companion?.1 ?? .none)
+        if visibility == .private, companionType.isClass || companionType.isInterface {
+            companionType = .object
+        }
+        switch companionType {
         case .none:
             output.append(extends.0.withGenerics([]).kotlin)
-            extends.2.append(to: output, indentation: indentation)
+            extends.1.append(to: output, indentation: indentation)
         case .object:
             output.append(extends.0.withGenerics([]).kotlin)
             output.append(".Companion")
@@ -103,9 +115,12 @@ extension KotlinMemberDeclaration {
             output.append(signature.kotlin)
         case .interface(let signature):
             output.append(signature.withGenerics([]).kotlin)
-            extends.2.append(to: output, indentation: indentation)
+            extends.1.append(to: output, indentation: indentation)
         }
         output.append(".")
+    }
+
+    func appendCompanionClassDelegatingMember(to output: OutputGenerator, indentation: Indentation) {
     }
 }
 
