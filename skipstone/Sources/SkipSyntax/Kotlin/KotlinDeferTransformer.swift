@@ -7,7 +7,7 @@ final class KotlinDeferTransformer: KotlinTransformer {
 }
 
 /// Uniquify identifiers we use in defer statements.
-private class DeferSuffixVisitor {
+private final class DeferSuffixVisitor {
     private var deferVariableSuffix = 0
 
     func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {

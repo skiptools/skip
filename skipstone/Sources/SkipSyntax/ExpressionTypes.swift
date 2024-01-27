@@ -113,7 +113,7 @@ enum ExpressionType: CaseIterable {
 }
 
 /// `[a, b, c]`
-class ArrayLiteral: Expression {
+final class ArrayLiteral: Expression {
     let elements: [Expression]
     let useMultilineFormatting: Bool
 
@@ -179,7 +179,7 @@ class ArrayLiteral: Expression {
 }
 
 /// `#available(...)`
-class Available: Expression {
+final class Available: Expression {
     init(syntax: SyntaxProtocol?, sourceFile: Source.FilePath?, sourceRange: Source.Range? = nil) {
         super.init(type: .available, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -197,7 +197,7 @@ class Available: Expression {
 }
 
 /// `await ...`
-class Await: Expression {
+final class Await: Expression {
     let target: Expression
 
     init(target: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -228,7 +228,7 @@ class Await: Expression {
 }
 
 /// `+, -, *, ...`
-class BinaryOperator: Expression {
+final class BinaryOperator: Expression {
     let op: Operator
     let lhs: Expression
     let rhs: Expression
@@ -366,7 +366,7 @@ class BinaryOperator: Expression {
 }
 
 /// `[if case .a(] let x  [)]`
-class Binding: Expression, BindingExpression {
+final class Binding: Expression, BindingExpression {
     private(set) var identifierPatterns: [IdentifierPattern]
     var variableTypes: [TypeSignature] {
         return variableType.tupleTypes(count: identifierPatterns.count)
@@ -415,7 +415,7 @@ class Binding: Expression, BindingExpression {
 }
 
 /// `true, false`
-class BooleanLiteral: Expression {
+final class BooleanLiteral: Expression {
     let literal: Bool
 
     init(literal: Bool, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -441,7 +441,7 @@ class BooleanLiteral: Expression {
 }
 
 /// Synthetic expression representing the pattern to match in a case expression.
-class CasePattern: Expression, BindingExpression {
+final class CasePattern: Expression, BindingExpression {
     let value: Expression
     private(set) var isVar: Bool
     private(set) var isNonNilMatch: Bool
@@ -506,7 +506,7 @@ class CasePattern: Expression, BindingExpression {
 }
 
 /// `{ ... }`
-class Closure: Expression {
+final class Closure: Expression {
     private(set) var captureList: [(CaptureType, LabeledValue<Expression>)]
     private(set) var returnType: TypeSignature
     private(set) var parameters: [Parameter<Void>]
@@ -635,7 +635,7 @@ class Closure: Expression {
 }
 
 /// `[a: b, c: d]`
-class DictionaryLiteral: Expression {
+final class DictionaryLiteral: Expression {
     let entries: [(key: Expression, value: Expression)]
     let useMultilineFormatting: Bool
 
@@ -701,7 +701,7 @@ class DictionaryLiteral: Expression {
 }
 
 /// `function(...)`
-class FunctionCall: Expression, APICallExpression, MemberAccessExpression {
+final class FunctionCall: Expression, APICallExpression, MemberAccessExpression {
     let function: Expression
     let arguments: [LabeledValue<Expression>]
     let trailingClosureCount: Int
@@ -886,7 +886,7 @@ class FunctionCall: Expression, APICallExpression, MemberAccessExpression {
 }
 
 /// `x`, also `self` or `super`
-class Identifier: Expression, APICallExpression {
+final class Identifier: Expression, APICallExpression {
     let name: String
     private(set) var generics: [TypeSignature]?
     /// Whether this appears to be a local variable or parameter.
@@ -958,7 +958,7 @@ class Identifier: Expression, APICallExpression {
 }
 
 /// `if ...`
-class If: Expression {
+final class If: Expression {
     let conditions: [Expression]
     let body: CodeBlock
     let elseBody: CodeBlock?
@@ -1029,7 +1029,7 @@ class If: Expression {
 }
 
 /// `&x`
-class InOut: Expression {
+final class InOut: Expression {
     let target: Expression
 
     init(target: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -1060,7 +1060,7 @@ class InOut: Expression {
 }
 
 /// `\.x`
-class KeyPathLiteral: Expression {
+final class KeyPathLiteral: Expression {
     private(set) var root: TypeSignature = .none
     let components: [Component]
 
@@ -1180,7 +1180,7 @@ class KeyPathLiteral: Expression {
 }
 
 /// `#Macro`
-class MacroExpansion: Expression {
+final class MacroExpansion: Expression {
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         guard syntax.kind == .macroExpansionExpr, let macroExpansionExpr = syntax.as(MacroExpansionExprSyntax.self) else {
             return nil
@@ -1194,7 +1194,7 @@ class MacroExpansion: Expression {
 }
 
 /// `case .a = x`
-class MatchingCase: Expression, BindingExpression {
+final class MatchingCase: Expression, BindingExpression {
     let pattern: CasePattern
     private(set) var declaredType: TypeSignature
     let target: Expression
@@ -1250,7 +1250,7 @@ class MatchingCase: Expression, BindingExpression {
 }
 
 /// `person.name`
-class MemberAccess: Expression, APICallExpression, MemberAccessExpression {
+final class MemberAccess: Expression, APICallExpression, MemberAccessExpression {
     var base: Expression?
     private(set) var baseType: TypeSignature // Will be .module(name, .none) for module qualifier
     let member: String
@@ -1325,6 +1325,8 @@ class MemberAccess: Expression, APICallExpression, MemberAccessExpression {
             if self.baseType == .none, memberType != .none, member != "self" && member != "Type", let baseIdentifier, baseIdentifier.generics?.isEmpty != false {
                 baseIdentifier.isModuleNameFor = memberType
                 self.baseType = .module(baseIdentifier.name, .none)
+            } else if base == nil, let selfType = match.memberOf?.selfType {
+                self.baseType = selfType
             }
         } else if let generics, !generics.isEmpty {
             memberType = .named(member, generics).asMember(of: self.baseType)
@@ -1370,7 +1372,7 @@ class MemberAccess: Expression, APICallExpression, MemberAccessExpression {
 }
 
 /// `nil`
-class NilLiteral: Expression {
+final class NilLiteral: Expression {
     init(syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         super.init(type: .nilLiteral, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -1395,7 +1397,7 @@ class NilLiteral: Expression {
 }
 
 /// `1, 1.0`
-class NumericLiteral: Expression {
+final class NumericLiteral: Expression {
     let literal: String
     let isFloatingPoint: Bool
 
@@ -1430,7 +1432,7 @@ class NumericLiteral: Expression {
 }
 
 /// `[if/guard/for/while] let x = optional`
-class OptionalBinding: Expression, BindingExpression {
+final class OptionalBinding: Expression, BindingExpression {
     let names: [String?]
     private(set) var declaredType: TypeSignature
     let isLet: Bool
@@ -1498,7 +1500,7 @@ class OptionalBinding: Expression, BindingExpression {
         if names.count == 1, let name = names[0], !context.isLocalOrSelfIdentifier(name), value == nil || (value as? Identifier)?.name == name {
             if let (signature, match) = context.identifier(name, messagesNode: nil) {
                 // For some reason Kotlin considers all closure members unstable
-                nameShadowsUnstableValue = match.isMember && (match.apiFlags.contains(.writeable) || signature.isFunction)
+                nameShadowsUnstableValue = match.memberOf != nil && (match.apiFlags.contains(.writeable) || signature.isFunction)
             } else {
                 nameShadowsUnstableValue = true // Better safe than sorry
             }
@@ -1521,7 +1523,7 @@ class OptionalBinding: Expression, BindingExpression {
 }
 
 /// `(...)`
-class Parenthesized: Expression {
+final class Parenthesized: Expression {
     let content: Expression
 
     init(content: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -1559,7 +1561,7 @@ class Parenthesized: Expression {
 ///     `#endif`
 ///
 /// - Note: We never instantiate this class. It is only used ot extract the statements from an `#if`.
-class PostfixIfDefined: Expression {
+final class PostfixIfDefined: Expression {
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         guard syntax.kind == .postfixIfConfigExpr, let postfixIfConfigExpr = syntax.as(PostfixIfConfigExprSyntax.self) else {
             return nil
@@ -1576,7 +1578,7 @@ class PostfixIfDefined: Expression {
 }
 
 /// `x?`, `x...`, etc
-class PostfixOperator: Expression {
+final class PostfixOperator: Expression {
     let operatorSymbol: String
     let target: Expression
 
@@ -1632,7 +1634,7 @@ class PostfixOperator: Expression {
 }
 
 /// `!x`, `..<x`, etc
-class PrefixOperator: Expression {
+final class PrefixOperator: Expression {
     let operatorSymbol: String
     let target: Expression
 
@@ -1680,7 +1682,7 @@ class PrefixOperator: Expression {
 }
 
 /// `"..."`
-class StringLiteral: Expression {
+final class StringLiteral: Expression {
     let segments: [StringLiteralSegment<Expression>]
     let isMultiline: Bool
     var expressibleByStringInterpolationType: (TypeSignature, TypeSignature)?
@@ -1762,7 +1764,7 @@ class StringLiteral: Expression {
 }
 
 /// `array[0]`
-class Subscript: Expression, APICallExpression {
+final class Subscript: Expression, APICallExpression {
     let base: Expression
     let arguments: [LabeledValue<Expression>]
 
@@ -1825,7 +1827,7 @@ class Subscript: Expression, APICallExpression {
 }
 
 /// `switch x { ... }`
-class Switch: Expression {
+final class Switch: Expression {
     let on: Expression
     let cases: [SwitchCase]
 
@@ -1887,7 +1889,7 @@ class Switch: Expression {
 }
 
 /// `case x:` or `default:`, and also used for `catch` matching.
-class SwitchCase: Expression, BindingExpression {
+final class SwitchCase: Expression, BindingExpression {
     let patterns: [(pattern: CasePattern, whereGuard: Expression?)] // Empty = default
     let body: CodeBlock
 
@@ -1989,7 +1991,7 @@ class SwitchCase: Expression, BindingExpression {
 }
 
 /// `b ? x : y`
-class TernaryOperator: Expression {
+final class TernaryOperator: Expression {
     let condition: Expression
     let ifTrue: Expression
     let ifFalse: Expression
@@ -2035,7 +2037,7 @@ class TernaryOperator: Expression {
 }
 
 /// `try f()`
-class Try: Expression {
+final class Try: Expression {
     let trying: Expression
     let kind: Kind
 
@@ -2090,7 +2092,7 @@ class Try: Expression {
 }
 
 /// `(x, y, z)`
-class TupleLiteral: Expression {
+final class TupleLiteral: Expression {
     let labels: [String?]
     let values: [Expression]
 
@@ -2136,7 +2138,7 @@ class TupleLiteral: Expression {
 }
 
 /// `Int`
-class TypeLiteral: Expression {
+final class TypeLiteral: Expression {
     private(set) var literal: TypeSignature
 
     init(literal: TypeSignature, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {

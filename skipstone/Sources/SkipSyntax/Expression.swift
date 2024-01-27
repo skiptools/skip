@@ -139,7 +139,7 @@ protocol MemberAccessExpression {
 }
 
 /// Raw source code.
-class RawExpression: Expression {
+final class RawExpression: Expression {
     let sourceCode: String
 
     init(sourceCode: String, message: Message? = nil, syntax: SyntaxProtocol? = nil, range: Source.Range? = nil, in syntaxTree: SyntaxTree? = nil) {

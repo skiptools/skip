@@ -1,5 +1,5 @@
 /// Give warnings for common API that we know we do not support in Kotlin.
-public class KotlinUnavailableAPI: UnavailableAPI {
+public final class KotlinUnavailableAPI: UnavailableAPI {
     public override init() {
     }
     
@@ -17,7 +17,7 @@ public class KotlinUnavailableAPI: UnavailableAPI {
             if name == "append" || name == "insert" || name == "remove" || name == "removeAll" || name == "removeFirst" || name == "removeLast" || name == "removeSubrange" || name == "replaceSubrange" {
                 let message = Message.kotlinStringMutation
                 let parameters = arguments.map { TypeSignature.Parameter(label: $0.label, type: $0.value.type) }
-                return APIMatch(signature: .function(parameters, .void, [], nil), declarationType: .functionDeclaration, isMember: true, availability: .unavailable(message))
+                return APIMatch(signature: .function(parameters, .void, [], nil), declarationType: .functionDeclaration, memberOf: (.string, nil), availability: .unavailable(message))
             }
         }
         return nil

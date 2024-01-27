@@ -11,7 +11,7 @@ final class KotlinIfWhenTransformer: KotlinTransformer {
 }
 
 /// Detect usages as value expressions rather than as statements.
-private class ValueExpressionVisitor {
+private final class ValueExpressionVisitor {
     func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
         // When used as value expressions, any 'if' or 'when' that we've turned into multiple statements because it requires an if check
         // or case target variable declaration needs to be nested in its own immediately-executed closure, and its implicit return values
@@ -96,7 +96,7 @@ private enum ValueExpressionType {
 }
 
 /// Uniquify identifiers we've added for if statements.
-private class IdentifiersVisitor {
+private final class IdentifiersVisitor {
     private var renamedIdentifiersStack: [[String: String]] = []
 
     func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {

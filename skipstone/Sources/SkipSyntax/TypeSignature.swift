@@ -1012,15 +1012,15 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     }
 
     /// Replace uses of `Self` as a type with the owning type declaration.
-    func resolvingSelf(in node: SyntaxNode?) -> TypeSignature {
-        guard let node else {
+    func resolvingSelf(in node: SyntaxNode?, to type: TypeSignature? = nil) -> TypeSignature {
+        guard node != nil || type != nil else {
             return self
         }
-        var owningType: TypeSignature? = nil
+        var owningType = type
         return mappingTypes {
             if $0 == .named("Self", []) {
                 if owningType == nil {
-                    owningType = node.owningTypeDeclaration?.signature
+                    owningType = node?.owningTypeDeclaration?.signature
                 }
                 return owningType
             }

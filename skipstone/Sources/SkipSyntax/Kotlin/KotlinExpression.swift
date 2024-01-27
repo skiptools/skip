@@ -168,7 +168,7 @@ protocol KotlinUsableAsTypeLiteral {
     var isUsedAsTypeLiteral: Bool { get set }
 }
 
-class KotlinRawExpression: KotlinExpression {
+final class KotlinRawExpression: KotlinExpression {
     let sourceCode: String
 
     init(sourceCode: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -189,7 +189,7 @@ class KotlinRawExpression: KotlinExpression {
 /// Special expression type that points to an expression elsewhere in the syntax tree.
 ///
 /// - Note: The shared expression is not included as a child, because it will already have a parent.
-class KotlinSharedExpressionPointer: KotlinExpression {
+final class KotlinSharedExpressionPointer: KotlinExpression {
     let shared: KotlinExpression
 
     init(shared: KotlinExpression) {

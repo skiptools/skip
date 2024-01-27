@@ -1,5 +1,5 @@
 /// Representation of the Kotlin syntax tree.
-public class KotlinSyntaxTree {
+public final class KotlinSyntaxTree {
     let source: Source
     let root: KotlinCodeBlock
     var dependencies: KotlinDependencies

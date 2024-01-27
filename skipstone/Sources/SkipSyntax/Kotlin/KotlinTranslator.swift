@@ -1,7 +1,7 @@
 import Foundation
 
 /// Translates a Swift syntax tree to Kotlin code.
-public class KotlinTranslator {
+public final class KotlinTranslator {
     let syntaxTree: SyntaxTree
     private(set) var codebaseInfo: CodebaseInfo.Context?
     private(set) var packageName: String?

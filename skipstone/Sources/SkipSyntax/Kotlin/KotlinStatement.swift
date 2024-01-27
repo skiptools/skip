@@ -211,7 +211,7 @@ class KotlinExpressionStatement: KotlinStatement, KotlinSingleStatementAppendabl
     }
 }
 
-class KotlinMessageStatement: KotlinStatement {
+final class KotlinMessageStatement: KotlinStatement {
     init(message: Message, statement: Statement? = nil) {
         super.init(type: .message, sourceFile: statement?.sourceFile, sourceRange: statement?.sourceRange, extras: statement?.extras)
         self.messages.append(message)
@@ -222,7 +222,7 @@ class KotlinMessageStatement: KotlinStatement {
     }
 }
 
-class KotlinRawStatement: KotlinStatement, KotlinSingleStatementAppendable {
+final class KotlinRawStatement: KotlinStatement, KotlinSingleStatementAppendable {
     let sourceCode: String
 
     init(sourceCode: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {

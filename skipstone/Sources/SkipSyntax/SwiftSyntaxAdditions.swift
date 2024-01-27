@@ -296,7 +296,7 @@ extension TypeEffectSpecifiersSyntax {
     }
 }
 
-private class PrettyPrintVisitor: SyntaxVisitor {
+private final class PrettyPrintVisitor: SyntaxVisitor {
     init() {
         super.init(viewMode: .sourceAccurate)
     }

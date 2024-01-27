@@ -110,7 +110,7 @@ class ExpressionStatement: Statement {
 }
 
 /// Attach a warning or error to the tree.
-class MessageStatement: Statement {
+final class MessageStatement: Statement {
     init(message: Message) {
         super.init(type: .message)
         self.messages = [message]
@@ -122,7 +122,7 @@ class MessageStatement: Statement {
 }
 
 /// Raw source code.
-class RawStatement: Statement {
+final class RawStatement: Statement {
     let sourceCode: String
 
     init(sourceCode: String, message: Message? = nil, syntax: SyntaxProtocol? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree? = nil) {

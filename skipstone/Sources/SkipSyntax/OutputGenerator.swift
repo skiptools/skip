@@ -1,5 +1,5 @@
 /// Generate output from a graph of nodes.
-class OutputGenerator {
+final class OutputGenerator {
     private let root: OutputNode
     private var content = ""
     private typealias MapEntryOffsets = (sourceFile: Source.FilePath, sourceRange: Source.Range?, offset: Int, length: Int)

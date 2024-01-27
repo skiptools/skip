@@ -401,31 +401,42 @@ final class TypeDeclarationTests: XCTestCase {
     }
 
     func testGenericProtocolSelfEqual() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: """
+        extension Int {
+            let min = 0
+        }
+        """, swift: """
         struct S: P {
-            static let value = 1
         }
         protocol P {
         }
         extension P where Self == S {
-            static let value: Int {
-                return S.value
+            static let value = 1
+            static let ref = S()
+            static func refFunc() -> S {
+                return S()
             }
+        }
+        func f(p: P = .ref, q: P = .refFunc()) {
+            let b = S.value == .max
         }
         """, kotlin: """
         internal class S: P {
 
             companion object: PCompanion {
-                internal val value = 1
+
+                val value = 1
+                val ref = S()
+                fun refFunc(): S = S()
             }
         }
         internal interface P {
         }
         internal interface PCompanion {
         }
-
-        internal val PCompanion.value: Int
-            get() = S.value
+        internal fun f(p: P = S.ref, q: P = S.refFunc()) {
+            val b = S.value == Int.max
+        }
         """)
     }
 

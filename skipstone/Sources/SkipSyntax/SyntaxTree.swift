@@ -2,7 +2,7 @@ import SwiftParser
 import SwiftSyntax
 
 /// Representation of the Swift syntax tree.
-public class SyntaxTree: PrettyPrintable {
+public final class SyntaxTree: PrettyPrintable {
     let source: Source
     let syntax: SourceFileSyntax
     let preprocessorSymbols: Set<String>

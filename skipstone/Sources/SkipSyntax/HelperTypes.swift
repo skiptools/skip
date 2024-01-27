@@ -24,7 +24,7 @@ struct APIMatch {
     var apiFlags: APIFlags = []
     /// May be `nil` for bultins like tuple members.
     var declarationType: StatementType?
-    var isMember = false
+    var memberOf: (declaringType: TypeSignature, selfType: TypeSignature?)?
     var availability: Availability = .available
 }
 
@@ -505,6 +505,11 @@ struct Generics: Equatable, Codable {
         }
     }
 
+    /// Extract any `where Self == Type` constraint value.
+    var selfType: TypeSignature? {
+        return entries.first { $0.name == "Self" }?.whereEqual
+    }
+
     /// Return the constrained type of the given generic parameter.
     ///
     /// - Returns: `.none` if the parameter is not found, `.composition(types)` for multiple constraints. If there are no constraints, returns itself as a `.named` type or the given fallback.
@@ -582,7 +587,7 @@ struct Generics: Equatable, Codable {
 
     func resolvingSelf(in node: SyntaxNode? = nil) -> Generics {
         var generics = self
-        generics.entries = generics.entries.map { $0.resolvingSelf(in: node) }
+        generics.entries = generics.entries.map { $0.resolvingSelf(in: node, to: selfType) }
         return generics
     }
 
@@ -644,10 +649,10 @@ struct Generic: Equatable, Codable {
         return generic
     }
 
-    func resolvingSelf(in node: SyntaxNode? = nil) -> Generic {
+    func resolvingSelf(in node: SyntaxNode? = nil, to type: TypeSignature?) -> Generic {
         var generic = self
-        generic.whereEqual = generic.whereEqual.map { $0.resolvingSelf(in: node) }
-        generic.inherits = generic.inherits.map { $0.resolvingSelf(in: node) }
+        generic.whereEqual = generic.whereEqual.map { $0.resolvingSelf(in: node, to: type) }
+        generic.inherits = generic.inherits.map { $0.resolvingSelf(in: node, to: type) }
         return generic
     }
 }

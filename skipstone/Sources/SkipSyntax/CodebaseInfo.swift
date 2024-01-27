@@ -1,5 +1,5 @@
 /// Information about the codebase used in type inference and translation.
-public class CodebaseInfo {
+public final class CodebaseInfo {
     /// The current module name.
     public let moduleName: String?
 
@@ -404,13 +404,13 @@ public class CodebaseInfo {
             } else if case .module(let module, .none) = type {
                 return matchIdentifier(name: name, moduleName: module)
             }
-            let isStatic = type.isMetaType
-            type = type.asMetaType(false)
 
             let key = ContextMatchKey(name: name, inConstrained: type, excludeConstrainedGenerics: excludeConstrainedExtensions)
             if let cached = cache.matches?[key] {
                 return cached.first
             }
+            let isStatic = type.isMetaType
+            type = type.asMetaType(false)
 
             let typeInfos = typeInfos(forNamed: type)
             let primaryTypeInfo = typeInfos.first { $0.declarationType != .extensionDeclaration }
@@ -522,11 +522,11 @@ public class CodebaseInfo {
                     // Slice - fall through to symbols
                 } else {
                     let signature: TypeSignature = .function([TypeSignature.Parameter(type: .int)], elementType.mappingSelf(to: type), [], nil)
-                    return [APIMatch(signature: signature, isMember: true)]
+                    return [APIMatch(signature: signature, memberOf: (type, nil))]
                 }
             } else if case .dictionary(let keyType, let valueType) = type, let keyType, let valueType, arguments.count == 1 {
                 let signature: TypeSignature = .function([TypeSignature.Parameter(type: keyType)], valueType.mappingSelf(to: type).asOptional(true), [], nil)
-                return [APIMatch(signature: signature, isMember: true)]
+                return [APIMatch(signature: signature, memberOf: (type, nil))]
             }
             let isStatic = type.isMetaType
             type = type.asMetaType(false)
@@ -583,6 +583,9 @@ public class CodebaseInfo {
                 var match = memberInfo.apiMatch
                 match.signature = signature
                 match.availability = availability
+                if let memberOf = match.memberOf, let selfType = typeInfo.generics.selfType {
+                    match.memberOf = (memberOf.declaringType, selfType)
+                }
                 return match
             }
             for inherits in typeInfo.inherits {
@@ -739,7 +742,7 @@ public class CodebaseInfo {
 
         private func syntheticInitCandidate(for type: TypeSignature, arguments: [LabeledValue<ArgumentValue>], apiFlags: APIFlags = [], availability: Availability = .available) -> FunctionCandidate {
             let initParameters = arguments.map { TypeSignature.Parameter(label: $0.label, type: $0.value.type) }
-            let match = APIMatch(signature: .function(initParameters, type, apiFlags, nil), apiFlags: apiFlags, declarationType: .initDeclaration, isMember: true, availability: availability)
+            let match = APIMatch(signature: .function(initParameters, type, apiFlags, nil), apiFlags: apiFlags, declarationType: .initDeclaration, memberOf: (type, nil), availability: availability)
             return FunctionCandidate(match: match, score: 0.0, level: 0)
         }
 
@@ -755,7 +758,7 @@ public class CodebaseInfo {
             default:
                 // Is this a cast?
                 if type.isNumeric && arguments.count == 1 && arguments[0].label == nil && arguments[0].value.type.isNumeric {
-                    return [FunctionCandidate(match: APIMatch(signature: .function([.init(type: arguments[0].value.type)], type, [], nil), apiFlags: [], declarationType: .initDeclaration, isMember: true, availability: .available), score: 1.0, level: 0)]
+                    return [FunctionCandidate(match: APIMatch(signature: .function([.init(type: arguments[0].value.type)], type, [], nil), apiFlags: [], declarationType: .initDeclaration, memberOf: (type, nil), availability: .available), score: 1.0, level: 0)]
                 }
                 return functionCandidates(name: type.name, moduleName: moduleName, constrainedGenerics: constrainedGenerics, arguments: arguments, includeTypes: false)
             }
@@ -783,10 +786,10 @@ public class CodebaseInfo {
         
         private func matchFunction(_ item: CodebaseInfoItem, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<ArgumentValue>], level: Int) -> FunctionCandidate? {
             let generics = (item as? FunctionInfo)?.generics
-            return matchFunction(signature: item.signature, generics: generics, declarationType: item.declarationType, availability: item.availability, in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments, level: level)
+            return matchFunction(signature: item.signature, generics: generics, isStatic: item.isStatic, declarationType: item.declarationType, availability: item.availability, in: typeInfo, constrainedGenerics: constrainedGenerics, arguments: arguments, level: level)
         }
 
-        private func matchFunction(signature: TypeSignature, generics: Generics? = nil, declarationType: StatementType, availability: Availability, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<ArgumentValue>], level: Int) -> FunctionCandidate? {
+        private func matchFunction(signature: TypeSignature, generics: Generics? = nil, isStatic: Bool = false, declarationType: StatementType, availability: Availability, in typeInfo: TypeInfo? = nil, constrainedGenerics: [TypeSignature] = [], arguments: [LabeledValue<ArgumentValue>], level: Int) -> FunctionCandidate? {
             guard case .function(let parameters, let returnType, let apiFlags, let attributes) = signature else {
                 return nil
             }
@@ -871,7 +874,13 @@ public class CodebaseInfo {
             for i in 0..<matchingParameters.count {
                 matchingParameters[i] = matchingParameters[i].or(mappedParameters[i], replaceAny: true)
             }
-            let match = APIMatch(signature: .function(matchingParameters, mappedSignature.returnType, apiFlags, attributes), apiFlags: apiFlags, declarationType: declarationType, isMember: typeInfo != nil, availability: availability)
+            let memberOf: (TypeSignature, TypeSignature?)?
+            if let signature = typeInfo?.signature {
+                memberOf = (signature.asMetaType(isStatic), typeInfo?.generics.selfType?.asMetaType(isStatic))
+            } else {
+                memberOf = nil
+            }
+            let match = APIMatch(signature: .function(matchingParameters, mappedSignature.returnType, apiFlags, attributes), apiFlags: apiFlags, declarationType: declarationType, memberOf: memberOf, availability: availability)
             return FunctionCandidate(match: match, score: totalScore, level: level)
         }
 
@@ -929,7 +938,7 @@ public class CodebaseInfo {
     }
 
     /// Reference-type cache so that we can mutate it within a `Context` struct.
-    fileprivate class ContextCache {
+    fileprivate final class ContextCache {
         var primaryTypeInfos: [TypeSignature: TypeInfo]?
         var typealiases: [ContextTypealiasKey: TypeSignature]?
         var visibleMembers: [TypeInfo: [CodebaseInfoItem]]?
@@ -1316,7 +1325,7 @@ public class CodebaseInfo {
         for i in 0..<rootExtensions.count { rootExtensions[i].addMainActorMemberFlags(codebaseInfo: self) }
     }
 
-    public class ModuleExport: Codable {
+    public final class ModuleExport: Codable {
         public let moduleName: String?
 
         // Default visibility for testing
@@ -1415,7 +1424,7 @@ public class CodebaseInfo {
     /// Information about a declared type.
     ///
     /// - Note: Unlike the other `CodebaseInfoItem` datastructures, types are modeled as `class` instances so that we can mutate them in place.
-    class TypeInfo: CodebaseInfoItem, Hashable, Codable {
+    final class TypeInfo: CodebaseInfoItem, Hashable, Codable {
         let name: String
         let declarationType: StatementType
         var signature: TypeSignature
@@ -2086,7 +2095,13 @@ protocol CodebaseInfoItem {
 
 extension CodebaseInfoItem {
     fileprivate var apiMatch: APIMatch {
-        return APIMatch(signature: signature, apiFlags: apiFlags ?? [], declarationType: declarationType, isMember: declaringType != nil, availability: availability)
+        let memberOf: (TypeSignature, TypeSignature?)?
+        if let declaringType {
+            memberOf = (declaringType.asMetaType(isStatic), nil)
+        } else {
+            memberOf = nil
+        }
+        return APIMatch(signature: signature, apiFlags: apiFlags ?? [], declarationType: declarationType, memberOf: memberOf, availability: availability)
     }
 }
 

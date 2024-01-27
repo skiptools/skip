@@ -12,20 +12,24 @@ extension CodebaseInfo {
 
 extension CodebaseInfo.Context {
     /// Return all extensions of a given type that can move into its definition.
-    func moveableExtensions(of type: TypeSignature, in syntaxTree: SyntaxTree) -> [(CodebaseInfo.TypeInfo, ExtensionDeclaration, [[String]])] {
+    func moveableExtensions(of type: TypeSignature, in syntaxTree: SyntaxTree) -> [(ExtensionDeclaration, [TypeSignature], [[String]])] {
         assert(global.kotlin != nil)
-        // Sort to always output added extensions in a stable order
-        return typeInfos(forNamed: type)
-            .compactMap { typeInfo in
-                guard let extensionAdditions = typeInfo.languageAdditions as? ExtensionAdditions else {
+        var additions = typeInfos(forNamed: type)
+            .compactMap { (typeInfo: CodebaseInfo.TypeInfo) -> (ExtensionAdditions, [TypeSignature])? in
+                guard let additions = typeInfo.languageAdditions as? ExtensionAdditions else {
                     return nil
                 }
-                guard let extensionDeclaration = extensionAdditions.moveableExtensionDeclaration(codebaseInfo: self, in: syntaxTree) else {
-                    return nil
-                }
-                return (typeInfo, extensionDeclaration, extensionAdditions.importedModulePaths)
+                return (additions, typeInfo.inherits)
             }
-            .sorted { ($0.0.sourceFile?.path ?? "") < ($1.0.sourceFile?.path ?? "") }
+        additions += (global.kotlin?.selfTypeExtensionAdditions[type.name] ?? []).map { ($0, []) }
+        // Sort to always output added extensions in a stable order
+        return additions.compactMap { (addition: (ExtensionAdditions, [TypeSignature])) -> (ExtensionDeclaration, [TypeSignature], [[String]])? in
+            guard let declaration = addition.0.moveableExtensionDeclaration(codebaseInfo: self, in: syntaxTree) else {
+                    return nil
+                }
+            return (declaration, addition.1, addition.0.importedModulePaths)
+        }
+        .sorted { ($0.0.sourceFile?.path ?? "") < ($1.0.sourceFile?.path ?? "") }
     }
 
     /// The signatures of all visible constructors of the given type.
@@ -264,6 +268,10 @@ extension CodebaseInfo.Context {
         return (Self.dedupe(initSignatures), messages)
     }
 
+    // WARNING: Technically we should be excluding static members of protocols that have a `Self == Type` constraint,
+    // because those members are added directly to the target type. The declaring protocol may not need a companion
+    // protocol. But then we wouldn't count those members on the protocol extension AND we wouldn't find them in the
+    // typeInfos of the extended type, which could result in us generating the wrong companion type.
     private func hasStaticMembers(typeInfos: [CodebaseInfo.TypeInfo], includeInits: Bool = false) -> Bool {
         return typeInfos.contains { typeInfo in
             typeInfo.members.contains { member in
@@ -287,12 +295,13 @@ extension CodebaseInfo.Context {
 }
 
 /// Wholistic information about the codebase needed when transpiling Swift to Kotlin.
-public class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseInfoLanguageAdditionsGatherDelegate {
+public final class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseInfoLanguageAdditionsGatherDelegate {
     /// The package being generated.
     public let packageName: String?
 
     // Warning: for performance, this set may contain interface names as well as the intended class names
     fileprivate var subclassedTypeNames: Set<String> = []
+    fileprivate var selfTypeExtensionAdditions: [String: [ExtensionAdditions]] = [:]
 
     init(packageName: String? = nil) {
         self.packageName = packageName
@@ -306,7 +315,15 @@ public class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseInfoLang
 
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration, syntaxTree: SyntaxTree) {
         // Keep the extension statement around so we can move it to the extended declarations
-        typeInfo.languageAdditions = ExtensionAdditions(extensionDeclaration: statement, syntaxTree: syntaxTree)
+        let extensionAdditions = ExtensionAdditions(extensionDeclaration: statement, syntaxTree: syntaxTree)
+        if let selfType = typeInfo.generics.selfType {
+            let typeName = selfType.name
+            var additions = selfTypeExtensionAdditions[typeName] ?? []
+            additions.append(extensionAdditions)
+            selfTypeExtensionAdditions[typeName] = additions
+        } else {
+            typeInfo.languageAdditions = extensionAdditions
+        }
     }
 
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather functionInfo: inout CodebaseInfo.FunctionInfo, from statement: FunctionDeclaration, syntaxTree: SyntaxTree) {
@@ -317,7 +334,7 @@ public class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseInfoLang
     }
 }
 
-private class ExtensionAdditions {
+private final class ExtensionAdditions {
     let extensionDeclaration: ExtensionDeclaration?
     let importedModulePaths: [[String]]
     let source: Source?
@@ -329,7 +346,7 @@ private class ExtensionAdditions {
         // syntax tree given on lookup, so just record the statement index. Otherwise we have to save the entire
         // extension declaration
         let statements = syntaxTree.root.statements
-        if statements.containsDeclaration(of: extensionDeclaration.extends), let index = statements.firstIndex(where: { $0 === extensionDeclaration }) {
+        if statements.containsDeclaration(of: extensionDeclaration.generics.selfType ?? extensionDeclaration.extends), let index = statements.firstIndex(where: { $0 === extensionDeclaration }) {
             self.statementIndex = index
             self.extensionDeclaration = nil
             self.importedModulePaths = []

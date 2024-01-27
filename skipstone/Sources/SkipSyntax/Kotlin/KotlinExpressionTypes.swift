@@ -32,7 +32,7 @@ enum KotlinExpressionType {
     case raw
 }
 
-class KotlinArrayLiteral: KotlinExpression, KotlinUsableAsTypeLiteral {
+final class KotlinArrayLiteral: KotlinExpression, KotlinUsableAsTypeLiteral {
     var elements: [KotlinExpression] = []
     var inferredType: TypeSignature = .none
     var isOptionSet = false
@@ -133,7 +133,7 @@ class KotlinArrayLiteral: KotlinExpression, KotlinUsableAsTypeLiteral {
     }
 }
 
-class KotlinAwait: KotlinExpression {
+final class KotlinAwait: KotlinExpression {
     var target: KotlinExpression
 
     static func translate(expression: Await, translator: KotlinTranslator) -> KotlinExpression {
@@ -185,7 +185,7 @@ class KotlinAwait: KotlinExpression {
     }
 }
 
-class KotlinBinaryOperator: KotlinExpression, KotlinSingleStatementVetoing {
+final class KotlinBinaryOperator: KotlinExpression, KotlinSingleStatementVetoing {
     var op: Operator
     var lhs: KotlinExpression
     var rhs: KotlinExpression
@@ -236,7 +236,7 @@ class KotlinBinaryOperator: KotlinExpression, KotlinSingleStatementVetoing {
         // need an sref because the property will sref the value it gets
         if memberAccess != nil {
             return false
-        } else if identifier?.name == "self" || identifier?.apiMatch?.isMember == true {
+        } else if identifier?.name == "self" || identifier?.apiMatch?.memberOf != nil {
             return false
         } else {
             return true
@@ -346,7 +346,7 @@ class KotlinBinaryOperator: KotlinExpression, KotlinSingleStatementVetoing {
     }
 }
 
-class KotlinBooleanLiteral: KotlinExpression {
+final class KotlinBooleanLiteral: KotlinExpression {
     var literal: Bool
 
     init(literal: Bool = false, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -555,7 +555,7 @@ struct KotlinCasePattern {
     }
 }
 
-class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
+final class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
     static let returnLabel = "l"
 
     var labeledCaptureList: [LabeledValue<KotlinExpression>] = []
@@ -784,7 +784,7 @@ class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
     }
 }
 
-class KotlinDictionaryLiteral: KotlinExpression, KotlinUsableAsTypeLiteral {
+final class KotlinDictionaryLiteral: KotlinExpression, KotlinUsableAsTypeLiteral {
     var entries: [(key: KotlinExpression, value: KotlinExpression)] = []
     var useMultilineFormatting = false
 
@@ -870,7 +870,7 @@ class KotlinDictionaryLiteral: KotlinExpression, KotlinUsableAsTypeLiteral {
     }
 }
 
-class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExpression {
+final class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExpression {
     var function: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
     var isOptionalInit = false
@@ -1107,7 +1107,7 @@ class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APICallExp
     }
 }
 
-class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTarget, KotlinSwiftUIBindable, APICallExpression {
+final class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTarget, KotlinSwiftUIBindable, APICallExpression {
     var name: String
     var apiMatch: APIMatch?
     var mayBeSharedMutableStruct = false
@@ -1286,7 +1286,7 @@ class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTa
 }
 
 /// - Seealso: ``KotlinIfTransformer``
-class KotlinIf: KotlinExpression {
+final class KotlinIf: KotlinExpression {
     var conditionSets: [ConditionSet]
     var isGuard = false
     var body: KotlinCodeBlock
@@ -1614,7 +1614,7 @@ class KotlinIf: KotlinExpression {
     }
 }
 
-class KotlinInOut: KotlinExpression {
+final class KotlinInOut: KotlinExpression {
     var target: KotlinExpression
 
     static func translate(expression: InOut, translator: KotlinTranslator) -> KotlinInOut {
@@ -1641,7 +1641,7 @@ class KotlinInOut: KotlinExpression {
     }
 }
 
-class KotlinKeyPathLiteral: KotlinExpression {
+final class KotlinKeyPathLiteral: KotlinExpression {
     var components: [KeyPathLiteral.Component] = []
     var isWrite = false
     var keyPathType: TypeSignature = .none
@@ -1713,7 +1713,7 @@ struct KotlinMatchingCase {
     }
 }
 
-class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwiftUIBindable, KotlinCastTarget, KotlinSingleStatementVetoing, APICallExpression {
+final class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwiftUIBindable, KotlinCastTarget, KotlinSingleStatementVetoing, APICallExpression {
     var base: KotlinExpression?
     var baseKClass: (TypeSignature, KotlinCompanionType)?
     var member: String
@@ -2113,7 +2113,7 @@ class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, KotlinSwif
     }
 }
 
-class KotlinNullLiteral: KotlinExpression {
+final class KotlinNullLiteral: KotlinExpression {
     init(sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         super.init(type: .nullLiteral, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -2127,7 +2127,7 @@ class KotlinNullLiteral: KotlinExpression {
     }
 }
 
-class KotlinNumericLiteral: KotlinExpression {
+final class KotlinNumericLiteral: KotlinExpression {
     var literal: String
     var isFloatingPoint: Bool
     var suffix: String = ""
@@ -2254,7 +2254,7 @@ struct KotlinOptionalBinding {
     }
 }
 
-class KotlinParenthesized: KotlinExpression {
+final class KotlinParenthesized: KotlinExpression {
     var content: KotlinExpression
 
     static func translate(expression: Parenthesized, translator: KotlinTranslator) -> KotlinParenthesized {
@@ -2293,7 +2293,7 @@ class KotlinParenthesized: KotlinExpression {
     }
 }
 
-class KotlinPostfixOperator: KotlinExpression {
+final class KotlinPostfixOperator: KotlinExpression {
     var operatorSymbol: String // May be set to empty by transformers
     var target: KotlinExpression
     var targetType: TypeSignature = .none
@@ -2350,7 +2350,7 @@ class KotlinPostfixOperator: KotlinExpression {
     }
 }
 
-class KotlinPrefixOperator: KotlinExpression {
+final class KotlinPrefixOperator: KotlinExpression {
     var operatorSymbol: String
     var target: KotlinExpression
     var targetType: TypeSignature = .none
@@ -2426,7 +2426,7 @@ class KotlinPrefixOperator: KotlinExpression {
     }
 }
 
-class KotlinSRef: KotlinExpression {
+final class KotlinSRef: KotlinExpression {
     var base: KotlinExpression
     var onUpdate: (() -> String)?
 
@@ -2469,7 +2469,7 @@ class KotlinSRef: KotlinExpression {
     }
 }
 
-class KotlinStringLiteral: KotlinExpression {
+final class KotlinStringLiteral: KotlinExpression {
     var segments: [StringLiteralSegment<KotlinExpression>] = []
     var isMultiline = false
     var isCharacter = false
@@ -2604,7 +2604,7 @@ class KotlinStringLiteral: KotlinExpression {
     }
 }
 
-class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting, KotlinSwiftUIBindable, APICallExpression {
+final class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting, KotlinSwiftUIBindable, APICallExpression {
     var base: KotlinExpression
     var arguments: [LabeledValue<KotlinExpression>] = []
     var apiMatch: APIMatch?
@@ -2722,7 +2722,7 @@ class KotlinSubscript: KotlinExpression, KotlinMainActorTargeting, KotlinSwiftUI
     }
 }
 
-class KotlinTernaryOperator: KotlinExpression {
+final class KotlinTernaryOperator: KotlinExpression {
     var condition: KotlinExpression
     var ifTrue: KotlinExpression
     var ifFalse: KotlinExpression
@@ -2759,7 +2759,7 @@ class KotlinTernaryOperator: KotlinExpression {
     }
 }
 
-class KotlinTry: KotlinExpression {
+final class KotlinTry: KotlinExpression {
     var trying: KotlinExpression
     var isOptional = false
 
@@ -2796,7 +2796,7 @@ class KotlinTry: KotlinExpression {
     }
 }
 
-class KotlinTupleLiteral: KotlinExpression, KotlinUsableAsTypeLiteral {
+final class KotlinTupleLiteral: KotlinExpression, KotlinUsableAsTypeLiteral {
     var values: [KotlinExpression]
 
     /// Maximum support tuple elements.
@@ -2862,7 +2862,7 @@ class KotlinTupleLiteral: KotlinExpression, KotlinUsableAsTypeLiteral {
     }
 }
 
-class KotlinTypeLiteral: KotlinExpression, KotlinCastTarget {
+final class KotlinTypeLiteral: KotlinExpression, KotlinCastTarget {
     var literal: TypeSignature
     var signature: TypeSignature?
 
@@ -2899,7 +2899,7 @@ class KotlinTypeLiteral: KotlinExpression, KotlinCastTarget {
     }
 }
 
-class KotlinWhen: KotlinExpression {
+final class KotlinWhen: KotlinExpression {
     static let breakLabel = "bl"
 
     var on: KotlinExpression

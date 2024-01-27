@@ -91,7 +91,7 @@ private func isSwiftUIType(named: String, declaration: KotlinClassDeclaration? =
             .contains { $0.isNamed(named, moduleName: "SwiftUI") }
 }
 
-private class TranslateVisitor {
+private final class TranslateVisitor {
     private let translator: KotlinTranslator
     private var composeViewIdentifiers: Set<ObjectIdentifier> = []
 

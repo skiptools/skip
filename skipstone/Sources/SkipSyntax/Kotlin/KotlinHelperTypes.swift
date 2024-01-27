@@ -249,6 +249,9 @@ extension Attribute {
 extension ExtensionDeclaration {
     /// Whether this extension's members can be moved into the extended type definition.
     var canMoveIntoExtendedType: Bool {
+        guard generics.selfType == nil else {
+            return true
+        }
         return extends.generics.isEmpty && !generics.entries.contains { $0.whereEqual != nil || !$0.inherits.isEmpty }
     }
 
@@ -268,7 +271,7 @@ extension ExtensionDeclaration {
         guard let codeBlock = root as? CodeBlock else {
             return false
         }
-        return codeBlock.statements.containsDeclaration(of: extends)
+        return codeBlock.statements.containsDeclaration(of: generics.selfType ?? extends)
     }
 }
 

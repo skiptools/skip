@@ -7,7 +7,7 @@ final class KotlinEscapeKeywordsTransformer: KotlinTransformer {
 }
 
 /// Appends an underscore to the end of hard keywords in Kotlin.
-private class EscapeKeywordsVisitor {
+private final class EscapeKeywordsVisitor {
     /// https://kotlinlang.org/docs/keyword-reference.html#hard-keywords
     static let hardKeywords: Set<String> = [
         "as", "break", "class", "continue", "do", "else", "false", "for", "fun", "if", "in", "interface", "checks", "is", "null", "object", "package", "return", "this", "throw", "true", "try", "typealias", "typeof", "val", "var", "when", "while", //"super", // super causes conflicts with the super() call

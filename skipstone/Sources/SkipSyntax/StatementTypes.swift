@@ -111,7 +111,7 @@ enum StatementType: CaseIterable, Codable {
 }
 
 /// `break`
-class Break: Statement {
+final class Break: Statement {
     let label: String?
 
     init(label: String? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
@@ -133,7 +133,7 @@ class Break: Statement {
 }
 
 /// A synthetic statement type used to represent a code block of statements.
-class CodeBlock: Statement {
+final class CodeBlock: Statement {
     var statements: [Statement]
 
     init(statements: [Statement]) {
@@ -181,7 +181,7 @@ class CodeBlock: Statement {
 }
 
 /// `continue`
-class Continue: Statement {
+final class Continue: Statement {
     let label: String?
 
     init(label: String? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
@@ -203,7 +203,7 @@ class Continue: Statement {
 }
 
 /// `defer { ... }`
-class Defer: Statement {
+final class Defer: Statement {
     let body: CodeBlock
 
     init(body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
@@ -230,7 +230,7 @@ class Defer: Statement {
 }
 
 /// `do { ... } [catch...]`
-class DoCatch: Statement {
+final class DoCatch: Statement {
     let body: CodeBlock
     let catches: [SwitchCase]
 
@@ -272,7 +272,7 @@ class DoCatch: Statement {
 }
 
 /// Empty statement typically used to hold trivia.
-class Empty: Statement {
+final class Empty: Statement {
     init(syntax: SyntaxProtocol, extras: StatementExtras, in syntaxTree: SyntaxTree) {
         super.init(type: .empty, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
     }
@@ -283,7 +283,7 @@ class Empty: Statement {
 }
 
 /// `fallthrough`
-class Fallthrough: Statement {
+final class Fallthrough: Statement {
     init(syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         super.init(type: .fallthrough, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
@@ -297,7 +297,7 @@ class Fallthrough: Statement {
 }
 
 /// `for ... in ... { ... }`
-class ForLoop: Statement {
+final class ForLoop: Statement {
     let identifierPatterns: [IdentifierPattern]
     let declaredType: TypeSignature
     let isTry: Bool
@@ -380,7 +380,7 @@ class ForLoop: Statement {
 }
 
 /// `guard ...`
-class Guard: Statement {
+final class Guard: Statement {
     let conditions: [Expression]
     let body: CodeBlock
 
@@ -421,7 +421,7 @@ class Guard: Statement {
 /// `#if SYMBOL ... #endif`
 ///
 /// - Note: We never instantiate this class. It is only used ot extract the statements from an `#if`.
-class IfDefined: Statement {
+final class IfDefined: Statement {
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .ifConfigDecl, let ifConfigDecl = syntax.as(IfConfigDeclSyntax.self) else {
             return nil
@@ -608,7 +608,7 @@ class IfDefined: Statement {
 }
 
 /// `label: for/while/etc`
-class LabeledStatement: Statement {
+final class LabeledStatement: Statement {
     let label: String
     let target: Statement
 
@@ -648,7 +648,7 @@ class LabeledStatement: Statement {
 }
 
 /// `return ...`
-class Return: ExpressionStatement {
+final class Return: ExpressionStatement {
     init(expression: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         super.init(type: .return, expression: expression, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
@@ -677,7 +677,7 @@ class Return: ExpressionStatement {
 }
 
 /// `throw ...`
-class Throw: Statement {
+final class Throw: Statement {
     let error: Expression
 
     init(error: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
@@ -704,7 +704,7 @@ class Throw: Statement {
 }
 
 /// `while(conditions) { ... }`
-class WhileLoop: Statement {
+final class WhileLoop: Statement {
     let conditions: [Expression]
     let body: CodeBlock
     let isRepeatWhile: Bool
@@ -773,7 +773,7 @@ class WhileLoop: Statement {
 // MARK: - Declarations
 
 /// `case x(Int)`
-class EnumCaseDeclaration: Statement {
+final class EnumCaseDeclaration: Statement {
     let name: String
     private(set) var associatedValues: [Parameter<Expression>]
     let rawValue: Expression?
@@ -859,7 +859,7 @@ class EnumCaseDeclaration: Statement {
 }
 
 /// `extension Type { ... }`
-class ExtensionDeclaration: TypeDeclaration {
+final class ExtensionDeclaration: TypeDeclaration {
     let extends: TypeSignature
 
     init(extends: TypeSignature, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
@@ -904,7 +904,7 @@ class ExtensionDeclaration: TypeDeclaration {
 }
 
 /// `func f() { ... }`
-class FunctionDeclaration: Statement {
+final class FunctionDeclaration: Statement {
     let name: String
     let isOptionalInit: Bool
     private(set) var returnType: TypeSignature
@@ -1065,7 +1065,7 @@ class FunctionDeclaration: Statement {
 }
 
 /// `import Module`
-class ImportDeclaration: Statement {
+final class ImportDeclaration: Statement {
     let modulePath: [String]
 
     init(modulePath: [String], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
@@ -1088,7 +1088,7 @@ class ImportDeclaration: Statement {
 }
 
 /// `subscript() { ... }`
-class SubscriptDeclaration: Statement {
+final class SubscriptDeclaration: Statement {
     private(set) var elementType: TypeSignature
     private(set) var parameters: [Parameter<Expression>]
     private(set) var asyncBehavior: AsyncBehavior
@@ -1208,7 +1208,7 @@ class SubscriptDeclaration: Statement {
 }
 
 /// `typealias ...`
-class TypealiasDeclaration: Statement {
+final class TypealiasDeclaration: Statement {
     let name: String
     let attributes: Attributes
     private(set) var modifiers: Modifiers
@@ -1431,7 +1431,7 @@ class TypeDeclaration: Statement {
 }
 
 /// `let/var v ...`
-class VariableDeclaration: Statement {
+final class VariableDeclaration: Statement {
     let names: [String?]
     var propertyName: String {
         return (names.first ?? "") ?? ""

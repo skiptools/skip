@@ -30,7 +30,7 @@ enum KotlinStatementType {
     case message
 }
 
-class KotlinBreak: KotlinStatement, KotlinSingleStatementAppendable {
+final class KotlinBreak: KotlinStatement, KotlinSingleStatementAppendable {
     var label: String?
 
     init(statement: Break) {
@@ -60,7 +60,7 @@ class KotlinBreak: KotlinStatement, KotlinSingleStatementAppendable {
     }
 }
 
-class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
+final class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
     var statements: [KotlinStatement]
 
     /// The number of defer statements in this block.
@@ -494,7 +494,7 @@ class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
     }
 }
 
-class KotlinContinue: KotlinStatement {
+final class KotlinContinue: KotlinStatement {
     var label: String?
 
     init(statement: Continue) {
@@ -511,7 +511,7 @@ class KotlinContinue: KotlinStatement {
     }
 }
 
-class KotlinDefer: KotlinStatement {
+final class KotlinDefer: KotlinStatement {
     var body: KotlinCodeBlock
     weak var codeBlock: KotlinCodeBlock?
 
@@ -534,7 +534,7 @@ class KotlinDefer: KotlinStatement {
     }
 }
 
-class KotlinEmpty: KotlinStatement, KotlinMemberDeclaration {
+final class KotlinEmpty: KotlinStatement, KotlinMemberDeclaration {
     init(statement: Empty) {
         super.init(type: .empty, statement: statement)
     }
@@ -545,7 +545,7 @@ class KotlinEmpty: KotlinStatement, KotlinMemberDeclaration {
     var visibility: Modifiers.Visibility = .private
 }
 
-class KotlinForLoop: KotlinStatement {
+final class KotlinForLoop: KotlinStatement {
     var identifierPatterns: [IdentifierPattern]
     var declaredType: TypeSignature = .none
     var sequence: KotlinExpression
@@ -636,7 +636,7 @@ class KotlinForLoop: KotlinStatement {
     }
 }
 
-class KotlinLabeledStatement: KotlinStatement {
+final class KotlinLabeledStatement: KotlinStatement {
     var label: String
     var target: KotlinStatement
 
@@ -661,7 +661,7 @@ class KotlinLabeledStatement: KotlinStatement {
     }
 }
 
-class KotlinReturn: KotlinExpressionStatement {
+final class KotlinReturn: KotlinExpressionStatement {
     var label: String? = nil
 
     static func translate(statement: Return, translator: KotlinTranslator) -> KotlinExpressionStatement {
@@ -706,7 +706,7 @@ class KotlinReturn: KotlinExpressionStatement {
     }
 }
 
-class KotlinThrow: KotlinStatement {
+final class KotlinThrow: KotlinStatement {
     var error: KotlinExpression
     var errorIsThrowable = false
 
@@ -744,7 +744,7 @@ class KotlinThrow: KotlinStatement {
     }
 }
 
-class KotlinTryCatch: KotlinStatement {
+final class KotlinTryCatch: KotlinStatement {
     var body: KotlinCodeBlock
 
     static func translate(statement: DoCatch, translator: KotlinTranslator) -> KotlinTryCatch {
@@ -814,7 +814,7 @@ class KotlinTryCatch: KotlinStatement {
     }
 }
 
-class KotlinWhileLoop: KotlinStatement {
+final class KotlinWhileLoop: KotlinStatement {
     var conditions: [KotlinExpression]
     var caseBindingVariables: [KotlinBindingVariable]
     var guardStatement: KotlinStatement?
@@ -921,7 +921,7 @@ class KotlinWhileLoop: KotlinStatement {
 
 // MARK: - Declarations
 
-class KotlinClassDeclaration: KotlinStatement {
+final class KotlinClassDeclaration: KotlinStatement {
     var name: String
     var signature: TypeSignature
     var inherits: [TypeSignature] = []
@@ -983,8 +983,8 @@ class KotlinClassDeclaration: KotlinStatement {
 
             // Move extensions of this type into the type itself rather than use Kotlin extension functions.
             // Kotlin extension functions act like static functions, which can lead to different behavior
-            for (extInfo, extDeclaration, extImportModulePaths) in codebaseInfo.moveableExtensions(of: statement.signature, in: translator.syntaxTree) {
-                kstatement.inherits += extInfo.inherits
+            for (extDeclaration, extInherits, extImportModulePaths) in codebaseInfo.moveableExtensions(of: statement.signature, in: translator.syntaxTree) {
+                kstatement.inherits += extInherits
                 let partitioned = KotlinExtensionDeclaration.partition(members: extDeclaration.members, of: kstatement.signature, isFinal: isFinal)
                 extensionMembers += partitioned.extensionMembers
                 let kpartitionedMembers = partitioned.members.flatMap { translator.translateStatement($0) }
@@ -1292,7 +1292,7 @@ class KotlinClassDeclaration: KotlinStatement {
     }
 }
 
-class KotlinEnumCaseDeclaration: KotlinStatement {
+final class KotlinEnumCaseDeclaration: KotlinStatement {
     /// Names that aren't hard reserved words but cause errors as enum cases.
     static let disallowedCaseNames: Set<String> = ["segmented", "name", "ordinal"]
 
@@ -1484,8 +1484,9 @@ class KotlinEnumCaseDeclaration: KotlinStatement {
 
 struct KotlinExtensionDeclaration {
     static func translate(statement: ExtensionDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
+        var extends = statement.generics.selfType ?? statement.extends
         var kstatements: [KotlinStatement] = []
-        let declarationType = translator.codebaseInfo?.declarationType(forNamed: statement.extends)
+        let declarationType = translator.codebaseInfo?.declarationType(forNamed: extends)
         if declarationType?.type == .protocolDeclaration {
             for member in statement.members {
                 if member.type == .initDeclaration {
@@ -1512,14 +1513,17 @@ struct KotlinExtensionDeclaration {
         if !statement.inherits.isEmpty, let message = Message.kotlinExtensionAddProtocols(statement, extensionPlacement: placement, source: translator.syntaxTree.source) {
             kstatements.append(KotlinMessageStatement(message: message, statement: statement))
         }
-        var extends = statement.extends
         var generics = statement.generics.resolvingSelf(in: statement)
         var visibility = statement.modifiers.visibility
-        if let extendedTypeInfo = translator.codebaseInfo?.primaryTypeInfo(forNamed: statement.extends) {
+        if let extendedTypeInfo = translator.codebaseInfo?.primaryTypeInfo(forNamed: extends) {
             // Set the extended type to match its primary type and put the complete set of constraints into the generics object
             extends = extendedTypeInfo.signature
-            generics = extendedTypeInfo.generics.merge(extension: statement.extends, generics: statement.generics).resolvingSelf(in: statement)
             visibility = extendedTypeInfo.modifiers.visibility
+            if statement.generics.selfType == nil {
+                generics = extendedTypeInfo.generics.merge(extension: statement.extends, generics: statement.generics).resolvingSelf(in: statement)
+            } else {
+                generics = extendedTypeInfo.generics
+            }
         }
         let companionType = translator.codebaseInfo?.companionType(of: extends) ?? .object
         let kextensionMembers = translateExtensionMembers(statement.members, of: extends, visibility: visibility, generics: generics, declarationType: declarationType?.type, companionType: companionType, translator: translator, extensionPlacement: placement)
@@ -1642,7 +1646,7 @@ struct KotlinExtensionDeclaration {
 }
 
 /// - Seealso: ``KotlinConstructorTransformer``
-class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
+final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var name: String
     var returnType: TypeSignature = .void
     var parameters: [Parameter<KotlinExpression>] = []
@@ -2211,7 +2215,7 @@ class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     }
 }
 
-class KotlinImportDeclaration: KotlinStatement {
+final class KotlinImportDeclaration: KotlinStatement {
     var modulePath: [String]
     var modulePathString: String {
         guard modulePath.count > 0 else {
@@ -2258,7 +2262,7 @@ class KotlinImportDeclaration: KotlinStatement {
     }
 }
 
-class KotlinInterfaceDeclaration: KotlinStatement {
+final class KotlinInterfaceDeclaration: KotlinStatement {
     var name: String
     var signature: TypeSignature
     var inherits: [TypeSignature] = []
@@ -2299,8 +2303,8 @@ class KotlinInterfaceDeclaration: KotlinStatement {
         var originalMembers = kstatement.members
         var newMembers: [KotlinStatement] = []
         var extensionMembers: [Statement] = []
-        for (extInfo, extDeclaration, extImportModulePaths) in codebaseInfo.moveableExtensions(of: statement.signature, in: translator.syntaxTree) {
-            kstatement.inherits += extInfo.inherits
+        for (extDeclaration, extInherits, extImportModulePaths) in codebaseInfo.moveableExtensions(of: statement.signature, in: translator.syntaxTree) {
+            kstatement.inherits += extInherits
 
             let partitioned = KotlinExtensionDeclaration.partition(members: extDeclaration.members, of: kstatement.signature, isFinal: false)
             extensionMembers += partitioned.extensionMembers
@@ -2454,7 +2458,7 @@ class KotlinInterfaceDeclaration: KotlinStatement {
 
 /// - Note: We perform full typealias resolution when transpiling. We do not actually use any typealiases in our generated Kotlin. We do translate typealiases, however,
 ///  so that any manually-written Kotlin has access to them.
-class KotlinTypealiasDeclaration: KotlinStatement {
+final class KotlinTypealiasDeclaration: KotlinStatement {
     var name: String
     var attributes = Attributes()
     var modifiers = Modifiers()
@@ -2506,7 +2510,7 @@ class KotlinTypealiasDeclaration: KotlinStatement {
     }
 }
 
-class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
+final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var names: [String?]
     var propertyName: String {
         get {
