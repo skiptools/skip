@@ -83,20 +83,36 @@ extension ToolOptionsCommand {
         await checkVersion(title: "Swift version", cmd: ["swift", "-version"], min: Version("5.9.0"), pattern: "Swift version ([0-9.]+)")
         // TODO: add advice to run `xcode-select -s /Applications/Xcode.app/Contents/Developer` to work around https://github.com/skiptools/skip/issues/18
         await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)")
+        await checkXcodeCommandLineTools(with: out)
         await checkVersion(title: "Homebrew version", cmd: ["brew", "--version"], min: Version("4.1.0"), pattern: "Homebrew ([0-9.]+)")
         await checkVersion(title: "Gradle version", cmd: ["gradle", "-version"], min: Version("8.3.0"), pattern: "Gradle ([0-9.]+)")
         await checkVersion(title: "Java version", cmd: ["java", "-version"], min: Version("17.0.0"), pattern: "version \"([0-9._]+)\"") // we don't necessarily need java in the path (which it doesn't seem to be by default with Homebrew)
         await checkVersion(title: "Android Debug Bridge version", cmd: ["adb", "version"], min: Version("1.0.40"), pattern: "version ([0-9.]+)")
+        await checkAndroidStudioVersion(with: out)
 
         // TODO: check for stale Intel Homebrew installations of tools (java, etc.) on ARM
+    }
 
-        await checkAndroidStudioVersion(with: out)
+    func checkXcodeCommandLineTools(with out: MessageQueue) async {
+        #if os(macOS)
+        await outputOptions.monitor(with: out, "Android Studio licenses", resultHandler: { result in
+            let paths: [String]? = try? result?.get()
+            let sdkCount = paths?.count ?? 0
+            if sdkCount > 0 {
+                return (result, MessageBlock(status: .pass, "Xcode tools SDKs: \(sdkCount)"))
+            } else {
+                return (result, MessageBlock(status: .warn, "Xcode tools must be installed with: xcode-select --install"))
+            }
+        }, monitorAction: { _ in
+            try FileManager.default.contentsOfDirectory(atPath: "/Library/Developer/CommandLineTools/SDKs/")
+        })
+
+        #endif
     }
 
     func checkAndroidStudioVersion(with out: MessageQueue) async {
         #if os(macOS) // on macOS, check for Android Studio
         //await checkVersion(title: "Android Studio version", cmd: ["/usr/libexec/PlistBuddy", "-c", "Print CFBundleShortVersionString", "/Applications/Android Studio.app/Contents/Info.plist"], min: Version("2022.3.0"), pattern: "([0-9.]+)")
-
 
         // Manually try to parse the Android Studio version; tolerate failures
         await outputOptions.monitor(with: out, "Android Studio version", resultHandler: { result in
@@ -107,6 +123,22 @@ extension ToolOptionsCommand {
         }, monitorAction: { _ in
             try androidInfoPlist()?["CFBundleShortVersionString"] as? String
         })
+
+        let androidHome = ProcessInfo.processInfo.environmentWithDefaultToolPaths["ANDROID_HOME"] ?? NSTemporaryDirectory()
+
+        // Check for SDK licenses in ~/Library/Android/sdk/licenses/ and advise to run ~/Library/Android/sdk/tools/bin/sdkmanager --licenses when not found
+        await outputOptions.monitor(with: out, "Android Studio licenses", resultHandler: { result in
+            let licensePaths: [String]? = try? result?.get()
+            let licenseCount = licensePaths?.count ?? 0
+            if licenseCount > 0 {
+                return (result, MessageBlock(status: .pass, "Android SDK licenses: \(licenseCount)"))
+            } else {
+                return (result, MessageBlock(status: .warn, "Android SDK licenses need to be accepted with: \((androidHome as NSString).abbreviatingWithTildeInPath)/tools/bin/sdkmanager --licenses"))
+            }
+        }, monitorAction: { _ in
+            try FileManager.default.contentsOfDirectory(atPath: androidHome + "/licenses/")
+        })
+
         #endif
     }
 
