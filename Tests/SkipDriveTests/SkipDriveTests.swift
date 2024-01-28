@@ -26,25 +26,25 @@ class SkipCommandTests : XCTestCase {
         XCTAssertNotEqual(0, welcome.count, "Welcome message should not be empty")
     }
 
-    func NOtestSkipCheckup() async throws {
-        try await skip("checkup")
-    }
-
     func testSkipDoctor() async throws {
         // run `skip doctor` with JSON array output and make sure we can parse the result
-        let doctor = try await skip("doctor", "-jA").parseJSONArray()
+        let doctor = try await skip("doctor", "-jA").parseJSONMessages()
         XCTAssertGreaterThan(doctor.count, 5, "doctor output should have contained some lines")
+    }
+
+    func testSkipCheckup() async throws {
+        let checkup = try await skip("checkup", "-jA").parseJSONMessages()
+        XCTAssertGreaterThan(checkup.count, 5, "checkup output should have contained some lines")
     }
 
     func testSkipCreate() async throws {
         let tempDir = try mktmp()
         let projectName = "hello-skip"
         let appName = "HelloSkip"
-        //let appScheme = appName + "App"
-        let stdout = try await skip("init", "--show-tree", "--no-build", "--no-verify", "--no-test", "-d", tempDir, "--appid", "com.company.HelloSkip", projectName, appName)
-        //print("skip create stdout: \(stdout)")
-        let out = stdout.split(separator: "\n")
-        XCTAssertEqual("Initializing Skip library \(projectName)", out.first)
+        let out = try await skip("init", "-jA", "--show-tree", "-d", tempDir, "--appid", "com.company.HelloSkip", projectName, appName)
+        let msgs = try out.parseJSONMessages()
+
+        XCTAssertEqual("Initializing Skip library \(projectName)", msgs.first)
         let dir = tempDir + "/" + projectName + "/"
 
         let xcodeproj = "Darwin/" + appName + ".xcodeproj"
@@ -53,17 +53,8 @@ class SkipCommandTests : XCTestCase {
             XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
         }
 
-        // fails when SKIPLOCAL is set
-        //let project = try await loadProjectPackage(dir)
-        //XCTAssertEqual(projectName, project.name)
-
-//        let config = try await loadProjectConfig(dir + "/" + xcodeproj, scheme: appScheme)
-//        XCTAssertEqual(appName, config.first?.buildSettings["PROJECT_NAME"])
-
-        // run the app checks and verify JSON output
-        //let checkResults = try await skip("app", "check", "--json", "-d", tempDir).parseJSONArray()
-
-        XCTAssertEqual(out.dropFirst(2).dropLast(1).joined(separator: "\n"), """
+        XCTAssertEqual(msgs.dropLast(1).last ?? "", """
+        .
         ├─ Android
         │  ├─ app
         │  │  ├─ build.gradle.kts
@@ -123,6 +114,7 @@ class SkipCommandTests : XCTestCase {
         │  │  └─ project.pbxproj
         │  └─ Sources
         │     └─ HelloSkipAppMain.swift
+        ├─ Package.resolved
         ├─ Package.swift
         ├─ README.md
         ├─ Skip.env
@@ -143,22 +135,17 @@ class SkipCommandTests : XCTestCase {
               ├─ Skip
               │  └─ skip.yml
               └─ XCSkipTests.swift
+
         """)
-
-        //let verify = try await skip("verify", "-jA", "--project", tempDir).parseJSONArray()
-        //_ = verify
-        //print("#### verify: \(verify)")
-        //XCTAssertGreaterThan(verify.count, 1, "verify output should have contained some lines")
-
     }
 
     func testSkipInit() async throws {
         let tempDir = try mktmp()
         let name = "cool-lib"
-        let out = try await skip("lib", "init", "-jA", "--show-tree", "--no-build", "--no-test", "--no-verify", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE")
-        let json = try out.parseJSONArray()
+        let out = try await skip("lib", "init", "-jA", "--show-tree", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE")
+        let msgs = try out.parseJSONMessages()
 
-        XCTAssertEqual("Initializing Skip library \(name)", (json.first as? JSONObject)?["msg"] as? String)
+        XCTAssertEqual("Initializing Skip library \(name)", msgs.first)
 
         let dir = tempDir + "/" + name + "/"
         for path in ["Package.swift", "Sources/CoolA", "Sources/CoolA", "Sources/CoolE", "Tests", "Tests/CoolATests/Skip/skip.yml"] {
@@ -168,8 +155,9 @@ class SkipCommandTests : XCTestCase {
         let project = try await loadProjectPackage(dir)
         XCTAssertEqual(name, project.name)
 
-        XCTAssertEqual((json.dropLast(1).last as? JSONObject)?["msg"] as? String ?? "", """
+        XCTAssertEqual(msgs.dropLast(1).last ?? "", """
         .
+        ├─ Package.resolved
         ├─ Package.swift
         ├─ README.md
         ├─ Sources
@@ -242,7 +230,6 @@ class SkipCommandTests : XCTestCase {
 
         """)
 
-//        try await skip("verify", "--project", tempDir)
     }
 
     func NOtestSkipTestReport() async throws {
@@ -262,14 +249,6 @@ class SkipCommandTests : XCTestCase {
         | SkipZipTests | testMissingTest | PASS  | ????   |
         |              |                 | 100%  | 33%    |
         """)
-
-//        +--------------+-----------------+-------+--------+
-//        | Test         | Case            | Swift | Kotlin |
-//        +--------------+-----------------+-------+--------+
-//        | SkipZipTests | testArchive     | PASS  | SKIP   |
-//        | SkipZipTests | testDeflateInfl | PASS  | PASS   |
-//        | SkipZipTests | testMissingTest | PASS  | ????   |
-//        +--------------+-----------------+-------+--------+
     }
 
     /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
@@ -371,6 +350,9 @@ private extension String {
         }
     }
 
+    func parseJSONMessages() throws -> [String] {
+        try parseJSONArray().compactMap({ ($0 as? JSONObject)?["msg"] as? String })
+    }
 }
 
 /// Create a temporary directory
