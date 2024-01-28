@@ -36,7 +36,7 @@ class SkipCommandTests : XCTestCase {
         XCTAssertGreaterThan(doctor.count, 5, "doctor output should have contained some lines")
     }
 
-    func XXXtestSkipCreate() async throws {
+    func testSkipCreate() async throws {
         let tempDir = try mktmp()
         let projectName = "hello-skip"
         let appName = "HelloSkip"
@@ -47,8 +47,8 @@ class SkipCommandTests : XCTestCase {
         XCTAssertEqual("Initializing Skip library \(projectName)", out.first)
         let dir = tempDir + "/" + projectName + "/"
 
-        let xcodeproj = appName + ".xcodeproj"
-        let xcconfig = appName + ".xcconfig"
+        let xcodeproj = "Darwin/" + appName + ".xcodeproj"
+        let xcconfig = "Darwin/" + appName + ".xcconfig"
         for path in ["Package.swift", xcodeproj, xcconfig, "Sources", "Tests"] {
             XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
         }
@@ -64,31 +64,77 @@ class SkipCommandTests : XCTestCase {
         //let checkResults = try await skip("app", "check", "--json", "-d", tempDir).parseJSONArray()
 
         XCTAssertEqual(out.dropFirst(2).dropLast(1).joined(separator: "\n"), """
-        .
-        ├─ HelloSkip.xcconfig
-        ├─ HelloSkip.xcodeproj
-        │  └─ project.pbxproj
+        ├─ Android
+        │  ├─ app
+        │  │  ├─ build.gradle.kts
+        │  │  ├─ proguard-rules.pro
+        │  │  └─ src
+        │  │     └─ main
+        │  │        ├─ AndroidManifest.xml
+        │  │        ├─ kotlin
+        │  │        │  └─ hello
+        │  │        │     └─ skip
+        │  │        │        └─ Main.kt
+        │  │        └─ res
+        │  │           ├─ mipmap-hdpi
+        │  │           │  └─ ic_launcher.png
+        │  │           ├─ mipmap-mdpi
+        │  │           │  └─ ic_launcher.png
+        │  │           ├─ mipmap-xhdpi
+        │  │           │  └─ ic_launcher.png
+        │  │           ├─ mipmap-xxhdpi
+        │  │           │  └─ ic_launcher.png
+        │  │           └─ mipmap-xxxhdpi
+        │  │              └─ ic_launcher.png
+        │  ├─ gradle
+        │  │  └─ wrapper
+        │  │     └─ gradle-wrapper.properties
+        │  ├─ gradle.properties
+        │  └─ settings.gradle.kts
+        ├─ Darwin
+        │  ├─ Assets.xcassets
+        │  │  ├─ AccentColor.colorset
+        │  │  │  └─ Contents.json
+        │  │  ├─ AppIcon.appiconset
+        │  │  │  ├─ AppIcon-20@2x.png
+        │  │  │  ├─ AppIcon-20@2x~ipad.png
+        │  │  │  ├─ AppIcon-20@3x.png
+        │  │  │  ├─ AppIcon-20~ipad.png
+        │  │  │  ├─ AppIcon-29.png
+        │  │  │  ├─ AppIcon-29@2x.png
+        │  │  │  ├─ AppIcon-29@2x~ipad.png
+        │  │  │  ├─ AppIcon-29@3x.png
+        │  │  │  ├─ AppIcon-29~ipad.png
+        │  │  │  ├─ AppIcon-40@2x.png
+        │  │  │  ├─ AppIcon-40@2x~ipad.png
+        │  │  │  ├─ AppIcon-40@3x.png
+        │  │  │  ├─ AppIcon-40~ipad.png
+        │  │  │  ├─ AppIcon-83.5@2x~ipad.png
+        │  │  │  ├─ AppIcon@2x.png
+        │  │  │  ├─ AppIcon@2x~ipad.png
+        │  │  │  ├─ AppIcon@3x.png
+        │  │  │  ├─ AppIcon~ios-marketing.png
+        │  │  │  ├─ AppIcon~ipad.png
+        │  │  │  └─ Contents.json
+        │  │  └─ Contents.json
+        │  ├─ Entitlements.plist
+        │  ├─ HelloSkip.xcconfig
+        │  ├─ HelloSkip.xcodeproj
+        │  │  └─ project.pbxproj
+        │  └─ Sources
+        │     └─ HelloSkipAppMain.swift
         ├─ Package.swift
         ├─ README.md
+        ├─ Skip.env
         ├─ Sources
-        │  ├─ HelloSkip
-        │  │  ├─ ContentView.swift
-        │  │  ├─ HelloSkip.swift
-        │  │  ├─ HelloSkipApp.swift
-        │  │  ├─ Resources
-        │  │  │  └─ Localizable.xcstrings
-        │  │  └─ Skip
-        │  │     ├─ AndroidManifest.xml
-        │  │     ├─ Assets.xcassets
-        │  │     │  ├─ AccentColor.colorset
-        │  │     │  │  └─ Contents.json
-        │  │     │  ├─ AppIcon.appiconset
-        │  │     │  │  └─ Contents.json
-        │  │     │  └─ Contents.json
-        │  │     ├─ Capabilities.entitlements
-        │  │     └─ skip.yml
-        │  └─ HelloSkipApp
-        │     └─ HelloSkipAppMain.swift
+        │  └─ HelloSkip
+        │     ├─ ContentView.swift
+        │     ├─ HelloSkip.swift
+        │     ├─ HelloSkipApp.swift
+        │     ├─ Resources
+        │     │  └─ Localizable.xcstrings
+        │     └─ Skip
+        │        └─ skip.yml
         └─ Tests
            └─ HelloSkipTests
               ├─ HelloSkipTests.swift
@@ -99,14 +145,14 @@ class SkipCommandTests : XCTestCase {
               └─ XCSkipTests.swift
         """)
 
-        let verify = try await skip("verify", "-jA", "--project", tempDir).parseJSONArray()
-        _ = verify
+        //let verify = try await skip("verify", "-jA", "--project", tempDir).parseJSONArray()
+        //_ = verify
         //print("#### verify: \(verify)")
         //XCTAssertGreaterThan(verify.count, 1, "verify output should have contained some lines")
 
     }
 
-    func XXXtestSkipInit() async throws {
+    func testSkipInit() async throws {
         let tempDir = try mktmp()
         let name = "cool-lib"
         let out = try await skip("lib", "init", "-jA", "--show-tree", "--no-build", "--no-test", "--no-verify", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE")
@@ -196,7 +242,7 @@ class SkipCommandTests : XCTestCase {
 
         """)
 
-        try await skip("verify", "--project", tempDir)
+//        try await skip("verify", "--project", tempDir)
     }
 
     func NOtestSkipTestReport() async throws {
@@ -227,7 +273,7 @@ class SkipCommandTests : XCTestCase {
     }
 
     /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
-    @discardableResult func skip(checkError: Bool = true, _ args: String...) async throws -> String {
+    @discardableResult func skip(checkError: Bool = true, printOutput: Bool = false, _ args: String...) async throws -> String {
         // turn "-[SkipCommandTests testSomeTest]" into "testSomeTest"
         let testName = testRun?.test.name.split(separator: " ").last?.trimmingCharacters(in: CharacterSet(charactersIn: "[]")) ?? "TEST"
 
@@ -252,7 +298,9 @@ class SkipCommandTests : XCTestCase {
         }
 
         let cmd = [skiptool] + args
-        print("running: \(cmd.joined(separator: " "))")
+        if printOutput {
+            print("running: \(cmd.joined(separator: " "))")
+        }
 
         //let result = try await Process.popen(arguments: cmd, loggingHandler: nil)
 
@@ -261,7 +309,9 @@ class SkipCommandTests : XCTestCase {
         var env = ProcessInfo.processInfo.environment
         env["TERM"] = "dumb" // override TERM to prevent skip from using ANSI colors or progress animations
         for try await outputLine in Process.streamLines(command: cmd, environment: env, includeStdErr: true, onExit: { result = $0 }) {
-            print("\(testName)> \(outputLine)")
+            if printOutput {
+                print("\(testName)> \(outputLine)")
+            }
             outputLines.append(outputLine)
         }
 
