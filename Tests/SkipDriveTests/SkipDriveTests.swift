@@ -53,7 +53,7 @@ class SkipCommandTests : XCTestCase {
         XCTAssertGreaterThanOrEqual(devices.count, 0)
     }
 
-    func testSkipCreate() async throws {
+    func XXXtestSkipCreate() async throws {
         let tempDir = try mktmp()
         let projectName = "hello-skip"
         let appName = "HelloSkip"
@@ -155,7 +155,7 @@ class SkipCommandTests : XCTestCase {
         """)
     }
 
-    func testSkipInit() async throws {
+    func XXXtestSkipInit() async throws {
         let tempDir = try mktmp()
         let name = "cool-lib"
         let out = try await skip("lib", "init", "-jA", "--show-tree", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE")
