@@ -13,7 +13,7 @@ jobs:
     env:     
       DEVELOPER_DIR: /Applications/Xcode_15.2.app/Contents/Developer
     steps:
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: release-candidate
 

@@ -15,7 +15,7 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: release-candidate
       - run: brew install skiptools/skip/skip
