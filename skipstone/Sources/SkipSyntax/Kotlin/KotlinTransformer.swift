@@ -54,7 +54,8 @@ public let builtinKotlinTransformerTypes: [KotlinTransformer.Type] = [
     // May add constructors and modify existing constructors. May suppress property setting side effects in functions.
     // May change optional init call sites
     KotlinConstructorAndSideEffectSupressionTransformer.self,
-    // May change the names of stored properties, but adds computed wrapper properties with the previous names
+    // May change the names of stored properties, but adds computed wrapper properties with the previous names. Requires
+    // knowledge of all constructors, including added constructors
     KotlinObservationTransformer.self,
     KotlinIfWhenTransformer.self,
     KotlinDeferTransformer.self,

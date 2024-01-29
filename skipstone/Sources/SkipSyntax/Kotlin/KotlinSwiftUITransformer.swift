@@ -309,8 +309,8 @@ private final class TranslateVisitor {
         let bindingVariables = variableDeclarations.filter { $0.attributes.contains(.binding) }
         let bindableVariables = variableDeclarations.filter { $0.attributes.contains(.bindable) || $0.attributes.contains(.observedObject) }
         let appStorageVariables = variableDeclarations.filter { $0.attributes.contains(.appStorage) }
-        if !stateVariables.isEmpty || !bindableVariables.isEmpty || !environmentVariables.isEmpty || !appStorageVariables.isEmpty {
-            let composeFunction = synthesizeComposeFunction(isModifier: isModifier, stateVariables: stateVariables, bindableVariables: bindableVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables)
+        if !stateVariables.isEmpty || !environmentVariables.isEmpty || !bindableVariables.isEmpty || !appStorageVariables.isEmpty {
+            let composeFunction = synthesizeComposeFunction(isModifier: isModifier, stateVariables: stateVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables)
             classDeclaration.insert(statements: [composeFunction], after: body)
 
             for stateVariable in stateVariables {
@@ -329,7 +329,7 @@ private final class TranslateVisitor {
     }
 
     /// Create an override of the SkipUI `Compose` function on views and modifiers to handle state synchronization, etc.
-    private func synthesizeComposeFunction(isModifier: Bool, stateVariables: [KotlinVariableDeclaration], bindableVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], appStorageVariables: [KotlinVariableDeclaration]) -> KotlinStatement {
+    private func synthesizeComposeFunction(isModifier: Bool, stateVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], appStorageVariables: [KotlinVariableDeclaration]) -> KotlinStatement {
         let composeFunction = KotlinFunctionDeclaration(name: isModifier ? "Compose" : "ComposeContent")
         composeFunction.modifiers.visibility = .public
         composeFunction.modifiers.isOverride = true
@@ -346,13 +346,6 @@ private final class TranslateVisitor {
         var composeBodyStatements: [KotlinStatement] = []
         for stateVariable in stateVariables {
             let statements = synthesizeStateSync(variable: stateVariable)
-            if !composeBodyStatements.isEmpty {
-                statements[0].extras = .singleNewline
-            }
-            composeBodyStatements += statements
-        }
-        for bindableVariable in bindableVariables {
-            let statements = synthesizeBindableSync(variable: bindableVariable)
             if !composeBodyStatements.isEmpty {
                 statements[0].extras = .singleNewline
             }
@@ -375,7 +368,15 @@ private final class TranslateVisitor {
             composeBodyStatements += statements
         }
 
-        let statement = KotlinRawStatement(sourceCode: "body(\(isModifier ? "content" : "")).Compose(composectx)")
+        var superCall = "super.\(composeFunction.name)("
+        for (i, parameter) in composeFunction.parameters.enumerated() {
+            if i > 0 {
+                superCall += ", "
+            }
+            superCall += parameter.internalLabel
+        }
+        superCall += ")"
+        let statement = KotlinRawStatement(sourceCode: superCall)
         statement.extras = .singleNewline
         composeBodyStatements.append(statement)
 
@@ -393,14 +394,7 @@ private final class TranslateVisitor {
         // internally so that all reads and writes are tracked by Compose, including those from bindings
         let stateValue = KotlinRawStatement(sourceCode: "val remembered\(variable.propertyName) by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<\(variable.propertyType.kotlin)>, Any>) { mutableStateOf(_\(variable.propertyName)) }")
         let updateStateValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName) = remembered\(variable.propertyName)")
-        let trackState = KotlinRawStatement(sourceCode: "_\(variable.propertyName).trackstate()") // See ComposeStateTracking
-        return [stateValue, updateStateValue, trackState]
-    }
-
-    /// Create code to remember and sync a bindable variable.
-    private func synthesizeBindableSync(variable: KotlinVariableDeclaration) -> [KotlinStatement] {
-        let trackState = KotlinRawStatement(sourceCode: "_\(variable.propertyName).trackstate()")
-        return [trackState]
+        return [stateValue, updateStateValue]
     }
 
     /// Create code to remember and sync an app storage variable.
@@ -408,8 +402,7 @@ private final class TranslateVisitor {
         // See explanation in the similar code for @State sync
         let stateValue = KotlinRawStatement(sourceCode: "val remembered\(variable.propertyName) by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.AppStorage<\(variable.propertyType.kotlin)>, Any>) { mutableStateOf(_\(variable.propertyName)) }")
         let updateStateValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName) = remembered\(variable.propertyName)")
-        let trackState = KotlinRawStatement(sourceCode: "_\(variable.propertyName).trackstate()") // See ComposeStateTracking
-        return [stateValue, updateStateValue, trackState]
+        return [stateValue, updateStateValue]
     }
 
     /// Create code to initialize an environment variable.

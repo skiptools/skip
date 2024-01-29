@@ -544,8 +544,6 @@ final class SwiftUITests: XCTestCase {
         import skip.model.*
         @Stable
         internal open class O: Observable {
-
-            override fun trackstate() = Unit
         }
         internal class V: View {
             internal var s: Int
@@ -580,13 +578,11 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 val remembereds by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_s) }
                 _s = remembereds
-                _s.trackstate()
 
                 val rememberedo by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<O>, Any>) { mutableStateOf(_o) }
                 _o = rememberedo
-                _o.trackstate()
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
 
             constructor(s: Int = 0, o: O = O()) {
@@ -671,9 +667,8 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 val remembereds by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<S>, Any>) { mutableStateOf(_s) }
                 _s = remembereds
-                _s.trackstate()
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
 
             constructor(s: S = S()) {
@@ -736,9 +731,8 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 val rememberedx by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<String?>, Any>) { mutableStateOf(_x) }
                 _x = rememberedx
-                _x.trackstate()
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
 
             constructor(x: String? = null) {
@@ -779,7 +773,7 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 envvalue = EnvironmentValues.shared.envvalue
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
         }
         """)
@@ -821,7 +815,7 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 envvalue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)!!
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
         }
         """)
@@ -856,7 +850,7 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 envvalue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)!!
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
         }
         """)
@@ -895,7 +889,7 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 envvalue = EnvironmentValues.shared.environmentObject(type = V.EnvValue::class)!!
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
             internal open class EnvValue {
             }
@@ -940,7 +934,7 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 envvalue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
         }
         """)
@@ -1026,9 +1020,8 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 val rememberedtext by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<String>, Any>) { mutableStateOf(_text) }
                 _text = rememberedtext
-                _text.trackstate()
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
 
             constructor(text: String = "") {
@@ -1078,9 +1071,8 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 val rememberedtext by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<String>, Any>) { mutableStateOf(_text) }
                 _text = rememberedtext
-                _text.trackstate()
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
 
             constructor(text: String = "") {
@@ -1148,9 +1140,8 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 val remembereditem by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Item>, Any>) { mutableStateOf(_item) }
                 _item = remembereditem
-                _item.trackstate()
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
 
             constructor(item: Item = Item(id = UUID(), s = "New Item")) {
@@ -1239,8 +1230,6 @@ final class SwiftUITests: XCTestCase {
                     _string.wrappedValue = newValue
                 }
             internal var _string: skip.model.Observed<String> = skip.model.Observed("")
-
-            override fun trackstate(): Unit = _string.track()
         }
 
         internal class V: View {
@@ -1256,9 +1245,8 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                _o.trackstate()
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
 
             constructor(o: O) {
@@ -1307,9 +1295,8 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                _o.trackstate()
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
 
             constructor(o: O) {
@@ -1357,9 +1344,8 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                _o.trackstate()
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
 
             constructor(o: O) {
@@ -1480,13 +1466,10 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 val rememberedcount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_count) }
                 _count = rememberedcount
-                _count.trackstate()
-
-                _o.trackstate()
 
                 envvalue = EnvironmentValues.shared.envvalue
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
 
             constructor(count: Int = 0, text: Binding<String>, o: O, i: Int = 0) {
@@ -1575,13 +1558,10 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 val rememberedcount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_count) }
                 _count = rememberedcount
-                _count.trackstate()
-
-                _o.trackstate()
 
                 envvalue = EnvironmentValues.shared.envvalue
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
 
             private constructor(copy: MutableStruct) {
@@ -2006,9 +1986,8 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 val rememberedappStorageProp by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.AppStorage<String>, Any>) { mutableStateOf(_appStorageProp) }
                 _appStorageProp = rememberedappStorageProp
-                _appStorageProp.trackstate()
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
 
             constructor(appStorageProp: String = "appStorageDefaultValue") {
@@ -2069,9 +2048,8 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 val remembereddoublePref by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.AppStorage<Double>, Any>) { mutableStateOf(_doublePref) }
                 _doublePref = remembereddoublePref
-                _doublePref.trackstate()
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
 
             constructor(doublePref: Double = 1.0) {
@@ -2134,13 +2112,11 @@ final class SwiftUITests: XCTestCase {
             override fun ComposeContent(composectx: ComposeContext) {
                 val rememberedenumProp by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.AppStorage<E>, Any>) { mutableStateOf(_enumProp) }
                 _enumProp = rememberedenumProp
-                _enumProp.trackstate()
 
                 val rememberedstructProp by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.AppStorage<S>, Any>) { mutableStateOf(_structProp) }
                 _structProp = rememberedstructProp
-                _structProp.trackstate()
 
-                body().Compose(composectx)
+                super.ComposeContent(composectx)
             }
 
             constructor(enumProp: E = E.a, structProp: S = S(rawValue = 1)) {
@@ -2277,9 +2253,8 @@ final class SwiftUITests: XCTestCase {
             override fun Compose(content: View, composectx: ComposeContext) {
                 val rememberedisPresented by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Boolean>, Any>) { mutableStateOf(_isPresented) }
                 _isPresented = rememberedisPresented
-                _isPresented.trackstate()
 
-                body(content).Compose(composectx)
+                super.Compose(content, composectx)
             }
 
             constructor(isPresented: Boolean = false) {

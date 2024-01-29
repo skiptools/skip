@@ -57,11 +57,6 @@ final class ObservationTests: XCTestCase {
             internal var _e: skip.model.Observed<Int> = skip.model.Observed(1)
             internal open var f = 1
 
-            override fun trackstate() {
-                _d.track()
-                _e.track()
-            }
-
             companion object {
 
                 internal var s = 1
@@ -92,8 +87,6 @@ final class ObservationTests: XCTestCase {
                     _a.wrappedValue = newValue.sref()
                 }
             internal var _a: skip.model.Observed<Array<A>> = skip.model.Observed(arrayOf())
-
-            override fun trackstate(): Unit = _a.track()
         }
         """)
     }
@@ -126,8 +119,6 @@ final class ObservationTests: XCTestCase {
                     _b.wrappedValue = newValue
                 }
             internal var _b: skip.model.Published<Int> = skip.model.Published(1)
-
-            override fun trackstate(): Unit = _b.track()
         }
         @Stable
         internal open class C2: C1() {
@@ -138,11 +129,6 @@ final class ObservationTests: XCTestCase {
                     _c.wrappedValue = newValue
                 }
             internal var _c: skip.model.Published<Int> = skip.model.Published(1)
-
-            override fun trackstate() {
-                super.trackstate()
-                _c.track()
-            }
         }
         """)
     }
@@ -184,11 +170,6 @@ final class ObservationTests: XCTestCase {
             internal constructor(a: S) {
                 this._a = skip.model.Published(a)
             }
-
-            override fun trackstate() {
-                _a.track()
-                _b.track()
-            }
         }
         """)
     }
@@ -217,8 +198,6 @@ final class ObservationTests: XCTestCase {
                     _i.wrappedValue = newValue
                 }
             internal var _i: skip.model.Published<Int> = skip.model.Published(0)
-
-            override fun trackstate(): Unit = _i.track()
         }
         """)
     }
@@ -252,8 +231,6 @@ final class ObservationTests: XCTestCase {
                 }
             internal var _i: skip.model.Published<Int> = skip.model.Published(0)
             internal open fun f(): Unit = objectWillChange.send()
-
-            override fun trackstate(): Unit = _i.track()
         }
         """)
     }
@@ -291,8 +268,6 @@ final class ObservationTests: XCTestCase {
                     _i.wrappedValue = newValue
                 }
             internal var _i: skip.model.Published<Int> = skip.model.Published(0)
-
-            override fun trackstate(): Unit = _i.track()
         }
         internal open class C {
             internal val o: O

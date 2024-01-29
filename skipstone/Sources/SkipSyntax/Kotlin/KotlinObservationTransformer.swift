@@ -49,33 +49,7 @@ final class KotlinObservationTransformer: KotlinTransformer {
             makeObservable(statement: observableVariable, in: statement, source: translator.syntaxTree.source)
             addManualObservationCallMessages(in: observableVariable, source: translator.syntaxTree.source)
         }
-
-        var hasObservableSuperclass = false
-        if let codebaseInfo = translator.codebaseInfo?.global {
-            hasObservableSuperclass = codebaseInfo
-                .inheritanceChainSignatures(forNamed: statement.signature)
-                .dropFirst()
-                .contains { codebaseInfo.primaryTypeInfo(forNamed: $0)?.attributes.contains(.observable) == true }
-        }
         updateObservableVariableInitializations(in: statement, for: observableVariables)
-        addStateTracking(to: statement, for: observableVariables, hasObservableSuperclass: hasObservableSuperclass)
-    }
-
-    private func addStateTracking(to statement: KotlinClassDeclaration, for variables: [KotlinVariableDeclaration], hasObservableSuperclass: Bool) {
-        let function = KotlinFunctionDeclaration(name: "trackstate")
-        function.modifiers.visibility = .public
-        function.modifiers.isOverride = true
-        function.extras = .singleNewline
-
-        var bodyStatements: [KotlinStatement] = []
-        if hasObservableSuperclass {
-            bodyStatements.append(KotlinRawStatement(sourceCode: "super.trackstate()"))
-        }
-        bodyStatements += variables.map { KotlinRawStatement(sourceCode: "_\($0.propertyName).track()") }
-        function.body = KotlinCodeBlock(statements: bodyStatements)
-        
-        function.assignParentReferences()
-        statement.insert(statements: [function], after: statement.members.last)
     }
 
     private func updateObservableVariableInitializations(in statement: KotlinClassDeclaration, for variables: [KotlinVariableDeclaration], isPublished: Bool = false) {
@@ -187,9 +161,7 @@ final class KotlinObservationTransformer: KotlinTransformer {
             statement.insert(statements: [objectWillChangeDeclaration], after: nil)
         }
         publishedVariables.forEach { makeObservable(statement: $0, in: statement, isPublished: true, source: translator.syntaxTree.source) }
-
         updateObservableVariableInitializations(in: statement, for: publishedVariables, isPublished: true)
-        addStateTracking(to: statement, for: publishedVariables, hasObservableSuperclass: !isObservableObjectBaseType)
         return true
     }
 
