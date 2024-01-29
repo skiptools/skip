@@ -73,10 +73,13 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
             AppCreateCommand.self, // skip create is shorthand for skip app create
             LibInitCommand.self, // skip init is shorthand for skip lib init
             VerifyCommand.self,
-            
+
             // Conditional on SkipDrive being imported
             GradleCommand.self,
             ADBCommand.self,
+            DevicesCommand.self,
+            AssembleCommand.self,
+            RunCommand.self,
             TestCommand.self,
 
             // Hidden commands used by the plugin
@@ -441,7 +444,7 @@ protocol StreamingCommand: AsyncParsableCommand {
     /// The structured output of this tool
     var outputOptions: OutputOptions { get set }
 
-    //associatedtype Output : MessageConvertible
+    associatedtype Output : MessageEncodable
     //typealias OutputMessage = Either<Output>.Or<Message>
 
     /// Perform the command, which will write messages to the output queue
@@ -521,13 +524,10 @@ extension StreamingCommand {
 }
 
 /// A simple command that issues messages
-protocol MessageCommand : SkipCommand, StreamingCommand, OutputOptionsCommand {
-    typealias Output = MessageBlock
-    // func performCommand(with out: Messenger) async throws
+protocol MessageCommand : SkipCommand, StreamingCommand, OutputOptionsCommand where Output == MessageBlock {
 }
 
 protocol SingleStreamingCommand : StreamingCommand {
-    associatedtype Output : MessageEncodable
     func executeCommand() async throws -> Output
 }
 
@@ -908,6 +908,10 @@ struct ToolOptions: ParsableArguments {
         }
         return try URL.findCommandInPath(toolName: tool, withAdditionalPaths: ProcessInfo.isARM ? ["/opt/homebrew/bin"] : ["/usr/local/bin"]).path
     }
+}
+
+public struct ToolLaunchError : LocalizedError {
+    public var errorDescription: String?
 }
 
 extension URL {

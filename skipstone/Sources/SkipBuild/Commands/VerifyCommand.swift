@@ -4,6 +4,7 @@ import ArgumentParser
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 struct VerifyCommand: SkipCommand, StreamingCommand, ProjectCommand, ToolOptionsCommand {
+    typealias Output = MessageBlock
 
     static var configuration = CommandConfiguration(
         commandName: "verify",

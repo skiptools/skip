@@ -10,7 +10,7 @@ fileprivate let adbCommandEnabled = false
 #endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct ADBCommand: MessageCommand {
+struct ADBCommand: MessageCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "adb",
         abstract: "Launch the adb build tool",
@@ -32,7 +32,7 @@ struct ADBCommand: MessageCommand {
         throw SkipDriveError(errorDescription: "SkipDrive not linked")
         #else
         var exitCode: ProcessResult.ExitStatus? = nil
-        let output = try await self.launchADB() {
+        let output = try await self.launchTool("adb", arguments: arguments) {
             exitCode = $0.exitStatus
         }
 
@@ -49,23 +49,6 @@ struct ADBCommand: MessageCommand {
 
         #endif
     }
-
-    #if canImport(SkipDriveExternal)
-    /// Executes `adb` with the current default arguments and the additional args and returns an async stream of the lines from the combined standard err and standard out.
-    private func launchADB(in workingDirectory: URL? = nil, env: [String: String] = [:], onExit: @escaping (ProcessResult) throws -> () = { _ in }) async throws -> SkipDriveExternal.Process.AsyncLineOutput {
-        #if DEBUG
-        // output the launch message in a format that makes it easy to copy and paste the result into the terminal
-        print("note: skip adb env:", env.keys.sorted().map { $0 + "=\"" + env[$0, default: ""] + "\"" }.joined(separator: " "), (arguments).joined(separator: " "))
-        #endif
-
-        // transfer process environment along with the additional environment
-        var penv = ProcessInfo.processInfo.environmentWithDefaultToolPaths
-        for (key, value) in env {
-            penv[key] = value
-        }
-        return Process.streamLines(command: [try toolOptions.toolPath(for: "adb")] + arguments, environment: penv, workingDirectory: workingDirectory, includeStdErr: true, onExit: onExit)
-    }
-    #endif
 
 
     /// Check for common ADB error patterns and report them back to Xcode.

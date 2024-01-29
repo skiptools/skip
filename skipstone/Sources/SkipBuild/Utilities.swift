@@ -263,4 +263,15 @@ extension URL {
     }
 }
 
+extension NSRegularExpression {
+    /// Returns the array of matches for a string against the regular expression.
+    func extract(from string: String, options: NSRegularExpression.MatchingOptions = []) -> [String]? {
+        guard let match = firstMatch(in: string, options: options, range: NSRange(string.startIndex..., in: string)) else {
+            return nil
+        }
+        return (1..<match.numberOfRanges).map {
+            (string as NSString).substring(with: match.range(at: $0))
+        }
+    }
+}
 

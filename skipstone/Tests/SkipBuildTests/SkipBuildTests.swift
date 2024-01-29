@@ -30,6 +30,13 @@ final class SkipBuildTests: XCTestCase {
         XCTAssertEqual("345", try "12345 abc".extract(pattern: "12([0-9]+)"))
     }
 
+    func testRegex() throws {
+        XCTAssertEqual(["345"], try NSRegularExpression(pattern: "12([0-9]+)").extract(from: "12345 abc"))
+        XCTAssertEqual(nil, try NSRegularExpression(pattern: "([a-zA-Z]+)([0-9]+)").extract(from: ""))
+        XCTAssertEqual(["A", "1"], try NSRegularExpression(pattern: "([a-zA-Z]+)([0-9]+)").extract(from: "A1"))
+        XCTAssertEqual(["xA", "19"], try NSRegularExpression(pattern: "([a-zA-Z]+)\\s([0-9]+)").extract(from: "xA 19"))
+    }
+
     func testSlide() {
         XCTAssertEqual(["A"], ["A"].slice(0))
         XCTAssertEqual([], ["A"].slice(1))

@@ -4,6 +4,8 @@ import SkipSyntax
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 struct WelcomeCommand: SkipCommand, SingleStreamingCommand {
+    typealias Output = WelcomeInfo?
+
     static var configuration = CommandConfiguration(
         commandName: "welcome",
         abstract: "Show the skip welcome message",
