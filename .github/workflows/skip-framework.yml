@@ -61,7 +61,7 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-29-aosp-atd
+          key: avd-30-aosp-atd
 
       - name: Generate Android emulator snapshot
         if: steps.avd-cache.outputs.cache-hit != 'true'
@@ -69,11 +69,11 @@ jobs:
         with:
           working-directory: .build/android-tests
           target: aosp_atd
-          api-level: 29
+          api-level: 30
           arch: x86
           channel: canary
           profile: pixel
-          avd-name: Pixel_3a_API_29
+          avd-name: Pixel_3a_API_30
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: false
@@ -85,12 +85,12 @@ jobs:
         with:
           working-directory: .build/android-tests
           target: aosp_atd
-          api-level: 29
+          api-level: 30
           arch: x86
           channel: canary
           profile: pixel
           #profile: Galaxy Nexus
-          avd-name: Pixel_3a_API_29
+          avd-name: Pixel_3a_API_30
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: adb logcat *:S TestRunner:V & ./gradlew connectedCheck --stacktrace
 
