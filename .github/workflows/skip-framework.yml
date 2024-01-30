@@ -68,15 +68,14 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           working-directory: .build/android-tests
-          target: aosp_atd
-          api-level: 29
+          target: google_apis
+          api-level: 30
           arch: arm64-v8a
           channel: canary
           profile: pixel
           avd-name: android-emulator
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: false
           script: echo "Generated AVD snapshot for caching"
 
 
@@ -84,12 +83,13 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           working-directory: .build/android-tests
-          target: aosp_atd
-          api-level: 29
+          target: google_apis
+          api-level: 30
           arch: arm64-v8a
           channel: canary
           profile: pixel
           avd-name: android-emulator
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: adb logcat *:S TestRunner:V & ./gradlew connectedCheck --stacktrace
 
       - name: Create Release
