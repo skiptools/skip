@@ -1689,16 +1689,13 @@ final class SwiftUITests: XCTestCase {
     func testEmbedCompose() async throws {
         try await check(supportingSwift: baseSupportingSwift + """
         #if SKIP
-        struct ComposeResult {
-            static let ok = ComposeResult()
-        }
         struct ComposeView: View {
-            let content: @Composable (ComposeContext) -> ComposeResult
-            init(content: @Composable (ComposeContext) -> ComposeResult) {
+            let content: @Composable (ComposeContext) -> Void
+            init(content: @Composable (ComposeContext) -> Void) {
                 self.content = content
             }
             @Composable public override func ComposeContent(context: ComposeContext) {
-                let _ = content(context)
+                content(context)
             }
         }
         #endif
@@ -1711,7 +1708,6 @@ final class SwiftUITests: XCTestCase {
                     androidx.compose.Column(modifier: $0.modifier) {
                         androidx.compose.Text("y")
                     }
-                    return .ok
                 }
                 ComposeView { _ in
                     androidx.compose.Text("y")
@@ -1743,28 +1739,20 @@ final class SwiftUITests: XCTestCase {
             override fun body(): View {
                 return ComposeBuilder { composectx: ComposeContext ->
                     Text("x").Compose(composectx)
-                    ComposeView l@{ it ->
+                    ComposeView { it ->
                         androidx.compose.Column(modifier = it.modifier) { androidx.compose.Text("y") }
-                        return@l ComposeResult.ok
                     }.Compose(composectx)
-                    ComposeView { _ ->
-                        androidx.compose.Text("y")
-                        ComposeResult.ok
-                    }.Compose(composectx)
-                    ComposeView(content = { _ ->
-                        androidx.compose.Text("y")
-                        ComposeResult.ok
-                    }).Compose(composectx)
+                    ComposeView { _ -> androidx.compose.Text("y") }.Compose(composectx)
+                    ComposeView(content = { _ -> androidx.compose.Text("y") }).Compose(composectx)
                     ComposeView l@{ context ->
                         if (true) {
-                            return@l ComposeResult.ok
+                            return@l
                         }
                         if (false) {
                             androidx.compose.Text("y")
                         } else {
                             androidx.compose.Text("y")
                         }
-                        return@l ComposeResult.ok
                     }.Compose(composectx)
                     ComposeResult.ok
                 }

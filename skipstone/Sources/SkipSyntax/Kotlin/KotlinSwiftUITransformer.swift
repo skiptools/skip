@@ -238,24 +238,6 @@ private final class TranslateVisitor {
     }
     
     private func translateFunctionCall(_ functionCall: KotlinFunctionCall) {
-        // Make sure ComposeView { ... } calls return a ComposeResult from their closures
-        let isComposeViewCall: Bool
-        if let memberAccess = functionCall.function as? KotlinMemberAccess, memberAccess.member == "ComposeView", (memberAccess.base as? KotlinIdentifier)?.name == "SwiftUI" {
-            isComposeViewCall = true
-        } else if (functionCall.function as? KotlinIdentifier)?.name == "ComposeView" {
-            isComposeViewCall = true
-        } else {
-            isComposeViewCall = false
-        }
-        if isComposeViewCall, functionCall.arguments.count == 1, let composeClosure = functionCall.arguments[0].value as? KotlinClosure {
-            // We use an anonymous function when the return type is specified, so should already be returning a ComposeResult
-            if !composeClosure.isAnonymousFunction {
-                let returnValue = KotlinRawExpression(sourceCode: "ComposeResult.ok")
-                composeClosure.body.updateWithExpectedReturn(.value(returnValue, asReturn: composeClosure.hasReturnLabel, label: KotlinClosure.returnLabel))
-            }
-            return
-        }
-
         // Translate .environment(\.keyPath, value) calls. The key path will have been transpiled
         // to a closure that reads the named property, but we want to set it in EnvironmentValues
         if (functionCall.function as? KotlinMemberAccess)?.member == "environment" || (functionCall.function as? KotlinIdentifier)?.name == "environment", functionCall.arguments.count == 2, let keyPath = functionCall.arguments[0].value as? KotlinKeyPathLiteral {
