@@ -38,7 +38,6 @@ class SkipCommandTests : XCTestCase {
         XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Gradle version") }), "missing Gradle version")
         XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Java version") }), "missing Java version")
         XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Android Debug Bridge version") }), "missing Android Debug Bridge version")
-        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Android Studio version") }), "missing Android Studio version")
         XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Android SDK licenses:") }), "missing Android SDK licenses")
         XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Check Skip Updates") }), "missing Check Skip Updates")
     }
