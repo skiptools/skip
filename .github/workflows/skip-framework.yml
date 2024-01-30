@@ -61,7 +61,7 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-30-aosp-atd
+          key: avd-30-aosp-atd-arm
 
       - name: Generate Android emulator snapshot
         if: steps.avd-cache.outputs.cache-hit != 'true'
@@ -70,6 +70,7 @@ jobs:
           working-directory: .build/android-tests
           target: aosp_atd
           api-level: 30
+          arch: arm64-v8a
           channel: canary
           profile: pixel
           avd-name: Pixel_3a_API_30
