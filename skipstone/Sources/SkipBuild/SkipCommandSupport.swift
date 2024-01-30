@@ -1,8 +1,11 @@
 import Foundation
 #if canImport(SkipDriveExternal)
 import SkipDriveExternal
+#else
+typealias ProcessResult = Void
 #endif
 
+/// The stream of lines that are output from the execution of a tool
 typealias AsyncLineOutput = AsyncCompactMapSequence<AsyncThrowingStream<Data, Error>, String>
 
 extension ToolOptionsCommand {

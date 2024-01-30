@@ -494,6 +494,7 @@ class AppProjectLayout : FrameworkProjectLayout {
 
     let androidGradleProperties: URL
     let androidGradleWrapperProperties: URL
+    let androidGradleVersionsCatalog: URL
     let androidGradleSettings: URL
     let androidAppFolder: URL
     let androidAppBuildGradle: URL
@@ -539,6 +540,7 @@ class AppProjectLayout : FrameworkProjectLayout {
         self.androidREADME = androidFolder.resolve("README.md", check: optional)
         self.androidGradleProperties = try androidFolder.resolve("gradle.properties", check: check)
         self.androidGradleWrapperProperties = androidFolder.resolve("gradle/wrapper/gradle-wrapper.properties", check: optional)
+        self.androidGradleVersionsCatalog = androidFolder.resolve("gradle/libs.versions.toml", check: optional)
         self.androidGradleSettings = try androidFolder.resolve("settings.gradle.kts", check: check)
         self.androidAppFolder = try androidFolder.resolve("app/", check: check)
         self.androidAppBuildGradle = try androidAppFolder.resolve("build.gradle.kts", check: check)
@@ -1392,6 +1394,9 @@ class AppProjectLayout : FrameworkProjectLayout {
         try defaultProguardContents().write(to: appProject.androidAppProguardRules, atomically: true, encoding: .utf8)
         try defaultGradleProperties().write(to: appProject.androidGradleProperties, atomically: true, encoding: .utf8)
         try defaultGradleWrapperProperties().write(to: appProject.androidGradleWrapperProperties.createParentDirectory(), atomically: true, encoding: .utf8)
+        try defaultGradleVersionsCatalog().write(to: appProject.androidGradleVersionsCatalog.createParentDirectory(), atomically: true, encoding: .utf8)
+
+
 
         let sourceMainKotlinPackage = appProject.androidAppSrcMainKotlin.appendingPathComponent(appModulePackage.split(separator: ".").joined(separator: "/"), isDirectory: true)
         let sourceMainKotlinSourceFile = sourceMainKotlinPackage.appendingPathComponent("Main.kt")
@@ -1910,6 +1915,17 @@ extension FrameworkProjectLayout {
     static func defaultGradleWrapperProperties() -> String {
         """
         distributionUrl=https\\://services.gradle.org/distributions/gradle-\(gradleVersion)-bin.zip
+
+        """
+    }
+
+    static func defaultGradleVersionsCatalog() -> String {
+        """
+        [versions]
+
+        [libraries]
+
+        [plugins]
 
         """
     }

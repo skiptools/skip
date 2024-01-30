@@ -26,6 +26,7 @@ struct DevicesCommand: SkipCommand, StreamingCommand, OutputOptionsCommand, Tool
 
     func listIOSDevices(with out: MessageQueue) async throws {
         // xcrun devicectl list devices --timeout 5 --json-output -
+        // need to ignore stderror since some non-JSON debugging info is sent there
         let deviceOutput: XCDeviceOutput = try await launchTool("xcrun", arguments: ["devicectl", "list", "devices", "--timeout", "10", "--json-output", "-"], includeStdErr: false).parseJSON()
         for device in deviceOutput.result.devices {
             let info = DevicesOutput(id: device.identifier, type: .device, platform: .ios, info: .init(device))
@@ -66,12 +67,18 @@ struct DevicesCommand: SkipCommand, StreamingCommand, OutputOptionsCommand, Tool
 
                 let _ = deviceState
 
+                func trim(_ string: String) -> String {
+                    string.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+                }
+
                 // create a dictionary from the device info string: "product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1"
-                let deviceInfoMap = Dictionary(deviceInfo.split(separator: " ")
-                    .map({ $0.split(separator: ":") })
-                    .filter({ $0.count == 2 })
-                    .map({ ($0[0].trimmingCharacters(in: .whitespacesAndNewlines), $0[1].trimmingCharacters(in: .whitespacesAndNewlines) )}),
-                                               uniquingKeysWith: { $1 })
+                var deviceInfoMap = Dictionary<String, String>()
+
+                for keyValue in deviceInfo.split(separator: " ").map({ $0.split(separator: ":") }) {
+                    if keyValue.count == 2 {
+                        deviceInfoMap[keyValue[0].description] = keyValue[1].description
+                    }
+                }
 
                 let info = DevicesOutput(id: deviceID, type: .device, platform: .android, info: .init(deviceInfoMap))
                 await out.yield(info)

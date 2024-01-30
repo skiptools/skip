@@ -272,6 +272,7 @@ final class SkipCommandTests: XCTestCase {
         │  │              └─ module
         │  │                 └─ Main.kt
         │  ├─ gradle
+        │  │  ├─ libs.versions.toml
         │  │  └─ wrapper
         │  │     └─ gradle-wrapper.properties
         │  ├─ gradle.properties
@@ -346,6 +347,7 @@ final class SkipCommandTests: XCTestCase {
         │  │           └─ mipmap-xxxhdpi
         │  │              └─ ic_launcher.png
         │  ├─ gradle
+        │  │  ├─ libs.versions.toml
         │  │  └─ wrapper
         │  │     └─ gradle-wrapper.properties
         │  ├─ gradle.properties
@@ -514,6 +516,7 @@ final class SkipCommandTests: XCTestCase {
         │  │              └─ module
         │  │                 └─ Main.kt
         │  ├─ gradle
+        │  │  ├─ libs.versions.toml
         │  │  └─ wrapper
         │  │     └─ gradle-wrapper.properties
         │  ├─ gradle.properties
@@ -642,6 +645,7 @@ final class SkipCommandTests: XCTestCase {
         │  │              └─ module
         │  │                 └─ Main.kt
         │  ├─ gradle
+        │  │  ├─ libs.versions.toml
         │  │  └─ wrapper
         │  │     └─ gradle-wrapper.properties
         │  ├─ gradle.properties
