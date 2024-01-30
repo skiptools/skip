@@ -16,6 +16,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: release-candidate
+          generate-job-summary: false
 
       - run: brew install skiptools/skip/skip tree ${{ inputs.brew-install }}
 
@@ -54,7 +55,7 @@ jobs:
           gradle wrapper
 
       - name: Cache Android emulator snapshot
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: avd-cache
         with:
           path: |

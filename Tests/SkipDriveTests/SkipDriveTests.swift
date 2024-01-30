@@ -30,17 +30,17 @@ class SkipCommandTests : XCTestCase {
         // run `skip doctor` with JSON array output and make sure we can parse the result
         let doctor = try await skip("doctor", "-jA").parseJSONMessages()
         XCTAssertGreaterThan(doctor.count, 5, "doctor output should have contained some lines")
-        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("macOS version") }))
-        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Swift version") }))
-        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Xcode version") }))
-        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Xcode tools") }))
-        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Homebrew version") }))
-        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Gradle version") }))
-        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Java version") }))
-        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Android Debug Bridge version") }))
-        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Android Studio version") }))
-        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Android SDK licenses:") }))
-        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Check Skip Updates") }))
+        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("macOS version") }), "missing macOS version")
+        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Swift version") }), "missing Swift version")
+        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Xcode version") }), "missing Xcode version")
+        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Xcode tools") }), "missing Xcode tools")
+        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Homebrew version") }), "missing Homebrew version")
+        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Gradle version") }), "missing Gradle version")
+        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Java version") }), "missing Java version")
+        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Android Debug Bridge version") }), "missing Android Debug Bridge version")
+        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Android Studio version") }), "missing Android Studio version")
+        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Android SDK licenses:") }), "missing Android SDK licenses")
+        XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Check Skip Updates") }), "missing Check Skip Updates")
     }
 
     func XXXtestSkipCheckup() async throws {
