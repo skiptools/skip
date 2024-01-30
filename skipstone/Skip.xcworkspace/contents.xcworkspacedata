@@ -26,6 +26,9 @@
       location = "group:../skip-sql">
    </FileRef>
    <FileRef
+      location = "group:../skipapp-hello/Darwin/HelloSkip.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "group:../skipapp-databake/Darwin/DataBake.xcodeproj">
    </FileRef>
    <FileRef

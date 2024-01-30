@@ -93,7 +93,6 @@ private func isSwiftUIType(named: String, declaration: KotlinClassDeclaration? =
 
 private final class TranslateVisitor {
     private let translator: KotlinTranslator
-    private var composeViewIdentifiers: Set<ObjectIdentifier> = []
 
     init(translator: KotlinTranslator) {
         self.translator = translator
@@ -250,7 +249,7 @@ private final class TranslateVisitor {
         }
         if isComposeViewCall, functionCall.arguments.count == 1, let composeClosure = functionCall.arguments[0].value as? KotlinClosure {
             // We use an anonymous function when the return type is specified, so should already be returning a ComposeResult
-            if !composeClosure.isAnonymousFunction, !composeViewIdentifiers.contains(ObjectIdentifier(functionCall)) {
+            if !composeClosure.isAnonymousFunction {
                 let returnValue = KotlinRawExpression(sourceCode: "ComposeResult.ok")
                 composeClosure.body.updateWithExpectedReturn(.value(returnValue, asReturn: composeClosure.hasReturnLabel, label: KotlinClosure.returnLabel))
             }
@@ -631,18 +630,16 @@ private final class TranslateVisitor {
             codeBlock.statements.append(KotlinRawStatement(sourceCode: "ComposeResult.ok"))
         }
 
-        // Wrap the code block in 'return ComposeView { ... }' to return a single view that will compose
+        // Wrap the code block in 'return ComposeBuilder { ... }' to return a single view that will compose
         // when the parent adds its tail call
         let composingClosure = KotlinClosure(body: codeBlock)
         composingClosure.parameters = [Parameter(externalLabel: "composectx", declaredType: .named("ComposeContext", []))]
         composingClosure.hasReturnLabel = needsReturnLabel
         let composingArgument = LabeledValue<KotlinExpression>(value: composingClosure)
-        let composingFunction = KotlinIdentifier(name: "ComposeView")
-        
+        let composingFunction = KotlinIdentifier(name: "ComposeBuilder")
+
         let composingFunctionCall = KotlinFunctionCall(function: composingFunction, arguments: [composingArgument])
         composingFunctionCall.hasTrailingClosures = true
-        // Track the ComposeView calls we add so that we don't process them when adding returns to ComposeView calls
-        composeViewIdentifiers.insert(ObjectIdentifier(composingFunctionCall))
 
         let returnStatement: KotlinStatement = closure == nil ? KotlinReturn(expression: composingFunctionCall) : KotlinExpressionStatement(expression: composingFunctionCall)
         let composingCodeBlock = KotlinCodeBlock(statements: [returnStatement])
