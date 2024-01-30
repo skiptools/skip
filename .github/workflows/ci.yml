@@ -12,7 +12,7 @@ env:
 
 jobs:
   skip-init:
-    runs-on: macos-13
+    runs-on: macos-14
     steps:
       - name: Checkout skip
         uses: actions/checkout@v4

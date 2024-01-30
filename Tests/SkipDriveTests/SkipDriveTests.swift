@@ -42,17 +42,17 @@ class SkipCommandTests : XCTestCase {
         XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Check Skip Updates") }), "missing Check Skip Updates")
     }
 
-    func XXXtestSkipCheckup() async throws {
-        let checkup = try await skip("checkup", "-jA").parseJSONMessages()
-        XCTAssertGreaterThan(checkup.count, 5, "checkup output should have contained some lines")
-    }
-
     func testSkipDevices() async throws {
         let devices = try await skip("devices", "-jA").parseJSONArray()
         XCTAssertGreaterThanOrEqual(devices.count, 0)
     }
 
-    func XXXtestSkipCreate() async throws {
+    func testSkipCheckup() async throws {
+        let checkup = try await skip("checkup", "-jA").parseJSONMessages()
+        XCTAssertGreaterThan(checkup.count, 5, "checkup output should have contained some lines")
+    }
+
+    func testSkipCreate() async throws {
         let tempDir = try mktmp()
         let projectName = "hello-skip"
         let appName = "HelloSkip"
