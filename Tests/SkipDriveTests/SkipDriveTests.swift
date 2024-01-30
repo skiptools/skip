@@ -93,6 +93,7 @@ class SkipCommandTests : XCTestCase {
         │  │           └─ mipmap-xxxhdpi
         │  │              └─ ic_launcher.png
         │  ├─ gradle
+        │  │  ├─ libs.versions.toml
         │  │  └─ wrapper
         │  │     └─ gradle-wrapper.properties
         │  ├─ gradle.properties
