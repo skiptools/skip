@@ -100,13 +100,19 @@ private final class IdentifiersVisitor {
     private var renamedIdentifiersStack: [[String: String]] = []
 
     func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
-        if node is KotlinCodeBlock {
+        if node is KotlinCodeBlock || node is KotlinWhileLoop || node is KotlinForLoop {
             // When entering a code block we create a renaming context. If we encounter optional bindings,
-            // we can apply them to the current context. When we leave, we pop the context
+            // we can apply them to the current context. When we leave, we pop the context.
+            //
+            // We also do this around loops because while they only use their bindings within the transpiled
+            // loop body, the bindings themselves are not children of the CodeBlock and so would pollute the
+            // parent stack otherwise
             renamedIdentifiersStack.append([:])
             return .recurse({ _ in self.renamedIdentifiersStack.removeLast() })
         } else if let identifier = node as? KotlinIdentifier {
             if let bindingVariableName = bindingVariableName(for: identifier.name) {
+                //~~~
+                print("FOUND BINDING VARIABLE NAME: \(bindingVariableName) =================================")
                 identifier.name = bindingVariableName
             }
             return .skip

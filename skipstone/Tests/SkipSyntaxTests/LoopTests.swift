@@ -87,6 +87,32 @@ final class LoopTests: XCTestCase {
             }
         }
         """)
+
+        try await check(supportingSwift: """
+        func f() -> Int? {
+            return 0
+        }
+        """, swift: """
+        func test() {
+            while let i = f() {
+                print(i)
+            }
+            let i = 1
+            print(i)
+        }
+        """, kotlin: """
+        internal fun test() {
+            while (true) {
+                val i_0 = f()
+                if (i_0 == null) {
+                    break
+                }
+                print(i_0)
+            }
+            val i = 1
+            print(i)
+        }
+        """)
     }
 
     func testRepeatWhileLoop() async throws {
