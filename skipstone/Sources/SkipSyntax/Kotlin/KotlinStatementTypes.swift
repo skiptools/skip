@@ -947,15 +947,7 @@ final class KotlinClassDeclaration: KotlinStatement {
         }
         return inherits.isNumeric || inherits == .string ? inherits : .none
     }
-    var isSealedClassesEnum: Bool {
-        get {
-            return forceSealedClassesEnum || members.contains { ($0 as? KotlinEnumCaseDeclaration)?.associatedValues.isEmpty == false }
-        }
-        set {
-            forceSealedClassesEnum = newValue
-        }
-    }
-    private var forceSealedClassesEnum = false
+    var isSealedClassesEnum = false
     var alwaysCreateNewSealedClassInstances = false
     var isGenerated = false
 
@@ -968,7 +960,7 @@ final class KotlinClassDeclaration: KotlinStatement {
             kstatement.messages.append(.kotlinGenericTypeNested(statement, source: translator.syntaxTree.source))
         }
         kstatement.attributes = kstatement.processAttributes(statement.attributes, from: statement, translator: translator)
-
+        kstatement.isSealedClassesEnum = statement.type == .enumDeclaration && (statement.members.contains(where: { ($0 as? EnumCaseDeclaration)?.associatedValues.isEmpty == false }) || translator.codebaseInfo?.isSealedClassesEnum(type: statement.signature) == true)
         let isFinal = statement.modifiers.isFinal || statement.type == .structDeclaration
         let partitioned = KotlinExtensionDeclaration.partition(members: statement.members, of: kstatement.signature, isFinal: isFinal)
         var extensionMembers = partitioned.extensionMembers
@@ -1051,7 +1043,6 @@ final class KotlinClassDeclaration: KotlinStatement {
 
         let caseDeclarations = members.compactMap { $0 as? KotlinEnumCaseDeclaration }
         let rawValueType = enumInheritedRawValueType
-        let isSealed = isSealedClassesEnum
         var lastRawValueInt = -1
         for (index, caseDeclaration) in caseDeclarations.enumerated() {
             if rawValueType != .none {
@@ -1072,7 +1063,7 @@ final class KotlinClassDeclaration: KotlinStatement {
 
             // Note that a transformer may force this enum into a sealed enum later, so we can only warn on the likelihood that
             // this will turn into an enum case and cause an error
-            if let messagesSource, !isSealed && KotlinEnumCaseDeclaration.disallowedCaseNames.contains(caseDeclaration.preEscapedName ?? caseDeclaration.name) {
+            if let messagesSource, !isSealedClassesEnum && KotlinEnumCaseDeclaration.disallowedCaseNames.contains(caseDeclaration.preEscapedName ?? caseDeclaration.name) {
                 caseDeclaration.messages.append(.kotlinEnumCaseName(caseDeclaration, source: messagesSource))
             }
         }
@@ -1109,7 +1100,6 @@ final class KotlinClassDeclaration: KotlinStatement {
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        let isSealedClassesEnum = isSealedClassesEnum
         if let declaration = extras?.declaration {
             output.append(indentation).append(declaration)
         } else {

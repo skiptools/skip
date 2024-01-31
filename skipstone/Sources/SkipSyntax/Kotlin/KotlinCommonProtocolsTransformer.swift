@@ -86,14 +86,6 @@ final class KotlinCommonProtocolsTransformer: KotlinTransformer {
     }
 
     private func synthesizeConformances(for classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context, source: Source) {
-        // Kotlin enums have built-in non-overridable ordering, so we have to convert regular enums to use sealed
-        // classes if they want custom ordering
-        let isEnum = classDeclaration.declarationType == .enumDeclaration
-        let isEnumWithLessThan = isEnum && codebaseInfo.typeInfos(forNamed: classDeclaration.signature).contains(where: { $0.members.contains { $0.isLessThanFunction } })
-        if isEnumWithLessThan && !classDeclaration.isSealedClassesEnum {
-            classDeclaration.isSealedClassesEnum = true
-        }
-
         // Nothing to do for classes - which never get automatic conformance - or for non-sealed-classes enums -
         // which have builtin conformances already
         guard classDeclaration.declarationType == .structDeclaration || classDeclaration.isSealedClassesEnum else {
@@ -101,7 +93,7 @@ final class KotlinCommonProtocolsTransformer: KotlinTransformer {
         }
 
         let protocols = codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature)
-        let isEnumWithoutAssociatedValues = isEnum && !classDeclaration.members.contains { ($0 as? KotlinEnumCaseDeclaration)?.associatedValues.isEmpty == false }
+        let isEnumWithoutAssociatedValues = classDeclaration.declarationType == .enumDeclaration && !classDeclaration.members.contains { ($0 as? KotlinEnumCaseDeclaration)?.associatedValues.isEmpty == false }
         if isEnumWithoutAssociatedValues || protocols.contains(where: \.isHashable) {
             ensureHasEquals(for: classDeclaration, codebaseInfo: codebaseInfo)
             ensureHasHash(for: classDeclaration, codebaseInfo: codebaseInfo)
@@ -109,8 +101,11 @@ final class KotlinCommonProtocolsTransformer: KotlinTransformer {
             ensureHasEquals(for: classDeclaration, codebaseInfo: codebaseInfo)
         }
 
-        if isEnum && !isEnumWithLessThan && protocols.contains(where: \.isComparable) {
-            classDeclaration.messages.append(.kotlinEnumSealedClassComparableConformance(classDeclaration, source: source))
+        if classDeclaration.isSealedClassesEnum && protocols.contains(where: \.isComparable) {
+            let hasLessThan = codebaseInfo.typeInfos(forNamed: classDeclaration.signature).contains(where: { $0.members.contains { $0.isLessThanFunction } })
+            if !hasLessThan {
+                classDeclaration.messages.append(.kotlinEnumSealedClassComparableConformance(classDeclaration, source: source))
+            }
         }
     }
 
@@ -238,23 +233,5 @@ extension KotlinCommonProtocolsTransformer: KotlinTypeSignatureOutputTransformer
         } else {
             return signature
         }
-    }
-}
-
-private extension CodebaseInfoItem {
-    var isEqualsFunction: Bool {
-        return declarationType == .functionDeclaration && name == "==" && modifiers.isStatic && signature.parameters.count == 2
-    }
-
-    var isHashFunction: Bool {
-        guard declarationType == .functionDeclaration && name == "hash" && !modifiers.isStatic else {
-            return false
-        }
-        let parameters = signature.parameters
-        return parameters.count == 1 && parameters[0].label == "into" && parameters[0].type.isNamed("Hasher", moduleName: "Swift", generics: [])
-    }
-
-    var isLessThanFunction: Bool {
-        return declarationType == .functionDeclaration && name == "<" && modifiers.isStatic && signature.parameters.count == 2
     }
 }

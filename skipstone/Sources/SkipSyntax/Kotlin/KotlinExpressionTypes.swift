@@ -2900,8 +2900,6 @@ final class KotlinTypeLiteral: KotlinExpression, KotlinCastTarget {
 }
 
 final class KotlinWhen: KotlinExpression {
-    static let breakLabel = "bl"
-
     var on: KotlinExpression
     var cases: [KotlinCase]
     var caseTargetVariable: KotlinTargetVariable?

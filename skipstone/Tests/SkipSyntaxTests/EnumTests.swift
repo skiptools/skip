@@ -298,10 +298,24 @@ final class EnumTests: XCTestCase {
             case one
             case two
         }
+        func f(e: E) {
+            switch e {
+            case .one:
+                print("one")
+            case .two:
+                print("two")
+            }
+        }
         """, kotlin: """
         internal enum class E: Comparable<E> {
             one,
             two;
+        }
+        internal fun f(e: E) {
+            when (e) {
+                E.one -> print("one")
+                E.two -> print("two")
+            }
         }
         """)
 
@@ -312,6 +326,14 @@ final class EnumTests: XCTestCase {
 
             static func < (lhs: E, rhs: E) -> Bool {
                 return lhs == .one && rhs == .two
+            }
+        }
+        func f(e: E) {
+            switch e {
+            case .one:
+                print("one")
+            case .two:
+                print("two")
             }
         }
         """, kotlin: """
@@ -332,6 +354,12 @@ final class EnumTests: XCTestCase {
             companion object {
                 val one: E = OneCase()
                 val two: E = TwoCase()
+            }
+        }
+        internal fun f(e: E) {
+            when (e) {
+                is E.OneCase -> print("one")
+                is E.TwoCase -> print("two")
             }
         }
         """)

@@ -41,8 +41,7 @@ final class KotlinErrorToExceptionTransformer: KotlinTransformer {
 
         var exceptionInheritsIndex = 0
         if classDeclaration.declarationType == .enumDeclaration {
-            // To extend Exception, an enum must be modeled as a sealed class, and we cannot create singleton case instances
-            classDeclaration.isSealedClassesEnum = true
+            // When extending Exception and capturing stack traces we cannot create singleton enum case instances
             classDeclaration.alwaysCreateNewSealedClassInstances = true
             // Leave the enum raw type extension first
             exceptionInheritsIndex = classDeclaration.enumInheritedRawValueType != .none ? 1 : 0

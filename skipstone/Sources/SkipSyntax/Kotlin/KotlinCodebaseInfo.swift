@@ -180,13 +180,20 @@ extension CodebaseInfo.Context {
     /// Whether the given enum type has cases with associated values.
     func isSealedClassesEnum(type: TypeSignature) -> Bool {
         assert(global.kotlin != nil)
-        guard let enumInfo = typeInfos(forNamed: type).first(where: { $0.declarationType == .enumDeclaration }) else {
+        let typeInfos = typeInfos(forNamed: type)
+        guard let enumInfo = typeInfos.first(where: { $0.declarationType == .enumDeclaration }) else {
             return false
         }
         if enumInfo.cases.contains(where: { $0.signature.isFunction }) {
             return true
         }
+        // Kotlin enums have built-in non-overridable ordering, so we have to convert regular enums to use sealed
+        // classes if they want custom ordering
+        if typeInfos.contains(where: { $0.members.contains { $0.isLessThanFunction } }) {
+            return true
+        }
         return conformsToError(type: type)
+        
     }
 
     /// Whether the given name corresponds to a function in the given type.
@@ -331,6 +338,24 @@ public final class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseIn
         if functionInfo.declarationType == .initDeclaration {
             functionInfo.languageAdditions = statement.parameters.map(\.defaultValue)
         }
+    }
+}
+
+extension CodebaseInfoItem {
+    var isEqualsFunction: Bool {
+        return declarationType == .functionDeclaration && name == "==" && modifiers.isStatic && signature.parameters.count == 2
+    }
+
+    var isHashFunction: Bool {
+        guard declarationType == .functionDeclaration && name == "hash" && !modifiers.isStatic else {
+            return false
+        }
+        let parameters = signature.parameters
+        return parameters.count == 1 && parameters[0].label == "into" && parameters[0].type.isNamed("Hasher", moduleName: "Swift", generics: [])
+    }
+
+    var isLessThanFunction: Bool {
+        return declarationType == .functionDeclaration && name == "<" && modifiers.isStatic && signature.parameters.count == 2
     }
 }
 
