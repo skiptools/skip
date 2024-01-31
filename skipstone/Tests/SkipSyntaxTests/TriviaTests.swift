@@ -546,5 +546,29 @@ final class TriviaTests: XCTestCase {
             internal val a: Array<Int>
         }
         """)
+
+        try await check(swift: """
+        /*
+         This is a header
+
+         End
+         */
+
+        class C {
+            let a: [Int]
+        }
+        """, kotlin: """
+        /*
+        This is a header
+
+        End
+        */
+        
+        import skip.lib.Array
+
+        internal open class C {
+            internal val a: Array<Int>
+        }
+        """)
     }
 }

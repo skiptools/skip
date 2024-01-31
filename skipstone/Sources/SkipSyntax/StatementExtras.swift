@@ -286,8 +286,14 @@ struct StatementExtras {
 
         var nonDocCommentsBeforeNewline: [String] = []
         var hasTrailingNewline = false
+        var isInMultilineComment = 0
         for line in leadingTrivia {
-            if line.hasPrefix("/**") || line.hasPrefix("///") || line == "\n" {
+            if line.hasSuffix("*/\n") && isInMultilineComment > 0 {
+                isInMultilineComment -= 1
+            } else if line.hasPrefix("/*") {
+                isInMultilineComment += 1
+            }
+            if line.hasPrefix("///") || (isInMultilineComment == 0 && line == "\n") {
                 hasTrailingNewline = line == "\n"
                 break
             } else {
