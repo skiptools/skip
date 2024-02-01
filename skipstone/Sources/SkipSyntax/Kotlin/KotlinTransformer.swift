@@ -37,23 +37,20 @@ public let builtinKotlinTransformerTypes: [KotlinTransformer.Type] = [
     KotlinOptionSetTransformer.self,
     // May add members, so place it before transformers that could manipulate those members
     KotlinStructTransformer.self,
-    // May alter superclasses and change enums to use sealed classes
-    KotlinErrorToExceptionTransformer.self,
-    // May *remove* information about protocol conformances. May change enums to use sealed classes. Requires knowledge of
-    // sealed vs. unsealed enums
+    // May *remove* information about protocol conformances
     KotlinCommonProtocolsTransformer.self,
-    // May add enums and constructors that must be enhanced by subsequent transformers. Requires knowledge of sealed vs.
-    // unsealed enums
+    // May add enums and constructors that must be enhanced by subsequent transformers
     KotlinCodableTransformer.self,
-    // May add RawRepresentable enum factory function. Requires knowledge of sealed vs. unsealed enums. Requires knowledge of
-    // constructors, so place before KotlinEnumTransformer
+    // May add RawRepresentable enum factory function. Requires knowledge of constructors, so place before KotlinEnumTransformer
     KotlinRawRepresentableTransformer.self,
     // May *replace* constructors with factory functions. May add static allCases function. May change optional init call
-    // sites to factory calls. Requires knowledge of sealed vs. unsealed enums
+    // sites to factory calls
     KotlinEnumTransformer.self,
     // May add constructors and modify existing constructors. May suppress property setting side effects in functions.
     // May change optional init call sites
     KotlinConstructorAndSideEffectSupressionTransformer.self,
+    // May change superclass initialization. Requires knowledge of all constructors, including added constructors
+    KotlinErrorToExceptionTransformer.self,
     // May change the names of stored properties, but adds computed wrapper properties with the previous names. Requires
     // knowledge of all constructors, including added constructors
     KotlinObservationTransformer.self,

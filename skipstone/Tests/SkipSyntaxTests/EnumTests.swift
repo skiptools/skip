@@ -1,6 +1,22 @@
 import XCTest
 
 final class EnumTests: XCTestCase {
+    func testEmptyEnum() async throws {
+        try await check(swift: """
+        enum E {
+            static let x = 1
+        }
+        """, kotlin: """
+        internal enum class E {
+            ;
+
+            companion object {
+                internal val x = 1
+            }
+        }
+        """)
+    }
+
     func testBasic() async throws {
         try await check(swift: """
         enum E {

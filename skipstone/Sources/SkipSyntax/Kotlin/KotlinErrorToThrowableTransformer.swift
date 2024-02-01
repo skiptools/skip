@@ -28,21 +28,16 @@ final class KotlinErrorToExceptionTransformer: KotlinTransformer {
             if member.type == .constructorDeclaration, let constructorDeclaration = member as? KotlinFunctionDeclaration {
                 hasConstructors = true
                 constructorDeclaration.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super()")
-            }
-            guard let variableDeclaration = member as? KotlinVariableDeclaration else {
-                continue
-            }
-            if variableDeclaration.propertyName == "message" {
-                variableDeclaration.modifiers.isOverride = true
-                variableDeclaration.modifiers.visibility = .public
-                break
+            } else if member.type == .variableDeclaration, let variableDeclaration = member as? KotlinVariableDeclaration {
+                if variableDeclaration.propertyName == "message" {
+                    variableDeclaration.modifiers.isOverride = true
+                    variableDeclaration.modifiers.visibility = .public
+                }
             }
         }
 
         var exceptionInheritsIndex = 0
         if classDeclaration.declarationType == .enumDeclaration {
-            // When extending Exception and capturing stack traces we cannot create singleton enum case instances
-            classDeclaration.alwaysCreateNewSealedClassInstances = true
             // Leave the enum raw type extension first
             exceptionInheritsIndex = classDeclaration.enumInheritedRawValueType != .none ? 1 : 0
         }

@@ -33,10 +33,10 @@ final class KotlinCodebaseInfoTests: XCTestCase {
 
     func testEnumHasAssociatedValues() async throws {
         let context = try await setUpContext()
-        XCTAssertEqual(false, context.isSealedClassesEnum(type: .named("NonExistantTypeName", [])))
+        XCTAssertEqual(false, context.isSealedClassesEnum(type: .named("NonExistantTypeName", [])).0)
 
-        XCTAssertEqual(false, context.isSealedClassesEnum(type: .named("TestsEnum", [])))
-        XCTAssertEqual(true, context.isSealedClassesEnum(type: .named("TestsEnumWithAssociatedValues", [])))
+        XCTAssertEqual(false, context.isSealedClassesEnum(type: .named("TestsEnum", [])).0)
+        XCTAssertEqual(true, context.isSealedClassesEnum(type: .named("TestsEnumWithAssociatedValues", [])).0)
     }
 
     func testProtocolTypeHasMember() async throws {

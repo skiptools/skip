@@ -336,7 +336,7 @@ extension TypeSignature {
     func kotlinIsSealedClassesEnum(codebaseInfo: CodebaseInfo.Context?) -> Bool {
         switch asOptional(false) {
         case .named, .member, .module:
-            return codebaseInfo?.isSealedClassesEnum(type: self) == true
+            return codebaseInfo?.isSealedClassesEnum(type: self).0 == true
         case .typealiased(_, let type):
             return type.kotlinIsSealedClassesEnum(codebaseInfo: codebaseInfo)
         default:

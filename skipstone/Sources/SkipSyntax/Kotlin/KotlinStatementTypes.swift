@@ -960,7 +960,15 @@ final class KotlinClassDeclaration: KotlinStatement {
             kstatement.messages.append(.kotlinGenericTypeNested(statement, source: translator.syntaxTree.source))
         }
         kstatement.attributes = kstatement.processAttributes(statement.attributes, from: statement, translator: translator)
-        kstatement.isSealedClassesEnum = statement.type == .enumDeclaration && (statement.members.contains(where: { ($0 as? EnumCaseDeclaration)?.associatedValues.isEmpty == false }) || translator.codebaseInfo?.isSealedClassesEnum(type: statement.signature) == true)
+        if statement.type == .enumDeclaration {
+            if let codebaseInfo = translator.codebaseInfo {
+                let (isSealedClassesEnum, createNewInstances) = codebaseInfo.isSealedClassesEnum(type: statement.signature)
+                kstatement.isSealedClassesEnum = isSealedClassesEnum
+                kstatement.alwaysCreateNewSealedClassInstances = createNewInstances
+            } else {
+                kstatement.isSealedClassesEnum = statement.members.contains(where: { ($0 as? EnumCaseDeclaration)?.associatedValues.isEmpty == false })
+            }
+        }
         let isFinal = statement.modifiers.isFinal || statement.type == .structDeclaration
         let partitioned = KotlinExtensionDeclaration.partition(members: statement.members, of: kstatement.signature, isFinal: isFinal)
         var extensionMembers = partitioned.extensionMembers
@@ -1180,8 +1188,15 @@ final class KotlinClassDeclaration: KotlinStatement {
         let memberIndentation = indentation.inc()
         if declarationType == .actorDeclaration {
             output.append(memberIndentation).append("override val isolatedContext = Actor.isolatedContext()\n")
+        } else if declarationType == .enumDeclaration {
+            if enumCases.isEmpty {
+                if !isSealedClassesEnum {
+                    output.append(memberIndentation).append(";\n")
+                }
+            } else {
+                enumCases.forEach { output.append($0, indentation: memberIndentation) }
+            }
         }
-        enumCases.forEach { output.append($0, indentation: memberIndentation) }
         nonstaticMembers.forEach { output.append($0, indentation: memberIndentation) }
 
         if let suppressSideEffectsPropertyName {
@@ -1284,7 +1299,7 @@ final class KotlinClassDeclaration: KotlinStatement {
 
 final class KotlinEnumCaseDeclaration: KotlinStatement {
     /// Names that aren't hard reserved words but cause errors as enum cases.
-    static let disallowedCaseNames: Set<String> = ["segmented", "name", "ordinal"]
+    static let disallowedCaseNames: Set<String> = ["const", "data", "description", "name", "ordinal", "segmented"]
 
     var name: String
     var preEscapedName: String?

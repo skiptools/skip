@@ -399,14 +399,80 @@ final class ErrorHandlingTests: XCTestCase {
             }
         }
         """)
+    }
+
+    func testErrorStruct() async throws {
+        try await check(swift: """
+        struct S: Error {
+        }
+        """, kotlin: """
+        internal class S: Exception(), Error {
+        }
+        """)
 
         try await check(swift: """
-        class C: Error {
+        struct S: Error {
             var message = ""
         }
         """, kotlin: """
-        internal open class C: Exception(), Error {
-            override var message = ""
+        internal class S: Exception, Error, MutableStruct {
+            override var message: String
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            constructor(message: String = ""): super() {
+                this.message = message
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S(message)
+        }
+        """)
+
+        try await check(swift: """
+        struct S: Error, Codable {
+            let i: Int
+
+            init(param: Int) {
+                self.i = param
+            }
+        }
+        """, kotlin: """
+        internal class S: Exception, Error, Codable {
+            internal val i: Int
+
+            internal constructor(param: Int): super() {
+                this.i = param
+            }
+
+            private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+                i("i");
+            }
+
+            override fun encode(to: Encoder) {
+                val container = to.container(keyedBy = CodingKeys::class)
+                container.encode(i, forKey = CodingKeys.i)
+            }
+
+            constructor(from: Decoder): super() {
+                val container = from.container(keyedBy = CodingKeys::class)
+                this.i = container.decode(Int::class, forKey = CodingKeys.i)
+            }
+
+            companion object: DecodableCompanion<S> {
+                override fun init(from: Decoder): S = S(from = from)
+
+                private fun CodingKeys(rawValue: String): CodingKeys? {
+                    return when (rawValue) {
+                        "i" -> CodingKeys.i
+                        else -> null
+                    }
+                }
+            }
         }
         """)
     }

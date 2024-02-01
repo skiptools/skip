@@ -111,8 +111,6 @@ private final class IdentifiersVisitor {
             return .recurse({ _ in self.renamedIdentifiersStack.removeLast() })
         } else if let identifier = node as? KotlinIdentifier {
             if let bindingVariableName = bindingVariableName(for: identifier.name) {
-                //~~~
-                print("FOUND BINDING VARIABLE NAME: \(bindingVariableName) =================================")
                 identifier.name = bindingVariableName
             }
             return .skip

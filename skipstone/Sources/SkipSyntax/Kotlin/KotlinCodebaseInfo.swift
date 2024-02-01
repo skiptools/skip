@@ -178,22 +178,24 @@ extension CodebaseInfo.Context {
     }
 
     /// Whether the given enum type has cases with associated values.
-    func isSealedClassesEnum(type: TypeSignature) -> Bool {
+    func isSealedClassesEnum(type: TypeSignature) -> (Bool, alwaysCreateNewInstances: Bool) {
         assert(global.kotlin != nil)
         let typeInfos = typeInfos(forNamed: type)
         guard let enumInfo = typeInfos.first(where: { $0.declarationType == .enumDeclaration }) else {
-            return false
+            return (false, false)
+        }
+        if conformsToError(type: type) {
+            return (true, true)
         }
         if enumInfo.cases.contains(where: { $0.signature.isFunction }) {
-            return true
+            return (true, false)
         }
         // Kotlin enums have built-in non-overridable ordering, so we have to convert regular enums to use sealed
         // classes if they want custom ordering
         if typeInfos.contains(where: { $0.members.contains { $0.isLessThanFunction } }) {
-            return true
+            return (true, false)
         }
-        return conformsToError(type: type)
-        
+        return (false, false)
     }
 
     /// Whether the given name corresponds to a function in the given type.

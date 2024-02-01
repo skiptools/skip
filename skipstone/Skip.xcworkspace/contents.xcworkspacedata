@@ -26,6 +26,9 @@
       location = "group:../skip-sql">
    </FileRef>
    <FileRef
+      location = "group:../OpenAI">
+   </FileRef>
+   <FileRef
       location = "group:../skipapp-hello/Darwin/HelloSkip.xcodeproj">
    </FileRef>
    <FileRef
