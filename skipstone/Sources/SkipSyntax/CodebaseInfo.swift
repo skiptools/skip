@@ -1132,13 +1132,17 @@ public final class CodebaseInfo {
             }
         }
         let unmapped = mappings.keys.filter { mappings[$0] == $0 }
+        var hasIDMember = false
         if !unmapped.isEmpty {
-            // Use the type's members to collection generic mappings
+            // Use the type's members to collect generic mappings
             var generics = Generics(unmapped)
             for protocolInfo in protocolSignatures(forNamed: protocolInfo.signature).compactMap({ primaryTypeInfo(forNamed: $0) }) {
                 for protocolMember in protocolInfo.members {
                     if let typeMember = findImplementingMember(in: typeInfo, for: protocolMember) {
                         generics = protocolMember.signature.mergeGenericMappings(in: typeMember.signature, with: generics)
+                        if !hasIDMember && protocolMember.declarationType == .variableDeclaration && protocolMember.name == "id" {
+                            hasIDMember = true
+                        }
                     }
                 }
             }
@@ -1147,23 +1151,42 @@ public final class CodebaseInfo {
                     mappings[entry.namedType] = whereEqual
                 }
             }
+            // Identifiable has an extension to allow any class to auto-conform with ObjectIdentifier. We track whether
+            // or not we found an "id" member explicitly just in case the user has her own `ID` type
+            if !hasIDMember && protocolInfo.signature.isNamed("Identifiable", moduleName: "Swift") {
+                let idGeneric = TypeSignature.named("ID", [])
+                if mappings[idGeneric] == idGeneric {
+                    mappings[idGeneric] = .named("ObjectIdentifier", [])
+                }
+            }
         }
         return protocolInfo.signature.generics.map { mappings[$0] ?? $0 }
     }
 
-    private func findImplementingMember(in typeInfo: TypeInfo, for protocolMember: CodebaseInfoItem) -> CodebaseInfoItem? {
+    private func findImplementingMember(in typeInfo: TypeInfo, for protocolMember: CodebaseInfoItem, recurse: Bool = true) -> CodebaseInfoItem? {
         if let variableInfo = protocolMember as? VariableInfo {
-            return typeInfo.variables.first { $0.name == variableInfo.name }
+            if let member = typeInfo.variables.first(where: { $0.name == variableInfo.name }) {
+                return member
+            }
         } else if let functionInfo = protocolMember as? FunctionInfo {
-            return typeInfo.functions.first {
+            let member = typeInfo.functions.first {
                 guard functionInfo.name == $0.name else {
                     return false
                 }
                 return functionInfo.signature.parameters.map(\.label) == $0.signature.parameters.map(\.label)
             }
-        } else {
-            return nil
+            if let member {
+                return member
+            }
         }
+        if recurse {
+            for additionalInfo in typeInfos(forNamed: typeInfo.signature) {
+                if additionalInfo !== typeInfo, let member = findImplementingMember(in: additionalInfo, for: protocolMember, recurse: false) {
+                    return member
+                }
+            }
+        }
+        return nil
     }
 
     private func inferVariableTypes() {

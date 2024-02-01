@@ -515,6 +515,26 @@ final class TypeDeclarationTests: XCTestCase {
             internal open fun add(x: Double) = Unit
         }
         """)
+
+        try await check(swift: """
+        protocol P {
+            associatedtype T
+            func add(t: T)
+        }
+        class C {
+            func add(t: Int) {
+            }
+        }
+        extension C: P {
+        }
+        """, kotlin: """
+        internal interface P<T> {
+            fun add(t: T)
+        }
+        internal open class C: P<Int> {
+            override fun add(t: Int) = Unit
+        }
+        """)
     }
 
     func testGenericInheritance() async throws {
@@ -918,6 +938,27 @@ final class TypeDeclarationTests: XCTestCase {
                     }
                 }
             }
+        }
+        """)
+    }
+
+    func testIdentifiableConformance() async throws {
+        try await check(supportingSwift: """
+        protocol Identifiable {
+            associatedtype ID
+            var id: ID { get }
+        }
+        """, swift: """
+        class A: Identifiable {
+            var id: String
+        }
+        class B: Identifiable {
+        }
+        """, kotlin: """
+        internal open class A: Identifiable<String> {
+            override var id: String
+        }
+        internal open class B: Identifiable<ObjectIdentifier> {
         }
         """)
     }
