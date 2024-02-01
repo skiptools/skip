@@ -65,6 +65,7 @@ public class SkipRunnerTests : XCTestCase {
 
         try await snippet(swift: "enum SomeEnum { }", kotlin: """
         internal enum class SomeEnum {
+            ;
         }
         """)
 
