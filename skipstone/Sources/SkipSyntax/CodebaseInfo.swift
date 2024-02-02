@@ -1099,8 +1099,18 @@ public final class CodebaseInfo {
                 return inherit
             }
             fixupProtocolGenericsInfo(inheritInfo, fixedupProtocolNames: &fixedupProtocolNames)
-            let inheritGenerics = inheritInfo.generics.merge(overrides: protocolInfo.generics)
-            protocolGenerics = protocolGenerics.merge(overrides: inheritInfo.generics, addNew: true)
+            guard !inheritInfo.generics.isEmpty else {
+                return inherit
+            }
+            let conformanceMappings = protocolGenericsMappings(for: inheritInfo, in: protocolInfo)
+            var inheritGenerics = inheritInfo.generics
+            for (i, generic) in inheritGenerics.entries.enumerated() {
+                if let mapping = conformanceMappings.first(where: { $0.0 == generic.namedType }), let whereEqual = mapping.1 {
+                    inheritGenerics.entries[i].whereEqual = whereEqual
+                }
+            }
+            protocolGenerics = protocolGenerics.merge(overrides: inheritGenerics, addNew: true)
+            inheritGenerics = inheritGenerics.merge(overrides: protocolInfo.generics)
             return inherit.withGenerics(inheritGenerics.entries.map { $0.constrainedType(ifEqual: true) })
         }
         protocolInfo.generics = protocolGenerics.merge(overrides: protocolInfo.generics, addNew: true).filterWhereEqual()
@@ -1112,7 +1122,8 @@ public final class CodebaseInfo {
             guard let inheritInfo = primaryTypeInfo(forNamed: inherit), inheritInfo.declarationType == .protocolDeclaration, !inheritInfo.generics.isEmpty else {
                 return inherit
             }
-            return inherit.withGenerics(protocolGenerics(for: inheritInfo, in: typeInfo))
+            let mappings = protocolGenericsMappings(for: inheritInfo, in: typeInfo)
+            return inherit.withGenerics(mappings.map { $0.1 ?? $0.0 })
         }
         for member in typeInfo.members {
             if let memberTypeInfo = member as? TypeInfo {
@@ -1121,28 +1132,24 @@ public final class CodebaseInfo {
         }
     }
 
-    private func protocolGenerics(for protocolInfo: TypeInfo, in typeInfo: TypeInfo) -> [TypeSignature] {
-        var mappings = protocolInfo.signature.generics.reduce(into: [TypeSignature: TypeSignature]()) { result, generic in
-            result[generic] = generic
-        }
+    private func protocolGenericsMappings(for protocolInfo: TypeInfo, in typeInfo: TypeInfo) -> [(TypeSignature, TypeSignature?)] {
+        var mappings: [TypeSignature: TypeSignature] = [:]
+        let keys = Set(protocolInfo.signature.generics)
         for typealiasInfo in typeInfo.typealiases {
             let generic: TypeSignature = .named(typealiasInfo.name, [])
-            if mappings.keys.contains(generic) {
+            if keys.contains(generic) {
                 mappings[generic] = typealiasInfo.targetSignature
             }
         }
-        let unmapped = mappings.keys.filter { mappings[$0] == $0 }
         var hasIDMember = false
-        if !unmapped.isEmpty {
+        if mappings.count < keys.count {
             // Use the type's members to collect generic mappings
-            var generics = Generics(unmapped)
+            var generics = Generics(keys.filter { !mappings.keys.contains($0) })
             for protocolInfo in protocolSignatures(forNamed: protocolInfo.signature).compactMap({ primaryTypeInfo(forNamed: $0) }) {
                 for protocolMember in protocolInfo.members {
-                    if let typeMember = findImplementingMember(in: typeInfo, for: protocolMember) {
+                    if let typeMember = findImplementingMember(in: typeInfo, for: protocolMember, searchExtensions: typeInfo.declarationType != .protocolDeclaration) {
                         generics = protocolMember.signature.mergeGenericMappings(in: typeMember.signature, with: generics)
-                        if !hasIDMember && protocolMember.declarationType == .variableDeclaration && protocolMember.name == "id" {
-                            hasIDMember = true
-                        }
+                        hasIDMember = hasIDMember || protocolMember.declarationType == .variableDeclaration && protocolMember.name == "id"
                     }
                 }
             }
@@ -1153,17 +1160,20 @@ public final class CodebaseInfo {
             }
             // Identifiable has an extension to allow any class to auto-conform with ObjectIdentifier. We track whether
             // or not we found an "id" member explicitly just in case the user has her own `ID` type
-            if !hasIDMember && protocolInfo.signature.isNamed("Identifiable", moduleName: "Swift") {
+            if !hasIDMember && typeInfo.declarationType != .protocolDeclaration && protocolInfo.signature.isNamed("Identifiable", moduleName: "Swift") {
                 let idGeneric = TypeSignature.named("ID", [])
-                if mappings[idGeneric] == idGeneric {
+                if !mappings.keys.contains(idGeneric) {
                     mappings[idGeneric] = .named("ObjectIdentifier", [])
                 }
             }
         }
-        return protocolInfo.signature.generics.map { mappings[$0] ?? $0 }
+        return protocolInfo.generics.entries.map {
+            let namedType = $0.namedType
+            return (namedType, mappings[namedType])
+        }
     }
 
-    private func findImplementingMember(in typeInfo: TypeInfo, for protocolMember: CodebaseInfoItem, recurse: Bool = true) -> CodebaseInfoItem? {
+    private func findImplementingMember(in typeInfo: TypeInfo, for protocolMember: CodebaseInfoItem, searchExtensions: Bool) -> CodebaseInfoItem? {
         if let variableInfo = protocolMember as? VariableInfo {
             if let member = typeInfo.variables.first(where: { $0.name == variableInfo.name }) {
                 return member
@@ -1179,9 +1189,9 @@ public final class CodebaseInfo {
                 return member
             }
         }
-        if recurse {
-            for additionalInfo in typeInfos(forNamed: typeInfo.signature) {
-                if additionalInfo !== typeInfo, let member = findImplementingMember(in: additionalInfo, for: protocolMember, recurse: false) {
+        if searchExtensions {
+            for extensionInfo in typeInfos(forNamed: typeInfo.signature) {
+                if extensionInfo !== typeInfo, let member = findImplementingMember(in: extensionInfo, for: protocolMember, searchExtensions: false) {
                     return member
                 }
             }
@@ -1616,8 +1626,8 @@ public final class CodebaseInfo {
 
         fileprivate func resolveTypeSignatures(codebaseInfo: CodebaseInfo) {
             let context = TypeResolutionContext(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile))
-            generics = generics.resolved(context: context)
-            inherits = inherits.map { $0.resolved(context: context) }
+            generics = generics.resolved(declaringType: signature, context: context)
+            inherits = inherits.map { $0.resolved(declaringType: signature, context: context) }
             for i in 0..<types.count { types[i].resolveTypeSignatures(codebaseInfo: codebaseInfo) }
             for i in 0..<typealiases.count { typealiases[i].resolveTypeSignatures(codebaseInfo: codebaseInfo) }
             for i in 0..<cases.count { cases[i].resolveTypeSignatures(codebaseInfo: codebaseInfo) }
@@ -1828,7 +1838,8 @@ public final class CodebaseInfo {
             guard let value = v.value else {
                 return v
             }
-            value.inferTypes(context: context, expecting: .none)
+            let varContext = v.isStatic ? context.pushingStatic(true) : context
+            value.inferTypes(context: varContext, expecting: .none)
             v.signature = value.inferredType
             if v.signature.isFullySpecified {
                 v.value = nil
@@ -1852,7 +1863,7 @@ public final class CodebaseInfo {
 
         fileprivate mutating func resolveTypeSignatures(codebaseInfo: CodebaseInfo) {
             let context = TypeResolutionContext(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile))
-            signature = signature.resolved(context: context)
+            signature = signature.resolved(declaringType: declaringType, context: context)
         }
 
         fileprivate mutating func addMainActorFlag() {
@@ -1923,8 +1934,8 @@ public final class CodebaseInfo {
 
         fileprivate mutating func resolveTypeSignatures(codebaseInfo: CodebaseInfo) {
             let context = TypeResolutionContext(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile))
-            generics = generics.resolved(context: context)
-            signature = signature.resolved(context: context)
+            generics = generics.resolved(declaringType: declaringType, context: context)
+            signature = signature.resolved(declaringType: declaringType, context: context)
         }
 
         fileprivate mutating func addMainActorFlag() {
@@ -1984,8 +1995,8 @@ public final class CodebaseInfo {
 
         fileprivate mutating func resolveTypeSignatures(codebaseInfo: CodebaseInfo) {
             let context = TypeResolutionContext(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile))
-            generics = generics.resolved(context: context)
-            signature = signature.resolved(context: context)
+            generics = generics.resolved(declaringType: declaringType, context: context)
+            signature = signature.resolved(declaringType: declaringType, context: context)
         }
 
         fileprivate mutating func addMainActorFlag() {
@@ -2044,8 +2055,8 @@ public final class CodebaseInfo {
 
         fileprivate mutating func resolveTypeSignatures(codebaseInfo: CodebaseInfo) {
             let context = TypeResolutionContext(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile))
-            generics = generics.resolved(context: context)
-            targetSignature = targetSignature.resolved(context: context)
+            generics = generics.resolved(declaringType: declaringType, context: context)
+            targetSignature = targetSignature.resolved(declaringType: declaringType, context: context)
         }
     }
 
@@ -2091,7 +2102,7 @@ public final class CodebaseInfo {
 
         fileprivate mutating func resolveTypeSignatures(codebaseInfo: CodebaseInfo) {
             let context = TypeResolutionContext(codebaseInfo: codebaseInfo.context(importedModuleNames: importedModuleNames ?? [], sourceFile: sourceFile))
-            signature = signature.resolved(context: context)
+            signature = signature.resolved(declaringType: declaringType, context: context)
         }
     }
 }

@@ -1923,6 +1923,27 @@ final class MemberDeclarationTests: XCTestCase {
         internal fun g(): Unit = voidReturn()
         """)
     }
+
+    func testStaticMemberArray() async throws {
+        try await check(swift: """
+        struct S {
+            static let a = 1
+            static let b = 2
+            static let c = [a, b]
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        internal class S {
+
+            companion object {
+                internal val a = 1
+                internal val b = 2
+                internal val c = arrayOf(a, b)
+            }
+        }
+        """)
+    }
 }
 
 var sideEffectOrdering: [String] = []

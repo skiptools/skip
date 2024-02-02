@@ -100,6 +100,15 @@ struct TypeInferenceContext {
         return addingIdentifiers(identifiers)
     }
 
+    /// Return a context that sets a static or non-static context.
+    func pushingStatic(_ isStatic: Bool) -> TypeInferenceContext {
+        var context = self
+        if let lastTypePathIndex = context.path.lastIndex(where: { $0.typeSignature != nil }) {
+            context.path[lastTypePathIndex].isStatic = isStatic
+        }
+        return context
+    }
+
     /// Return a context expecting the given type to be returned from the current code block.
     func expectingReturn(_ returnType: TypeSignature) -> TypeInferenceContext {
         var context = self

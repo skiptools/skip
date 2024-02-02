@@ -955,32 +955,32 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     }
 
     /// Qualify local type names with any enclosing types, resolve typealiases and module-qualified types, add missing generics.
-    func resolved(in node: SyntaxNode? = nil, moduleName: String? = nil, context: TypeResolutionContext) -> TypeSignature {
+    func resolved(in node: SyntaxNode? = nil, declaringType: TypeSignature? = nil, moduleName: String? = nil, context: TypeResolutionContext) -> TypeSignature {
         switch self {
         case .array(let elementType):
-            return .array(elementType?.resolved(in: node, context: context))
+            return .array(elementType?.resolved(in: node, declaringType: declaringType, context: context))
         case .composition(let types):
-            return .composition(types.map { $0.resolved(in: node, context: context) })
+            return .composition(types.map { $0.resolved(in: node, declaringType: declaringType, context: context) })
         case .dictionary(let keyType, let valueType):
-            return .dictionary(keyType?.resolved(in: node, context: context), valueType?.resolved(in: node, context: context))
+            return .dictionary(keyType?.resolved(in: node, declaringType: declaringType, context: context), valueType?.resolved(in: node, declaringType: declaringType, context: context))
         case .function(let parameters, let returnType, let apiFlags, let attributes):
-            let resolvedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.resolved(in: node, context: context), isInOut: $0.isInOut, isVariadic: $0.isVariadic, isVariadicContinuation: $0.isVariadicContinuation, hasDefaultValue: $0.hasDefaultValue) }
-            return .function(resolvedParameters, returnType.resolved(in: node, context: context), apiFlags, attributes)
+            let resolvedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.resolved(in: node, declaringType: declaringType, context: context), isInOut: $0.isInOut, isVariadic: $0.isVariadic, isVariadicContinuation: $0.isVariadicContinuation, hasDefaultValue: $0.hasDefaultValue) }
+            return .function(resolvedParameters, returnType.resolved(in: node, declaringType: declaringType, context: context), apiFlags, attributes)
         case .member(let baseType, let type):
-            let resolvedBase = baseType.resolved(in: node, moduleName: moduleName, context: context)
+            let resolvedBase = baseType.resolved(in: node, declaringType: declaringType, moduleName: moduleName, context: context)
             if case .named(let name, let generics) = type {
-                let generics = generics.map { $0.resolved(in: node, context: context) }
+                let generics = generics.map { $0.resolved(in: node, declaringType: declaringType, context: context) }
                 return context.resolve(.named(name, generics), in: resolvedBase)
             } else {
                 return context.resolve(type, in: resolvedBase)
             }
         case .metaType(let type):
-            return type.resolved(in: node, moduleName: moduleName, context: context).asMetaType(true)
+            return type.resolved(in: node, declaringType: declaringType, moduleName: moduleName, context: context).asMetaType(true)
         case .module(let moduleName, let type):
             // Type will already be qualified, but may need typealias resolution
             return type.resolved(moduleName: moduleName, context: context)
         case .named(let name, let generics):
-            let generics = generics.map { $0.resolved(in: node, context: context) }
+            let generics = generics.map { $0.resolved(in: node, declaringType: declaringType, context: context) }
             if let node {
                 let (qualified, isGenericParameter) = node.qualifyReferencedNamedType(name: name, generics: generics, context: context)
                 // If we get back a typealiased type, the target type might again need qualification
@@ -991,21 +991,24 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 } else {
                     return qualified.resolved(moduleName: moduleName, context: context)
                 }
+            } else if let declaringType {
+                let qualified = context.qualifyInherited(type: self, in: declaringType)
+                return qualified.resolved(moduleName: moduleName, context: context)
             } else {
                 return context.resolve(.named(name, generics), moduleName: moduleName)
             }
         case .optional(let type):
-            return type.resolved(in: node, moduleName: moduleName, context: context).asOptional(true)
+            return type.resolved(in: node, declaringType: declaringType, moduleName: moduleName, context: context).asOptional(true)
         case .range(let elementType):
-            return .range(elementType?.resolved(in: node, context: context))
+            return .range(elementType?.resolved(in: node, declaringType: declaringType, context: context))
         case .set(let elementType):
-            return .set(elementType?.resolved(in: node, context: context))
+            return .set(elementType?.resolved(in: node, declaringType: declaringType, context: context))
         case .tuple(let labels, let types):
-            return .tuple(labels, types.map { $0.resolved(in: node, context: context) })
+            return .tuple(labels, types.map { $0.resolved(in: node, declaringType: declaringType, context: context) })
         case .typealiased(let alias, let type):
-            return type.resolved(in: node, moduleName: moduleName, context: context).asTypealiased(alias)
+            return type.resolved(in: node, declaringType: declaringType, moduleName: moduleName, context: context).asTypealiased(alias)
         case .unwrappedOptional(let type):
-            return type.resolved(in: node, moduleName: moduleName, context: context).asUnwrappedOptional(true)
+            return type.resolved(in: node, declaringType: declaringType, moduleName: moduleName, context: context).asUnwrappedOptional(true)
         default:
             return self
         }

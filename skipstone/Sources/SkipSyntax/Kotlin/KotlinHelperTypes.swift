@@ -276,12 +276,6 @@ extension ExtensionDeclaration {
 }
 
 extension Generics {
-    func filterWhereEqual() -> Generics {
-        var generics = self
-        generics.entries = generics.entries.filter { $0.whereEqual == nil }
-        return generics
-    }
-
     func insertDependencies(into dependencies: inout KotlinDependencies) {
         for entry in entries {
             entry.inherits.forEach { $0.insertDependencies(into: &dependencies) }

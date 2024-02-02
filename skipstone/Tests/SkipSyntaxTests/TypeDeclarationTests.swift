@@ -535,6 +535,48 @@ final class TypeDeclarationTests: XCTestCase {
             override fun add(t: Int) = Unit
         }
         """)
+
+        try await check(supportingSwift: """
+        protocol Identifiable {
+            associatedtype ID
+            var id: ID { get }
+        }
+        """, swift: """
+        protocol P: Identifiable {
+            var id: String { get }
+            var name: String { get }
+        }
+        extension P {
+            var id: String { "X" }
+        }
+        """, kotlin: """
+        internal interface P: Identifiable<String> {
+            override val id: String
+                get() = "X"
+            val name: String
+        }
+        """)
+    }
+
+    func testIdentifiableClassConformance() async throws {
+        try await check(supportingSwift: """
+        protocol Identifiable {
+            associatedtype ID
+            var id: ID { get }
+        }
+        """, swift: """
+        class A: Identifiable {
+            var id: String
+        }
+        class B: Identifiable {
+        }
+        """, kotlin: """
+        internal open class A: Identifiable<String> {
+            override var id: String
+        }
+        internal open class B: Identifiable<ObjectIdentifier> {
+        }
+        """)
     }
 
     func testGenericInheritance() async throws {
@@ -690,16 +732,33 @@ final class TypeDeclarationTests: XCTestCase {
 
     func testTypeDeclaredWithinExtension() async throws {
         try await check(swift: """
-        class C {
+        public class C {
         }
         extension C {
-            class Sub {
+            class Sub1 {
+            }
+        }
+        public extension C {
+            class Sub2 {
             }
         }
         """, kotlin: """
-        internal open class C {
+        open class C {
         
-            internal open class Sub {
+            internal open class Sub1 {
+            }
+
+            open class Sub2 {
+
+                companion object: CompanionClass() {
+                }
+                open class CompanionClass {
+                }
+            }
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
             }
         }
         """)
@@ -710,6 +769,28 @@ final class TypeDeclarationTests: XCTestCase {
         extension C where T: Equatable {
             class Sub {
             }
+        }
+        """)
+
+        try await check(supportingSwift: """
+        class C {
+            var sub: Sub
+        }
+        extension C {
+            class Sub {
+                var x = 1
+            }
+        }
+        extension Int {
+            let min = 0
+        }
+        """, swift: """
+        func f(c: C) {
+            let b = c.sub.x == .min
+        }
+        """, kotlin: """
+        internal fun f(c: C) {
+            val b = c.sub.x == Int.min
         }
         """)
     }
@@ -938,27 +1019,6 @@ final class TypeDeclarationTests: XCTestCase {
                     }
                 }
             }
-        }
-        """)
-    }
-
-    func testIdentifiableConformance() async throws {
-        try await check(supportingSwift: """
-        protocol Identifiable {
-            associatedtype ID
-            var id: ID { get }
-        }
-        """, swift: """
-        class A: Identifiable {
-            var id: String
-        }
-        class B: Identifiable {
-        }
-        """, kotlin: """
-        internal open class A: Identifiable<String> {
-            override var id: String
-        }
-        internal open class B: Identifiable<ObjectIdentifier> {
         }
         """)
     }

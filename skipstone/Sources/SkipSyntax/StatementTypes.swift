@@ -1397,7 +1397,12 @@ class TypeDeclaration: Statement {
         }
         inherits = inherits.map { $0.resolved(in: self, context: context) }
         if modifiers.visibility == .default {
-            modifiers.visibility = .internal
+            // Types in extensions inherit the visibility of the extension
+            if let owningTypeDeclaration = parent as? TypeDeclaration, owningTypeDeclaration.type == .extensionDeclaration {
+                modifiers.visibility = owningTypeDeclaration.modifiers.visibility == .private ? .fileprivate : owningTypeDeclaration.modifiers.visibility
+            } else {
+                modifiers.visibility = .internal
+            }
         }
         generics = generics.resolved(in: self, context: context)
     }
@@ -1551,22 +1556,23 @@ final class VariableDeclaration: Statement {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         constrainedDeclaredType = declaredType.constrainedTypeWithGenerics(context.generics)
-        value?.inferTypes(context: context, expecting: declaredType)
+        let varContext = modifiers.isStatic ? context.pushingStatic(true) : context
+        value?.inferTypes(context: varContext, expecting: declaredType)
         let type = TypeSignature.for(labels: names, types: variableTypes)
         if let body = getter?.body {
-            let bodyContext = context.expectingReturn(type)
+            let bodyContext = varContext.expectingReturn(type)
             let _ = body.inferTypes(context: bodyContext, expecting: body.statements.count == 1 ? bodyContext.expectedReturn : .none)
         }
         if let body = setter?.body {
-            let bodyContext = context.addingIdentifier(setter?.parameterName ?? "newValue", type: type)
+            let bodyContext = varContext.addingIdentifier(setter?.parameterName ?? "newValue", type: type)
             let _ = body.inferTypes(context: bodyContext, expecting: .none)
         }
         if let body = willSet?.body {
-            let bodyContext = context.addingIdentifier(willSet?.parameterName ?? "newValue", type: type)
+            let bodyContext = varContext.addingIdentifier(willSet?.parameterName ?? "newValue", type: type)
             let _ = body.inferTypes(context: bodyContext, expecting: .none)
         }
         if let body = didSet?.body {
-            let bodyContext = context.addingIdentifier(didSet?.parameterName ?? "oldValue", type: type)
+            let bodyContext = varContext.addingIdentifier(didSet?.parameterName ?? "oldValue", type: type)
             let _ = body.inferTypes(context: bodyContext, expecting: .none)
         }
         if parent is TypeDeclaration {

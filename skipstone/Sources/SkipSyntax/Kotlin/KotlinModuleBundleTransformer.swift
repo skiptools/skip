@@ -10,7 +10,7 @@ final class KotlinModuleBundleTransformer: KotlinTransformer {
         guard translator.codebaseInfo != nil else {
             return
         }
-        guard syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }).contains(where: { $0.modulePath.first == "Foundation" || $0.modulePath.first == "SkipFoundation" }) else {
+        guard syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }).contains(where: { $0.modulePath.first == "Foundation" || $0.modulePath.first == "SkipFoundation" || $0.modulePath.first == "SwiftUI" || $0.modulePath.first == "SkipUI" }) else {
             return
         }
 

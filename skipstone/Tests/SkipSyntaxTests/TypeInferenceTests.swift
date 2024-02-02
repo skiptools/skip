@@ -1107,4 +1107,20 @@ final class TypeInferenceTests: XCTestCase {
         }
         """)
     }
+
+    func testBundleModule() async throws {
+        try await check(supportingSwift: """
+        class Bundle {
+        }
+        """, swift: """
+        func f(_ string: String, bundle: Bundle? = nil) {
+        }
+        func g() {
+            f("", bundle: .module)
+        }
+        """, kotlin: """
+        internal fun f(string: String, bundle: Bundle? = null) = Unit
+        internal fun g(): Unit = f("", bundle = Bundle.module)
+        """)
+    }
 }

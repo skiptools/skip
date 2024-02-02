@@ -527,6 +527,13 @@ struct Generics: Equatable, Codable {
         return constrainedType(of: name, ifEqual: ifEqual, fallback: fallback)
     }
 
+    /// Remove entries that have a `whereEquals` value.
+    func filterWhereEqual() -> Generics {
+        var generics = self
+        generics.entries = generics.entries.filter { $0.whereEqual == nil }
+        return generics
+    }
+
     /// Merge the given constraints with these, allowing the given constraints to override our own.
     ///
     /// Use this to create a complete set of generics from the additional constraints declared by a function, extension, sub-protocol, etc.
@@ -579,9 +586,9 @@ struct Generics: Equatable, Codable {
         return result
     }
 
-    func resolved(in node: SyntaxNode? = nil, context: TypeResolutionContext) -> Generics {
+    func resolved(in node: SyntaxNode? = nil, declaringType: TypeSignature? = nil, context: TypeResolutionContext) -> Generics {
         var generics = self
-        generics.entries = generics.entries.map { $0.resolved(in: node, context: context) }
+        generics.entries = generics.entries.map { $0.resolved(in: node, declaringType: declaringType, context: context) }
         return generics
     }
 
@@ -642,10 +649,10 @@ struct Generic: Equatable, Codable {
         }
     }
 
-    func resolved(in node: SyntaxNode? = nil, context: TypeResolutionContext) -> Generic {
+    func resolved(in node: SyntaxNode? = nil, declaringType: TypeSignature? = nil, context: TypeResolutionContext) -> Generic {
         var generic = self
-        generic.whereEqual = generic.whereEqual.map { $0.resolved(in: node, context: context) }
-        generic.inherits = generic.inherits.map { $0.resolved(in: node, context: context) }
+        generic.whereEqual = generic.whereEqual.map { $0.resolved(in: node, declaringType: declaringType, context: context) }
+        generic.inherits = generic.inherits.map { $0.resolved(in: node, declaringType: declaringType, context: context) }
         return generic
     }
 
