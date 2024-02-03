@@ -365,7 +365,7 @@ public final class CodebaseInfo {
             }
 
             let lookup = global.lookup(name: name, moduleName: moduleName, qualifiedMatch: true)
-            let topRanked = ranked(lookup).first { candidate in
+            let candidates = ranked(lookup).filter { candidate in
                 switch candidate.declarationType {
                 case .actorDeclaration, .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration, .typealiasDeclaration, .enumCaseDeclaration, .variableDeclaration, .functionDeclaration:
                     return true
@@ -373,6 +373,7 @@ public final class CodebaseInfo {
                     return false
                 }
             }
+            let topRanked = candidates.first { $0.declarationType != .functionDeclaration } ?? candidates.first
             guard let topRanked else {
                 let type = moduleName == nil || moduleName == "Swift" ? TypeSignature.for(name: name, genericTypes: [], allowNamed: false).asMetaType(true) : .none
                 let apiMatch = type == .none ? nil : APIMatch(signature: type)
@@ -416,15 +417,10 @@ public final class CodebaseInfo {
             let primaryTypeInfo = typeInfos.first { $0.declarationType != .extensionDeclaration }
             // We intentionally exclude extensions to unknown named types
             if primaryTypeInfo != nil || !type.isNamedType {
-                for typeInfo in typeInfos {
-                    if excludeConstrainedExtensions && typeInfo.declarationType == .extensionDeclaration && typeInfo.generics != primaryTypeInfo?.generics {
-                        continue
-                    }
-                    if var match = matchIdentifier(name: name, in: typeInfo, constrainedGenerics: type.generics, isStatic: isStatic) {
-                        match.signature = match.signature.mappingSelf(to: type)
-                        cache.matches?[key] = [match]
-                        return match
-                    }
+                if var match = matchIdentifier(name: name, in: type, primaryTypeInfo: primaryTypeInfo, typeInfos: typeInfos, isStatic: isStatic, excludeConstrainedExtensions: excludeConstrainedExtensions, functionMatch: false) ?? matchIdentifier(name: name, in: type, primaryTypeInfo: primaryTypeInfo, typeInfos: typeInfos, isStatic: isStatic, excludeConstrainedExtensions: excludeConstrainedExtensions, functionMatch: true) {
+                    match.signature = match.signature.mappingSelf(to: type)
+                    cache.matches?[key] = [match]
+                    return match
                 }
             }
 
@@ -565,6 +561,18 @@ public final class CodebaseInfo {
             }
         }
 
+        private func matchIdentifier(name: String, in type: TypeSignature, primaryTypeInfo: TypeInfo?, typeInfos: [TypeInfo], isStatic: Bool, excludeConstrainedExtensions: Bool, functionMatch: Bool) -> APIMatch? {
+            for typeInfo in typeInfos {
+                if excludeConstrainedExtensions && typeInfo.declarationType == .extensionDeclaration && typeInfo.generics != primaryTypeInfo?.generics {
+                    continue
+                }
+                if let match = matchIdentifier(name: name, in: typeInfo, constrainedGenerics: type.generics, isStatic: isStatic, functionMatch: functionMatch) {
+                    return match
+                }
+            }
+            return nil
+        }
+
         private func matchIdentifier(name: String, in typeInfo: TypeInfo, constrainedGenerics: [TypeSignature], isStatic: Bool, functionMatch: Bool) -> APIMatch? {
             // We allow .init to be used both as a static or instance member
             if let memberInfo = visibleMembers(of: typeInfo).first(where: { $0.name == name
@@ -591,7 +599,7 @@ public final class CodebaseInfo {
             for inherits in typeInfo.inherits {
                 for inheritsInfo in typeInfos(forNamed: inherits) {
                     let inheritsConstraints = inherits.mappingTypes(from: typeInfo.signature.generics, to: constrainedGenerics).generics
-                    if let match = matchIdentifier(name: name, in: inheritsInfo, constrainedGenerics: inheritsConstraints, isStatic: isStatic) {
+                    if let match = matchIdentifier(name: name, in: inheritsInfo, constrainedGenerics: inheritsConstraints, isStatic: isStatic, functionMatch: functionMatch) {
                         return match
                     }
                 }
@@ -1838,7 +1846,7 @@ public final class CodebaseInfo {
             guard let value = v.value else {
                 return v
             }
-            let varContext = v.isStatic ? context.pushingStatic(true) : context
+            let varContext = v.isStatic ? context.pushingBlock(isStatic: true) : context
             value.inferTypes(context: varContext, expecting: .none)
             v.signature = value.inferredType
             if v.signature.isFullySpecified {

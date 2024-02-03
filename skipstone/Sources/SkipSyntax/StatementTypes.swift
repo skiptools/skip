@@ -1556,7 +1556,7 @@ final class VariableDeclaration: Statement {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         constrainedDeclaredType = declaredType.constrainedTypeWithGenerics(context.generics)
-        let varContext = modifiers.isStatic ? context.pushingStatic(true) : context
+        let varContext = modifiers.isStatic ? context.pushingBlock(isStatic: true) : context
         value?.inferTypes(context: varContext, expecting: declaredType)
         let type = TypeSignature.for(labels: names, types: variableTypes)
         if let body = getter?.body {

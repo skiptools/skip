@@ -1248,8 +1248,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         let targetModuleName = target.moduleName
         let maybeSameModule = moduleName == nil || targetModuleName == nil || moduleName == targetModuleName
         let strippedTarget = target.asTypealiased(nil).withoutOptionality().withModuleName(nil)
-        if type == target && maybeSameModule && !isInterpolated {
-            return 2.0
+        if type == strippedTarget && maybeSameModule {
+            if type == .string {
+                // Favor using ExpressibleByStringInterpolation for interpolated strings
+                return isInterpolated ? 1.95 : 2.0
+            } else {
+                return 2.0
+            }
         }
 
         switch type {
@@ -1355,15 +1360,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 return (inheritanceScore + elementScore) / 2.0
             }
         case .string:
-            if isInterpolated, target.compatibilityScore(target: .named("ExpressibleByStringInterpolation", []), codebaseInfo: codebaseInfo) != nil {
-                return 2.0
-            }
-            if strippedTarget == .string {
-                // Favor using ExpressibleByStringInterpolation for interpolated strings
-                return isInterpolated ? 1.95 : 2.0
-            }
             if strippedTarget.isStringy {
                 return 1.0
+            }
+            if isInterpolated, target.compatibilityScore(target: .named("ExpressibleByStringInterpolation", []), codebaseInfo: codebaseInfo) != nil {
+                return 2.0
             }
         case .tuple(_, let types):
             if case .tuple(_, let targetTypes) = strippedTarget {

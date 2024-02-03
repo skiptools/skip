@@ -93,18 +93,12 @@ struct TypeInferenceContext {
     }
 
     /// Return a context for evaluating code within a block with the given additional identiifers.
-    func pushingBlock(identifiers: [String: TypeSignature]) -> TypeInferenceContext {
-        guard !identifiers.isEmpty else {
-            return self
-        }
-        return addingIdentifiers(identifiers)
-    }
-
-    /// Return a context that sets a static or non-static context.
-    func pushingStatic(_ isStatic: Bool) -> TypeInferenceContext {
-        var context = self
-        if let lastTypePathIndex = context.path.lastIndex(where: { $0.typeSignature != nil }) {
-            context.path[lastTypePathIndex].isStatic = isStatic
+    func pushingBlock(identifiers: [String: TypeSignature] = [:], isStatic: Bool? = nil) -> TypeInferenceContext {
+        var context = addingIdentifiers(identifiers)
+        if let isStatic {
+            if let lastTypePathIndex = context.path.lastIndex(where: { $0.typeSignature != nil }) {
+                context.path[lastTypePathIndex].isStatic = isStatic
+            }
         }
         return context
     }
@@ -136,6 +130,9 @@ struct TypeInferenceContext {
 
     /// Return a context that includes the given identifiers.
     func addingIdentifiers(_ identifiers: [String: TypeSignature]) -> TypeInferenceContext {
+        guard !identifiers.isEmpty else {
+            return self
+        }
         var context = self
         for (name, type) in identifiers {
             context.localIdentifierTypes[name] = (type, [])

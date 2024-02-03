@@ -122,6 +122,24 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
+    func testOptionalParameterType() async throws {
+        try await check(supportingSwift: """
+        extension Int {
+            static let min = 0
+        }
+        class C {
+            init(i: Int, b: Bool? = nil) {
+            }
+        }
+        """, swift: """
+        func f() -> C {
+            .init(i: .min, b: true)
+        }
+        """, kotlin: """
+        internal fun f(): C = C(i = Int.min, b = true)
+        """)
+    }
+
     func testDictionaries() async throws {
         try await check(supportingSwift: """
         class DictionaryHolder {
@@ -1121,6 +1139,49 @@ final class TypeInferenceTests: XCTestCase {
         """, kotlin: """
         internal fun f(string: String, bundle: Bundle? = null) = Unit
         internal fun g(): Unit = f("", bundle = Bundle.module)
+        """)
+    }
+
+    func testSameNamedVarAndFunc() async throws {
+        try await check(supportingSwift: """
+        struct Array<Element>: Collection<Element> {
+        }
+        public protocol Sequence<Element> {
+            associatedtype Element
+            func first(where: Any) -> Element?
+        }
+        protocol Collection: Sequence {
+            var first: Element? { get }
+        }
+        public struct Filtered {
+          public let filter: Filter
+        }
+        public struct Filter {
+          public static var xxx: Filter {
+            fatalError()
+          }
+        }
+        """, swift: """
+        struct T {
+            let filtered: [Filtered]?
+            var isHidden: Bool {
+                filtered?.first?.filter == .xxx
+            }
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        internal class T {
+            internal val filtered: Array<Filtered>?
+            internal val isHidden: Boolean
+                get() {
+                    return filtered?.first?.filter == Filter.xxx
+                }
+
+            constructor(filtered: Array<Filtered>? = null) {
+                this.filtered = filtered.sref()
+            }
+        }
         """)
     }
 }
