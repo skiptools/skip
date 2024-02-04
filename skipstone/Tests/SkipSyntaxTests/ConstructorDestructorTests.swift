@@ -177,11 +177,6 @@ final class ConstructorDestructorTests: XCTestCase {
             var i = 100
             var s: String
         }
-        
-        struct E {
-            var i = 100
-            private var s: String
-        }
         """, kotlin: """
         internal class A {
         }
@@ -240,8 +235,42 @@ final class ConstructorDestructorTests: XCTestCase {
             override var smutatingcount = 0
             override fun scopy(): MutableStruct = D(i, s)
         }
+        """)
+    }
 
-        internal class E: MutableStruct {
+    func testStructMemberwiseConstructorWithPrivateMembers() async throws {
+        try await check(swift: """
+        struct A {
+            private var s = ""
+        }
+        struct B {
+            var i: Int
+            private var s = ""
+        }
+        private struct C {
+            private var s: String
+        }
+        """, kotlin: """
+        internal class A: MutableStruct {
+            private var s: String
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            private constructor(s: String = "", privatep: Nothing? = null) {
+                this.s = s
+            }
+
+            constructor(): this(privatep = null) {
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = A(s)
+        }
+        internal class B: MutableStruct {
             internal var i: Int
                 set(newValue) {
                     willmutate()
@@ -255,14 +284,33 @@ final class ConstructorDestructorTests: XCTestCase {
                     didmutate()
                 }
 
-            private constructor(i: Int = 100, s: String) {
+            private constructor(i: Int, s: String = "", privatep: Nothing? = null) {
                 this.i = i
+                this.s = s
+            }
+
+            constructor(i: Int): this(i = i, privatep = null) {
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = B(i, s)
+        }
+        private class C: MutableStruct {
+            private var s: String
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            constructor(s: String) {
                 this.s = s
             }
 
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct = E(i, s)
+            override fun scopy(): MutableStruct = C(s)
         }
         """)
     }

@@ -577,9 +577,12 @@ final class StructTests: XCTestCase {
                     didmutate()
                 }
 
-            private constructor(i: Int = 1, s: String = "") {
+            private constructor(i: Int = 1, s: String = "", privatep: Nothing? = null) {
                 this.i = i
                 this.s = s
+            }
+
+            constructor(s: String = ""): this(s = s, privatep = null) {
             }
 
             override var supdate: ((Any) -> Unit)? = null

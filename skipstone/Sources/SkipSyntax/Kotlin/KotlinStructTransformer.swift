@@ -136,7 +136,7 @@ final class KotlinStructTransformer: KotlinTransformer {
             }
         }
 
-        // The visibility of the generated constructor matches the minimum property visibility
+        // Create a memberwise constructor for all properties that matches the minimum property visibility
         let constructor = KotlinFunctionDeclaration(name: "constructor")
         if (minimumVisibility == .private && classDeclaration.modifiers.visibility != .private)
             || (minimumVisibility == .internal && classDeclaration.modifiers.visibility == .public) {
@@ -147,35 +147,11 @@ final class KotlinStructTransformer: KotlinTransformer {
         }
         constructor.extras = .singleNewline
         constructor.isGenerated = true
-
-        constructor.parameters = variableDeclarations.map { variableDeclaration in
-            let label = variableDeclaration.propertyName
-            var type = variableDeclaration.propertyType
-            if type == .none {
-                if translator.codebaseInfo != nil {
-                    variableDeclaration.messages.append(.kotlinConstructorCannotInferPropertyType(variableDeclaration, source: translator.syntaxTree.source))
-                }
-            } else if variableDeclaration.attributes.contains(.binding) {
-                type = type.asBinding()
-            }
-            var defaultValue: KotlinExpression? = nil
-            if let value = variableDeclaration.value {
-                defaultValue = value
-                // Clear the default value if it will be assigned from the constructor to prevent creating the value twice
-                if variableDeclaration.declaredType == .none && variableDeclaration.propertyType == .none {
-                    // We can't clear it, however, if we don't know what type to declare the variable
-                    defaultValue = KotlinSharedExpressionPointer(shared: value)
-                } else {
-                    defaultValue = value
-                    variableDeclaration.value = nil
-                    if variableDeclaration.declaredType == .none {
-                        variableDeclaration.declaredType = variableDeclaration.propertyType
-                    }
-                }
-            } else if type.isOptional {
-                defaultValue = KotlinNullLiteral()
-            }
-            return Parameter(externalLabel: label, declaredType: type, defaultValue: defaultValue)
+        let parameters = memberwiseConstructorParameters(for: classDeclaration, variableDeclarations: variableDeclarations, translator: translator)
+        constructor.parameters = parameters
+        if constructor.modifiers.visibility == .private {
+            // Differentiate the private constructor with an extra param so we can call it specifically
+            constructor.parameters.append(Parameter(externalLabel: "privatep", declaredType: .named("Nothing", []).asOptional(true), defaultValue: KotlinNullLiteral()))
         }
 
         var bodyStatements: [KotlinStatement] = []
@@ -210,6 +186,69 @@ final class KotlinStructTransformer: KotlinTransformer {
         constructor.parent = classDeclaration
         constructor.assignParentReferences()
         classDeclaration.members.append(constructor)
+
+        // If we generated a private constructor, generate a non-private version that can be called by outside code
+        if constructor.modifiers.visibility == .private {
+            let constructor = KotlinFunctionDeclaration(name: "constructor")
+            // Use public to omit any modifier on the generated code
+            constructor.modifiers = Modifiers(visibility: .public)
+            constructor.extras = .singleNewline
+            constructor.isGenerated = true
+
+            let nonPrivateParameters = zip(variableDeclarations, parameters)
+                .filter { $0.0.modifiers.visibility != .private }
+                .map(\.1)
+            var parametersEqual = nonPrivateParameters.map {
+                if let label = $0.externalLabel {
+                    "\(label) = \(label)"
+                } else {
+                    $0.internalLabel
+                }
+            }.joined(separator: ", ")
+            if !nonPrivateParameters.isEmpty {
+                parametersEqual += ", "
+            }
+            parametersEqual += "privatep = null"
+
+            constructor.parameters = nonPrivateParameters
+            constructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: "this(" + parametersEqual + ")")
+            constructor.body = KotlinCodeBlock()
+            constructor.parent = classDeclaration
+            constructor.assignParentReferences()
+            classDeclaration.members.append(constructor)
+        }
+    }
+
+    private func memberwiseConstructorParameters(for classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], translator: KotlinTranslator) -> [Parameter<KotlinExpression>] {
+        return variableDeclarations.map { variableDeclaration in
+            let label = variableDeclaration.propertyName
+            var type = variableDeclaration.propertyType
+            if type == .none {
+                if translator.codebaseInfo != nil {
+                    variableDeclaration.messages.append(.kotlinConstructorCannotInferPropertyType(variableDeclaration, source: translator.syntaxTree.source))
+                }
+            } else if variableDeclaration.attributes.contains(.binding) {
+                type = type.asBinding()
+            }
+            var defaultValue: KotlinExpression? = nil
+            if let value = variableDeclaration.value {
+                defaultValue = value
+                // Clear the default value if it will be assigned from the constructor to prevent creating the value twice
+                if variableDeclaration.declaredType == .none && variableDeclaration.propertyType == .none {
+                    // We can't clear it, however, if we don't know what type to declare the variable
+                    defaultValue = KotlinSharedExpressionPointer(shared: value)
+                } else {
+                    defaultValue = value
+                    variableDeclaration.value = nil
+                    if variableDeclaration.declaredType == .none {
+                        variableDeclaration.declaredType = variableDeclaration.propertyType
+                    }
+                }
+            } else if type.isOptional {
+                defaultValue = KotlinNullLiteral()
+            }
+            return Parameter(externalLabel: label, declaredType: type, defaultValue: defaultValue)
+        }
     }
 
     private func addMutableStructCopyConstructor(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration]) {
