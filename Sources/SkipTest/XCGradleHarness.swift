@@ -311,6 +311,11 @@ extension XCGradleHarness where Self : XCTestCase {
             return
         }
 
+        // only turn errors into assertion failures
+        if issue.kind != .error {
+            return
+        }
+
         if var location = issue.location, 
             let linkDestination = try? FileManager.default.destinationOfSymbolicLink(atPath: location.path) {
             // attempt the map the error back any originally linking source projects, since it is better the be editing the canonical Xcode version of the file as Xcode is able to provide details about it
