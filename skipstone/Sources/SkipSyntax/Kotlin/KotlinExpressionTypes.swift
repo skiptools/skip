@@ -1296,10 +1296,10 @@ final class KotlinIf: KotlinExpression {
     struct ConditionSet {
         var optionalBindingVariable: KotlinBindingVariable?
         var caseTargetVariable: KotlinTargetVariable?
-        var caseBindingVariables: [KotlinBindingVariable]
-        var conditions: [KotlinExpression]
+        var caseBindingVariables: [KotlinBindingVariable] = []
+        var conditions: [KotlinExpression] = []
         var targetVariable: KotlinTargetVariable?
-        var isConditionBeforeBinding: Bool
+        var isConditionBeforeBinding = false
     }
 
     static func translate(expression: If, translator: KotlinTranslator) -> KotlinIf {

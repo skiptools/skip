@@ -35,7 +35,8 @@ public let builtinKotlinTransformerTypes: [KotlinTransformer.Type] = [
     // May add members to implement our internal OptionSet contract, including using self assignment that must be
     // detected and further translated by the KotlinStructTransformer
     KotlinOptionSetTransformer.self,
-    // May add members, so place it before transformers that could manipulate those members
+    // May add members, so place it before transformers that could manipulate those members. May update variable values
+    // and move them to constructors, so place before constructor transformer
     KotlinStructTransformer.self,
     // May *remove* information about protocol conformances
     KotlinCommonProtocolsTransformer.self,

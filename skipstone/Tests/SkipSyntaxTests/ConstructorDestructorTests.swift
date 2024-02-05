@@ -210,7 +210,7 @@ final class ConstructorDestructorTests: XCTestCase {
         }
 
         internal class D: MutableStruct {
-            internal val letVar = 100
+            internal val letVar: Int
             internal val computedVar: Int
                 get() = 100
             internal var i: Int
@@ -227,13 +227,21 @@ final class ConstructorDestructorTests: XCTestCase {
                 }
 
             constructor(i: Int = 100, s: String) {
+                this.letVar = 100
                 this.i = i
                 this.s = s
             }
 
+            private constructor(copy: MutableStruct) {
+                @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as D
+                this.letVar = copy.letVar
+                this.i = copy.i
+                this.s = copy.s
+            }
+
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct = D(i, s)
+            override fun scopy(): MutableStruct = D(this as MutableStruct)
         }
         """)
     }
@@ -313,6 +321,122 @@ final class ConstructorDestructorTests: XCTestCase {
             override fun scopy(): MutableStruct = C(s)
         }
         """)
+
+        try await check(swift: """
+        struct S1 {
+            let a: Int
+            private let b = 100
+            var c: S3
+            private var d = 200
+        }
+        struct S2 {
+            let a: Int
+            private let b = 100
+            var c: S3
+            private var d = 200
+
+            init(a: Int, c: S3) {
+                self.a = a
+                self.c = c
+            }
+        }
+        struct S3 {
+            var i = 100
+        }
+        """, kotlin: """
+        internal class S1: MutableStruct {
+            internal val a: Int
+            private val b: Int
+            internal var c: S3
+                get() = field.sref({ this.c = it })
+                set(newValue) {
+                    @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+            private var d: Int
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            private constructor(a: Int, c: S3, d: Int = 200, privatep: Nothing? = null) {
+                this.b = 100
+                this.a = a
+                this.c = c
+                this.d = d
+            }
+
+            constructor(a: Int, c: S3): this(a = a, c = c, privatep = null) {
+            }
+
+            private constructor(copy: MutableStruct) {
+                @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as S1
+                this.a = copy.a
+                this.b = copy.b
+                this.c = copy.c
+                this.d = copy.d
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S1(this as MutableStruct)
+        }
+        internal class S2: MutableStruct {
+            internal val a: Int
+            private val b: Int
+            internal var c: S3
+                get() = field.sref({ this.c = it })
+                set(newValue) {
+                    @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+            private var d = 200
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            internal constructor(a: Int, c: S3) {
+                this.b = 100
+                this.a = a
+                this.c = c
+            }
+
+            private constructor(copy: MutableStruct) {
+                @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as S2
+                this.a = copy.a
+                this.b = copy.b
+                this.c = copy.c
+                this.d = copy.d
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S2(this as MutableStruct)
+        }
+        internal class S3: MutableStruct {
+            internal var i: Int
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            constructor(i: Int = 100) {
+                this.i = i
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S3(i)
+        }
+        """)
     }
 
     func testStructMemberwiseConstructorDoesNotDuplicateDefaultValue() async throws {
@@ -362,19 +486,39 @@ final class ConstructorDestructorTests: XCTestCase {
 
     func testMutableStructWithoutInitialableProperties() async throws {
         try await check(swift: """
-        struct S {
+        struct S1 {
+            mutating func f() {
+            }
+        }
+        struct S2 {
             let x = 1
             mutating func f() {
             }
         }
         """, kotlin: """
-        internal class S: MutableStruct {
-            internal val x = 1
+        internal class S1: MutableStruct {
             internal fun f() = Unit
 
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct = S()
+            override fun scopy(): MutableStruct = S1()
+        }
+        internal class S2: MutableStruct {
+            internal val x: Int
+            internal fun f() = Unit
+
+            private constructor(copy: MutableStruct) {
+                @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as S2
+                this.x = copy.x
+            }
+
+            constructor() {
+                this.x = 1
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S2(this as MutableStruct)
         }
         """)
 
@@ -388,12 +532,15 @@ final class ConstructorDestructorTests: XCTestCase {
         }
         """, kotlin: """
         internal class S: MutableStruct {
-            internal val x = 1
+            internal val x: Int
             internal constructor() {
+                this.x = 1
             }
             internal fun f() = Unit
 
             private constructor(copy: MutableStruct) {
+                @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as S
+                this.x = copy.x
             }
 
             override var supdate: ((Any) -> Unit)? = null
@@ -594,6 +741,57 @@ final class ConstructorDestructorTests: XCTestCase {
             internal constructor(x: Double): this(c = { print("delegating") }) {
                 print("double")
             }
+        }
+        """)
+    }
+
+    func testMutatingStructDelegatingConstructor() async throws {
+        try await check(swift: """
+        struct S {
+            let x = 100
+            var s = ""
+            var i: Int
+            init(i: Int) {
+                self.init(i: i, s: "")
+            }
+            init(i: Int, s: String) {
+                self.i = i
+                self.s = s
+            }
+        }
+        """, kotlin: """
+        internal class S: MutableStruct {
+            internal val x: Int
+            internal var s = ""
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+            internal var i: Int
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+            internal constructor(i: Int): this(i = i, s = "") {
+            }
+            internal constructor(i: Int, s: String) {
+                this.x = 100
+                this.i = i
+                this.s = s
+            }
+
+            private constructor(copy: MutableStruct) {
+                @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as S
+                this.x = copy.x
+                this.s = copy.s
+                this.i = copy.i
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S(this as MutableStruct)
         }
         """)
     }

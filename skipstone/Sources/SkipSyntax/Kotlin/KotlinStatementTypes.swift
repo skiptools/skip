@@ -2547,6 +2547,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
     }
     var isActorIsolated = false
     var value: KotlinExpression?
+    var constructionValue: KotlinExpression?
     var getter: Accessor<KotlinCodeBlock>?
     var setter: Accessor<KotlinCodeBlock>?
     var willSet: Accessor<KotlinCodeBlock>?
@@ -2752,6 +2753,9 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         var children: [KotlinSyntaxNode] = []
         if let value {
             children.append(value)
+        }
+        if let constructionValue {
+            children.append(constructionValue)
         }
         if let body = getter?.body {
             children.append(body)

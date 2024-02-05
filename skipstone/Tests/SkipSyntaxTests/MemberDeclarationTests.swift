@@ -517,10 +517,6 @@ final class MemberDeclarationTests: XCTestCase {
                     val isinitialized = vinitialized
                     if (!isinitialized) willmutate()
                     try {
-                        if (!vinitialized) {
-                            vstorage = V()
-                            vinitialized = true
-                        }
                         return vstorage
                     } finally {
                         if (!isinitialized) didmutate()
@@ -535,9 +531,66 @@ final class MemberDeclarationTests: XCTestCase {
             private lateinit var vstorage: V
             private var vinitialized = false
 
+            constructor(v: V? = V()) {
+                if (v != null) { this.v = v }
+            }
+
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct = S()
+            override fun scopy(): MutableStruct {
+                return S(if (vinitialized) {
+                    v
+                } else {
+                    null
+                })
+            }
+        }
+        """)
+
+        try await check(supportingSwift: """
+        class V {
+        }
+        """, swift: """
+        struct S {
+            let x = 1
+            lazy var v = V()
+        }
+        """, kotlin: """
+        internal class S: MutableStruct {
+            internal val x: Int
+            internal var v: V
+                get() {
+                    val isinitialized = vinitialized
+                    if (!isinitialized) willmutate()
+                    try {
+                        return vstorage
+                    } finally {
+                        if (!isinitialized) didmutate()
+                    }
+                }
+                set(newValue) {
+                    willmutate()
+                    vstorage = newValue
+                    vinitialized = true
+                    didmutate()
+                }
+            private lateinit var vstorage: V
+            private var vinitialized = false
+
+            constructor(v: V? = V()) {
+                this.x = 1
+                if (v != null) { this.v = v }
+            }
+
+            private constructor(copy: MutableStruct) {
+                @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as S
+                this.x = copy.x
+                if (copy.vinitialized) { this.v = copy.v }
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S(this as MutableStruct)
         }
         """)
     }
@@ -696,9 +749,13 @@ final class MemberDeclarationTests: XCTestCase {
                 v = V()
             }
 
+            constructor(v: V) {
+                this.v = v
+            }
+
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
-            override fun scopy(): MutableStruct = S()
+            override fun scopy(): MutableStruct = S(v)
         }
         """)
 

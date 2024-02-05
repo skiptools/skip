@@ -37,20 +37,22 @@ final class KotlinStructTransformer: KotlinTransformer {
         var hasConstructors = false
         var isMutable = false
         var initializableVariableDeclarations: [KotlinVariableDeclaration] = []
+        var copyableVariableDeclarations: [KotlinVariableDeclaration] = []
         for member in classDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
                 if !isNoCopy && !variableDeclaration.isStatic && ((variableDeclaration.apiFlags.contains(.writeable) && !variableDeclaration.attributes.isNonMutating && variableDeclaration.getter == nil) || variableDeclaration.modifiers.isLazy) && !variableDeclaration.isGenerated {
                     variableDeclaration.mutationFunctionNames = mutationFunctionNames
                     isMutable = true
                 }
-                if variableDeclaration.declaredType.isUnwrappedOptional {
-                    // Not initialized
-                } else if variableDeclaration.value == nil && (variableDeclaration.attributes.contains(.environment) || variableDeclaration.attributes.contains(.environmentObject)) {
+                if variableDeclaration.value == nil && (variableDeclaration.attributes.contains(.environment) || variableDeclaration.attributes.contains(.environmentObject)) {
                     // It's so rare to want to pass environment values to the constructor that we omit them when they'd cause an error due to
                     // lack of initial value. To fix this we'd need help from the SwiftUI transformer (which runs after us) to figure out the
                     // variable type in many cases
-                } else if !variableDeclaration.modifiers.isStatic && variableDeclaration.getter == nil && (!variableDeclaration.isLet || variableDeclaration.value == nil) && !variableDeclaration.modifiers.isLazy && !variableDeclaration.isGenerated {
-                    initializableVariableDeclarations.append(variableDeclaration)
+                } else if !variableDeclaration.modifiers.isStatic && variableDeclaration.getter == nil && !variableDeclaration.isGenerated {
+                    copyableVariableDeclarations.append(variableDeclaration)
+                    if !variableDeclaration.isLet || variableDeclaration.value == nil {
+                        initializableVariableDeclarations.append(variableDeclaration)
+                    }
                 }
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration, !functionDeclaration.isGenerated {
                 if functionDeclaration.type == .constructorDeclaration {
@@ -62,17 +64,22 @@ final class KotlinStructTransformer: KotlinTransformer {
             }
         }
 
-        var needsMutableStructCopyConstructor = false
-        if !hasConstructors && !initializableVariableDeclarations.isEmpty {
+        let needsMemberwiseConstructor = !hasConstructors && !initializableVariableDeclarations.isEmpty
+        if needsMemberwiseConstructor {
             addMemberwiseConstructor(to: classDeclaration, variableDeclarations: initializableVariableDeclarations, translator: translator)
-        } else if isMutable && (hasConstructors || !initializableVariableDeclarations.isEmpty) {
-            needsMutableStructCopyConstructor = true
-            addMutableStructCopyConstructor(to: classDeclaration, variableDeclarations: initializableVariableDeclarations)
+        }
+        let needsMutableStructCopyConstructor = isMutable && ((!needsMemberwiseConstructor && !copyableVariableDeclarations.isEmpty) || (needsMemberwiseConstructor && copyableVariableDeclarations.count > initializableVariableDeclarations.count))
+        if needsMutableStructCopyConstructor {
+            addMutableStructCopyConstructor(to: classDeclaration, variableDeclarations: copyableVariableDeclarations)
+        }
+        if !hasConstructors && !needsMemberwiseConstructor && needsMutableStructCopyConstructor {
+            // If we add a copy constructor, be sure to also have a default constructor
+            addMemberwiseConstructor(to: classDeclaration, variableDeclarations: [], translator: translator)
         }
         if isMutable {
             classDeclaration.inherits.append(.named("MutableStruct", []))
-            // If we generated a memberwise constructor (or have no members and get a default constructor), we can use that to create a copy.
-            // Otherwise we generate a copy constructor. In particular, we do not trust any user-written constructor to perform a pure copy
+            // If we generated a complete memberwise constructor (or have no members and get a default constructor), we can use that to create
+            // a copy. Otherwise we generate a copy constructor. We do not trust any user-written constructor to perform a pure copy
             addMutableStructAPI(to: classDeclaration, variableDeclarations: initializableVariableDeclarations, useMutableStructCopyConstructor: needsMutableStructCopyConstructor)
         }
     }
@@ -110,10 +117,23 @@ final class KotlinStructTransformer: KotlinTransformer {
             constructorCall = KotlinRawExpression(sourceCode: "\(classDeclaration.signature.kotlin)(this as MutableStruct)")
         } else {
             let initFunction = KotlinMemberAccess(base: KotlinIdentifier(name: classDeclaration.signature.kotlin), member: "init")
-            let arguments = variableDeclarations.map {
-                let propertyName = $0.attributes.contains(.binding) ? "_" + $0.propertyName : $0.propertyName
-                let argumentValue = KotlinIdentifier(name: propertyName)
-                argumentValue.mayBeSharedMutableStruct = $0.mayBeSharedMutableStruct
+            let arguments = variableDeclarations.map { variableDeclaration in
+                let propertyName = variableDeclaration.attributes.contains(.binding) ? "_" + variableDeclaration.propertyName : variableDeclaration.propertyName
+                let identifier = KotlinIdentifier(name: propertyName)
+                identifier.mayBeSharedMutableStruct = variableDeclaration.mayBeSharedMutableStruct
+
+                let argumentValue: KotlinExpression
+                if variableDeclaration.modifiers.isLazy {
+                    // if (varinitialized) { var } else { null }
+                    let isInitialized = KotlinIdentifier(name: KotlinVariableStorage.lazyInitializedName(variableDeclaration))
+                    let ifCondition = KotlinIf.ConditionSet(conditions: [isInitialized])
+                    let ifBody = KotlinCodeBlock(statements: [KotlinExpressionStatement(expression: identifier)])
+                    let ifInitialized = KotlinIf(conditionSets: [ifCondition], body: ifBody)
+                    ifInitialized.elseBody = KotlinCodeBlock(statements: [KotlinExpressionStatement(expression: KotlinNullLiteral())])
+                    argumentValue = ifInitialized
+                } else {
+                    argumentValue = identifier
+                }
                 return LabeledValue<KotlinExpression>(value: argumentValue)
             }
             constructorCall = KotlinFunctionCall(function: initFunction, arguments: arguments)
@@ -175,9 +195,16 @@ final class KotlinStructTransformer: KotlinTransformer {
             } else if variableDeclaration.attributes.contains(.bindable) || variableDeclaration.attributes.contains(.observedObject) {
                 assignment = "this._\(variableDeclaration.propertyName) = skip.ui.Bindable(\(variableDeclaration.propertyName))"
             } else {
-                assignment = "this.\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
+                if variableDeclaration.modifiers.isLazy {
+                    assignment = "if (\(variableDeclaration.propertyName) != null) { this.\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
+                } else {
+                    assignment = "this.\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
+                }
                 if !variableDeclaration.apiFlags.contains(.writeable) && variableDeclaration.mayBeSharedMutableStruct {
                     assignment += ".sref()"
+                }
+                if variableDeclaration.modifiers.isLazy {
+                    assignment += " }"
                 }
             }
             return KotlinRawStatement(sourceCode: assignment)
@@ -229,16 +256,17 @@ final class KotlinStructTransformer: KotlinTransformer {
                 }
             } else if variableDeclaration.attributes.contains(.binding) {
                 type = type.asBinding()
+            } else if variableDeclaration.modifiers.isLazy {
+                type = type.asOptional(true)
             }
             let defaultValue: KotlinExpression?
             if let value = variableDeclaration.value {
-                // Clear the default value if it will be assigned from the constructor to prevent creating the value twice
-                if variableDeclaration.declaredType == .none && variableDeclaration.propertyType == .none {
-                    // We can't clear it, however, if we don't know what type to declare the variable
-                    defaultValue = KotlinSharedExpressionPointer(shared: value)
-                } else {
-                    defaultValue = value
+                // Clear the default value if it will be assigned from the constructor to prevent creating the value twice.
+                // We can't clear it, however, if we don't know what type to declare the variable
+                defaultValue = KotlinSharedExpressionPointer(shared: value)
+                if variableDeclaration.declaredType != .none || variableDeclaration.propertyType != .none {
                     variableDeclaration.value = nil
+                    variableDeclaration.constructionValue = value
                     if variableDeclaration.declaredType == .none {
                         variableDeclaration.declaredType = variableDeclaration.propertyType
                     }
@@ -257,7 +285,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         // define their own custom copy constructor with this signature
         for member in classDeclaration.members where member.type == .constructorDeclaration {
             let constructor = member as! KotlinFunctionDeclaration
-            if constructor.parameters.count == 1 && constructor.parameters[0].declaredType == .named("MutableStruct", []) {
+            if constructor.isMutableStructCopyConstructor {
                 return
             }
         }
@@ -279,7 +307,25 @@ final class KotlinStructTransformer: KotlinTransformer {
                 } else if variableDeclaration.attributes.contains(.bindable) || variableDeclaration.attributes.contains(.observedObject) {
                     return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.Bindable(copy.\(variableDeclaration.propertyName))")
                 } else {
-                    return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.propertyName) = copy.\(variableDeclaration.propertyName)")
+                    // Clear the default value if it will be assigned from the constructor to prevent creating the value twice. The constructor
+                    // transformer will then add these assignments to each constructor. So we only do this for 'let' values that other constructors
+                    // will not already assign. We also can't clear the value if we don't know what type to declare the variable
+                    if variableDeclaration.isLet, let value = variableDeclaration.value, variableDeclaration.declaredType != .none || variableDeclaration.propertyType != .none {
+                        variableDeclaration.value = nil
+                        variableDeclaration.constructionValue = value
+                        if variableDeclaration.declaredType == .none {
+                            variableDeclaration.declaredType = variableDeclaration.propertyType
+                        }
+                    }
+                    var assignment = ""
+                    if variableDeclaration.modifiers.isLazy {
+                        assignment += "if (copy.\(KotlinVariableStorage.lazyInitializedName(variableDeclaration))) { "
+                    }
+                    assignment += "this.\(variableDeclaration.propertyName) = copy.\(variableDeclaration.propertyName)"
+                    if variableDeclaration.modifiers.isLazy {
+                        assignment += " }"
+                    }
+                    return KotlinRawStatement(sourceCode: assignment)
                 }
             }
         }
@@ -402,5 +448,14 @@ final class KotlinStructTransformer: KotlinTransformer {
                 return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.propertyName) = \(copy).\(variableDeclaration.propertyName)")
             }
         }
+    }
+}
+
+extension KotlinFunctionDeclaration {
+    var isMutableStructCopyConstructor: Bool {
+        guard type == .constructorDeclaration else {
+            return false
+        }
+        return parameters.count == 1 && parameters[0].declaredType == .named("MutableStruct", [])
     }
 }

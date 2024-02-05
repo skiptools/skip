@@ -37,7 +37,7 @@ final class KotlinConstructorAndSideEffectSupressionTransformer: KotlinTransform
             }
         } else {
             for constructor in constructors {
-                fixupClassConstructor(constructor, isSubclass: superclass != nil, translator: translator)
+                fixupClassConstructor(constructor, for: classDeclaration, isSubclass: superclass != nil, translator: translator)
                 if constructor.body?.statements.isEmpty == false {
                     hasNonEmptyConstructor = true
                 }
@@ -87,7 +87,7 @@ final class KotlinConstructorAndSideEffectSupressionTransformer: KotlinTransform
         classDeclaration.members.append(constructor)
     }
 
-    private func fixupClassConstructor(_ constructor: KotlinFunctionDeclaration, isSubclass: Bool, translator: KotlinTranslator) {
+    private func fixupClassConstructor(_ constructor: KotlinFunctionDeclaration, for classDeclaration: KotlinClassDeclaration, isSubclass: Bool, translator: KotlinTranslator) {
         guard let body = constructor.body else {
             return
         }
@@ -99,13 +99,15 @@ final class KotlinConstructorAndSideEffectSupressionTransformer: KotlinTransform
         }
 
         // Find any call to self or super init and move it to the Kotlin delegating constructor call
+        var assignConstructionValues = true
         for (index, statement) in body.statements.enumerated() {
-            guard let delegatingCall = delegatingConstructorCall(for: statement) else {
+            guard let (delegatingCall, isSuper) = delegatingConstructorCall(for: statement) else {
                 continue
             }
             body.statements.remove(at: index)
             fixupDelegatingConstructorCall(delegatingCall, in: constructor, translator: translator)
             constructor.delegatingConstructorCall = delegatingCall
+            assignConstructionValues = isSuper
             break
         }
         // Validate that there aren't additional or conditional delegating calls
@@ -119,9 +121,26 @@ final class KotlinConstructorAndSideEffectSupressionTransformer: KotlinTransform
         if isSubclass && constructor.delegatingConstructorCall == nil {
             constructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super()")
         }
+        if assignConstructionValues && !constructor.isMutableStructCopyConstructor {
+            self.assignConstructionValues(in: body, for: classDeclaration)
+        }
     }
 
-    private func delegatingConstructorCall(for statement: KotlinStatement) -> KotlinFunctionCall? {
+    private func assignConstructionValues(in body: KotlinCodeBlock, for classDeclaration: KotlinClassDeclaration) {
+        let statements = classDeclaration.members.compactMap { (member: KotlinStatement) -> KotlinStatement? in
+            guard let variableDeclaration = member as? KotlinVariableDeclaration, variableDeclaration.isLet, let constructionValue = variableDeclaration.constructionValue else {
+                return nil
+            }
+            let access = KotlinMemberAccess(base: KotlinIdentifier(name: "self"), member: variableDeclaration.propertyName)
+            let assignment = KotlinBinaryOperator(op: .with(symbol: "="), lhs: access, rhs: constructionValue)
+            return KotlinExpressionStatement(expression: assignment)
+        }
+        if !statements.isEmpty {
+            body.insert(statements: statements, after: nil)
+        }
+    }
+
+    private func delegatingConstructorCall(for statement: KotlinStatement) -> (KotlinFunctionCall, isSuper: Bool)? {
         guard statement.type == .expression, let expressionStatement = statement as? KotlinExpressionStatement else {
             return nil
         }
@@ -134,7 +153,7 @@ final class KotlinConstructorAndSideEffectSupressionTransformer: KotlinTransform
         guard memberAccess.member == "init" else {
             return nil
         }
-        return memberAccess.isBaseSelfOrSuper ? functionCall : nil
+        return memberAccess.isBaseSelfOrSuper ? (functionCall, (memberAccess.base as? KotlinIdentifier)?.name == "super") : nil
     }
 
     private func fixupDelegatingConstructorCall(_ functionCall: KotlinFunctionCall, in constructor: KotlinFunctionDeclaration, translator: KotlinTranslator) {
