@@ -202,6 +202,38 @@ final class ObservationTests: XCTestCase {
         """)
     }
 
+    func testPublishedImplicitArray() async throws {
+        try await check(supportingSwift: """
+        func arrayFunc() -> [Int] {
+            return []
+        }
+        """, swift: """
+        import Combine
+
+        class C: ObservableObject {
+            @Published var a = arrayFunc()
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Stable
+        import androidx.compose.runtime.mutableStateOf
+        import skip.lib.Array
+
+        import skip.model.*
+
+        @Stable
+        internal open class C: ObservableObject {
+            override val objectWillChange = ObservableObjectPublisher()
+            internal open var a: Array<Int>
+                get() = _a.wrappedValue.sref({ this.a = it })
+                set(newValue) {
+                    objectWillChange.send()
+                    _a.wrappedValue = newValue.sref()
+                }
+            internal var _a: skip.model.Published<Array<Int>> = skip.model.Published(arrayFunc())
+        }
+        """)
+    }
+
     func testCustomObjectWillChange() async throws {
         try await check(supportingSwift: """
         class ObservableObjectPublisher {

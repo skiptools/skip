@@ -147,7 +147,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         }
         constructor.extras = .singleNewline
         constructor.isGenerated = true
-        let parameters = memberwiseConstructorParameters(for: classDeclaration, variableDeclarations: variableDeclarations, translator: translator)
+        let parameters = prepareMemberwiseConstructorParameters(for: classDeclaration, variableDeclarations: variableDeclarations, translator: translator)
         constructor.parameters = parameters
         if constructor.modifiers.visibility == .private {
             // Differentiate the private constructor with an extra param so we can call it specifically
@@ -219,7 +219,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         }
     }
 
-    private func memberwiseConstructorParameters(for classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], translator: KotlinTranslator) -> [Parameter<KotlinExpression>] {
+    private func prepareMemberwiseConstructorParameters(for classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], translator: KotlinTranslator) -> [Parameter<KotlinExpression>] {
         return variableDeclarations.map { variableDeclaration in
             let label = variableDeclaration.propertyName
             var type = variableDeclaration.propertyType
@@ -230,9 +230,8 @@ final class KotlinStructTransformer: KotlinTransformer {
             } else if variableDeclaration.attributes.contains(.binding) {
                 type = type.asBinding()
             }
-            var defaultValue: KotlinExpression? = nil
+            let defaultValue: KotlinExpression?
             if let value = variableDeclaration.value {
-                defaultValue = value
                 // Clear the default value if it will be assigned from the constructor to prevent creating the value twice
                 if variableDeclaration.declaredType == .none && variableDeclaration.propertyType == .none {
                     // We can't clear it, however, if we don't know what type to declare the variable
@@ -246,6 +245,8 @@ final class KotlinStructTransformer: KotlinTransformer {
                 }
             } else if type.isOptional {
                 defaultValue = KotlinNullLiteral()
+            } else {
+                defaultValue = nil
             }
             return Parameter(externalLabel: label, declaredType: type, defaultValue: defaultValue)
         }

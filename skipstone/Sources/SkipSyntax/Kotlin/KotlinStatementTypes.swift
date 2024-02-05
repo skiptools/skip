@@ -2742,6 +2742,10 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
 
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
         declaredType.insertDependencies(into: &dependencies)
+        // Include implicit property types in case a transformer uses it as a declared type
+        if declaredType == .none && role == .property && propertyType != .none {
+            propertyType.insertDependencies(into: &dependencies)
+        }
     }
 
     override var children: [KotlinSyntaxNode] {
