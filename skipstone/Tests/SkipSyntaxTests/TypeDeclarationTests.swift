@@ -1,4 +1,5 @@
 import XCTest
+@testable import SkipSyntax
 
 final class TypeDeclarationTests: XCTestCase {
     func testClass() async throws {
@@ -1021,5 +1022,15 @@ final class TypeDeclarationTests: XCTestCase {
             }
         }
         """)
+    }
+
+    func testTypeSignatureStringParsing() async throws {
+        XCTAssertEqual(TypeSignature.for(name: "String", genericTypes: []), .string)
+        XCTAssertEqual(TypeSignature.for(name: "Swift.Int", genericTypes: []), .int)
+        XCTAssertEqual(TypeSignature.for(name: "A", genericTypes: []), .named("A", []))
+        XCTAssertEqual(TypeSignature.for(name: "A<Int>", genericTypes: []), .named("A", [.int]))
+        XCTAssertEqual(TypeSignature.for(name: "Dictionary<Int, String>", genericTypes: []), .dictionary(.int, .string))
+        XCTAssertEqual(TypeSignature.for(name: "Array<S<String>>", genericTypes: []), .array(.named("S", [.string])))
+        XCTAssertEqual(TypeSignature.for(name: "Dictionary<S<String>, Array<Int>>", genericTypes: []), .dictionary(.named("S", [.string]), .array(.int)))
     }
 }

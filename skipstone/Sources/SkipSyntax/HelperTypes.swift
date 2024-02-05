@@ -355,6 +355,14 @@ struct Attribute: Hashable, Codable {
             return String(message)
         }
     }
+
+    /// If the first token is "T.self", return `T` as a type signature.
+    var tokenTypeSignature: TypeSignature? {
+        guard let token = tokens.first, token.hasSuffix(".self") else {
+            return nil
+        }
+        return TypeSignature.for(name: String(token.dropLast(".self".count)), genericTypes: [])
+    }
 }
 
 /// Availability information.

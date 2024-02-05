@@ -788,7 +788,7 @@ final class SwiftUITests: XCTestCase {
         try await check(supportingSwift: supportingSwift, swift: """
         import SwiftUI
         struct V: View {
-            @Environment(EnvValue.self) var envvalue
+            @Environment(EnvValue<String>.self) var envvalue
             var body: some View {
                 Text("Value: \\(envvalue.x)")
             }
@@ -806,7 +806,7 @@ final class SwiftUITests: XCTestCase {
         import skip.foundation.*
         import skip.model.*
         internal class V: View {
-            internal lateinit var envvalue: EnvValue
+            internal lateinit var envvalue: EnvValue<String>
             override fun body(): View {
                 return ComposeBuilder { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
             }
@@ -823,7 +823,7 @@ final class SwiftUITests: XCTestCase {
         try await check(supportingSwift: supportingSwift, swift: """
         import SwiftUI
         struct V: View {
-            @EnvironmentObject var envvalue: EnvValue
+            @EnvironmentObject var envvalue: EnvValue<String>
             var body: some View {
                 Text("Value: \\(envvalue.x)")
             }
@@ -841,7 +841,7 @@ final class SwiftUITests: XCTestCase {
         import skip.foundation.*
         import skip.model.*
         internal class V: View {
-            internal lateinit var envvalue: EnvValue
+            internal lateinit var envvalue: EnvValue<String>
             override fun body(): View {
                 return ComposeBuilder { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
             }

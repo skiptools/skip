@@ -1603,6 +1603,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 return .named(name, genericTypes)
             }
         }
+        let (name, genericTypes) = genericTypes.isEmpty ? parseGenericTypes(from: name) : (name, genericTypes)
         switch name {
         case "Any", "Swift.Any":
             return genericTypes.isEmpty ? .any : allowNamed ? swiftNamed(name, genericTypes) : .none
@@ -1667,6 +1668,47 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 return .named(name, genericTypes)
             }
         }
+    }
+
+    private static func parseGenericTypes(from name: String) -> (String, [TypeSignature]) {
+        guard name.hasSuffix(">") else {
+            return (name, [])
+        }
+        var typeNames: [String] = []
+        var currentName = ""
+        var depth = 0
+        var strippedName = ""
+        for c in name {
+            switch c {
+            case "<":
+                depth += 1
+                if depth > 1 {
+                    currentName.append(c)
+                }
+            case ">":
+                depth -= 1
+                if depth == 0 {
+                    typeNames.append(currentName)
+                    currentName = ""
+                } else {
+                    currentName.append(c)
+                }
+            case ",":
+                if depth == 1 {
+                    typeNames.append(currentName)
+                    currentName = ""
+                } else if depth > 1 {
+                    currentName.append(c)
+                }
+            default:
+                if depth == 0 {
+                    strippedName.append(c)
+                } else if !c.isWhitespace && depth >= 1 {
+                    currentName.append(c)
+                }
+            }
+        }
+        return (strippedName, typeNames.map { TypeSignature.for(name: $0, genericTypes: []) })
     }
 
     /// Return a tuple type made up of the given types.

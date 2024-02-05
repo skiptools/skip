@@ -1944,6 +1944,25 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """)
     }
+
+    func testEnvironmentAttributeDeclaredType() async throws {
+        try await check(supportingSwift: """
+        struct Env {
+            static let x = Env()
+        }
+        final class S {
+            @Environment(Env.self) var e
+        }
+        """, swift: """
+        func f(s: S) {
+            let b = s.e == .x
+        }
+        """, kotlin: """
+        internal fun f(s: S) {
+            val b = s.e == Env.x
+        }
+        """)
+    }
 }
 
 var sideEffectOrdering: [String] = []

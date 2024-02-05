@@ -390,12 +390,16 @@ private final class TranslateVisitor {
     private func synthesizeEnvironmentSync(variable: KotlinVariableDeclaration) -> KotlinStatement? {
         let entry: (key: String, type: TypeSignature?, isObject: Bool)
         if let environment = (variable.attributes.of(kind: .environment) + variable.attributes.of(kind: .environmentObject)).first {
-            let rawKey = environment.tokens.first ?? ""
-            if let environmentEntry = environmentEntry(for: variable, key: rawKey) {
-                entry = environmentEntry
+            if let environmentType = environment.tokenTypeSignature {
+                entry = (environmentType.withGenerics([]).kotlin + "::class", environmentType, true)
             } else {
-                variable.messages.append(.kotlinEnvironmentKeyType(variable, source: translator.syntaxTree.source))
-                return nil
+                let rawKey = environment.tokens.first ?? ""
+                if let environmentEntry = environmentEntry(for: variable, key: rawKey) {
+                    entry = environmentEntry
+                } else {
+                    variable.messages.append(.kotlinEnvironmentKeyType(variable, source: translator.syntaxTree.source))
+                    return nil
+                }
             }
         } else {
             return nil
@@ -442,24 +446,20 @@ private final class TranslateVisitor {
 
     /// Given a Swift `@Environment` property wrapper key, return the Kotlin key and the expected value type.
     private func environmentEntry(for variableDeclaration: KotlinVariableDeclaration, key: String) -> (key: String, type: TypeSignature?, isObject: Bool)? {
-        if key.isEmpty {
+        guard !key.isEmpty else {
             let type = variableDeclaration.declaredType
-            return type == .none ? nil : (type.kotlin + "::class", type, true)
-        } else if key.hasSuffix(".self") {
-            let typeName = String(key.dropLast(".self".count))
-            return (typeName + "::class", .named(typeName, []), true)
-        } else {
-            let propertyName: String
-            if key.hasPrefix("\\EnvironmentValues.") {
-                propertyName = String(key.dropFirst("\\EnvironmentValues.".count))
-            } else if key.hasPrefix("\\.") {
-                propertyName = String(key.dropFirst(2))
-            } else {
-                return nil
-            }
-            let type = translator.codebaseInfo?.matchIdentifier(name: propertyName, inConstrained: .named("EnvironmentValues", []))?.signature
-            return (propertyName, type, false)
+            return type == .none ? nil : (type.withGenerics([]).kotlin + "::class", type, true)
         }
+        let propertyName: String
+        if key.hasPrefix("\\EnvironmentValues.") {
+            propertyName = String(key.dropFirst("\\EnvironmentValues.".count))
+        } else if key.hasPrefix("\\.") {
+            propertyName = String(key.dropFirst(2))
+        } else {
+            return nil
+        }
+        let type = translator.codebaseInfo?.matchIdentifier(name: propertyName, inConstrained: .named("EnvironmentValues", []))?.signature
+        return (propertyName, type, false)
     }
 
     /// Create the additional property synthesized for `@State` and similar variables.
