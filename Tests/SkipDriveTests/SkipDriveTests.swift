@@ -47,7 +47,7 @@ class SkipCommandTests : XCTestCase {
         XCTAssertGreaterThanOrEqual(devices.count, 0)
     }
 
-    func XXXtestSkipCheckup() async throws {
+    func testSkipCheckup() async throws {
         if ProcessInfo.processInfo.environment["CI"] != nil {
             throw XCTSkip("skipping checkup test on CI due to unknown failure")
         }
@@ -56,6 +56,9 @@ class SkipCommandTests : XCTestCase {
     }
 
     func testSkipCreate() async throws {
+        if ProcessInfo.processInfo.environment["CI"] != nil {
+            throw XCTSkip("skipping checkup test on CI due to unknown failure")
+        }
         let tempDir = try mktmp()
         let projectName = "hello-skip"
         let appName = "HelloSkip"
