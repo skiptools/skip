@@ -250,6 +250,11 @@ final class CodableTests: XCTestCase {
             constructor(from: Decoder) {
             }
 
+            constructor(i: Int, s: String) {
+                this.i = i
+                this.s = s
+            }
+
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
@@ -502,6 +507,11 @@ final class CodableTests: XCTestCase {
             constructor(from: Decoder) {
             }
 
+            constructor(i: Int, s: String) {
+                this.i = i
+                this.s = s
+            }
+
             override fun encode(to: Encoder) {
                 val container = to.container(keyedBy = CodingKeys::class)
                 container.encode(i, forKey = CodingKeys.i)
@@ -545,7 +555,7 @@ final class CodableTests: XCTestCase {
 
             init(from decoder: Decoder) {
                 let container = decoder.container(keyedBy: CK.self)
-                self.a = container.decode([Int].self, forKey: CK.a)
+                self.a = container.decodeIfPresent([Int].self, forKey: CK.a) ?? []
                 self.d = container.decode(Dictionary<String, S>.self, forKey: CK.d)
                 self.na = container.decode(Array<[Int]>.self, forKey: CK.na)
                 self.nd = container.decode([String: Array<S>].self, forKey: CK.nd)
@@ -579,10 +589,17 @@ final class CodableTests: XCTestCase {
             constructor(from: Decoder) {
                 val decoder = from
                 val container = decoder.container(keyedBy = CK::class)
-                this.a = container.decode(Array::class, elementType = Int::class, forKey = CK.a)
+                this.a = (container.decodeIfPresent(Array::class, elementType = Int::class, forKey = CK.a) ?: arrayOf()).sref()
                 this.d = container.decode(Dictionary::class, keyType = String::class, valueType = S::class, forKey = CK.d)
                 this.na = container.decode(Array::class, elementType = Array::class, nestedElementType = Int::class, forKey = CK.na)
                 this.nd = container.decode(Dictionary::class, keyType = String::class, valueType = Array::class, nestedElementType = S::class, forKey = CK.nd)
+            }
+
+            constructor(a: Array<Int>, d: Dictionary<String, S>, na: Array<Array<Int>>, nd: Dictionary<String, Array<S>>) {
+                this.a = a.sref()
+                this.d = d.sref()
+                this.na = na.sref()
+                this.nd = nd.sref()
             }
 
             companion object: DecodableCompanion<S> {
@@ -607,32 +624,40 @@ final class CodableTests: XCTestCase {
         struct S: Codable {
             let i: Int?
             let s: String?
+            let a: [Int]?
         }
         """, kotlin: """
+        import skip.lib.Array
+
         internal class S: Codable {
             internal val i: Int?
             internal val s: String?
+            internal val a: Array<Int>?
 
-            constructor(i: Int? = null, s: String? = null) {
+            constructor(i: Int? = null, s: String? = null, a: Array<Int>? = null) {
                 this.i = i
                 this.s = s
+                this.a = a.sref()
             }
 
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
-                s("s");
+                s("s"),
+                a("a");
             }
 
             override fun encode(to: Encoder) {
                 val container = to.container(keyedBy = CodingKeys::class)
                 container.encodeIfPresent(i, forKey = CodingKeys.i)
                 container.encodeIfPresent(s, forKey = CodingKeys.s)
+                container.encodeIfPresent(a, forKey = CodingKeys.a)
             }
 
             constructor(from: Decoder) {
                 val container = from.container(keyedBy = CodingKeys::class)
                 this.i = container.decodeIfPresent(Int::class, forKey = CodingKeys.i)
                 this.s = container.decodeIfPresent(String::class, forKey = CodingKeys.s)
+                this.a = container.decodeIfPresent(Array::class, elementType = Int::class, forKey = CodingKeys.a)
             }
 
             companion object: DecodableCompanion<S> {
@@ -642,6 +667,7 @@ final class CodableTests: XCTestCase {
                     return when (rawValue) {
                         "i" -> CodingKeys.i
                         "s" -> CodingKeys.s
+                        "a" -> CodingKeys.a
                         else -> null
                     }
                 }

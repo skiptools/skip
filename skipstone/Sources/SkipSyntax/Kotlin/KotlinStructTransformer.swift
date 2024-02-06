@@ -56,7 +56,10 @@ final class KotlinStructTransformer: KotlinTransformer {
                 }
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration, !functionDeclaration.isGenerated {
                 if functionDeclaration.type == .constructorDeclaration {
-                    hasConstructors = true
+                    // Decodable constructor and overridden copy constructor don't count
+                    if !functionDeclaration.isDecodableConstructor && !functionDeclaration.isMutableStructCopyConstructor {
+                        hasConstructors = true
+                    }
                 } else if !isNoCopy && functionDeclaration.modifiers.isMutating {
                     functionDeclaration.mutationFunctionNames = mutationFunctionNames
                     isMutable = true
@@ -448,14 +451,5 @@ final class KotlinStructTransformer: KotlinTransformer {
                 return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.propertyName) = \(copy).\(variableDeclaration.propertyName)")
             }
         }
-    }
-}
-
-extension KotlinFunctionDeclaration {
-    var isMutableStructCopyConstructor: Bool {
-        guard type == .constructorDeclaration else {
-            return false
-        }
-        return parameters.count == 1 && parameters[0].declaredType == .named("MutableStruct", [])
     }
 }

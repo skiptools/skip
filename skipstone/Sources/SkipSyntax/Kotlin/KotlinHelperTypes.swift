@@ -97,6 +97,24 @@ struct KotlinExtensionPlacement {
     var isInModule: Bool?
 }
 
+extension KotlinFunctionDeclaration {
+    /// Whether this declaration can act as our `MutableStruct` copy constructor.
+    var isMutableStructCopyConstructor: Bool {
+        guard type == .constructorDeclaration else {
+            return false
+        }
+        return parameters.count == 1 && parameters[0].declaredType.isNamed("MutableStruct", moduleName: "Swift", generics: [])
+    }
+
+    /// Whether this declaration is the `Decodable` protocol constructor.
+    var isDecodableConstructor: Bool {
+        guard type == .constructorDeclaration else {
+            return false
+        }
+        return parameters.count == 1 && parameters[0].externalLabel == "from" && parameters[0].declaredType.isNamed("Decoder", moduleName: "Swift", generics: [])
+    }
+}
+
 extension KotlinStatement {
     /// Return supported attributes and add warnings for unsupported attributes.
     func processAttributes(_ attributes: Attributes, from statement: Statement, translator: KotlinTranslator) -> Attributes {

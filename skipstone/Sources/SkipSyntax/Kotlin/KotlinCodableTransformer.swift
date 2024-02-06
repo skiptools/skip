@@ -40,7 +40,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
                 guard let functionDeclaration = $0 as? KotlinFunctionDeclaration else {
                     return false
                 }
-                return functionDeclaration.type == .constructorDeclaration && functionDeclaration.parameters.count == 1 && functionDeclaration.parameters[0].externalLabel == "from" && functionDeclaration.parameters[0].declaredType.isNamed("Decoder", moduleName: "Swift", generics: [])
+                return functionDeclaration.isDecodableConstructor
             } as? KotlinFunctionDeclaration
             decodeDeclaration?.modifiers.visibility = .public
         }
@@ -281,7 +281,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
     }
 
     private func fixupDecode(functionCall: KotlinFunctionCall) {
-        guard let function = functionCall.function as? KotlinMemberAccess, function.member == "decode" else {
+        guard let function = functionCall.function as? KotlinMemberAccess, function.member == "decode" || function.member == "decodeIfPresent" else {
             return
         }
         // .decode(_, from:) for e.g. JSONDecoder or .decode(_, forKey:) for KeyedDecodingContainer

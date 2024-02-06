@@ -89,8 +89,8 @@ final class KotlinEnumTransformer: KotlinTransformer {
     }
 }
 
-private extension CodebaseInfoItem {
-    var isAllCasesVar: Bool {
+extension CodebaseInfoItem {
+    fileprivate var isAllCasesVar: Bool {
         return declarationType == .variableDeclaration && name == "allCases" && modifiers.isStatic
     }
 }

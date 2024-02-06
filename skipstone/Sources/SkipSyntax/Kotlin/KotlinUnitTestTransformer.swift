@@ -56,7 +56,7 @@ final class KotlinUnitTestTransformer: KotlinTransformer {
         }
     }
 
-    static func isTestFunction(_ functionDeclaration: KotlinFunctionDeclaration, owningClass: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context) -> Bool {
+    private static func isTestFunction(_ functionDeclaration: KotlinFunctionDeclaration, owningClass: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context) -> Bool {
         guard functionDeclaration.name.hasPrefix("test") && !functionDeclaration.isStatic && functionDeclaration.role != .global else {
             return false
         }
