@@ -62,7 +62,7 @@ class SkipCommandTests : XCTestCase {
         let out = try await skip("init", "-jA", "--show-tree", "-d", tempDir, "--appid", "com.company.HelloSkip", projectName, appName)
         let msgs = try out.parseJSONMessages()
 
-        XCTAssertEqual("Initializing Skip library \(projectName)", msgs.first)
+        XCTAssertEqual("Initializing Skip application \(projectName)", msgs.first)
         let dir = tempDir + "/" + projectName + "/"
 
         let xcodeproj = "Darwin/" + appName + ".xcodeproj"
