@@ -181,7 +181,9 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
             if let referencedType = owningType.members.first(where: { ($0 as? TypeDeclaration)?.signature.name.hasSuffix(suffix) == true }) {
                 return ((referencedType as! TypeDeclaration).signature.withGenerics(generics), false)
             } else if let referencedTypealias = owningType.members.first(where: { ($0 as? TypealiasDeclaration)?.name == name }) {
-                return ((referencedTypealias as! TypealiasDeclaration).signature.withGenerics(generics), false)
+                let declaration = referencedTypealias as! TypealiasDeclaration
+                let alias = TypeSignature.Typealias(from: declaration.signature, to: declaration.aliasedType)
+                return (.typealiased(alias, declaration.aliasedType).withGenerics(generics), false)
             } else if generics.isEmpty, let generic = owningType.generics.entries.first(where: { $0.name == name }) {
                 return (generic.namedType, true)
             }

@@ -418,4 +418,20 @@ final class TypealiasTests: XCTestCase {
         }
         """)
     }
+
+    func testTypealiasGenericConflictsWithKnownType() async throws {
+        try await check(supportingSwift: """
+        public final class State<Value> {
+        }
+        """, swift: """
+        final class Store<State, Action> {
+            typealias Reducer = (State, Action) -> State
+            private let reducer: Reducer
+        }
+        """, kotlin: """
+        internal class Store<State, Action> {
+            private val reducer: (State, Action) -> State
+        }
+        """)
+    }
 }
