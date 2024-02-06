@@ -1077,6 +1077,7 @@ class AppProjectLayout : FrameworkProjectLayout {
     /* Begin PBXBuildFile section */
             49231BAC2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) in Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) */; };
             49231BAD2AC5BCEF00F98ADF /* \(primaryModuleAppTarget)App in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+            493568292B71C19600D01714 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 493568282B71C19600D01714 /* Localizable.xcstrings */; };
             499CD43B2AC5B799001AE8D8 /* \(appMainSwiftFileName) in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* \(appMainSwiftFileName) */; };
             499CD4402AC5B799001AE8D8 /* \(Assets_xcassets_name) in Resources */ = {isa = PBXBuildFile; fileRef = 49F90C2F2A52156300F06D93 /* \(Assets_xcassets_name) */; };
     /* End PBXBuildFile section */
@@ -1131,6 +1132,7 @@ class AppProjectLayout : FrameworkProjectLayout {
             49F90C1F2A52156200F06D93 = {
                 isa = PBXGroup;
                 children = (
+                    493568282B71C19600D01714 /* Localizable.xcstrings */,
                     496EB72F2A6AE4DE00C1253C /* README.md */,
                     496EB72F2A6AE4DE00C1253A /* \(skipEnvBaseName) */,
                     496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */,
@@ -1211,6 +1213,7 @@ class AppProjectLayout : FrameworkProjectLayout {
                 buildActionMask = 2147483647;
                 files = (
                     499CD4402AC5B799001AE8D8 /* \(Assets_xcassets_name) in Resources */,
+                    493568292B71C19600D01714 /* Localizable.xcstrings in Resources */,
                 );
                 runOnlyForDeploymentPostprocessing = 0;
             };
@@ -1397,7 +1400,7 @@ class AppProjectLayout : FrameworkProjectLayout {
         let androidIconName: String? = hasIcon ? "mipmap/ic_launcher" : nil
         try createAndroidManifest(androidIconName: androidIconName).write(to: appProject.androidManifest.createParentDirectory(), atomically: true, encoding: .utf8)
         try createSettingsGradle().write(to: appProject.androidGradleSettings, atomically: true, encoding: .utf8)
-        try createAppBuildGradle().write(to: appProject.androidAppBuildGradle, atomically: true, encoding: .utf8)
+        try createAppBuildGradle(appModulePackage: appModulePackage, appModuleName: appModuleName).write(to: appProject.androidAppBuildGradle, atomically: true, encoding: .utf8)
         try defaultProguardContents().write(to: appProject.androidAppProguardRules, atomically: true, encoding: .utf8)
         try defaultGradleProperties().write(to: appProject.androidGradleProperties, atomically: true, encoding: .utf8)
         try defaultGradleWrapperProperties().write(to: appProject.androidGradleWrapperProperties.createParentDirectory(), atomically: true, encoding: .utf8)
@@ -1478,22 +1481,6 @@ extension FrameworkProjectLayout {
         // This is the top-level Gradle settings for a Skip App project.
         // It reads from the Skip.env file in the root of the project
 
-        pluginManagement {
-            repositories {
-                maven("https://maven.skip.tools")
-                gradlePluginPortal()
-                mavenCentral()
-                google()
-            }
-        }
-
-        dependencyResolutionManagement {
-            repositories {
-                maven("https://maven.skip.tools")
-                mavenCentral()
-                google()
-            }
-        }
 
         // Use the properties in the Skip.env file for configuration
         val parentFolder = file("..")
@@ -1515,11 +1502,6 @@ extension FrameworkProjectLayout {
         rootProject.name = prop(key = "ANDROID_PACKAGE_NAME")
         val swiftProjectName = prop(key = "SKIP_PROJECT_NAME")
         val swiftModuleName = prop(key = "PRODUCT_NAME")
-
-        // After the settings have been evaluated, resolve the Skip transpilation output folders
-        gradle.settingsEvaluated {
-            addSkipModules()
-        }
 
         // Parse .env file into a map of strings
         fun loadSkipEnv(file: File): Map<String, String> {
@@ -1553,7 +1535,8 @@ extension FrameworkProjectLayout {
             return value
         }
 
-        fun addSkipModules() {
+        // After the settings have been evaluated, resolve the Skip transpilation output folders
+        gradle.settingsEvaluated {
             // When running from Xcode, the BUILT_PRODUCTS_DIR environment
             // variable will point to the project's DerivedData path, like:
             // ~/Library/Developer/Xcode/DerivedData/NAME-HASH/Build/Products/Debug-iphonesimulator
@@ -1590,26 +1573,9 @@ extension FrameworkProjectLayout {
                 .resolve(swiftModuleName)
                 .resolve("skipstone")
 
-            if (!projectDir.exists()) {
-                // If the directory does not exist, fail the build
-                throw GradleException("Skip output directory does not exist at: $projectDir")
+            apply(projectDir.resolve("settings.gradle.kts"))
+            includeBuild(projectDir) {
             }
-
-            var skipDependencies: List<String> = listOf()
-            projectDir.listFiles()?.forEach { outputDir ->
-                // for each child package, include it in this build
-                if (outputDir.resolve("build.gradle.kts").exists()) {
-                    val moduleName = outputDir.name
-                    logger.log(LogLevel.LIFECYCLE, "Skip module :${moduleName} added to project: ${outputDir}")
-                    include(":${moduleName}")
-                    project(":${moduleName}").projectDir = outputDir
-                    skipDependencies += ":${moduleName}"
-                }
-            }
-
-            // pass down the list of dynamic Skip dependencies to the app build
-            // we would prefer to use the `exta` property for this, but it doesn't seem to be readable in app/build.gradle.kts
-            System.setProperty("SKIP_DEPENDENCIES", skipDependencies.joinToString(separator = ":"))
             include(":app")
         }
 
@@ -1617,24 +1583,23 @@ extension FrameworkProjectLayout {
     }
 
 
-    static func createAppBuildGradle() -> String {
+    static func createAppBuildGradle(appModulePackage: String, appModuleName: String) -> String {
         """
         import java.io.FileInputStream
         import java.util.Properties
 
         plugins {
-            kotlin("android") version "1.9.0"
-            id("com.android.application") version "8.1.0"
+            alias(libs.plugins.kotlin.android)
+            alias(libs.plugins.android.application)
         }
 
         val keystorePropertiesFile = file("keystore.properties")
 
         android {
-            compileSdk = 34
+            compileSdk = libs.versions.android.sdk.compile.get().toInt()
             defaultConfig {
-                minSdk = 29
-                targetSdk = 34
-                testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+                minSdk = libs.versions.android.sdk.min.get().toInt()
+
                 manifestPlaceholders["PRODUCT_NAME"] = prop("PRODUCT_NAME")
                 manifestPlaceholders["PRODUCT_BUNDLE_IDENTIFIER"] = prop("PRODUCT_BUNDLE_IDENTIFIER")
                 manifestPlaceholders["MARKETING_VERSION"] = prop("MARKETING_VERSION")
@@ -1661,6 +1626,7 @@ extension FrameworkProjectLayout {
                     }
                 }
             }
+
             buildTypes {
                 release {
                     signingConfig = signingConfigs.findByName("release")
@@ -1670,48 +1636,15 @@ extension FrameworkProjectLayout {
                     proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
                 }
             }
-            composeOptions {
-                kotlinCompilerExtensionVersion = "1.5.1"
-            }
             namespace = group as String
+
             compileOptions {
-                sourceCompatibility = JavaVersion.VERSION_17
-                targetCompatibility = JavaVersion.VERSION_17
+                sourceCompatibility = JavaVersion.toVersion(libs.versions.jvm.get())
+                targetCompatibility = JavaVersion.toVersion(libs.versions.jvm.get())
             }
-            testOptions {
-                unitTests {
-                    isIncludeAndroidResources = true
-                }
-            }
-        }
 
-        afterEvaluate {
-            dependencies {
-                // SKIP_DEPENDENCIES is set by the settings.gradle.kts as a list of the modules that were created as a result of the Skip build
-                var deps = prop(key = "DEPENDENCIES")
-                deps.split(":").filter { it.isNotEmpty() }.forEach { skipModuleName ->
-                    if (skipModuleName != "SkipUnit") {
-                        implementation(project(":" + skipModuleName))
-                    }
-                }
-            }
-        }
-
-        kotlin {
-            jvmToolchain(17)
-        }
-
-        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>() {
-            kotlinOptions {
-                suppressWarnings = true
-            }
-        }
-
-        tasks.withType<Test>().configureEach {
-            systemProperties.put("robolectric.logging", "stdout")
-            systemProperties.put("robolectric.graphicsMode", "NATIVE")
-            testLogging {
-                this.showStandardStreams = true
+            composeOptions {
+                kotlinCompilerExtensionVersion = libs.versions.kotlin.compose.compiler.extension.get()
             }
         }
 
@@ -1751,6 +1684,20 @@ extension FrameworkProjectLayout {
                         )
                     }
                 }
+            }
+        }
+
+        dependencies {
+            implementation("\(appModulePackage):\(appModuleName)")
+        }
+
+        kotlin {
+            jvmToolchain(libs.versions.jvm.get().toInt())
+        }
+
+        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>() {
+            kotlinOptions {
+                suppressWarnings = true
             }
         }
 

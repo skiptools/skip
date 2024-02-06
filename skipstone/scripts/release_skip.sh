@@ -106,7 +106,7 @@ cd -
 
 # make sure both private skipstone/ and public skip/ tests pass
 # disabled because the skip init tests fail
-#SKIPLOCAL=1 swift test --configuration debug --parallel --package-path ../skip/ 
+SKIPLOCAL=1 CI=1 swift test --configuration debug --parallel --package-path ../skip/ 
 
 swift test --configuration debug --parallel
 

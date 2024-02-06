@@ -781,7 +781,7 @@ final class SkipCommandTests: XCTestCase {
         cmd += moduleNames
 
         let created = try await skipstone(cmd).json()
-        XCTAssertEqual(created.array?.first, ["msg": .string("Initializing Skip library \(projectName)")])
+        XCTAssertEqual(created.array?.first, ["msg": .string("Initializing Skip \(appid == nil ? "library" : "application") \(projectName)")])
         // return the tree output, which is in the 2nd-to-last message
        return (projectURL: tmpDir.appendingPathComponent(projectName, isDirectory: true), projectTree: created.array?.dropLast().last?["msg"]?.string)
     }
