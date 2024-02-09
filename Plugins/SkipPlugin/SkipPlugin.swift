@@ -131,7 +131,7 @@ import PackagePlugin
         let outputURL = URL(fileURLWithPath: outputFolder.string, isDirectory: true)
         let sourceHashDot = "."
         let sourcehashOutputPath = Path(outputURL.appendingPathComponent(sourceHashDot + peerTarget.name + sourcehashExtension, isDirectory: false).path)
-        Diagnostics.remark("add sourcehash output for \(target.name): \(sourcehashOutputPath)", file: sourcehashOutputPath.string)
+        //Diagnostics.remark("add sourcehash output for \(target.name): \(sourcehashOutputPath)", file: sourcehashOutputPath.string)
 
         struct Dep : Identifiable {
             let package: Package
