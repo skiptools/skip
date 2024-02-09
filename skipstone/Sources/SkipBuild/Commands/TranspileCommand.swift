@@ -104,6 +104,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         // the module will be treated differently if it is an app versus a library (it will use the "com.android.application" plugin instead of "com.android.library")
         let AndroidManifestName = "AndroidManifest.xml"
 
+        // folders that can contain gradle plugins and scripts
+        let buildSrcFolderName = "buildSrc"
+
         let cmakeLists = projectFolderPath.appending(component: "CMakeLists.txt")
         let isCMakeProject = fs.exists(cmakeLists)
         if !isCMakeProject && !fs.isDirectory(skipFolderPath) {
@@ -196,6 +199,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         // always touch the sourcehash file with the most recent source hashes in order to update the output file time
         /// Create a link from the source to the destination; this is used for resources and custom Kotlin files in order to permit edits to target file and have them reflected in the original source
         func addLink(at linkSource: AbsolutePath, pointingAt destPath: AbsolutePath, relative: Bool) throws {
+            msg(.trace, "linking: \(linkSource) to: \(destPath)")
+
             let modTime = try? fs.getFileInfo(destPath).modTime
             try? fs.removeFileTree(linkSource) // remove any existing link in order to re-create it
             try fs.createSymbolicLink(addOutputFile(linkSource), pointingAt: destPath, relative: relative)
@@ -313,6 +318,14 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let transformers: [KotlinTransformer] = try createTransformers(for: baseSkipConfig, with: configMap)
 
         let overridden = try linkSkipFolder(skipFolderPath, to: kotlinOutputFolder, topLevel: true)
+
+        // the contents of a folder named "buildSrc" are linked at the top level to contain scripts and plugins
+        let buildSrcFolder = skipFolderPath.appending(component: buildSrcFolderName)
+        if fs.isDirectory(buildSrcFolder) {
+            // try addLink(at: moduleBasePath.appending(component: buildSrcFolderName), pointingAt: buildSrcFolder, relative: false)
+            try createMergedAbsoluteLinkTree(from: buildSrcFolder, to: moduleBasePath.appending(component: buildSrcFolderName))
+        }
+
         let overriddenKotlinFiles = overridden.map({ $0.basename })
 
         let transpiler = Transpiler(packageName: packageName, sourceFiles: sourceURLs.map(\.path).sorted().map(Source.FilePath.init(path:)), codebaseInfo: codebaseInfo, preprocessorSymbols: Set(inputOptions.symbols), transformers: transformers)
@@ -651,6 +664,11 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 if fileName.hasPrefix(".") {
                     continue // skip hidden files
                 }
+
+                if fileName == buildSrcFolderName {
+                    continue // the top-level "buildSrc" folder is linked higher up
+                }
+
                 let sourcePath = try AbsolutePath(path, validating: fileName)
                 let outputPath = try AbsolutePath(outputFilePath, validating: fileName)
 
@@ -752,6 +770,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
                 let sourcePath = try AbsolutePath(validating: resourceSourceURL.path)
 
+
                 // all resources get put into a single "Resources/" folder in the jar, so drop the first item and replace it with "Resources/"
                 let components = try RelativePath(validating: resourceSourceURL.relativePath).components.dropFirst(1)
                 let resourceSourcePath = try RelativePath(validating: components.joined(separator: "/"))
@@ -826,48 +845,67 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             // transpilation was successful; now set up links to the other output packages (located in different plug-in folders)
             let moduleBasePath = moduleRootPath.parentDirectory
 
-            /// Attempts to make a link from the `fromPath` to the given relative path.
-            /// If `fromPath` already exists and is a directory, attempt to create links for each of the contents of the directory to the updated relative folder
-            func createMergedLinkTree(from fromPath: AbsolutePath, to relative: String) throws {
-                let destPath = try AbsolutePath(validating: relative, relativeTo: fromPath.parentDirectory)
-                if !fs.isDirectory(destPath) {
-                    // skip over anything that is not a destination folder
-                    // if it doesn't exist at all, then it is an error
-                    if !fs.exists(destPath) {
-                        warn("Expected destination path did not exist: \(destPath)")
-                    }
-                    return
-                }
-                trace("creating merged link tree from: \(fromPath) to: \(relative)")
-                if fs.isSymlink(fromPath) {
-                    try fs.removeFileTree(fromPath) // clear any pre-existing symlink
-                }
-
-                // the folder is a directory; recurse into the destination paths in order to link to the local paths
-                if fs.isDirectory(fromPath) {
-                    for fsEntry in try fs.getDirectoryContents(destPath) {
-                        let fromSubPath = fromPath.appending(try RelativePath(validating: fsEntry))
-                        // bump up all the relative links to account for the folder we just recursed into.
-                        // e.g.: ../SomeSharedRoot/OtherModule/
-                        // becomes: ../../SomeSharedRoot/OtherModule/someFolder/
-                        try createMergedLinkTree(from: fromSubPath, to: "../" + relative + "/" + fsEntry)
-                    }
-                } else {
-                    try addLink(at: fromPath, pointingAt: destPath, relative: true)
-                }
-            }
 
             // for each of the specified link/path pairs, create symbol links, either to the base folders, or the the sub-folders that share a common root
             // this is the logic that allows us to merge two modules (like MyMod and MyModTests) into a single Kotlin module with the idiomatic src/main/kotlin/ and src/test/kotlin/ pair of folders
             for (linkModuleName, relativeLinkPath) in linkNamePaths {
                 let linkModulePath = try moduleBasePath.appending(RelativePath(validating: linkModuleName))
                 trace("relativeLinkPath: \(relativeLinkPath) moduleBasePath: \(moduleBasePath) linkModuleName: \(linkModuleName) -> linkModulePath: \(linkModulePath)")
-                try createMergedLinkTree(from: linkModulePath, to: relativeLinkPath)
+                try createMergedRelativeLinkTree(from: linkModulePath, to: relativeLinkPath)
                 dependentModules.append(linkModuleName)
             }
 
             return dependentModules
         }
+
+        /// Attempts to make a link from the `fromPath` to the given relative path.
+        /// If `fromPath` already exists and is a directory, attempt to create links for each of the contents of the directory to the updated relative folder
+        func createMergedRelativeLinkTree(from fromPath: AbsolutePath, to relative: String) throws {
+            let destPath = try AbsolutePath(validating: relative, relativeTo: fromPath.parentDirectory)
+            if !fs.isDirectory(destPath) {
+                // skip over anything that is not a destination folder
+                // if it doesn't exist at all, then it is an error
+                if !fs.exists(destPath) {
+                    warn("Expected destination path did not exist: \(destPath)")
+                }
+                return
+            }
+            trace("creating merged link tree from: \(fromPath) to: \(relative)")
+            if fs.isSymlink(fromPath) {
+                try fs.removeFileTree(fromPath) // clear any pre-existing symlink
+            }
+
+            // the folder is a directory; recurse into the destination paths in order to link to the local paths
+            if fs.isDirectory(fromPath) {
+                for fsEntry in try fs.getDirectoryContents(destPath) {
+                    let fromSubPath = fromPath.appending(try RelativePath(validating: fsEntry))
+                    // bump up all the relative links to account for the folder we just recursed into.
+                    // e.g.: ../SomeSharedRoot/OtherModule/
+                    // becomes: ../../SomeSharedRoot/OtherModule/someFolder/
+                    try createMergedRelativeLinkTree(from: fromSubPath, to: "../" + relative + "/" + fsEntry)
+                }
+            } else {
+                try addLink(at: fromPath, pointingAt: destPath, relative: true)
+            }
+        }
+
+
+        func createMergedAbsoluteLinkTree(from fromPath: AbsolutePath, to destPath: AbsolutePath) throws {
+            trace("creating absolute merged link tree from: \(fromPath) to: \(destPath)")
+            // the folder is a directory; recurse into the destination paths in order to link to the local paths
+            if fs.isDirectory(fromPath) {
+                for fsEntry in try fs.getDirectoryContents(fromPath) {
+                    let rel = try RelativePath(validating: fsEntry)
+                    try createMergedAbsoluteLinkTree(from: fromPath.appending(rel), to: destPath.appending(rel))
+                }
+            } else if fs.isFile(fromPath) {
+                try addLink(at: destPath, pointingAt: fromPath, relative: false)
+            } else {
+                warn("unknown file type encountered when creating lines: \(fromPath)")
+            }
+        }
+
+
     }
 
     /// Generate transpiler transformers from the given skip config
