@@ -48,6 +48,7 @@ private final class EscapeKeywordsVisitor {
         } else if let node = node as? KotlinMemberAccess {
             node.member = fixKeyword(name: node.member)
         } else if let node = node as? KotlinFunctionDeclaration {
+            node.name = fixKeyword(name: node.name)
             node.parameters = node.parameters.map(fixParameter)
         } else if let node = node as? KotlinFunctionCall {
             node.arguments = node.arguments.map(fixLabeledArgument)

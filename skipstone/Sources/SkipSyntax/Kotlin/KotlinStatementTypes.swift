@@ -1976,6 +1976,10 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
         guard isStatic && visibility != .private, let companion else {
             return
         }
+        // We can't delegate to an unavailable API
+        guard !attributes.contains(.unavailable) else {
+            return
+        }
         attributes.append(to: output, indentation: indentation)
         annotations.appendLines(to: output, indentation: indentation)
         output.append(indentation)
@@ -1997,7 +2001,7 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
     private func appendFunctionDeclaration(to output: OutputGenerator, indentation: Indentation, isDelegatingToCompanion: Bool) -> Bool {
         var forceOverride = false
         if role != .local {
-            forceOverride = !isDelegatingToCompanion && isStatic && modifiers.visibility != .private && companion?.1.isClass == true
+            forceOverride = !isDelegatingToCompanion && isStatic && modifiers.visibility != .private && companion?.1.isClass == true && !attributes.contains(.unavailable)
             if forceOverride {
                 output.append("override ")
             } else {
@@ -2806,6 +2810,10 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         guard isStatic && visibility != .private, let companion else {
             return
         }
+        // We can't delegate to an unavailable API
+        guard !attributes.contains(.unavailable) else {
+            return
+        }
         appendDeclaration(to: output, indentation: indentation, isDelegatingToCompanion: true)
         if isAppendAsFunction {
             output.append(" = ").append(companion.0.name).append(".").append(propertyName).append("()")
@@ -2828,7 +2836,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         annotations.appendLines(to: output, indentation: indentation)
         output.append(indentation)
         if role.isProperty || role == .global {
-            if !isDelegatingToCompanion && isStatic && visibility != .private && companion?.1.isClass == true {
+            if !isDelegatingToCompanion && isStatic && visibility != .private && companion?.1.isClass == true && !attributes.contains(.unavailable) {
                 output.append("override ")
             } else {
                 output.append(modifiers.kotlinMemberString(isGlobal: role == .global, isOpen: isOpen || isDelegatingToCompanion, suffix: " "))
