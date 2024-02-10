@@ -99,6 +99,16 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
     }
 
     private func transpile(root rootPath: AbsolutePath, project projectFolderPath: AbsolutePath, module moduleRootPath: AbsolutePath, skip skipFolderPath: AbsolutePath, output outputFolderPath: AbsolutePath, fs: FileSystem, with out: MessageQueue) async throws {
+        do {
+            try await transpileThrows(root: rootPath, project: projectFolderPath, module: moduleRootPath, skip: skipFolderPath, output: outputFolderPath, fs: fs, with: out)
+        } catch {
+            // ensure that the error is logged in some way before failing
+            self.error("An error occurred while performing transpilation: \(error.localizedDescription)")
+            throw error
+        }
+    }
+
+    private func transpileThrows(root rootPath: AbsolutePath, project projectFolderPath: AbsolutePath, module moduleRootPath: AbsolutePath, skip skipFolderPath: AbsolutePath, output outputFolderPath: AbsolutePath, fs: FileSystem, with out: MessageQueue) async throws {
         // the path that will contain the `skip.yml`
 
         // the module will be treated differently if it is an app versus a library (it will use the "com.android.application" plugin instead of "com.android.library")
@@ -198,7 +208,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         // always touch the sourcehash file with the most recent source hashes in order to update the output file time
         /// Create a link from the source to the destination; this is used for resources and custom Kotlin files in order to permit edits to target file and have them reflected in the original source
-        func addLink(at linkSource: AbsolutePath, pointingAt destPath: AbsolutePath, relative: Bool) throws {
+        func addLink(_ linkSource: AbsolutePath, pointingAt destPath: AbsolutePath, relative: Bool) throws {
             msg(.trace, "linking: \(linkSource) to: \(destPath)")
 
             let modTime = try? fs.getFileInfo(destPath).modTime
@@ -284,7 +294,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             if fs.isSymlink(extLink) {
                 try fs.removeFileTree(extLink) // clear any pre-existing symlink
             }
-            try addLink(at: extLink, pointingAt: projectFolderPath, relative: false)
+            try addLink(extLink, pointingAt: projectFolderPath, relative: false)
             try saveCodebaseInfo() // save out the ModuleName.skipcode.json
             return
         }
@@ -322,8 +332,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         // the contents of a folder named "buildSrc" are linked at the top level to contain scripts and plugins
         let buildSrcFolder = skipFolderPath.appending(component: buildSrcFolderName)
         if fs.isDirectory(buildSrcFolder) {
-            // try addLink(at: moduleBasePath.appending(component: buildSrcFolderName), pointingAt: buildSrcFolder, relative: false)
-            try createMergedAbsoluteLinkTree(from: buildSrcFolder, to: moduleBasePath.appending(component: buildSrcFolderName))
+            // we link (recursively) the individual files in a mirror of the directory hierarchy
+            try createMirroredLinkTree(from: buildSrcFolder, to: moduleBasePath.appending(component: buildSrcFolderName))
         }
 
         let overriddenKotlinFiles = overridden.map({ $0.basename })
@@ -681,7 +691,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                         copiedFiles.insert(outputFilePath)
                         try fs.createDirectory(outputFilePath.parentDirectory, recursive: true) // ensure parent exists
                         // we make links instead of copying so the file can be edited from the gradle project structure without needing to be manually synchronized
-                        try addLink(at: outputFilePath, pointingAt: sourcePath, relative: false)
+                        try addLink(outputFilePath, pointingAt: sourcePath, relative: false)
                         info("\(outputFilePath.relative(to: moduleBasePath).pathString) override linked from project source \(sourcePath.pathString)", sourceFile: sourcePath.sourceFile)
                     }
                 }
@@ -820,7 +830,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                         if fs.isSymlink(destinationPath) {
                             try fs.removeFileTree(destinationPath) // clear any pre-existing symlink
                         }
-                        try addLink(at: destinationPath, pointingAt: sourcePath, relative: false)
+                        try addLink(destinationPath, pointingAt: sourcePath, relative: false)
                     }
                 }
             }
@@ -885,12 +895,13 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                     try createMergedRelativeLinkTree(from: fromSubPath, to: "../" + relative + "/" + fsEntry)
                 }
             } else {
-                try addLink(at: fromPath, pointingAt: destPath, relative: true)
+                try addLink(fromPath, pointingAt: destPath, relative: true)
             }
         }
 
 
-        func createMergedAbsoluteLinkTree(from fromPath: AbsolutePath, to destPath: AbsolutePath) throws {
+        /// Create a mirror hierarchy of the directory structure at `from` in the folder specified by `to`, and link each individual file in the hierarchy
+        func createMirroredLinkTree(from fromPath: AbsolutePath, to destPath: AbsolutePath) throws {
             trace("creating absolute merged link tree from: \(fromPath) to: \(destPath)")
             // the folder is a directory; recurse into the destination paths in order to link to the local paths
             if fs.isDirectory(fromPath) {
@@ -902,12 +913,12 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                     let destDir = destPath.appending(rel)
                     // we create output directories and link the contents, rather than just linking the folders themselves, since Gradle wants to be able to write to the output folders
                     try fs.createDirectory(destDir, recursive: true)
-                    try createMergedAbsoluteLinkTree(from: fromPath.appending(rel), to: destDir)
+                    try createMirroredLinkTree(from: fromPath.appending(rel), to: destDir)
                 }
             } else if fs.isFile(fromPath) {
                 trace("linking: at: \(destPath) pointingAt: \(fromPath)")
                 try? fs.removeFileTree(destPath) // need to re-create link if it aleady exists
-                try addLink(at: destPath, pointingAt: fromPath, relative: false)
+                try addLink(destPath, pointingAt: fromPath, relative: false)
             } else {
                 warn("unknown file type encountered when creating lines: \(fromPath)")
             }
