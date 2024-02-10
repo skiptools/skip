@@ -895,10 +895,17 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             // the folder is a directory; recurse into the destination paths in order to link to the local paths
             if fs.isDirectory(fromPath) {
                 for fsEntry in try fs.getDirectoryContents(fromPath) {
+                    if fsEntry.hasPrefix(".") {
+                        continue
+                    }
                     let rel = try RelativePath(validating: fsEntry)
-                    try createMergedAbsoluteLinkTree(from: fromPath.appending(rel), to: destPath.appending(rel))
+                    let destDir = destPath.appending(rel)
+                    // we create output directories and link the contents, rather than just linking the folders themselves, since Gradle wants to be able to write to the output folders
+                    try fs.createDirectory(destDir, recursive: true)
+                    try createMergedAbsoluteLinkTree(from: fromPath.appending(rel), to: destDir)
                 }
             } else if fs.isFile(fromPath) {
+                trace("linking: at: \(destPath) pointingAt: \(fromPath)")
                 try addLink(at: destPath, pointingAt: fromPath, relative: false)
             } else {
                 warn("unknown file type encountered when creating lines: \(fromPath)")
