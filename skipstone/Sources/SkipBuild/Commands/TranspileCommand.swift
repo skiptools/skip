@@ -906,6 +906,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 }
             } else if fs.isFile(fromPath) {
                 trace("linking: at: \(destPath) pointingAt: \(fromPath)")
+                try? fs.removeFileTree(destPath) // need to re-create link if it aleady exists
                 try addLink(at: destPath, pointingAt: fromPath, relative: false)
             } else {
                 warn("unknown file type encountered when creating lines: \(fromPath)")
