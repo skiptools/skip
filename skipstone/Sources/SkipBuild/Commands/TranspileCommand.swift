@@ -905,26 +905,23 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             trace("creating absolute merged link tree from: \(fromPath) to: \(destPath)")
             // the folder is a directory; recurse into the destination paths in order to link to the local paths
             if fs.isDirectory(fromPath) {
+                // we create output directories and link the contents, rather than just linking the folders themselves, since Gradle wants to be able to write to the output folders
+                try fs.createDirectory(destPath, recursive: true)
                 for fsEntry in try fs.getDirectoryContents(fromPath) {
                     if fsEntry.hasPrefix(".") {
                         continue
                     }
                     let rel = try RelativePath(validating: fsEntry)
                     let destDir = destPath.appending(rel)
-                    // we create output directories and link the contents, rather than just linking the folders themselves, since Gradle wants to be able to write to the output folders
-                    try fs.createDirectory(destDir, recursive: true)
                     try createMirroredLinkTree(from: fromPath.appending(rel), to: destDir)
                 }
             } else if fs.isFile(fromPath) {
-                trace("linking: at: \(destPath) pointingAt: \(fromPath)")
                 try? fs.removeFileTree(destPath) // need to re-create link if it aleady exists
                 try addLink(destPath, pointingAt: fromPath, relative: false)
             } else {
                 warn("unknown file type encountered when creating lines: \(fromPath)")
             }
         }
-
-
     }
 
     /// Generate transpiler transformers from the given skip config
