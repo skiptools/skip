@@ -1478,106 +1478,47 @@ extension FrameworkProjectLayout {
 
     static func createSettingsGradle() -> String {
         """
-        // This is the top-level Gradle settings for a Skip App project.
-        // It reads from the Skip.env file in the root of the project
-
-
-        // Use the properties in the Skip.env file for configuration
-        val parentFolder = file("..")
-        val envFile = parentFolder.resolve("Skip.env")
-        if (!envFile.exists()) {
-            throw GradleException("Skip.env file missing from ${parentFolder}")
-        }
-
-        val skipenv = loadSkipEnv(envFile)
-
-        // Use the shared ../.build/Android/ build folder as the gradle build output
-        val buildOutput = parentFolder.resolve(".build/Android/")
-        gradle.projectsLoaded {
-            rootProject.allprojects {
-                layout.buildDirectory.set(buildOutput.resolve(project.name))
-            }
-        }
-
-        rootProject.name = prop(key = "ANDROID_PACKAGE_NAME")
-        val swiftProjectName = prop(key = "SKIP_PROJECT_NAME")
-        val swiftModuleName = prop(key = "PRODUCT_NAME")
-
-        // Parse .env file into a map of strings
-        fun loadSkipEnv(file: File): Map<String, String> {
-            val envMap = mutableMapOf<String, String>()
-            file.forEachLine { line ->
-                if (line.isNotBlank() && line[0] != '#' && !line.startsWith("//")) {
-                    val parts = line.split("=", limit = 2)
-                    if (parts.size == 2) {
-                        val key = parts[0].trim()
-                        val value = parts[1].trim()
-                        envMap[key] = value
-                    }
-                }
+        // This gradle project is part of a conventional Skip app project.
+        // It invokes the shared build skip plugin logic, which included as part of the skip-unit buildSrc
+        // When built from Xcode, it uses the BUILT_PRODUCTS_DIR folder to share the same build outputs as Xcode, otherwise it uses SwiftPM's .build/ folder
+        pluginManagement {
+            // local override of BUILT_PRODUCTS_DIR
+            if (System.getenv("BUILT_PRODUCTS_DIR") == null) {
+                //System.setProperty("BUILT_PRODUCTS_DIR", "${System.getProperty("user.home")}/Library/Developer/Xcode/DerivedData/Skip-Everything-aqywrhrzhkbvfseiqgxuufbdwdft/Build/Products/Debug-iphonesimulator")
             }
 
-            // Set system properties prefixed with SKIP_ for each key-value pair in the .env file
-            // access with getProperty("SKIP_PRODUCT_BUNDLE_IDENTIFIER")
-            envMap.forEach { (key, value) ->
-                System.setProperty("SKIP_" + key, value)
-            }
+            // the source for the plugin is linked as part of the SkipUnit transpilation
+            val skipOutput = System.getenv("BUILT_PRODUCTS_DIR") ?: System.getProperty("BUILT_PRODUCTS_DIR")
 
-            return envMap
-        }
-
-
-        fun prop(key: String): String {
-            val value = System.getProperty("SKIP_" + key, System.getenv(key))
-            if (value == null) {
-                throw GradleException("Required key ${key} is not set in environment or Skip.env")
-            }
-            return value
-        }
-
-        // After the settings have been evaluated, resolve the Skip transpilation output folders
-        gradle.settingsEvaluated {
-            // When running from Xcode, the BUILT_PRODUCTS_DIR environment
-            // variable will point to the project's DerivedData path, like:
-            // ~/Library/Developer/Xcode/DerivedData/NAME-HASH/Build/Products/Debug-iphonesimulator
-            //
-            // When unset, we assume using the local SwiftPM .build folder, and
-            // will invoke `swift build` to perform transpilation at the
-            // beginning of the build
-            var builtProductsDir = System.getenv("BUILT_PRODUCTS_DIR")
-
-            // In order to build and debug in an IDE using locally-sourced modules,
-            // temporarily override this setting with the known-local BUILT_PRODUCTS_DIR,
-            // which can be found in Xcode's Reports Navigator Build log for the app in the
-            // environment settings list of the "Run custom shell script 'Run skip gradle'" log entry
-            // builtProductsDir = "/Users/marc/Library/Developer/Xcode/DerivedData/Skip-App-aqywrhrzhkbvfseiqgxuufbdwdft/Build/Products/Debug-iphonesimulator"
-
-            var skipOutputs: File
-            if (builtProductsDir != null) {
+            val outputExt = if (skipOutput != null) ".output" else "" // Xcode saves output in package-name.output; SPM has no suffix
+            val skipOutputs: File = if (skipOutput != null) {
                 // BUILT_PRODUCTS_DIR is set when building from Xcode, in which case we will use Xcode's DerivedData plugin output
-                skipOutputs = file(builtProductsDir).resolve("../../../SourcePackages/plugins/")
+                file(skipOutput).resolve("../../../SourcePackages/plugins/")
             } else {
-                // SPM output folder is a peer of the parent Package.swift
-                skipOutputs = parentFolder.resolve(".build/plugins/outputs/")
-
-                // not running from xcode, so fork swift to build locally to ../.build/
                 exec {
-                    logger.log(LogLevel.LIFECYCLE, "Skip transpile swift to kotlin")
+                    // create transpiled Kotlin and generate Gradle projects from SwiftPM modules
                     commandLine("swift", "build")
+                    workingDir = file("..")
                 }
+                // SPM output folder is a peer of the parent Package.swift
+                rootDir.resolve("../.build/plugins/outputs/")
             }
 
-            val outputExt = if (builtProductsDir != null) ".output" else ""
-            val projectDir = skipOutputs
-                .resolve(swiftProjectName + outputExt)
-                .resolve(swiftModuleName)
-                .resolve("skipstone")
-
-            apply(projectDir.resolve("settings.gradle.kts"))
-            includeBuild(projectDir) {
+            // load the Skip plugin (part of the skip-unit project), which handles configuring the Android project
+            // because this path is a symlink, we need to use the canonical path or gradle will mis-interpret it as a different build source
+            val pluginSource = skipOutputs.resolve("skip-unit${outputExt}/SkipUnit/skipstone/buildSrc/").canonicalFile
+            if (!pluginSource.isDirectory) {
+                throw GradleException("Missing expected Skip output folder: ${pluginSource}. Run `swift build` in the root folder to create, or specify Xcode environment BUILT_PRODUCTS_DIR.")
             }
-            include(":app")
+            includeBuild(pluginSource.path) {
+                name = "skip-plugins"
+            }
         }
+
+        plugins {
+            id("skip-plugin") apply true
+        }
+
 
         """
     }
@@ -1585,40 +1526,53 @@ extension FrameworkProjectLayout {
 
     static func createAppBuildGradle(appModulePackage: String, appModuleName: String) -> String {
         """
-        import java.io.FileInputStream
         import java.util.Properties
 
         plugins {
             alias(libs.plugins.kotlin.android)
             alias(libs.plugins.android.application)
+            id("skip-build-plugin")
         }
 
-        val keystorePropertiesFile = file("keystore.properties")
+        skip {
+        }
+
+        kotlin {
+            jvmToolchain(libs.versions.jvm.get().toInt())
+        }
 
         android {
+            namespace = group as String
             compileSdk = libs.versions.android.sdk.compile.get().toInt()
+            compileOptions {
+                sourceCompatibility = JavaVersion.toVersion(libs.versions.jvm.get())
+                targetCompatibility = JavaVersion.toVersion(libs.versions.jvm.get())
+            }
+
             defaultConfig {
                 minSdk = libs.versions.android.sdk.min.get().toInt()
-
-                manifestPlaceholders["PRODUCT_NAME"] = prop("PRODUCT_NAME")
-                manifestPlaceholders["PRODUCT_BUNDLE_IDENTIFIER"] = prop("PRODUCT_BUNDLE_IDENTIFIER")
-                manifestPlaceholders["MARKETING_VERSION"] = prop("MARKETING_VERSION")
-                manifestPlaceholders["CURRENT_PROJECT_VERSION"] = prop("CURRENT_PROJECT_VERSION")
-                manifestPlaceholders["ANDROID_PACKAGE_NAME"] = prop("ANDROID_PACKAGE_NAME")
-                applicationId = manifestPlaceholders["PRODUCT_BUNDLE_IDENTIFIER"]?.toString()
-                versionCode = (manifestPlaceholders["CURRENT_PROJECT_VERSION"]?.toString())?.toInt()
-                versionName = manifestPlaceholders["MARKETING_VERSION"]?.toString()
+                // skip.tools.skip-build-plugin will automatically use Skip.env properties for:
+                // applicationId = PRODUCT_BUNDLE_IDENTIFIER
+                // versionCode = CURRENT_PROJECT_VERSION
+                // versionName = MARKETING_VERSION
             }
+
             buildFeatures {
                 buildConfig = true
                 compose = true
             }
+
+            composeOptions {
+                kotlinCompilerExtensionVersion = libs.versions.kotlin.compose.compiler.extension.get()
+            }
+
+            // default signing configuration tries to load from keystore.properties
             signingConfigs {
-                if (keystorePropertiesFile.exists()) {
+                val keystorePropertiesFile = file("keystore.properties")
+                if (keystorePropertiesFile.isFile) {
                     create("release") {
                         val keystoreProperties = Properties()
-                        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
-
+                        keystoreProperties.load(keystorePropertiesFile.inputStream())
                         keyAlias = keystoreProperties.getProperty("keyAlias")
                         keyPassword = keystoreProperties.getProperty("keyPassword")
                         storeFile = file(keystoreProperties.getProperty("storeFile"))
@@ -1632,72 +1586,9 @@ extension FrameworkProjectLayout {
                     signingConfig = signingConfigs.findByName("release")
                     isMinifyEnabled = true
                     isShrinkResources = true
-                    isDebuggable = false
+                    isDebuggable = false // can be set to true for debugging release build, but needs to be false when uploading to store
                     proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
                 }
-            }
-            namespace = group as String
-
-            compileOptions {
-                sourceCompatibility = JavaVersion.toVersion(libs.versions.jvm.get())
-                targetCompatibility = JavaVersion.toVersion(libs.versions.jvm.get())
-            }
-
-            composeOptions {
-                kotlinCompilerExtensionVersion = libs.versions.kotlin.compose.compiler.extension.get()
-            }
-        }
-
-        fun prop(key: String): String {
-            val value = System.getProperty("SKIP_" + key, System.getenv(key))
-            if (value == null) {
-                throw GradleException("Required key ${key} is not set")
-            }
-            return value
-        }
-
-        // add the "launchDebug" and "launchRelease" commands
-        listOf("Debug", "Release").forEach { buildType ->
-            task("launch" + buildType) {
-                dependsOn("install" + buildType)
-
-                doLast {
-                    val activity = prop("PRODUCT_BUNDLE_IDENTIFIER") + "/" + prop("ANDROID_PACKAGE_NAME") + ".MainActivity"
-
-                    var adbCommand = "adb"
-                    if (org.gradle.internal.os.OperatingSystem.current().isWindows) {
-                        adbCommand += ".exe"
-                    }
-
-                    exec {
-                        commandLine = listOf(
-                            adbCommand,
-                            "shell",
-                            "am",
-                            "start",
-                            "-a",
-                            "android.intent.action.MAIN",
-                            "-c",
-                            "android.intent.category.LAUNCHER",
-                            "-n",
-                            "$activity"
-                        )
-                    }
-                }
-            }
-        }
-
-        dependencies {
-            implementation("\(appModulePackage):\(appModuleName)")
-        }
-
-        kotlin {
-            jvmToolchain(libs.versions.jvm.get().toInt())
-        }
-
-        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>() {
-            kotlinOptions {
-                suppressWarnings = true
             }
         }
 
