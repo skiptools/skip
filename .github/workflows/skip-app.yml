@@ -148,7 +148,6 @@ jobs:
           cd -
 
       - name: Prepare Artifacts
-        if: startsWith(github.ref, 'refs/tags/')
         run: |
           APPNAME="${SKIP_MODULE}"
 
