@@ -49,13 +49,15 @@ jobs:
 
       - name: Setup
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
+          # convert "refs/tags/1.0.0" to "1.0.0"
+          # and "refs/heads/main" to "main"
+          TAG=${GITHUB_REF#refs/*/}
           # the version if it matches the semantic tag pattern, otherwise "dev"
           echo "RELTAG=${TAG:-'dev'}" >> $GITHUB_ENV
           # the path to generate the artifacts (.ipa, .apk, etc.)
           echo "RELDIR=Skip/build/artifacts" >> $GITHUB_ENV
 
-          echo "COMMIT_DATE=$(git log -1 --format=%ad --date=iso-strict ${GITHUB_REF#refs/tags/})" >> $GITHUB_ENV
+          echo "COMMIT_DATE=$(git log -1 --format=%ad --date=iso-strict ${TAG})" >> $GITHUB_ENV
 
           # the primary skip module is the first product name
           #SKIP_MODULE=$(swift package dump-package | jq -r '.products[0].name')

@@ -107,11 +107,11 @@ jobs:
           test -n "${PACKAGE}"
           MODULE=$(swift package dump-package | jq -r '.targets[0].name')
           test -n "${MODULE}"
-          COMMIT_DATE=$(git log -1 --format=%ad --date=iso-strict ${GITHUB_REF#refs/tags/})
+          COMMIT_DATE=$(git log -1 --format=%ad --date=iso-strict ${GITHUB_REF#refs/*/})
           test -n "${COMMIT_DATE}"
 
           # the tag is the most recent GitHub ref
-          TAG="${GITHUB_REF#refs/tags/}"
+          TAG="${GITHUB_REF#refs/*/}"
           test -n "${TAG}"
 
           gradle assemble --project-dir .build/plugins/outputs/${PACKAGE}/${MODULE}Tests/skipstone -PbuildDir=.build/${MODULE}
