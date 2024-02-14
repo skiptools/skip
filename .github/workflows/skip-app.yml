@@ -165,6 +165,7 @@ jobs:
           APPMODULE="${APPNAME}"
           #APK="${APPMODULE}-release.apk"
           APK="app-release.apk"
+          APK_DEBUG="app-debug.apk"
           APK_UNSIGNED="app-release-unsigned.apk"
           # in case the APK has the -unsigned suffix, move it to the APK
           mv -v ${APK_UNSIGNED} ${APK} || true
@@ -182,7 +183,7 @@ jobs:
           ls -lah ${APK} ${IPA} ${APPZ}
 
           mv -v ${APK} ${APPNAME}-android-${RELTAG}.apk
-          #mv -v ${APPNAME}-debug.apk ${APPNAME}-android-${RELTAG}-debug.apk
+          mv -v ${APK_DEBUG} ${APPNAME}-android-${RELTAG}-debug.apk
           mv -v ${APPNAME}-Release.ipa ${APPNAME}-ios-${RELTAG}.ipa
           mv -v ${APPNAME}-Debug.ipa ${APPNAME}-ios-${RELTAG}-debug.ipa
 
