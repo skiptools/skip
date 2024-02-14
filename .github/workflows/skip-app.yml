@@ -199,6 +199,14 @@ jobs:
           # finally create the checksums file for everything remaining
           shasum -a 256 *.* > checksums.txt
 
+          # output file sizes to the GITHUB_STEP_SUMMARY
+          for file in *.*; do
+            fileSize=$(du -sh "$file" | cut -f1)
+            fileName=$(basename $file)
+            #echo "::set-output name=$fileName::$fileSize"
+            echo "$fileName: $fileSize" >> $GITHUB_STEP_SUMMARY
+          done
+
           # sign the checksums file
           #echo "$SKIP_SIGNING_KEY" | gpg --import
           #gpg --clearsign --yes --output checksums.txt.asc checksums.txt
