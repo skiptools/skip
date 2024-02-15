@@ -77,6 +77,7 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
             // Conditional on SkipDrive being imported
             GradleCommand.self,
             ADBCommand.self,
+            ExportCommand.self,
             DevicesCommand.self,
             AssembleCommand.self,
             RunCommand.self,
@@ -966,7 +967,7 @@ public struct PackageManifest : Hashable, Decodable {
     //public var toolsVersion: String // can be string or dict
     public var products: [Product]
     public var dependencies: [Dependency]
-    //public var targets: [Either<Target>.Or<String>]
+    public var targets: [Either<Target>.Or<String>]
     public var platforms: [SupportedPlatform]
     public var cModuleName: String?
     public var cLanguageStandard: String?
@@ -979,17 +980,56 @@ public struct PackageManifest : Hashable, Decodable {
             case system
         }
 
+        public var packageAccess: Bool?
         public var `type`: TargetType
         public var name: String
         public var path: String?
         public var excludedPaths: [String]?
-        //public var dependencies: [String]? // dict
         //public var resources: [String]? // dict
-        public var settings: [String]?
+        public var settings: [JSON]?
         public var cModuleName: String?
         // public var providers: [] // apt, brew, etc.
-    }
 
+        /*
+         "pluginUsages" : [
+                 {
+                   "plugin" : [
+                     "skipstone",
+                     "skip"
+                   ]
+                 }
+               ]
+         */
+        public var pluginUsages: [JSON]?
+
+        /*
+         "dependencies" : [
+                 {
+                   "byName" : [
+                     "LibCLibrary",
+                     null
+                   ]
+                 },
+                 {
+                   "product" : [
+                     "SkipFoundation",
+                     "skip-foundation",
+                     null,
+                     null
+                   ]
+                 },
+                 {
+                   "product" : [
+                     "SkipFFI",
+                     "skip-ffi",
+                     null,
+                     null
+                   ]
+                 }
+               ]
+         */
+        public var dependencies: [JSON]?
+    }
 
     public struct Product : Hashable, Decodable {
         //public var `type`: ProductType // can be string or dict
@@ -1011,6 +1051,25 @@ public struct PackageManifest : Hashable, Decodable {
     public struct SupportedPlatform : Hashable, Decodable {
         var platformName: String
         var version: String
+    }
+}
+
+
+/// An incomplete representation of Package.resolved JSON.
+public struct PackageResolved : Hashable, Decodable {
+    public var version: Int
+    public var pins: [Pin]
+
+    public struct Pin : Hashable, Decodable {
+        public var identity: String
+        public var kind: String
+        public var location: String
+        public var state: State
+
+        public struct State: Hashable, Decodable {
+            public var revision: String
+            public var version: String
+        }
     }
 }
 

@@ -9,7 +9,7 @@ struct DevicesCommand: SkipCommand, StreamingCommand, OutputOptionsCommand, Tool
     
     static var configuration = CommandConfiguration(
         commandName: "devices",
-        abstract: "List running emulators/simulators and connected devices",
+        abstract: "List connected devices and emulators/simulators",
         shouldDisplay: true)
 
     @OptionGroup(title: "Tool Options")
