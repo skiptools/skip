@@ -31,8 +31,19 @@ jobs:
       - name: Verify Skip Framework
         run: skip verify
 
-      - name: Gradle assemble
-        run: test ! -f settings.gradle.kts || (gradle assemble && ls -lah .build/plugins/outputs/*/*/skipstone/*/build/outputs/aar/*.aar)
+      - name: Export project
+        run: |
+          skip export
+
+          # output exported AAR sizes table to the job summary
+          echo "Artifact | Size" >> $GITHUB_STEP_SUMMARY
+          echo "--- | ---" >> $GITHUB_STEP_SUMMARY
+          for file in `find .build/skip-export/artifacts/ -name '*.aar'`; do
+            fileSize=$(du -sh "$file" | cut -f1)
+            fileName=$(basename $file)
+            echo "\`$fileName\` | \`$fileSize\`" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
 
       - name: Test iOS (connected)
         run: |
@@ -43,6 +54,7 @@ jobs:
 
       - name: Test macOS & Robolectric (local)
         run: skip test --verbose
+
 
       - name: Prepare Android emulator
         run: |
