@@ -8,6 +8,9 @@
       location = "group:../skip">
    </FileRef>
    <FileRef
+      location = "group:../skip-unit">
+   </FileRef>
+   <FileRef
       location = "group:../skip-lib">
    </FileRef>
    <FileRef

@@ -70,6 +70,7 @@ enum KotlinCompanionType {
 
 enum KotlinDirectiveAttribute: String {
     case nocopy
+    case nodispatch
 }
 
 /// The type of return statement expected from a code block.

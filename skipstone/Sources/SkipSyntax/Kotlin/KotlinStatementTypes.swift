@@ -1698,6 +1698,9 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
     var isLessThanImplementation: Bool {
         return name == "<" && modifiers.isStatic && parameters.count == 2
     }
+    var isNoDispatch: Bool {
+        return attributes.kotlinHasDirective(.nodispatch)
+    }
 
     enum Role {
         case local
@@ -1887,7 +1890,7 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
                 // have symbols. It also makes functions symmetrical with the behavior of arrays and of mutable properties
                 body.updateWithExpectedReturn(.sref(nil))
             }
-            if asyncBehavior != .sync && body.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) {
+            if asyncBehavior != .sync && !kstatement.isNoDispatch && body.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) {
                 kstatement.hasAsyncExplicitReturn = true
             }
         }
@@ -2117,7 +2120,7 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
             return
         }
 
-        if apiFlags.contains(.async) {
+        if apiFlags.contains(.async) && !isNoDispatch {
             if apiFlags.contains(.mainActor) {
                 output.append(" = MainActor.run ")
             } else if isActorIsolated {

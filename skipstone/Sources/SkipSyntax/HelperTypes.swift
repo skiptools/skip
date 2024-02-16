@@ -140,6 +140,8 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
             switch attribute.kind {
             case .autoclosure:
                 apiFlags.insert(.autoclosure)
+            case .directive:
+                attributes.append(attribute)
             case .mainActor:
                 apiFlags.insert(.mainActor)
             case .viewBuilder:

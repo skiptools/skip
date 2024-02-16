@@ -148,7 +148,7 @@ struct StatementExtras {
                     directiveLines.append(String(trimmedLine.dropFirst(declarationPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
                 } else if trimmedLine.hasPrefix(attributesPrefix) {
                     directive = .attributes([])
-                    directiveLines.append(String(trimmedLine.dropFirst(declarationPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
+                    directiveLines.append(String(trimmedLine.dropFirst(attributesPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
                 } else if trimmedLine.hasPrefix(noWarnPrefix) {
                     directives.append(.nowarn)
                     isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective

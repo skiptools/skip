@@ -569,13 +569,28 @@ final class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
     var isAnonymousFunction = false
     var body: KotlinCodeBlock
     var hasReturnLabel = false
-    var isTaskClosure = false
     var useMultilineFormatting: Bool {
         guard labeledCaptureList.isEmpty else {
             return true
         }
         return !body.isSingleStatementAppendable(mode: isAnonymousFunction ? .function : .closure)
     }
+    var isNoDispatch: Bool {
+        get {
+            if let _isNoDispatch {
+                return _isNoDispatch
+            }
+            // Is this a parameter to a function marked as 'nodispatch'?
+            guard case .function(_, _, _, let attributes) = (parent as? KotlinFunctionCall)?.apiMatch?.signature else {
+                return false
+            }
+            return attributes?.kotlinHasDirective(.nodispatch) == true
+        }
+        set {
+            _isNoDispatch = newValue
+        }
+    }
+    private var _isNoDispatch: Bool?
 
     static func translate(expression: Closure, translator: KotlinTranslator) -> KotlinClosure {
         let labeledCaptureList = expression.captureList.compactMap { (capture: (CaptureType, LabeledValue<Expression>)) -> LabeledValue<KotlinExpression>? in
@@ -712,9 +727,8 @@ final class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
     }
 
     private func appendClosure(to output: OutputGenerator, indentation: Indentation) {
-        // Tasks establish the correct async context on launch, so no need to output as async if we're a task closure.
-        // Otherwise, output with the correct context if we're async or if we need to jump to the main actor
-        let isAsync = !isTaskClosure && (apiFlags?.contains(.async) == true || mainActorMode.output != .none)
+        // Output with the correct context if we're async or if we need to jump to the main actor
+        let isAsync = !isNoDispatch && (apiFlags?.contains(.async) == true || mainActorMode.output != .none)
         let isMainActor = isAsync && apiFlags?.contains(.mainActor) == true
         let returnLabel = hasReturnLabel ? "\(Self.returnLabel)@" : ""
         if !isAsync {

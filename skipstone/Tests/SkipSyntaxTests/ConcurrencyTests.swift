@@ -189,6 +189,7 @@ final class ConcurrencyTests: XCTestCase {
     func testMainActorRun() async throws {
         let supportingSwift = """
         class MainActor {
+            // SKIP ATTRIBUTES: nodispatch
             static func run<T>(body: () throws -> T) async -> T {
                 fatalError()
             }
@@ -442,6 +443,65 @@ final class ConcurrencyTests: XCTestCase {
         internal suspend fun f(): Int = Async.run l@{
             val task = Task(isMainActor = true) l@{ return@l 10 }
             return@l task.value()
+        }
+        """)
+    }
+
+    func testTaskGroup() async throws {
+        let supportingSwift = """
+        struct ThrowingTaskGroup<ChildTaskResult, Failure> where Failure : Error {
+            // SKIP ATTRIBUTES: nodispatch
+            public mutating func addTask(priority: TaskPriority? = nil, operation: () async throws -> ChildTaskResult) {
+            }
+        }
+        // SKIP ATTRIBUTES: nodispatch
+        func withThrowingTaskGroup<ChildTaskResult, GroupResult>(of childTaskResultType: ChildTaskResult.Type, returning returnType: GroupResult.Type? = nil, body: (ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult) async rethrows -> GroupResult {
+            fatalError()
+        }
+        func delayedInt(millis: Int) async -> Int {
+            return millis
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f() async -> [Int] {
+            return try await withThrowingTaskGroup(of: Int.self) { group in
+                group.addTask {
+                    return try await delayedInt(millis: 200)
+                }
+                group.addTask {
+                    return try await delayedInt(millis: 100)
+                }
+                group.addTask {
+                    return try await delayedInt(millis: 400)
+                }
+                var results: [Int] = []
+                for try await result in group {
+                    results.append(result)
+                }
+                return results
+            }
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        internal suspend fun f(): Array<Int> = Async.run l@{
+            return@l withThrowingTaskGroup(of = Int::class) l@{ group ->
+                group.addTask l@{
+                    return@l delayedInt(millis = 200)
+                }
+                group.addTask l@{
+                    return@l delayedInt(millis = 100)
+                }
+                group.addTask l@{
+                    return@l delayedInt(millis = 400)
+                }
+                var results: Array<Int> = arrayOf()
+                for (result in group.sref()) {
+                    results.append(result)
+                }
+                return@l results
+            }
         }
         """)
     }

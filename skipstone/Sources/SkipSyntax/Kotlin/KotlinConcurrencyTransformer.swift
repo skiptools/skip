@@ -34,7 +34,7 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
                 if !taskClosureIdentifiers.contains(ObjectIdentifier(closure)) {
                     updateClosure(closure, codebaseInfo: codebaseInfo)
                 }
-                if closure.isTaskClosure || closure.apiFlags?.contains(.async) == true {
+                if closure.isNoDispatch || closure.apiFlags?.contains(.async) == true {
                     updateNestingClosures(in: closure.body)
                 }
             } else if let functionCall = node as? KotlinFunctionCall {
@@ -66,15 +66,8 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
                 if let closure = taskClosure(in: functionCall, source: source) {
                     // Task.detached always launches with the default dispatcher. Only a closure with a specified actor needs to dispatch itself
                     if closure.apiFlags?.contains(.mainActor) != true {
-                        closure.isTaskClosure = true
+                        closure.isNoDispatch = true
                     }
-                    return closure
-                }
-            } else if memberAccess.member == "run" && memberAccess.isBaseType(named: "MainActor", moduleName: "Swift") {
-                if let closure = taskClosure(in: functionCall, source: source) {
-                    // MainActor.run always uses the main dispatcher. The closure does not have to dispatch itself.
-                    // NOTE: Should MainActor.run also mark the closure as .mainActor for actor inheritance within its body?
-                    closure.isTaskClosure = true
                     return closure
                 }
             }
@@ -103,7 +96,7 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
             functionCall.arguments.insert(LabeledValue(label: "isMainActor", value: KotlinBooleanLiteral(literal: true)), at: 0)
         }
         // The closure itself does not need to specify a dispatch
-        closure.isTaskClosure = true
+        closure.isNoDispatch = true
     }
 
     private func updateClosure(_ closure: KotlinClosure, codebaseInfo: CodebaseInfo.Context?) {
@@ -183,8 +176,10 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
 
 extension KotlinConcurrencyTransformer: KotlinTypeSignatureOutputTransformer {
     static func outputSignature(for signature: TypeSignature) -> TypeSignature {
-        if signature.isNamed("Task", moduleName: "Swift") && signature.generics.count == 2 {
+        if (signature.isNamed("Task", moduleName: "Swift") || signature.isNamed("ThrowingTaskGroup", moduleName: "Swift")) && signature.generics.count == 2 {
             return signature.withGenerics([signature.generics[0]])
+        } else if signature.isNamed("ThrowingDiscardingTaskGroup", moduleName: "Swift") && signature.generics.count == 1 {
+            return signature.withGenerics([])
         } else {
             return signature
         }
