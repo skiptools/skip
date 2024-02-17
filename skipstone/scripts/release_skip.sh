@@ -106,7 +106,7 @@ cd -
 
 # make sure both private skipstone/ and public skip/ tests pass
 # disabled because the skip init tests fail
-SKIPLOCAL=1 CI=1 swift test --configuration debug --parallel --package-path ../skip/ 
+#SKIPLOCAL=${PWD} swift test --configuration debug --parallel --package-path ../skip/ 
 
 swift test --configuration debug --parallel
 
@@ -165,7 +165,7 @@ cd ${SKIPPKGDIR}
 
 #SKIP_ARTIFACT_ZIP="skip.zip"
 #echo "Building ${SKIP_ARTIFACT_ZIP}"
-#SKIPLOCAL=.. swift build --arch arm64 --arch x86_64 --configuration ${SKIPCONFIG} --product skip
+#SKIPLOCAL=${PWD}/../skipstone swift build --arch arm64 --arch x86_64 --configuration ${SKIPCONFIG} --product skip
 
 #cd .build/apple/Products/${SKIPCONFIG}/
 ## ensure we can run the skip command

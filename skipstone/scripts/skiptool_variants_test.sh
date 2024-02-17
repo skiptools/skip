@@ -9,7 +9,7 @@ echo "EXTERNAL DEBUG PASSED"
 swift test -c release --filter testSkipTool
 echo "EXTERNAL RELEASE PASSED"
 
-SKIPLOCAL=.. swift test --filter testSkipTool
+SKIPLOCAL=${PWD}/../skipstone swift test --filter testSkipTool
 echo "INTERNAL DEBUG PASSED"
 
 swift test -c release --filter testSkipTool
