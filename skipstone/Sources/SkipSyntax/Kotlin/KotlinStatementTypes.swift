@@ -1856,7 +1856,7 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
                 kstatement.convertToGenericFunction(owningTypeDeclaration, generics: owningSignature.generics, translator: translator)
             }
             // Within a type C<T>, convert any references to C<none> into C<T>
-            let withUnknownGenerics: TypeSignature = .named(owningTypeDeclaration.name, owningTypeDeclaration.generics.entries.map { _ in TypeSignature.none })
+            let withUnknownGenerics = owningTypeDeclaration.signature.withGenerics(owningTypeDeclaration.generics.entries.map { _ in TypeSignature.none })
             kstatement.returnType = kstatement.returnType.mappingTypes(from: [withUnknownGenerics], to: [owningSignature])
             kstatement.parameters = kstatement.parameters.map {
                 var parameter = $0
@@ -2655,7 +2655,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
                     kstatement.messages.append(.kotlinGenericExtensionStaticMember(kstatement, source: translator.syntaxTree.source))
                 }
                 // Within a type C<T>, convert any references to C<none> into C<T>
-                let withUnknownGenerics: TypeSignature = .named(owningTypeDeclaration.name, owningTypeDeclaration.generics.entries.map { _ in TypeSignature.none })
+                let withUnknownGenerics = owningTypeDeclaration.signature.withGenerics(owningTypeDeclaration.generics.entries.map { _ in TypeSignature.none })
                 kstatement.declaredType = kstatement.declaredType.mappingTypes(from: [withUnknownGenerics], to: [owningSignature])
             }
         } else if statement.isGlobal {

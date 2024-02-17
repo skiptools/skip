@@ -34,6 +34,31 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
+    func testNestedGenericClassForced() async throws {
+        try await check(swift: """
+        class A<T> {
+            // SKIP NOWARN
+            class B<T> {
+                // SKIP NOWARN
+                class C<T> {
+                }
+
+                func f(b: B.C<T>) {
+                }
+            }
+        }
+        """, kotlin: """
+        internal open class A<T> {
+            internal open class B<T> {
+                internal open class C<T> {
+                }
+
+                internal open fun f(b: A.B.C<T>) = Unit
+            }
+        }
+        """)
+    }
+
     func testExtension() async throws {
         try await check(supportingSwift: """
         protocol TypeDeclarationTestsProtocol {
