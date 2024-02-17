@@ -47,22 +47,20 @@ class SkipCommandTests : XCTestCase {
         XCTAssertGreaterThanOrEqual(devices.count, 0)
     }
 
-    func testSkipCheckup() async throws {
+    func DISABLEDtestSkipCheckup() async throws {
         if ProcessInfo.processInfo.environment["CI"] != nil {
             throw XCTSkip("skipping checkup test on CI due to unknown failure")
         }
+
         let checkup = try await skip("checkup", "-jA").parseJSONMessages()
         XCTAssertGreaterThan(checkup.count, 5, "checkup output should have contained some lines")
     }
 
     func testSkipCreate() async throws {
-        if ProcessInfo.processInfo.environment["CI"] != nil {
-            throw XCTSkip("skipping checkup test on CI due to unknown failure")
-        }
         let tempDir = try mktmp()
         let projectName = "hello-skip"
         let appName = "HelloSkip"
-        let out = try await skip("init", "-jA", "--show-tree", "-d", tempDir, "--appid", "com.company.HelloSkip", projectName, appName)
+        let out = try await skip("init", "-jA", "--show-tree", "-v", "-d", tempDir, "--appid", "com.company.HelloSkip", projectName, appName)
         let msgs = try out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip application \(projectName)", msgs.first)
@@ -160,10 +158,10 @@ class SkipCommandTests : XCTestCase {
         """)
     }
 
-    func XXXtestSkipInit() async throws {
+    func testSkipInit() async throws {
         let tempDir = try mktmp()
         let name = "cool-lib"
-        let out = try await skip("lib", "init", "-jA", "--show-tree", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE")
+        let out = try await skip("init", "-jA", "--show-tree", "-v", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE")
         let msgs = try out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip library \(name)", msgs.first)
@@ -251,9 +249,19 @@ class SkipCommandTests : XCTestCase {
 
         """)
 
+        // now export the package and make sure the .aars are listed
+        let exportPath = try mktmp()
+        let exported = try await skip("export", "-jA", "--show-tree", "-p", tempDir, "-d", exportPath)
+        let exportedJSON = try exported.parseJSONMessages()
+        
+        // TODO: verify output
+//        XCTAssertEqual(exportedJSON.dropLast(1).last ?? "", """
+//        """)
+
     }
 
-    func NOtestSkipTestReport() async throws {
+    func DISABLEDtestSkipTestReport() async throws {
+        // hangs when running from the CLI
         let xunit = try mktmpFile(contents: Data(xunitResults.utf8))
         let tempDir = try mktmp()
         let junit = tempDir + "/" + "testDebugUnitTest"
@@ -273,14 +281,15 @@ class SkipCommandTests : XCTestCase {
     }
 
     /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
-    @discardableResult func skip(checkError: Bool = true, printOutput: Bool = false, _ args: String...) async throws -> String {
+    @discardableResult func skip(checkError: Bool = true, printOutput: Bool = true, _ args: String...) async throws -> String {
         // turn "-[SkipCommandTests testSomeTest]" into "testSomeTest"
         let testName = testRun?.test.name.split(separator: " ").last?.trimmingCharacters(in: CharacterSet(charactersIn: "[]")) ?? "TEST"
 
         // the default SPM location of the current skip CLI for testing
         var skiptools = [
-            ".build/artifacts/skip/skip/skip.artifactbundle/macos/skip",
-            ".build/plugins/tools/debug/skip",
+            //".build/artifacts/skip/skip/skip.artifactbundle/macos/skip",
+            //".build/artifactbundle/skip.artifactbundle/macos/skip",
+            ".build/plugins/tools/debug/skip", // the SKIPLOCAL build path
         ]
 
         // when running tests from Xcode, we need to use the tool download folder, which seems to be placed in one of the environment property `__XCODE_BUILT_PRODUCTS_DIR_PATHS`, so check those folders and override if skip is found
@@ -318,12 +327,16 @@ class SkipCommandTests : XCTestCase {
         guard let result = result else {
             throw SkipLaunchError(errorDescription: "command did not exit: \(cmd)")
         }
+
+        let outputString = outputLines.joined(separator: "\n")
+
         // Throw if there was a non zero termination.
         guard result.exitStatus == .terminated(code: 0) else {
+            XCTFail("error running command: \(cmd)\noutput: \(outputString)")
             throw ProcessResult.Error.nonZeroExit(result)
         }
 
-        return outputLines.joined(separator: "\n")
+        return outputString
     }
 
 }

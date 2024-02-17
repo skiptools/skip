@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
   schedule:
-    - cron: '0 3,9,15,21 * * *'
+    - cron: '30 * * * *'
   workflow_dispatch:
 
 env:
@@ -14,9 +14,25 @@ jobs:
   skip-init:
     runs-on: macos-14
     steps:
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: release-candidate
+          generate-job-summary: false
+
+      - name: Checkout skipstone
+        uses: actions/checkout@v4
+        with:
+          repository: skiptools/skipstone
+          path: skipstone
+
       - name: Checkout skip
         uses: actions/checkout@v4
+        with:
+          repository: skiptools/skip
+          path: skip
 
-      - name: Test Skip
-        run: swift test
+      - name: Swift Test
+        working-directory: skip
+        run: SKIPLOCAL=${PWD}/../skipstone swift test
+
 
