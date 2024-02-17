@@ -772,14 +772,6 @@ extension ProcessInfo {
             #endif
         }
 
-        let JAVA_HOME = "JAVA_HOME"
-        if (env[JAVA_HOME] ?? "").isEmpty {
-            #if os(macOS)
-            // default to openjdk@17 if JAVA_HOME is unset
-            env[JAVA_HOME] = Self.defaultJavaHome
-            #endif
-        }
-
         return env
     }
 
