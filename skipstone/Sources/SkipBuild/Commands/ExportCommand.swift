@@ -45,8 +45,7 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
     func performCommand(with out: MessageQueue) async throws {
         let startTime = Date.now
 
-        let packageJSONString = try await run(with: out, "Read swift package", ["swift", "package", "dump-package", "--package-path", project]).get().stdout
-        let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
+        let packageJSON = try await parseSwiftPackage(with: out, at: project)
         let packageName: String = self.package ?? packageJSON.name
 
         if build == true {
@@ -88,19 +87,22 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
             //gradleArgs += ["-PbuildDir=" + buildFolderAbsolute.appending(component: "skip-export").pathString]
 
             let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths // environment that includes a default ANDROID_HOME
-            await run(with: out, "Assembling archive for \(moduleName)", ["gradle", "publishToMavenLocal"] + gradleArgs, environment: env)
+            await run(with: out, "Assemble archive for \(moduleName)", ["gradle", "publishToMavenLocal"] + gradleArgs, environment: env)
 
+            await outputOptions.monitor(with: out, "Export project for \(moduleName)", resultHandler: { result in
+                (result, MessageBlock(status: result?.messageStatusAny, "Export project for \(moduleName)"))
+            }) { log in
+                let projectOutputFolder = outputFolderAbsolute.appending(components: ["project", moduleName])
+                if fs.exists(projectOutputFolder) || fs.isDirectory(projectOutputFolder) {
+                    try fs.removeFileTree(projectOutputFolder)
+                }
+                try fs.createDirectory(projectOutputFolder.parentDirectory, recursive: true)
 
-            let projectOutputFolder = outputFolderAbsolute.appending(components: ["project", moduleName])
-            if fs.exists(projectOutputFolder) || fs.isDirectory(projectOutputFolder) {
-                try fs.removeFileTree(projectOutputFolder)
+                try FileManager.default.copyItem(at: skipOutputFolder.asURL, to: projectOutputFolder.asURL, traverseLinks: true, excludeNames: ["build"])
             }
-            try fs.createDirectory(projectOutputFolder.parentDirectory, recursive: true)
-
-            try FileManager.default.copyItem(at: skipOutputFolder.asURL, to: projectOutputFolder.asURL, traverseLinks: true, excludeNames: ["build"])
         }
 
-        await out.write(status: .pass, "Skip \(skipVersion) export to \(outputFolder) (\(startTime.timingSecondsSinceNow))")
+        await out.write(status: .pass, "Skip export \(packageName) to \((outputFolder as NSString).abbreviatingWithTildeInPath) (\(startTime.timingSecondsSinceNow))")
 
         if showTree {
             await showFileTree(in: outputFolderAbsolute, with: out)
