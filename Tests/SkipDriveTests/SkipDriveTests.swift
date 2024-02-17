@@ -48,10 +48,6 @@ class SkipCommandTests : XCTestCase {
     }
 
     func DISABLEDtestSkipCheckup() async throws {
-        if ProcessInfo.processInfo.environment["CI"] != nil {
-            throw XCTSkip("skipping checkup test on CI due to unknown failure")
-        }
-
         let checkup = try await skip("checkup", "-jA").out.parseJSONMessages()
         XCTAssertGreaterThan(checkup.count, 5, "checkup output should have contained some lines")
     }
@@ -60,7 +56,7 @@ class SkipCommandTests : XCTestCase {
         let tempDir = try mktmp()
         let projectName = "hello-skip"
         let appName = "HelloSkip"
-        let out = try await skip("init", "-jA", "--show-tree", "-d", tempDir, "--appid", "com.company.HelloSkip", projectName, appName)
+        let out = try await skip("init", "-jA", "-v", "--show-tree", "-d", tempDir, "--appid", "com.company.HelloSkip", projectName, appName)
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip application \(projectName)", msgs.first)
@@ -161,7 +157,7 @@ class SkipCommandTests : XCTestCase {
     func testSkipInit() async throws {
         let tempDir = try mktmp()
         let name = "cool-lib"
-        let out = try await skip("init", "-jA", "--show-tree", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE")
+        let out = try await skip("init", "-jA", "-v", "--show-tree", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE")
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip library \(name)", msgs.first)
@@ -329,12 +325,12 @@ class SkipCommandTests : XCTestCase {
             print("running: \(cmd.joined(separator: " "))")
         }
 
-        //let result = try await Process.popen(arguments: cmd, loggingHandler: nil)
-
         var outputLines: [AsyncLineOutput.Element] = []
         var result: ProcessResult? = nil
         var env = ProcessInfo.processInfo.environment
         env["TERM"] = "dumb" // override TERM to prevent skip from using ANSI colors or progress animations
+        env["SKIPLOCAL"] = nil // need to clear the sub-process SKIPLOCAL, since remote dependencies cannot use local paths (https://forums.swift.org/t/unable-to-integrate-a-remote-package-that-has-local-packages/53146/17)
+
         for try await outputLine in Process.streamLines(command: cmd, environment: env, includeStdErr: true, onExit: { result = $0 }) {
             if printOutput {
                 print("\(testName) [\(outputLine.err ? "stderr" : "stdout")]> \(outputLine.line)")
@@ -351,7 +347,7 @@ class SkipCommandTests : XCTestCase {
 
         // Throw if there was a non zero termination.
         guard result.exitStatus == .terminated(code: 0) else {
-            XCTFail("error running command: \(cmd)\noutput: \(stdoutString)")
+            XCTFail("error running command: \(cmd)\nenvironment:\n    \(env.sorted(by: { $0.key < $1.key }).map({ $0.key + ": " + $0.value }).joined(separator: "\n    "))\nSTDERR: \(stderrString)")
             throw ProcessResult.Error.nonZeroExit(result)
         }
 
