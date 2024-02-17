@@ -253,6 +253,7 @@ class SkipCommandTests : XCTestCase {
         let exportPath = try mktmp()
         let exported = try await skip("export", "-jA", "--show-tree", "-p", tempDir, "-d", exportPath)
         let exportedJSON = try exported.parseJSONMessages()
+        let _ = exportedJSON
         
         // TODO: verify output
 //        XCTAssertEqual(exportedJSON.dropLast(1).last ?? "", """
