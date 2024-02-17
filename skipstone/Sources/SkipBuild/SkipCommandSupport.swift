@@ -5,8 +5,8 @@ import SkipDriveExternal
 typealias ProcessResult = Void
 #endif
 
-/// The stream of lines that are output from the execution of a tool
-typealias AsyncLineOutput = AsyncCompactMapSequence<AsyncThrowingStream<Data, Error>, String>
+/// An async stream of standard out + err data resulting from process execution
+public typealias AsyncLineOutput = AsyncThrowingStream<(line: String, err: Bool), Swift.Error>
 
 extension ToolOptionsCommand {
     /// Executes `adb` with the current default arguments and the additional args and returns an async stream of the lines from the combined standard err and standard out.
@@ -32,10 +32,12 @@ extension ToolOptionsCommand {
 extension AsyncLineOutput {
     /// Gather all the output from the command and parse it as a single JSON blob into the given format
     func parseJSON<T: Decodable>() async throws -> T {
-        var lines = [String]()
+        var lines = [AsyncLineOutput.Element]()
         for try await line in self {
             lines.append(line)
         }
-        return try JSONDecoder().decode(T.self, from: lines.joined(separator: "\n").utf8Data)
+
+        let stdout = lines.filter({ $0.err == false }).map(\.line).joined(separator: "\n")
+        return try JSONDecoder().decode(T.self, from: stdout.utf8Data)
     }
 }

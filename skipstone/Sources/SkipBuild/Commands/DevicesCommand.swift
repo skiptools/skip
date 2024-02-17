@@ -51,7 +51,8 @@ struct DevicesCommand: SkipCommand, StreamingCommand, OutputOptionsCommand, Tool
         let adbDevicesPattern = try NSRegularExpression(pattern: #"^(\S+)\s+(\S+)(.*)$"#)
 
         var seenDevicesHeader = false
-        for try await line in try await launchTool("adb", arguments: ["devices", "-l"]) {
+        for try await pout in try await launchTool("adb", arguments: ["devices", "-l"]) {
+            let line = pout.line
             // ignore everything output before the "List of devices" header
             if line.hasPrefix("List of devices") {
                 seenDevicesHeader = true

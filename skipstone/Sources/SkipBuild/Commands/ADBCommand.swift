@@ -38,7 +38,7 @@ struct ADBCommand: MessageCommand, ToolOptionsCommand {
 
         for try await line in output {
             await out.write(status: nil, "ADB> \(line)")
-            if let formattedError = scanADBOutput(line: line) { // check for errors and report them to the IDE
+            if let formattedError = scanADBOutput(line: line.line) { // check for errors and report them to the IDE
                 await out.write(status: nil, formattedError)
             }
         }

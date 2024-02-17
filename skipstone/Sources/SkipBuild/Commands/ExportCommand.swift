@@ -102,11 +102,11 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
             }
         }
 
-        await out.write(status: .pass, "Skip export \(packageName) to \((outputFolder as NSString).abbreviatingWithTildeInPath) (\(startTime.timingSecondsSinceNow))")
-
         if showTree {
             await showFileTree(in: outputFolderAbsolute, with: out)
         }
+
+        await out.write(status: .pass, "Skip export \(packageName) to \((outputFolder as NSString).abbreviatingWithTildeInPath) (\(startTime.timingSecondsSinceNow))")
     }
 }
 
