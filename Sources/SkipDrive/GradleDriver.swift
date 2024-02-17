@@ -80,7 +80,7 @@ public struct GradleDriver {
     }
 
     /// Executes `gradle` with the current default arguments and the additional args and returns an async stream of the lines from the combined standard err and standard out.
-    public func execGradle(in workingDirectory: URL?, args: [String], env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, onExit: @escaping (ProcessResult) throws -> ()) async throws -> Process.AsyncLineOutput {
+    public func execGradle(in workingDirectory: URL?, args: [String], env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, onExit: @escaping (ProcessResult) throws -> ()) async throws -> AsyncLineOutput {
         // the resulting command will be something like:
         // java -Xmx64m -Xms64m -Dorg.gradle.appname=gradle -classpath /opt/homebrew/Cellar/gradle/8.0.2/libexec/lib/gradle-launcher-8.0.2.jar org.gradle.launcher.GradleMain info
         #if DEBUG
@@ -107,7 +107,7 @@ public struct GradleDriver {
     ///   - exitHandler: the exit handler, which may want to permit a process failure in order to have time to parse the tests
     /// - Returns: an array of parsed test suites containing information about the test run
     @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
-    public func launchGradleProcess(in workingDirectory: URL?, buildFolder: String = ".build", module: String?, actions: [String], arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, daemon enableDaemon: Bool = true, info infoFlag: Bool = false, quiet quietFlag: Bool = false, plain plainFlag: Bool = true, maxMemory: UInt64? = nil, failFast failFastFlag: Bool = false, noBuildCache noBuildCacheFlag: Bool = false, continue continueFlag: Bool = false, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true, exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: Process.AsyncLineOutput, result: () throws -> [TestSuite]) {
+    public func launchGradleProcess(in workingDirectory: URL?, buildFolder: String = ".build", module: String?, actions: [String], arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, daemon enableDaemon: Bool = true, info infoFlag: Bool = false, quiet quietFlag: Bool = false, plain plainFlag: Bool = true, maxMemory: UInt64? = nil, failFast failFastFlag: Bool = false, noBuildCache noBuildCacheFlag: Bool = false, continue continueFlag: Bool = false, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true, exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: AsyncLineOutput, result: () throws -> [TestSuite]) {
 
 
         var args = actions + arguments
@@ -247,11 +247,12 @@ public struct GradleDriver {
          OS:           Mac OS X 13.3.1 x86_64
          */
 
-        let lines = try await Process.streamLines(command: gradleArgs + ["--version"], includeStdErr: true, onExit: Process.expectZeroExitCode).reduce([]) { $0 + [$1] }
+        let lines = try await Process.streamLines(command: gradleArgs + ["--version"], environment: ProcessInfo.processInfo.environment, includeStdErr: true, onExit: Process.expectZeroExitCode).reduce([]) { $0 + [$1] }
         //print("gradle info", lines.joined(separator: "\n"))
         var lineMap: [String: String] = [:]
         let gradlePrefix = "Gradle"
-        for line in lines {
+        for output in lines {
+            let line = output.line
             // properties are "Key: Value", except the "Gradle" version. Ugh.
             if line.hasPrefix(gradlePrefix + " ") {
                 lineMap[gradlePrefix] = line.dropFirst(gradlePrefix.count).trimmingCharacters(in: .whitespaces)

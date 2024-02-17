@@ -5,13 +5,11 @@ import Foundation
 import FoundationXML
 #endif
 
+/// An async stream of standard out + err data resulting from process execution
+public typealias AsyncLineOutput = AsyncThrowingStream<(line: String, err: Bool), Swift.Error>
+
 @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
 extension Process {
-    /// An async stream of standard out + err data resulting from process execution
-    public typealias AsyncDataOutput = AsyncThrowingStream<Data, Swift.Error>
-
-    /// An async stream of standard out + err lines resulting from process execution
-    public typealias AsyncLineOutput = AsyncCompactMapSequence<AsyncDataOutput, String>
 
     /// Static function for exit handling that will only accept an exit code of 0
     public static func expectZeroExitCode(result: ProcessResult) throws {
@@ -24,24 +22,24 @@ extension Process {
     }
 
     /// Forks the given command and returns an async stream of lines of output
-    public static func streamLines(command arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environment, workingDirectory: URL? = nil, includeStdErr: Bool, onExit: @escaping (_ result: ProcessResult) throws -> ()) -> AsyncLineOutput {
+    public static func streamLines(command arguments: [String], environment: [String: String], workingDirectory: URL? = nil, includeStdErr: Bool, onExit: @escaping (_ result: ProcessResult) throws -> ()) -> AsyncLineOutput {
         streamSeparator(command: arguments, environment: environment, workingDirectory: workingDirectory, includeStdErr: includeStdErr, onExit: onExit)
-            .compactMap({ String(data: $0, encoding: .utf8) })
     }
 
     /// Forks the given command and returns an async stream of parsed JSON messages, one dictionary for each line of output.
-    public static func streamJSON(command arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environment, workingDirectory: URL? = nil, onExit: @escaping (_ result: ProcessResult) throws -> ()) -> AsyncThrowingCompactMapSequence<AsyncDataOutput, NSDictionary> {
+    public static func streamJSON(command arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environment, workingDirectory: URL? = nil, onExit: @escaping (_ result: ProcessResult) throws -> ()) -> AsyncThrowingCompactMapSequence<AsyncLineOutput, NSDictionary> {
         streamSeparator(command: arguments, environment: environment, workingDirectory: workingDirectory, includeStdErr: false, onExit: onExit)
             .compactMap({ line in
-                try JSONSerialization.jsonObject(with: line) as? NSDictionary
+                try JSONSerialization.jsonObject(with: line.line.data(using: .utf8) ?? Data()) as? NSDictionary
             })
     }
 
-
     /// Invokes the given command arguments and returns an async stream of output chunks delimited by the given separator (typically a newline).
-    private static func streamSeparator(character separatorCharacter: UnicodeScalar = Character("\n").unicodeScalars.first!, command arguments: [String], environment: [String: String], workingDirectory: URL?, includeStdErr: Bool, onExit: @escaping (_ result: ProcessResult) throws -> ()) -> AsyncDataOutput {
+    private static func streamSeparator(character separatorCharacter: UnicodeScalar = Character("\n").unicodeScalars.first!, command arguments: [String], environment: [String: String], workingDirectory: URL?, includeStdErr: Bool, onExit: @escaping (_ result: ProcessResult) throws -> ()) -> AsyncLineOutput {
         AsyncThrowingStream { continuation in
-            var buffer: [UInt8] = []
+            var stdout: [UInt8] = []
+            var stderr: [UInt8] = []
+
             // lock is needed because handleProcessOutput seems to sometimes be invoked from different threads (somehow) – possibly one for stdout and stdin?
             let bufferLock = NSLock()
             func handleProcessOutput(err: Bool) -> (_ data: [UInt8]) -> Void {
@@ -53,14 +51,25 @@ extension Process {
                     var data: ArraySlice<UInt8> = outputBytes[outputBytes.startIndex...] // turn array into slice
                     while let nl = data.firstIndex(of: separatorCharacter.utf8.first!) {
                         bufferLock.withLock {
-                            let line = buffer + data[data.startIndex..<nl]
-                            buffer = []
-                            continuation.yield(Data(line))
+                            let chunk = data[data.startIndex..<nl]
+                            if err {
+                                let line = stderr + chunk
+                                stderr = [] // clear the stderr buffer
+                                continuation.yield(AsyncLineOutput.Element(line: String(data: Data(line), encoding: .utf8) ?? "", err: true))
+                            } else {
+                                let line = stdout + chunk
+                                stdout = [] // clear the stdout buffer
+                                continuation.yield(AsyncLineOutput.Element(line: String(data: Data(line), encoding: .utf8) ?? "", err: false))
+                            }
                             data = data[nl...].dropFirst() // continue processing the rest of the buffer
                         }
                     }
                     bufferLock.withLock {
-                        buffer += data
+                        if err {
+                            stderr += data
+                        } else {
+                            stdout += data
+                        }
                     }
                 }
             }

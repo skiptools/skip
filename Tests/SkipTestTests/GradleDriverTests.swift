@@ -10,7 +10,7 @@ final class GradleDriverTests: XCTestCase {
         let driver = try await GradleDriver()
         let result = try await driver.execGradle(in: URL(fileURLWithPath: NSTemporaryDirectory()), args: ["-v"], onExit: { _ in })
         guard let line = try await result.first(where: { line in
-            line.hasPrefix("Gradle ")
+            line.line.hasPrefix("Gradle ")
         }) else {
             return XCTFail("No Gradle line in output")
         }

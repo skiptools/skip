@@ -118,13 +118,13 @@ extension XCGradleHarness where Self : XCTestCase {
                     testProcessResult = result
                 })
 
-                var previousLine: String? = nil
+                var previousLine: AsyncLineOutput.Element? = nil
                 for try await line in output {
                     if let outputPrefix = outputPrefix {
                         print(outputPrefix, line)
                     }
                     // check for errors and report them to the IDE with a 1-line buffer
-                    scanGradleOutput(line1: previousLine ?? line, line2: line)
+                    scanGradleOutput(line1: previousLine?.line ?? line.line, line2: line.line)
                     previousLine = line
                 }
 

@@ -5,7 +5,7 @@ import SkipDrive
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 class SkipCommandTests : XCTestCase {
     func testSkipVersion() async throws {
-        var versionOut = try await skip("version")
+        var versionOut = try await skip("version").out
         if versionOut.hasSuffix(" (debug)") {
             versionOut.removeLast(" (debug)".count)
         }
@@ -14,7 +14,7 @@ class SkipCommandTests : XCTestCase {
     }
 
     func testSkipVersionJSON() async throws {
-        try await XCTAssertEqualAsync(SkipDrive.skipVersion, skip("version", "--json").parseJSONObject()["version"] as? String)
+        try await XCTAssertEqualAsync(SkipDrive.skipVersion, skip("version", "--json").out.parseJSONObject()["version"] as? String)
     }
 
     func testSkipWelcome() async throws {
@@ -22,13 +22,13 @@ class SkipCommandTests : XCTestCase {
     }
 
     func testSkipWelcomeJSON() async throws {
-        let welcome = try await skip("welcome", "--json", "--json-array").parseJSONArray()
+        let welcome = try await skip("welcome", "--json", "--json-array").out.parseJSONArray()
         XCTAssertNotEqual(0, welcome.count, "Welcome message should not be empty")
     }
 
     func testSkipDoctor() async throws {
         // run `skip doctor` with JSON array output and make sure we can parse the result
-        let doctor = try await skip("doctor", "-jA").parseJSONMessages()
+        let doctor = try await skip("doctor", "-jA", "-v").out.parseJSONMessages()
         XCTAssertGreaterThan(doctor.count, 5, "doctor output should have contained some lines")
         XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("macOS version") }), "missing macOS version")
         XCTAssertTrue(doctor.contains(where: { $0.hasPrefix("Swift version") }), "missing Swift version")
@@ -43,7 +43,7 @@ class SkipCommandTests : XCTestCase {
     }
 
     func testSkipDevices() async throws {
-        let devices = try await skip("devices", "-jA").parseJSONArray()
+        let devices = try await skip("devices", "-jA").out.parseJSONArray()
         XCTAssertGreaterThanOrEqual(devices.count, 0)
     }
 
@@ -52,7 +52,7 @@ class SkipCommandTests : XCTestCase {
             throw XCTSkip("skipping checkup test on CI due to unknown failure")
         }
 
-        let checkup = try await skip("checkup", "-jA").parseJSONMessages()
+        let checkup = try await skip("checkup", "-jA").out.parseJSONMessages()
         XCTAssertGreaterThan(checkup.count, 5, "checkup output should have contained some lines")
     }
 
@@ -60,8 +60,8 @@ class SkipCommandTests : XCTestCase {
         let tempDir = try mktmp()
         let projectName = "hello-skip"
         let appName = "HelloSkip"
-        let out = try await skip("init", "-jA", "--show-tree", "-v", "-d", tempDir, "--appid", "com.company.HelloSkip", projectName, appName)
-        let msgs = try out.parseJSONMessages()
+        let out = try await skip("init", "-jA", "--show-tree", "-d", tempDir, "--appid", "com.company.HelloSkip", projectName, appName)
+        let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip application \(projectName)", msgs.first)
         let dir = tempDir + "/" + projectName + "/"
@@ -161,8 +161,8 @@ class SkipCommandTests : XCTestCase {
     func testSkipInit() async throws {
         let tempDir = try mktmp()
         let name = "cool-lib"
-        let out = try await skip("init", "-jA", "--show-tree", "-v", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE")
-        let msgs = try out.parseJSONMessages()
+        let out = try await skip("init", "-jA", "--show-tree", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE")
+        let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip library \(name)", msgs.first)
 
@@ -248,17 +248,34 @@ class SkipCommandTests : XCTestCase {
               └─ XCSkipTests.swift
 
         """)
+    }
 
-        // now export the package and make sure the .aars are listed
+    func testSkipExportFramework() async throws {
+        let tempDir = try mktmp()
+        let name = "demo-framework"
+        let out = try await skip("init", "-jA", "--show-tree", "-v", "-d", tempDir, name, "DemoFramework")
+        let msgs = try out.out.parseJSONMessages()
+
+        XCTAssertEqual("Initializing Skip library \(name)", msgs.first)
+
+        let dir = tempDir + "/" + name + "/"
+        for path in ["Package.swift", "Sources/DemoFramework", "Tests", "Tests/DemoFrameworkTests/Skip/skip.yml"] {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
+        }
+
+        let project = try await loadProjectPackage(dir)
+        XCTAssertEqual(name, project.name)
+
         let exportPath = try mktmp()
-        let exported = try await skip("export", "-jA", "--show-tree", "-p", tempDir, "-d", exportPath)
-        let exportedJSON = try exported.parseJSONMessages()
-        let _ = exportedJSON
-        
-        // TODO: verify output
-//        XCTAssertEqual(exportedJSON.dropLast(1).last ?? "", """
-//        """)
+        let exported = try await skip("export", "-jA", "-v", "--show-tree", "--project", tempDir + "/" + name, "-d", exportPath)
+        let exportedJSON = try exported.out.parseJSONMessages()
+        let fileTree = exportedJSON.dropLast(1).last ?? ""
 
+        XCTAssertTrue(fileTree.contains("DemoFramework-unspecified-release.aar"), "missing expected aar in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("DemoFramework-unspecified-debug.aar"), "missing expected aar in \(fileTree)")
+
+        XCTAssertTrue(fileTree.contains("SkipFoundation-unspecified-debug.aar"), "missing expected aar in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("SkipFoundation-unspecified-release.aar"), "missing expected aar in \(fileTree)")
     }
 
     func DISABLEDtestSkipTestReport() async throws {
@@ -271,7 +288,7 @@ class SkipCommandTests : XCTestCase {
 
         // .build/plugins/outputs/skip-zip/SkipZipTests/skipstone/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
         let report = try await skip("test", "--configuration", "debug", "--test", "--max-column-length", "15", "--xunit", xunit, "--junit", junit)
-        XCTAssertEqual(report, """
+        XCTAssertEqual(report.out, """
         | Test         | Case            | Swift | Kotlin |
         | ------------ | --------------- | ----- | ------ |
         | SkipZipTests | testArchive     | PASS  | SKIP   |
@@ -282,7 +299,7 @@ class SkipCommandTests : XCTestCase {
     }
 
     /// Runs the tool with the given arguments, returning the entire output string as well as a function to parse it to `JSON`
-    @discardableResult func skip(checkError: Bool = true, printOutput: Bool = true, _ args: String...) async throws -> String {
+    @discardableResult func skip(checkError: Bool = true, printOutput: Bool = true, _ args: String...) async throws -> (out: String, err: String) {
         // turn "-[SkipCommandTests testSomeTest]" into "testSomeTest"
         let testName = testRun?.test.name.split(separator: " ").last?.trimmingCharacters(in: CharacterSet(charactersIn: "[]")) ?? "TEST"
 
@@ -314,13 +331,13 @@ class SkipCommandTests : XCTestCase {
 
         //let result = try await Process.popen(arguments: cmd, loggingHandler: nil)
 
-        var outputLines: [String] = []
+        var outputLines: [AsyncLineOutput.Element] = []
         var result: ProcessResult? = nil
         var env = ProcessInfo.processInfo.environment
         env["TERM"] = "dumb" // override TERM to prevent skip from using ANSI colors or progress animations
         for try await outputLine in Process.streamLines(command: cmd, environment: env, includeStdErr: true, onExit: { result = $0 }) {
             if printOutput {
-                print("\(testName)> \(outputLine)")
+                print("\(testName) [\(outputLine.err ? "stderr" : "stdout")]> \(outputLine.line)")
             }
             outputLines.append(outputLine)
         }
@@ -329,15 +346,16 @@ class SkipCommandTests : XCTestCase {
             throw SkipLaunchError(errorDescription: "command did not exit: \(cmd)")
         }
 
-        let outputString = outputLines.joined(separator: "\n")
+        let stdoutString = outputLines.filter({ $0.err == false }).map(\.line).joined(separator: "\n")
+        let stderrString = outputLines.filter({ $0.err == true }).map(\.line).joined(separator: "\n")
 
         // Throw if there was a non zero termination.
         guard result.exitStatus == .terminated(code: 0) else {
-            XCTFail("error running command: \(cmd)\noutput: \(outputString)")
+            XCTFail("error running command: \(cmd)\noutput: \(stdoutString)")
             throw ProcessResult.Error.nonZeroExit(result)
         }
 
-        return outputString
+        return (out: stdoutString, err: stderrString)
     }
 
 }
