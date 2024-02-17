@@ -24,6 +24,8 @@ jobs:
         with:
           repository: skiptools/skipstone
           path: skipstone
+          ref: main
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
 
       - name: Checkout skip
         uses: actions/checkout@v4
