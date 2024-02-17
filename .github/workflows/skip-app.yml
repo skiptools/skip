@@ -38,7 +38,7 @@ jobs:
     steps:
       - uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: release-candidate
+          gradle-version: current
           generate-job-summary: false
 
       - run: brew install skiptools/skip/skip
