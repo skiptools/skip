@@ -48,23 +48,21 @@ extension Process {
                         // we ignore stderr for streaming
                         return
                     }
-                    var data: ArraySlice<UInt8> = outputBytes[outputBytes.startIndex...] // turn array into slice
-                    while let nl = data.firstIndex(of: separatorCharacter.utf8.first!) {
-                        bufferLock.withLock {
+                    bufferLock.withLock {
+                        var data: ArraySlice<UInt8> = outputBytes[outputBytes.startIndex...] // turn array into slice
+                        while let nl = data.firstIndex(of: separatorCharacter.utf8.first!) {
                             let chunk = data[data.startIndex..<nl]
                             if err {
-                                let line = stderr + chunk
+                                let line = String(data: Data(stderr + chunk), encoding: .utf8) ?? ""
                                 stderr = [] // clear the stderr buffer
-                                continuation.yield(AsyncLineOutput.Element(line: String(data: Data(line), encoding: .utf8) ?? "", err: true))
+                                continuation.yield(AsyncLineOutput.Element(line: line, err: true))
                             } else {
-                                let line = stdout + chunk
+                                let line = String(data: Data(stdout + chunk), encoding: .utf8) ?? ""
                                 stdout = [] // clear the stdout buffer
-                                continuation.yield(AsyncLineOutput.Element(line: String(data: Data(line), encoding: .utf8) ?? "", err: false))
+                                continuation.yield(AsyncLineOutput.Element(line: line, err: false))
                             }
                             data = data[nl...].dropFirst() // continue processing the rest of the buffer
                         }
-                    }
-                    bufferLock.withLock {
                         if err {
                             stderr += data
                         } else {
