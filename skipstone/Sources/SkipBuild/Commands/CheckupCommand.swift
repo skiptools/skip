@@ -16,7 +16,7 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
     var toolOptions: ToolOptions
 
     @Option(name: [.customShort("c"), .long], help: ArgumentHelp("Configuration debug/release", valueName: "c"))
-    var configuration: String = "release"
+    var configuration: BuildConfiguration = .release
 
     @Flag(help: ArgumentHelp("Check twice that sample build outputs produce identical artifacts", valueName: "verify"))
     var doubleCheck: Bool = false

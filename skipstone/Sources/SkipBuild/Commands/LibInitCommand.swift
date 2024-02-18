@@ -97,9 +97,123 @@ let buildFolderName = ".build"
 let darwinBuildFolder = buildFolderName + "/Darwin"
 let androidBuildFolder = buildFolderName + "/Android"
 
+/// The build configuration, either `debug` or `release`.
+enum BuildConfiguration : String, ExpressibleByArgument {
+    case debug, release
+}
+
 extension ToolOptionsCommand {
 
-    func initSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: String, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, appModuleName: String = "app", iconColor: String?, version: String?, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
+    func createAPK(projectURL: URL, appModuleName: String, configuration: BuildConfiguration, out: MessageQueue, primaryModuleName: String, cfgSuffix: String, returnHashes: Bool, prefix re: String) async -> [URL : String?] {
+        // assemble the .apk
+        let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths // environment that includes a default ANDROID_HOME
+        
+        let gradleProjectDir = projectURL.path + "/Android"
+        let outputsPath = projectURL.path + "/" + androidBuildFolder + "/" + appModuleName + "/outputs"
+        
+        let action = "assemble" + configuration.rawValue.capitalized // turn "debug" into "Debug" and "release" into "Release"
+        await run(with: out, "Assembling Android apk", ["gradle", action, "--console=plain", "--project-dir", gradleProjectDir], environment: env)
+        //{ result in (result, nil) }
+        
+        // the expected path for the gradle output folder of the assemble action
+        
+        // for example: skipapp-playground/.build/plugins/outputs/skipapp-playground/Playground/skipstone/Playground/.build/skipapp-playground/outputs/apk/release/Playground-release.apk
+        let unsigned = configuration == .release ? "-unsigned" : "" // we do not sign the release builds for reproducibility, which leads to them having the "-unsigned" suffix
+
+        let apkTitle = primaryModuleName + cfgSuffix + ".apk" // the name of the .apk for reporting purposes (don't include the -unsigned)
+        let apkPath = outputsPath + "/apk/" + configuration.rawValue + "/" + appModuleName + cfgSuffix + unsigned + ".apk"
+        let apkURL = URL(fileURLWithPath: apkPath, isDirectory: false)
+        
+        await checkFile(apkURL, with: out, title: "Verify \(apkTitle): \(apkURL.path)") { url in
+            return CheckStatus(status: .pass, message: try "Verify \(apkTitle) \(url.fileSizeString)")
+        }
+        
+        var hashes: [URL : String?] = [:]
+        hashes[apkURL] = nil
+        if returnHashes {
+            await checkFile(apkURL, with: out, title: "\(re)Checksum Archive") { url in
+                let apkHash = try url.SHA256Hash()
+                hashes[apkURL] = apkHash
+                return CheckStatus(status: .pass, message: "APK SHA256: \(apkHash)")
+            }
+        }
+        return hashes
+    }
+    
+    /// Zip up the given folder.
+    @discardableResult func zipFolder(with out: MessageQueue, message msg: String, compressionLevel: Int = 9, zipFile: URL, folder: URL) async -> Result<ProcessOutput, Error> {
+        return await run(with: out, msg, ["zip", "-\(compressionLevel)", "-r", zipFile.path, folder.lastPathComponent], in: folder.deletingLastPathComponent())
+    }
+    
+    func createIPA(configuration: BuildConfiguration, primaryModuleName: String, cfgSuffix: String, projectURL: URL, out: MessageQueue, prefix re: String, xcodeProjectURL: URL, returnHashes: Bool) async throws -> [URL : String?] {
+        // xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
+        let cfg = configuration.rawValue.capitalized
+        let archiveBasePath = darwinBuildFolder + "/Archives/" + cfg
+
+        let archivePath = archiveBasePath + "/" + primaryModuleName + ".xcarchive"
+        let ipaPath = archiveBasePath + "/" + primaryModuleName + cfgSuffix + ".ipa"
+        let ipaURL = projectURL.appending(path: ipaPath)
+        
+        // note that derivedDataPath and archivePath are relative to CWD rather than
+        let fullArchivePath = projectURL.path + "/" + archivePath
+        let fullDerivedDataPath = projectURL.path + "/" + darwinBuildFolder + "/DerivedData"
+        
+        let sdk = "iphoneos"
+        
+        await run(with: out, "\(re)Archive iOS ipa", [
+            "xcodebuild",
+            "-project", xcodeProjectURL.path,
+            "-derivedDataPath", fullDerivedDataPath,
+            "-skipPackagePluginValidation",
+            "-archivePath", fullArchivePath,
+            "-configuration", cfg,
+            "-scheme", primaryModuleName,
+            "-sdk", sdk,
+            "-destination", "generic/platform=iOS",
+            "archive",
+            "CODE_SIGNING_ALLOWED=NO",
+            "ZERO_AR_DATE=1", // excludes timestamps from archives for build reproducibility
+        ], additionalEnvironment: ["SKIP_ZERO": "1"]) // SKIP_ZERO builds without Skip dependency libraries
+        
+        
+        let archiveAppPath = archivePath + "/Products/Applications/" + primaryModuleName + ".app"
+        let archiveAppURL = projectURL.appendingPathComponent(archiveAppPath, isDirectory: true)
+        if archiveAppURL.isDirectoryFile == false {
+            throw MissingProjectFileError(errorDescription: "Expected archive does not exist at: \(archiveAppURL.path)")
+        }
+        
+        // Create an ipa (zip) file of the app contents
+        
+        // need to first copy the contents over to a "Payload" folder, since the root of the .ipa needs to be "Payload"
+        let archiveAppPayloadURL = archiveAppURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("Payload", isDirectory: true)
+        try FileManager.default.createDirectory(at: archiveAppPayloadURL, withIntermediateDirectories: false)
+        let archiveAppContentsURL = archiveAppPayloadURL
+            .appendingPathComponent(archiveAppURL.lastPathComponent, isDirectory: true)
+        
+        try FileManager.default.copyItem(at: archiveAppURL, to: archiveAppContentsURL)
+        try FileManager.default.zeroFileTimes(under: archiveAppPayloadURL)
+        
+        await zipFolder(with: out, message: "\(re)Assemble \(ipaURL.lastPathComponent)", zipFile: ipaURL, folder: archiveAppPayloadURL)
+
+        await checkFile(ipaURL, with: out, title: "\(re)Verifying \(ipaURL.lastPathComponent)") { url in
+            CheckStatus(status: .pass, message: try "Verify \(ipaURL.lastPathComponent) \(url.fileSizeString)")
+        }
+        
+        var hashes: [URL : String?] = [:]
+        hashes[ipaURL] = nil
+        if returnHashes {
+            await checkFile(ipaURL, with: out, title: "\(re)Checksum Archive") { url in
+                let ipaHash = try url.SHA256Hash()
+                hashes[ipaURL] = ipaHash
+                return CheckStatus(status: .pass, message: "IPA SHA256: \(ipaHash)")
+            }
+        }
+        return hashes
+    }
+    
+    func initSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: BuildConfiguration, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, appModuleName: String = "app", iconColor: String?, version: String?, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
 
         // the initial build/test is done with debug configuration regardless of the configuration setting; this is because unit tests don't always run correctly in release mode
         let debugConfiguration = "debug"
@@ -128,110 +242,18 @@ extension ToolOptionsCommand {
         // the suffix for build artifacts
         // TODO: include version number from xcconfig
         // let cfgSuffix = "-" + (version ?? "0.0.1") + "-" + configuration
-        let cfgSuffix = "-" + configuration
+        let cfgSuffix = "-" + configuration.rawValue
 
         let xcodeProjectURL = project.darwinProjectFolder
         if ipa == true  {
-            // xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
-            let archiveBasePath = darwinBuildFolder + "/Archives/" + configuration.capitalized
-
-            let archivePath = archiveBasePath + "/" + primaryModuleName + ".xcarchive"
-            let ipaPath = archiveBasePath + "/" + primaryModuleName + cfgSuffix + ".ipa"
-            let ipaURL = projectURL.appending(path: ipaPath)
-
-            // note that derivedDataPath and archivePath are relative to CWD rather than
-            let fullArchivePath = projectURL.path + "/" + archivePath
-            let fullDerivedDataPath = projectURL.path + "/" + darwinBuildFolder + "/DerivedData"
-
-            let cfg = configuration.capitalized
-            let sdk = "iphoneos"
-
-            await run(with: out, "\(re)Archive iOS ipa", [
-                "xcodebuild",
-                "-project", xcodeProjectURL.path,
-                "-derivedDataPath", fullDerivedDataPath,
-                "-skipPackagePluginValidation",
-                "-archivePath", fullArchivePath,
-                "-configuration", cfg,
-                "-scheme", primaryModuleName,
-                "-sdk", sdk,
-                "-destination", "generic/platform=iOS",
-                "archive",
-                "CODE_SIGNING_ALLOWED=NO",
-                "ZERO_AR_DATE=1", // excludes timestamps from archives for build reproducibility
-            ], additionalEnvironment: ["SKIP_ZERO": "1"]) // SKIP_ZERO builds without Skip dependency libraries
-
-
-            let archiveAppPath = archivePath + "/Products/Applications/" + primaryModuleName + ".app"
-            let archiveAppURL = projectURL.appendingPathComponent(archiveAppPath, isDirectory: true)
-            if archiveAppURL.isDirectoryFile == false {
-                throw MissingProjectFileError(errorDescription: "Expected archive does not exist at: \(archiveAppURL.path)")
-            }
-
-            // Create an ipa (zip) file of the app contents
-
-            // need to first copy the contents over to a "Payload" folder, since the root of the .ipa needs to be "Payload"
-            let archiveAppPayloadURL = archiveAppURL
-                .deletingLastPathComponent()
-                .appendingPathComponent("Payload", isDirectory: true)
-            try FileManager.default.createDirectory(at: archiveAppPayloadURL, withIntermediateDirectories: false)
-            let archiveAppContentsURL = archiveAppPayloadURL
-                .appendingPathComponent(archiveAppURL.lastPathComponent, isDirectory: true)
-
-            try FileManager.default.copyItem(at: archiveAppURL, to: archiveAppContentsURL)
-            try FileManager.default.zeroFileTimes(under: archiveAppPayloadURL)
-
-            await run(with: out, "\(re)Assemble \(ipaURL.lastPathComponent)", ["zip", "-9", "-r", ipaURL.path, archiveAppPayloadURL.lastPathComponent], in: archiveAppPayloadURL.deletingLastPathComponent())
-
-            await checkFile(ipaURL, with: out, title: "\(re)Verifying \(ipaURL.lastPathComponent)") { url in
-                CheckStatus(status: .pass, message: try "Verify \(ipaURL.lastPathComponent) \(url.fileSizeString)")
-            }
-
-            if returnHashes {
-                func checkArtifactHash(url: URL) throws -> CheckStatus {
-                    let ipaHash = try url.SHA256Hash()
-                    artifactHashes[ipaURL] = ipaHash
-                    return CheckStatus(status: .pass, message: "IPA SHA256: \(ipaHash)")
-                }
-
-                await checkFile(ipaURL, with: out, title: "\(re)Checksum Archive", handle: checkArtifactHash)
-            }
+            let ipaFiles = try await createIPA(configuration: configuration, primaryModuleName: primaryModuleName, cfgSuffix: cfgSuffix, projectURL: projectURL, out: out, prefix: re, xcodeProjectURL: xcodeProjectURL, returnHashes: returnHashes)
+            artifactHashes.merge(ipaFiles, uniquingKeysWith: { $1 })
         }
 
-        if apk == true { // assemble the .apk
-            let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths // environment that includes a default ANDROID_HOME
-
-            let gradleProjectDir = projectURL.path + "/Android"
-            let outputsPath = projectURL.path + "/" + androidBuildFolder + "/" + appModuleName + "/outputs"
-
-            let action = "assemble" + configuration.capitalized // turn "debug" into "Debug" and "release" into "Release"
-            await run(with: out, "Assembling Android apk", ["gradle", action, "--console=plain", "--project-dir", gradleProjectDir], environment: env)
-            //{ result in (result, nil) }
-
-            // the expected path for the gradle output folder of the assemble action
-
-            // for example: skipapp-playground/.build/plugins/outputs/skipapp-playground/Playground/skipstone/Playground/.build/skipapp-playground/outputs/apk/release/Playground-release.apk
-            let unsigned = configuration == "release" ? "-unsigned" : "" // we do not sign the release builds for reproducibility, which leads to them having the "-unsigned" suffix
-
-            let apkTitle = primaryModuleName + cfgSuffix + ".apk" // the name of the .apk for reporting purposes (don't include the -unsigned)
-            let apkPath = outputsPath + "/apk/" + configuration + "/" + appModuleName + cfgSuffix + unsigned + ".apk"
-            let apkURL = URL(fileURLWithPath: apkPath, isDirectory: false)
-
-            await checkFile(apkURL, with: out, title: "Verify \(apkTitle): \(apkURL.path)") { url in
-                return CheckStatus(status: .pass, message: try "Verify \(apkTitle) \(url.fileSizeString)")
-            }
-
-            if returnHashes {
-                func checkArtifactHash(url: URL) throws -> CheckStatus {
-                    let apkHash = try url.SHA256Hash()
-                    artifactHashes[apkURL] = apkHash
-                    return CheckStatus(status: .pass, message: "APK SHA256: \(apkHash)")
-                }
-
-                await checkFile(apkURL, with: out, title: "\(re)Checksum Archive", handle: checkArtifactHash)
-            }
+        if apk == true {
+            let apkFiles = await createAPK(projectURL: projectURL, appModuleName: appModuleName, configuration: configuration, out: out, primaryModuleName: primaryModuleName, cfgSuffix: cfgSuffix, returnHashes: returnHashes, prefix: re)
+            artifactHashes.merge(apkFiles, uniquingKeysWith: { $1 })
         }
-
 
         if verify {
             try await performVerifyCommand(project: projectPath.pathString, with: out)

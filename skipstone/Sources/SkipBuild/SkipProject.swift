@@ -556,7 +556,7 @@ class AppProjectLayout : FrameworkProjectLayout {
     }
 
 
-    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: String, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, iconColor: String?, version: String?, moduleTests: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool) throws -> (baseURL: URL, project: AppProjectLayout) {
+    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, iconColor: String?, version: String?, moduleTests: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool) throws -> (baseURL: URL, project: AppProjectLayout) {
 
         let sourceHeader = free ? licenseLGPLHeader : ""
         let projectURL = try createSkipLibrary(projectName: projectName, productName: productName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: appid != nil, moduleTests: moduleTests, packageResolved: packageResolvedURL)
@@ -1401,7 +1401,7 @@ class AppProjectLayout : FrameworkProjectLayout {
         try createAndroidManifest(androidIconName: androidIconName).write(to: appProject.androidManifest.createParentDirectory(), atomically: true, encoding: .utf8)
         try createSettingsGradle().write(to: appProject.androidGradleSettings, atomically: true, encoding: .utf8)
         try createAppBuildGradle(appModulePackage: appModulePackage, appModuleName: appModuleName).write(to: appProject.androidAppBuildGradle, atomically: true, encoding: .utf8)
-        try defaultProguardContents().write(to: appProject.androidAppProguardRules, atomically: true, encoding: .utf8)
+        try defaultProguardContents(appModulePackage).write(to: appProject.androidAppProguardRules, atomically: true, encoding: .utf8)
         try defaultGradleProperties().write(to: appProject.androidGradleProperties, atomically: true, encoding: .utf8)
         try defaultGradleWrapperProperties().write(to: appProject.androidGradleWrapperProperties.createParentDirectory(), atomically: true, encoding: .utf8)
 
@@ -1736,9 +1736,13 @@ extension FrameworkProjectLayout {
 
         """
     }
-    static func defaultProguardContents() -> String {
+
+    /// See https://github.com/skiptools/skip/issues/95 for why we need to be so permissive
+    static func defaultProguardContents(_ packageName: String) -> String {
         """
-        #-keep class skip.** { *; }
+        -keep class skip.** { *; }
+        -keep class \(packageName).** { *; }
+
         """
     }
 
@@ -1747,7 +1751,6 @@ extension FrameworkProjectLayout {
         org.gradle.jvmargs=-Xmx2048m
         android.useAndroidX=true
         kotlin.code.style=official
-        android.suppressUnsupportedCompileSdk=34
 
         """
     }

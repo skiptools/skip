@@ -430,7 +430,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         func generateGradle(for sourceModules: [String], with skipConfig: SkipConfig, isApp: Bool) throws {
             try generateGradleWrapperProperties()
-            try generateProguardFile()
+            try generateProguardFile(packageName)
             try generatePerModuleGradle()
             try generateGradleProperties()
             try generateSettingsGradle()
@@ -478,8 +478,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             }
 
             /// Create the proguard-rules.pro file, which configures the optimization settings for release buils
-            func generateProguardFile() throws {
-                try writeChanges(tag: "proguard", to: moduleRootPath.appending(component: "proguard-rules.pro"), contents: FrameworkProjectLayout.defaultProguardContents().utf8Data, readOnly: true)
+            func generateProguardFile(_ packageName: String) throws {
+                try writeChanges(tag: "proguard", to: moduleRootPath.appending(component: "proguard-rules.pro"), contents: FrameworkProjectLayout.defaultProguardContents(packageName).utf8Data, readOnly: true)
             }
 
 

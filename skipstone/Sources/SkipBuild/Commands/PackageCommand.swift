@@ -45,7 +45,7 @@ struct CreateOptions : ParsableArguments {
     var dir: String?
 
     @Option(name: [.customShort("c"), .long], help: ArgumentHelp("Configuration debug/release", valueName: "c"))
-    var configuration: String = "debug"
+    var configuration: BuildConfiguration = .debug
 
     @Option(name: [.customShort("t"), .long], help: ArgumentHelp("Template name/ID for new project", valueName: "id"))
     var template: String = "skipapp"

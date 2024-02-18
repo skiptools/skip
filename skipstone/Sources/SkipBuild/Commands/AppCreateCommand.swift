@@ -76,11 +76,11 @@ struct AppCreateCommand: MessageCommand, ToolOptionsCommand {
         await run(with: out, "Resolving \(pname)/\(appName)", ["swift", "package", "resolve", "--verbose", "--package-path", projectFolderURL.path])
 
         if buildOptions.build == true {
-            await run(with: out, "Building \(pname)/\(appName)", ["swift", "build", "--verbose", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
+            await run(with: out, "Building \(pname)/\(appName)", ["swift", "build", "--verbose", "-c", createOptions.configuration.rawValue, "--package-path", projectFolderURL.path])
         }
 
         if buildOptions.test == true {
-            await run(with: out, "Test \(pname)/\(appName)", ["swift", "test", "-j", "1", "--verbose", "-c", createOptions.configuration, "--package-path", projectFolderURL.path])
+            await run(with: out, "Test \(pname)/\(appName)", ["swift", "test", "-j", "1", "--verbose", "-c", createOptions.configuration.rawValue, "--package-path", projectFolderURL.path])
         }
 
         // TODO: make code project match project name
