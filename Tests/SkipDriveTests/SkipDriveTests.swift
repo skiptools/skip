@@ -267,11 +267,36 @@ class SkipCommandTests : XCTestCase {
         let exportedJSON = try exported.out.parseJSONMessages()
         let fileTree = exportedJSON.dropLast(1).last ?? ""
 
-        XCTAssertTrue(fileTree.contains("DemoFramework-unspecified-release.aar"), "missing expected aar in \(fileTree)")
-        XCTAssertTrue(fileTree.contains("DemoFramework-unspecified-debug.aar"), "missing expected aar in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("DemoFramework-release.aar"), "missing expected aar in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("DemoFramework-debug.aar"), "missing expected aar in \(fileTree)")
 
-        XCTAssertTrue(fileTree.contains("SkipFoundation-unspecified-debug.aar"), "missing expected aar in \(fileTree)")
-        XCTAssertTrue(fileTree.contains("SkipFoundation-unspecified-release.aar"), "missing expected aar in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("SkipFoundation-debug.aar"), "missing expected aar in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("SkipFoundation-release.aar"), "missing expected aar in \(fileTree)")
+    }
+
+    func testSkipExportApp() async throws {
+        let tempDir = try mktmp()
+        let name = "demo-app"
+        let out = try await skip("init", "-jA", "--show-tree", "-v", "-d", tempDir, "--appid", "demo.app.App", name, "Demo")
+        let msgs = try out.out.parseJSONMessages()
+
+        XCTAssertEqual("Initializing Skip application \(name)", msgs.first)
+
+        let dir = tempDir + "/" + name + "/"
+        for path in ["Package.swift", "Sources/Demo", "Tests", "Tests/DemoTests/Skip/skip.yml"] {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
+        }
+
+        let project = try await loadProjectPackage(dir)
+        XCTAssertEqual(name, project.name)
+
+        let exportPath = try mktmp()
+        let exported = try await skip("export", "-jA", "-v", "--show-tree", "--project", tempDir + "/" + name, "-d", exportPath)
+        let exportedJSON = try exported.out.parseJSONMessages()
+        let fileTree = exportedJSON.dropLast(1).last ?? ""
+
+        XCTAssertTrue(fileTree.contains("Demo-debug.apk"), "missing expected apk in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-release.apk"), "missing expected apk in \(fileTree)")
     }
 
     func DISABLEDtestSkipTestReport() async throws {
