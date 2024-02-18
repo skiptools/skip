@@ -199,6 +199,19 @@ extension Date {
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 extension ToolOptionsCommand {
     
+    func resultString(_ result: Result<String, Error>?) -> String {
+        guard let result = result else {
+            return ""
+        }
+
+        do {
+            //return try outputOptions.term.green(result.get())
+            return try result.get()
+        } catch {
+            return outputOptions.term.red(error.localizedDescription)
+        }
+    }
+
     static func timingResultHandler<T>(message: String, time: Date = .now) -> (_ result: Result<T, Error>?) -> (result: Result<T, Error>?, message: MessageBlock?) {
         return { result in
             (result, MessageBlock(status: result?.messageStatusAny, message + " (\(time.timingSecondsSinceNow))"))
@@ -324,12 +337,29 @@ extension OutputOptions {
         return "[" + term.cyan(String(pchar)) + "] "
     }
 
+    func defaultResultHandler<T>(message: String) -> (_ result: Result<T, Error>?) -> (result: Result<T, Error>?, message: MessageBlock?) {
+        return { result in
+            guard let result = result else {
+                return (result, MessageBlock(status: result?.messageStatusAny, message))
+            }
+
+            do {
+                let resultString = try result.get()
+                return (result, MessageBlock(status: result.messageStatusAny, message + ": " + String(describing: resultString)))
+            } catch {
+                return (result, MessageBlock(status: result.messageStatusAny, message + ": " + term.red(error.localizedDescription)))
+            }
+        }
+    }
+
     /// Perform an operation with a given message handler, which will be invoked in the progress cycle with a nil result, and then a final time with the result of the block invocation
     ///
     /// If we are using a rich terminal (and not specifying plain or JSON output), outputs a progress animation while waiting for the given process to complete
-    @discardableResult func monitor<T>(with messenger: MessageQueue, _ message: String, watch: Bool = false, resultHandler: MessageResultHandler<T>?, monitorAction: @escaping (_ outputHandler: @escaping (String) -> ()) async throws -> T) async -> Result<T, Error> {
+    @discardableResult func monitor<T>(with messenger: MessageQueue, _ message: String, watch: Bool = false, resultHandler rhandler: MessageResultHandler<T>? = nil, monitorAction: @escaping (_ outputHandler: @escaping (String) -> ()) async throws -> T) async -> Result<T, Error> {
         _ = self.streams.outputBuffer(reset: true) // reset the output line buffer
         let terminalWidth = TerminalController.terminalWidth()
+
+        let resultHandler = rhandler ?? defaultResultHandler(message: message)
 
         let startTime = Date.now
 
@@ -341,7 +371,8 @@ extension OutputOptions {
                 /// The default implementation of the message handler cycles through the default progress animation and then outputs the result
                 func animatingMessageHandler(_ result: Result<T, Error>?) -> String {
                     let prefix = monitorPrefix(progressSprites, for: result?.messageStatusAny, startTime: startTime)
-                    if let result = result, let msg = resultHandler?(result) {
+                    if let result = result {
+                        let msg = resultHandler(result)
                         return msg.message.message(term: term) ?? ((prefix ?? "") + message)
                     } else {
                         // the progress index is based on the current time index
@@ -423,18 +454,15 @@ extension OutputOptions {
         streams.outputBuffer(reset: true) // clear the current output buffer
 
         // send the final message to the block
-        if let resultHandled = resultHandler?(result) {
-            if let msgmsg = resultHandled.message { // the result handler spcifies a message to issue
-                await messenger.yield(msgmsg)
-            } else { // otherwise translate the result
-                var messageWithError = message
-                if case .failure(let error) = resultHandled.result {
-                    messageWithError += ": " + error.localizedDescription
-                }
-                await messenger.yield(MessageBlock(status: resultHandled.result?.messageStatusAny ?? result.messageStatusAny, messageWithError))
+        let resultHandled = resultHandler(result)
+        if let msgmsg = resultHandled.message { // the result handler spcifies a message to issue
+            await messenger.yield(msgmsg)
+        } else { // otherwise translate the result
+            var messageWithError = message
+            if case .failure(let error) = resultHandled.result {
+                messageWithError += ": " + error.localizedDescription
             }
-        } else {
-            await messenger.yield(MessageBlock(status: .pass, message))
+            await messenger.yield(MessageBlock(status: resultHandled.result?.messageStatusAny ?? result.messageStatusAny, messageWithError))
         }
 
         return result
