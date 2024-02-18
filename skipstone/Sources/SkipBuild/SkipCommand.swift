@@ -844,7 +844,21 @@ extension String {
             return String(self[..<self.index(self.startIndex, offsetBy: length)])
         }
     }
+    
+    /// A new string that replaces the current home directory portion of the current path with a tilde (~) character.
+    ///
+    /// On non-macOS systems, returns the string itself
+    var abbreviatingWithTildeInPath: String {
+        #if os(macOS)
+        // crashes the compiler on Linux
+        (self as NSString).abbreviatingWithTildeInPath
+        #else
+        self
+        #endif
+    }
 }
+
+
 
 protocol ProjectCommand {
     var project: String { get }
