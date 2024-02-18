@@ -113,10 +113,9 @@ extension ToolOptionsCommand {
         
         let action = "assemble" + configuration.rawValue.capitalized // turn "debug" into "Debug" and "release" into "Release"
         await run(with: out, "Assembling Android apk", ["gradle", action, "--console=plain", "--project-dir", gradleProjectDir], environment: env)
-        //{ result in (result, nil) }
-        
+
         // the expected path for the gradle output folder of the assemble action
-        
+
         // for example: skipapp-playground/.build/plugins/outputs/skipapp-playground/Playground/skipstone/Playground/.build/skipapp-playground/outputs/apk/release/Playground-release.apk
         let unsigned = configuration == .release ? "-unsigned" : "" // we do not sign the release builds for reproducibility, which leads to them having the "-unsigned" suffix
 
@@ -124,10 +123,10 @@ extension ToolOptionsCommand {
         let apkPath = outputsPath + "/apk/" + configuration.rawValue + "/" + appModuleName + cfgSuffix + unsigned + ".apk"
         let apkURL = URL(fileURLWithPath: apkPath, isDirectory: false)
         
-        await checkFile(apkURL, with: out, title: "Verify \(apkTitle): \(apkURL.path)") { url in
+        await checkFile(apkURL, with: out, title: "Verify \(apkTitle)") { url in
             return CheckStatus(status: .pass, message: try "Verify \(apkTitle) \(url.fileSizeString)")
         }
-        
+
         var hashes: [URL : String?] = [:]
         hashes[apkURL] = nil
         if returnHashes {
@@ -145,7 +144,7 @@ extension ToolOptionsCommand {
         return await run(with: out, msg, ["zip", "-\(compressionLevel)", "-r", zipFile.path, folder.lastPathComponent], in: folder.deletingLastPathComponent())
     }
     
-    func createIPA(configuration: BuildConfiguration, primaryModuleName: String, cfgSuffix: String, projectURL: URL, out: MessageQueue, prefix re: String, xcodeProjectURL: URL, returnHashes: Bool) async throws -> [URL : String?] {
+    func createIPA(configuration: BuildConfiguration, primaryModuleName: String, sdk: String = "iphoneos", cfgSuffix: String, projectURL: URL, out: MessageQueue, prefix re: String, xcodeProjectURL: URL, returnHashes: Bool) async throws -> [URL : String?] {
         // xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
         let cfg = configuration.rawValue.capitalized
         let archiveBasePath = darwinBuildFolder + "/Archives/" + cfg
@@ -157,9 +156,7 @@ extension ToolOptionsCommand {
         // note that derivedDataPath and archivePath are relative to CWD rather than
         let fullArchivePath = projectURL.path + "/" + archivePath
         let fullDerivedDataPath = projectURL.path + "/" + darwinBuildFolder + "/DerivedData"
-        
-        let sdk = "iphoneos"
-        
+
         await run(with: out, "\(re)Archive iOS ipa", [
             "xcodebuild",
             "-project", xcodeProjectURL.path,
