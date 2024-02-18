@@ -119,7 +119,8 @@ extension XCGradleHarness where Self : XCTestCase {
                 })
 
                 var previousLine: AsyncLineOutput.Element? = nil
-                for try await line in output {
+                for try await pout in output {
+                    let line = pout.line
                     if let outputPrefix = outputPrefix {
                         print(outputPrefix, line)
                     }
