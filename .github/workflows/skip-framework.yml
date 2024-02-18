@@ -38,7 +38,7 @@ jobs:
           # output exported AAR sizes table to the job summary
           echo "Artifact | Size" >> $GITHUB_STEP_SUMMARY
           echo "--- | ---" >> $GITHUB_STEP_SUMMARY
-          for file in `find .build/skip-export/artifacts/ -name '*.aar'`; do
+          for file in `find .build/skip-export/ -name '*.aar'`; do
             fileSize=$(du -sh "$file" | cut -f1)
             fileName=$(basename $file)
             echo "\`$fileName\` | \`$fileSize\`" >> $GITHUB_STEP_SUMMARY
