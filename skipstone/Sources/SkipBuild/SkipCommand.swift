@@ -849,14 +849,14 @@ extension String {
 /// A new string that replaces the current home directory portion of the current path with a tilde (~) character.
 ///
 /// On non-macOS systems, returns the string itself
-func abbreviate(path: String) -> String {
-    #if os(macOS)
-    return (path as NSString).abbreviatingWithTildeInPath
-    #else
-    // crashes the compiler on Linux
-    return path
-    #endif
-}
+//func abbreviate(path: String) -> String {
+//    #if os(macOS)
+//    return (path as NSString).abbreviatingWithTildeInPath
+//    #else
+//    // crashes the compiler on Linux
+//    return path
+//    #endif
+//}
 
 protocol ProjectCommand {
     var project: String { get }
