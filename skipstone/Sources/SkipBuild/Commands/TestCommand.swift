@@ -68,10 +68,10 @@ extension TestCommand {
             passed + failed + skipped + missing
         }
 
-        mutating func update(_ test: GradleDriver.TestCase?) {
+        mutating func update(_ test: TestCaseInfo?) {
             if test?.skipped == true {
                 skipped += 1
-            } else if test?.failures.isEmpty == false {
+            } else if test?.hasFailures == true {
                 failed += 1
             } else if test == nil {
                 missing += 1
@@ -114,7 +114,7 @@ extension TestCommand {
             throw SkipDriveError(errorDescription: "No test results found in \(xunit)")
         }
 
-        func testNameComparison(_ t1: GradleDriver.TestCase, _ t2: GradleDriver.TestCase) -> Bool {
+        func testNameComparison(_ t1: TestCaseInfo, _ t2: TestCaseInfo) -> Bool {
             t1.classname < t2.classname || (t1.classname == t2.classname && t1.name < t2.name)
         }
 
@@ -168,7 +168,7 @@ extension TestCommand {
                 throw SkipDriveError(errorDescription: "JUnit test output folder did not contain any results at: \(junitFolder.path)")
             }
 
-            var junitCases: [GradleDriver.TestCase] = []
+            var junitCases: [TestCaseInfo] = []
             for testResultFile in testResultFiles {
                 // load the xunit results file
                 let junitResults = try GradleDriver.TestSuite.parse(contentsOf: testResultFile)
@@ -182,9 +182,9 @@ extension TestCommand {
             // now we have all the test cases; for each xunit test, check for an equivalent JUnit test
             // note that xunit: classname="SkipZipTests.SkipZipTests" name="testDeflateInflate"
             // maps to junit: classname="skip.zip.SkipZipTests" name="testDeflateInflate$SkipZip_debugUnitTest"
-            var matchedCases: [(xunit: GradleDriver.TestCase, junit: GradleDriver.TestCase?)] = []
+            var matchedCases: [(xunit: TestCaseInfo, junit: TestCaseInfo?)] = []
 
-            func junitModuleCases(for className: String) -> [GradleDriver.TestCase] {
+            func junitModuleCases(for className: String) -> [TestCaseInfo] {
                 junitCases.filter({ $0.classname.hasSuffix("." + className) })
             }
 
@@ -260,7 +260,7 @@ extension TestCommand {
         #endif
     }
 
-    private func createTestSummaryTable(columnLength: Int, _ matchedCases: [(xunit: GradleDriver.TestCase, junit: GradleDriver.TestCase?)], _ testNameComparison: (GradleDriver.TestCase, GradleDriver.TestCase) -> Bool) -> (table: String, xunit: Stats, junit: Stats) {
+    private func createTestSummaryTable(columnLength: Int, _ matchedCases: [(xunit: TestCaseInfo, junit: TestCaseInfo?)], _ testNameComparison: (TestCaseInfo, TestCaseInfo) -> Bool) -> (table: String, xunit: Stats, junit: Stats) {
         // now output all of the test cases
         var outputColumns: [[String]] = [[], [], [], []]
 
@@ -286,11 +286,11 @@ extension TestCommand {
             xunitStats.update(xunit)
             junitStats.update(junit)
 
-            func desc(_ test: GradleDriver.TestCase?) -> String {
+            func desc(_ test: TestCaseInfo?) -> String {
                 guard let test = test else {
                     return "????" // unmatched
                 }
-                let result = (test.skipped == true ? "SKIP" : test.failures.count > 0 ? "FAIL" : "PASS")
+                let result = (test.skipped == true ? "SKIP" : test.hasFailures ? "FAIL" : "PASS")
                 //result += " (" + ((round(test.time * 1000) / 1000).description) + ")"
                 return result
 
@@ -334,9 +334,28 @@ extension TestCommand {
 
         return (testsTable, xunitStats, junitStats)
     }
-
-
 }
+
+protocol TestCaseInfo {
+    /// e.g.: someTestCaseThatAlwaysFails()
+    var name: String { get }
+    /// e.g.: sample.project.LibraryTest
+    var classname: String { get }
+    /// The amount of time it took the test case to run
+    var time: TimeInterval { get }
+    /// Whether the test was skipped by throwing `XCTSkip` (`org.junit.AssumptionViolatedException`)
+    var skipped: Bool { get }
+    /// The failures, if any
+    var hasFailures: Bool { get }
+}
+
+#if canImport(SkipDriveExternal) // needed for GradleDriver.TestCase
+extension GradleDriver.TestCase : TestCaseInfo {
+    var hasFailures: Bool {
+        !failures.isEmpty
+    }
+}
+#endif
 
 
 extension ToolOptionsCommand where Self : OutputOptionsCommand {
