@@ -253,7 +253,7 @@ extension ToolOptionsCommand {
         let args = [cmd] + commandArgs.dropFirst()
 
         // write the command output directly to stderr
-        self.outputOptions.log("executing command: \(args.joined(separator: " "))")
+        self.outputOptions.logMessage("executing command: \(args.joined(separator: " "))")
 
         return await outputOptions.monitor(with: messenger, message, watch: watch, resultHandler: resultHandler) { outputHandler in
             //let result = try await Process.popen(arguments: args, environment: environment, loggingHandler: outputHandler)
@@ -336,7 +336,7 @@ extension ToolOptionsCommand {
 
 extension OutputOptions {
     /// Logs a message, either to standard error (if verbose is `true`), or to the log stream if it is active
-    func log(_ line: String) {
+    func logMessage(_ line: String) {
         if verbose {
             // write to standard out when verbose is true
             writeString(line, error: true, flush: true)
@@ -452,7 +452,7 @@ extension OutputOptions {
             await {
                 do {
                     let result = try await monitorAction({ line in
-                        log(line)
+                        logMessage(line)
                         streams.outputBuffer(add: line) // remember the current output line
                     })
 
