@@ -93,9 +93,15 @@ public struct OutputOptions: ParsableArguments {
     internal final class OutputHandler : Decodable {
         var out: WritableByteStream = stdoutStream
         var err: WritableByteStream = stderrStream
-        var file: LocalFileOutputByteStream? = nil
+        var outFile: LocalFileOutputByteStream? = nil
+        var logFile: LocalFileOutputByteStream? = nil
 
         private var _currentOutput: (lines: [String], lock: NSLock) = ([], NSLock())
+
+        deinit {
+            try? outFile?.close()
+            try? logFile?.close()
+        }
 
         /// Returns the current output line, optionally also setting it; guarded behind a lock
         @discardableResult func outputBuffer(add line: String? = nil, reset: Bool = false) -> [String] {
@@ -115,22 +121,31 @@ public struct OutputOptions: ParsableArguments {
 
         func fileStream(for outputPath: String?) -> LocalFileOutputByteStream? {
             guard let outputPath else { return nil }
-            if let file = file { return file }
+            if let file = outFile { return file }
             do {
                 let path = try AbsolutePath(validating: outputPath)
-                self.file = try LocalFileOutputByteStream(path)
-                return self.file
+                self.outFile = try LocalFileOutputByteStream(path)
+                return self.outFile
             } catch {
                 // should we re-throw? that would make any logging message become throwable
                 return nil
             }
         }
 
+
         /// The closure that will output a message to standard out
         func writeStream(error: Bool, output: String?, _ message: String, terminator: String = "\n") {
             let stream = (error ? err : fileStream(for: output) ?? out)
             stream.write(message + terminator)
             if !terminator.isEmpty { stream.flush() }
+        }
+
+        /// The closure that will output a message to the log file, if it has been configured for the current operation
+        func writeLog(_ message: String, terminator: String = "\n") {
+            if let stream = self.logFile {
+                stream.write(message + terminator)
+                if !terminator.isEmpty { stream.flush() }
+            }
         }
 
         /// The closure that will handle converting and writing the output type to stream
@@ -238,9 +253,7 @@ extension ToolOptionsCommand {
         let args = [cmd] + commandArgs.dropFirst()
 
         // write the command output directly to stderr
-        if self.outputOptions.verbose {
-            self.outputOptions.writeString("executing command: \(args.joined(separator: " "))", error: true, flush: true)
-        }
+        self.outputOptions.log("executing command: \(args.joined(separator: " "))")
 
         return await outputOptions.monitor(with: messenger, message, watch: watch, resultHandler: resultHandler) { outputHandler in
             //let result = try await Process.popen(arguments: args, environment: environment, loggingHandler: outputHandler)
@@ -322,6 +335,16 @@ extension ToolOptionsCommand {
 }
 
 extension OutputOptions {
+    /// Logs a message, either to standard error (if verbose is `true`), or to the log stream if it is active
+    func log(_ line: String) {
+        if verbose {
+            // write to standard out when verbose is true
+            writeString(line, error: true, flush: true)
+        }
+
+        streams.writeLog(line)
+    }
+
     func monitorPrefix(_ progressCharacters: String?, for status: MessageBlock.Status?, startTime: Date) -> String? {
         if let status = status {
             return status.prefix(self.term)
@@ -429,10 +452,7 @@ extension OutputOptions {
             await {
                 do {
                     let result = try await monitorAction({ line in
-                        if verbose {
-                            // write the command output directly to stderr
-                            writeString(line, error: true, flush: true)
-                        }
+                        log(line)
                         streams.outputBuffer(add: line) // remember the current output line
                     })
 

@@ -23,6 +23,9 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
 
     func performCommand(with out: MessageQueue) async throws {
         let startTime = Date.now
+        let logPath = "/tmp/skip-checkup-\(startTime.ISO8601Format()).txt"
+        outputOptions.streams.logFile = try .init(.init(validating: logPath))
+
         await runDoctor(with: out)
 
         @Sendable func buildSampleProject(packageResolvedURL: URL? = nil) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
@@ -67,7 +70,14 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
         let statuses = Dictionary(grouping: messages, by: \.status)
         let failCount = statuses[.fail]?.count ?? 0
         let warnCount = statuses[.warn]?.count ?? 0
-        await out.write(status: failCount > 0 ? .fail : warnCount > 0 ? .warn : .pass, "Skip \(skipVersion) checkup (\(startTime.timingSecondsSinceNow))")
+        let status: MessageBlock.Status = failCount > 0 ? .fail : warnCount > 0 ? .warn : .pass
+        var msg = "Skip \(skipVersion) checkup"
+        if status == .pass {
+            msg += " (\(startTime.timingSecondsSinceNow))"
+        } else {
+            msg += " log: \(logPath)"
+        }
+        await out.write(status: status, msg)
     }
 }
 
