@@ -105,10 +105,8 @@ cd -
 #swift run SkipRunner checkup
 
 # make sure both private skipstone/ and public skip/ tests pass
-# disabled because the skip init tests fail
-#SKIPLOCAL=${PWD} swift test --configuration debug --parallel --package-path ../skip/ 
-
 swift test --configuration debug --parallel
+SKIPLOCAL=${PWD} swift test --configuration debug --parallel --package-path ../skip/ 
 
 # now make the final release build for both architectures
 swift build --arch arm64 --arch x86_64 --configuration ${SKIPCONFIG} --product ${PRODUCT}
