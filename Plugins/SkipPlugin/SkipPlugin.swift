@@ -207,13 +207,8 @@ import PackagePlugin
 
             let hasSkipConfig = FileManager.default.isReadableFile(atPath: depTarget.directory.appending("Skip", "skip.yml").string)
 
-            // perform special Skip cmake support by specifying SKIP_BUILD_CMAKE
-            let isNDKTarget = (depTarget as? ClangSourceModuleTarget)?.preprocessorDefinitions.contains(where: { $0 == "SKIP_BUILD_NDK" }) == true
-
-            // ignore non-Skip-enabled dependency modules, based on the existance of the SRC/MODULE/Skip/skip.yml file,
-            // or if it is a zero-dependency C library.
-            // ideally, we would simply filter out dependencies that don't use the skip plugin, but there's no `plugins` property of PackagePlugin.Target
-            if !hasSkipConfig && !isNDKTarget {
+            // ignore non-Skip-enabled dependency modules, based on the existance of the SRC/MODULE/Skip/skip.yml file
+            if !hasSkipConfig {
                 continue
             }
 
