@@ -78,6 +78,20 @@ jobs:
       - name: Verify Skip App
         run: skip verify
 
+      - name: Export project
+        run: |
+          skip export
+
+          # output exported AAR sizes table to the job summary
+          echo "Artifact | Size" >> $GITHUB_STEP_SUMMARY
+          echo "--- | ---" >> $GITHUB_STEP_SUMMARY
+          for file in .build/skip-export/[dr]e*/*/*.*; do
+            fileSize=$(du -sh "$file" | cut -f1)
+            fileName=$(basename $file)
+            echo "\`$fileName\` | \`$fileSize\`" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+
       - name: Run Tests
         # "null cannot be cast to non-null type kotlin.String"
         run: test ! -d Tests || skip test || skip test -v
