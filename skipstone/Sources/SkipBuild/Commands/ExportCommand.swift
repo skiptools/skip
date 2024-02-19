@@ -85,6 +85,7 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
         let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths // environment that includes a default ANDROID_HOME
 
         let assembleAction = variants == ["debug"] ? "assembleDebug" : variants == ["release"] ? "assembleRelease" : "assemble"
+        let bundleAction = variants == ["debug"] ? "bundleDebug" : variants == ["release"] ? "bundleRelease" : "bundle"
 
         // as well as the app itself, also output each of the specified modules (or all the modules if they are not specified)
         for moduleName in moduleNames {
@@ -146,23 +147,44 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
             await run(with: out, "Assemble app \(appModuleName)", ["gradle", assembleAction] + gradleArgs, environment: env)
 
             for variant in variants {
-                let appOutputFolder = outputFolderAbsolute.appending(components: [variant, "apk"])
-                try fs.createDirectory(appOutputFolder, recursive: true)
-
-                let appBuildOutputFolder = buildFolderAbsolute.appending(components: ["Android", "app", "outputs", "apk", variant])
+                let apkBuildOutputFolder = buildFolderAbsolute.appending(components: ["Android", "app", "outputs", "apk", variant])
+                let apkOutputFolder = outputFolderAbsolute.appending(components: [variant, "apk"])
+                try fs.createDirectory(apkOutputFolder, recursive: true)
 
                 // when the user has set up signing in their build.gradle.kts it will not be called "unsigned"
                 let apkNames = variant == "release" ? ["app-release.apk", "app-release-unsigned.apk"] : ["app-debug.apk"]
                 let apkOutputName = "\(appModuleName)-\(variant).apk"
-                let appOutputPath = appOutputFolder.appending(component: apkOutputName)
+                let apkOutputPath = apkOutputFolder.appending(component: apkOutputName)
 
                 await outputOptions.monitor(with: out, "Export \(apkOutputName)") { _ in
-                    try? fs.removeFileTree(appOutputPath) // copy will fail if it already exists
+                    try? fs.removeFileTree(apkOutputPath) // copy will fail if it already exists
                     // try each of the names, to handle signed and unsigned artifacts
                     for apkName in apkNames {
-                        try? fs.copy(from: appBuildOutputFolder.appending(component: apkName), to: appOutputPath)
+                        try? fs.copy(from: apkBuildOutputFolder.appending(component: apkName), to: apkOutputPath)
                     }
-                    return try appOutputPath.asURL.fileSizeString
+                    return try apkOutputPath.asURL.fileSizeString
+                }
+            }
+
+            await run(with: out, "Bundle app \(appModuleName)", ["gradle", bundleAction] + gradleArgs, environment: env)
+
+            for variant in variants {
+                let aabBuildOutputFolder = buildFolderAbsolute.appending(components: ["Android", "app", "outputs", "bundle", variant])
+                let aabOutputFolder = outputFolderAbsolute.appending(components: [variant, "bundle"])
+                try fs.createDirectory(aabOutputFolder, recursive: true)
+
+                // when the user has set up signing in their build.gradle.kts it will not be called "unsigned"
+                let aabNames = variant == "release" ? ["app-release.aab", "app-release-unsigned.aab"] : ["app-debug.aab"]
+                let aabOutputName = "\(appModuleName)-\(variant).aab"
+                let aabOutputPath = aabOutputFolder.appending(component: aabOutputName)
+
+                await outputOptions.monitor(with: out, "Export \(aabOutputName)") { _ in
+                    try? fs.removeFileTree(aabOutputPath) // copy will fail if it already exists
+                    // try each of the names, to handle signed and unsigned artifacts
+                    for aabName in aabNames {
+                        try? fs.copy(from: aabBuildOutputFolder.appending(component: aabName), to: aabOutputPath)
+                    }
+                    return try aabOutputPath.asURL.fileSizeString
                 }
             }
         }

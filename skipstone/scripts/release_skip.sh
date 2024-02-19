@@ -110,7 +110,7 @@ swift test --configuration debug --parallel
 # note that these sometimes need to be disabled when a framework upate
 # is dependent on a skipstone change; the swift test init tests will
 # fail until there is a new release
-SKIPLOCAL=${PWD} swift test --configuration debug --parallel --package-path ../skip/ 
+#SKIPLOCAL=${PWD} swift test --configuration debug --package-path ../skip/ 
 
 # now make the final release build for both architectures
 swift build --arch arm64 --arch x86_64 --configuration ${SKIPCONFIG} --product ${PRODUCT}
