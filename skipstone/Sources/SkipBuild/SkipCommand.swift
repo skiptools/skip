@@ -844,20 +844,20 @@ extension String {
             return String(self[..<self.index(self.startIndex, offsetBy: length)])
         }
     }
+
+    /// A new string that replaces the current home directory portion of the current path with a tilde (~) character.
+    ///
+    /// On non-macOS systems, returns the string itself
+    var abbreviatingWithTilde: String {
+        #if os(macOS)
+        // crashes the compiler on Linux
+        (self as NSString).abbreviatingWithTildeInPath as String
+        #else
+        self
+        #endif
+    }
 }
 
-
-/// A new string that replaces the current home directory portion of the current path with a tilde (~) character.
-///
-/// On non-macOS systems, returns the string itself
-//func abbreviate(path: String) -> String {
-//    #if os(macOS)
-//    return (path as NSString).abbreviatingWithTildeInPath
-//    #else
-//    // crashes the compiler on Linux
-//    return path
-//    #endif
-//}
 
 protocol ProjectCommand {
     var project: String { get }

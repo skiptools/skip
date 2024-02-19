@@ -23,7 +23,7 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
 
     func performCommand(with out: MessageQueue) async throws {
         let startTime = Date.now
-        let logPath = "/tmp/skip-checkup-\(startTime.ISO8601Format()).txt"
+        let logPath = "/tmp/skip-checkup-\(ISO8601DateFormatter.string(from: startTime, timeZone: TimeZone.current)).txt"
         outputOptions.streams.logFile = try .init(.init(validating: logPath))
 
         await runDoctor(with: out)

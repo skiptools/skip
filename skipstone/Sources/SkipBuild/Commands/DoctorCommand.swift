@@ -133,7 +133,7 @@ extension ToolOptionsCommand {
             if licenseCount > 0 {
                 return (result, MessageBlock(status: .pass, "Android tools SDKs: \(licenseCount)"))
             } else {
-                return (result, MessageBlock(status: .warn, "Android SDK licenses need to be accepted with: \(androidHome)/tools/bin/sdkmanager --licenses"))
+                return (result, MessageBlock(status: .warn, "Android SDK licenses need to be accepted with: \(androidHome.abbreviatingWithTilde)/tools/bin/sdkmanager --licenses"))
             }
         }, monitorAction: { _ in
             try FileManager.default.contentsOfDirectory(atPath: androidHome + "/licenses/")

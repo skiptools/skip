@@ -171,7 +171,7 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
             await showFileTree(in: outputFolderAbsolute, with: out)
         }
 
-        await out.write(status: .pass, "Skip export \(packageName) to \(outputFolder) (\(startTime.timingSecondsSinceNow))")
+        await out.write(status: .pass, "Skip export \(packageName) to \(outputFolder.abbreviatingWithTilde) (\(startTime.timingSecondsSinceNow))")
     }
 }
 
