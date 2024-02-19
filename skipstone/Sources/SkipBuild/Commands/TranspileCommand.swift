@@ -675,8 +675,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                     continue // skip hidden files
                 }
 
-                if fileName == buildSrcFolderName {
-                    continue // the top-level "buildSrc" folder is linked higher up
+                if path.basename == buildSrcFolderName {
+                    continue // don't copy buildSrc into resources
                 }
 
                 let sourcePath = try AbsolutePath(path, validating: fileName)
@@ -820,7 +820,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                     }
                 } else { // non-processed resources are just linked directly from the package
                     resourcesIndex.append(resourceSourcePath)
-
                     let destinationPath = destinationBasePath.appending(resourceSourcePath)
 
                     // only create links for files that exist

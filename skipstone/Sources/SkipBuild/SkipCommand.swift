@@ -874,6 +874,32 @@ protocol ToolOptionsCommand : OutputOptionsCommand {
     var toolOptions: ToolOptions { get }
 }
 
+extension ToolOptionsCommand {
+    /// Run swift package dump-package and return the parsed JSON results
+    func parseSwiftPackage(with out: MessageQueue, at projectPath: String) async throws -> PackageManifest {
+        try await decodeCommand(with: out, title: "Check Swift Package", cmd: ["swift", "package", "dump-package", "--package-path", projectPath]).get()
+    }
+
+    /// Invokes the given command that launches an executable and is expected to output JSON, which we parse into the specified data structure
+    func decodeCommand<T: Decodable>(with out: MessageQueue, title: String, cmd: [String]) async -> Result<T, Error> {
+
+        func decodeResult(_ result: Result<ProcessOutput, Error>) -> Result<T, Error> {
+            do {
+                let res = try result.get()
+                let decoder = JSONDecoder()
+                let decoded = try decoder.decode(T.self, from: res.stdout.utf8Data)
+                return .success(decoded) // (result: .success(decoded), message: nil)
+            } catch {
+                return .failure(error) // (result: .failure(error), message: MessageBlock(status: .fail, title + ": error executing \(cmd.joined(separator: " ")): \(error)"))
+            }
+        }
+
+        let output = await run(with: out, title, cmd)
+        return decodeResult(output)
+    }
+
+}
+
 struct ToolOptions: ParsableArguments {
     @Option(help: ArgumentHelp("Xcode command path", valueName: "path"))
     var xcodebuild: String? = nil
@@ -963,6 +989,7 @@ struct ProjectTemplate : Codable {
     let localizedTitle: [String: String]
     let localizedDescription: [String: String]
 }
+
 
 /// An incomplete representation of package JSON, to be filled in as needed for the purposes of the tool
 /// The output from `swift package dump-package`.

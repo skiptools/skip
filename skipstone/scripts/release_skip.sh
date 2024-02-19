@@ -106,6 +106,10 @@ cd -
 
 # make sure both private skipstone/ and public skip/ tests pass
 swift test --configuration debug --parallel
+
+# note that these sometimes need to be disabled when a framework upate
+# is dependent on a skipstone change; the swift test init tests will
+# fail until there is a new release
 SKIPLOCAL=${PWD} swift test --configuration debug --parallel --package-path ../skip/ 
 
 # now make the final release build for both architectures

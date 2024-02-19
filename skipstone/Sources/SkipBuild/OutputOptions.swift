@@ -524,6 +524,15 @@ extension Result where Success == MessageEncodable {
 }
 
 extension Result {
+    /// Async equivalent of `Result.init(catching:)`
+    public init(catchingAsync block: () async throws -> Success) async where Failure == Error {
+        do {
+            self = .success(try await block())
+        } catch {
+            self = .failure(error)
+        }
+    }
+
     var messageStatusAny: MessageBlock.Status {
         switch self {
         case .success: return .pass

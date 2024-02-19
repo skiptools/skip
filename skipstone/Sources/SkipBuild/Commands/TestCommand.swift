@@ -48,12 +48,43 @@ struct TestCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
     @Option(name: [.customShort("c"), .long], help: ArgumentHelp("Configuration debug/release", valueName: "c"))
     var configuration: String = "debug"
 
+    @Option(name: [.long], help: ArgumentHelp("Output summary table", valueName: "path"))
+    var summaryFile: String?
+
     func performCommand(with out: MessageQueue) async throws {
         try await runTestCommand(with: out)
     }
 }
 
 extension TestCommand {
+
+    struct Stats {
+        var passed: Int = 0
+        var failed: Int = 0
+        var skipped: Int = 0
+        var missing: Int = 0
+
+        var total: Int {
+            passed + failed + skipped + missing
+        }
+
+        mutating func update(_ test: GradleDriver.TestCase?) {
+            if test?.skipped == true {
+                skipped += 1
+            } else if test?.failures.isEmpty == false {
+                failed += 1
+            } else if test == nil {
+                missing += 1
+            } else {
+                passed += 1
+            }
+        }
+
+        var passRate: String {
+            NumberFormatter.localizedString(from: (Double(passed) / Double(total)) as NSNumber, number: .percent)
+        }
+    }
+
     func runTestCommand(with out: MessageQueue) async throws {
 
         // only run tests when there is a Tests/ folder
@@ -64,9 +95,7 @@ extension TestCommand {
 
         let xunit = xunit ?? ".build/xcunit-\(UUID().uuidString).xml"
 
-        func packageName() async throws -> String {
-            try await parseSwiftPackage(with: out, at: project).name
-        }
+        let packageName = await Result(catchingAsync: { try await parseSwiftPackage(with: out, at: project).name })
 
         var testResult: Result<ProcessOutput, Error>? = nil
         if test == true {
@@ -104,32 +133,6 @@ extension TestCommand {
         // XUnit: <testcase name="testDeflateInflate" classname="SkipZipTests.SkipZipTests" time="0.047230875">
         // JUnit: <testcase name="testDeflateInflate$SkipZip_debugUnitTest" classname="skip.zip.SkipZipTests" time="0.024"/>
 
-        struct Stats {
-            var passed: Int = 0
-            var failed: Int = 0
-            var skipped: Int = 0
-            var missing: Int = 0
-
-            var total: Int {
-                passed + failed + skipped + missing
-            }
-
-            mutating func update(_ test: GradleDriver.TestCase?) {
-                if test?.skipped == true {
-                    skipped += 1
-                } else if test?.failures.isEmpty == false {
-                    failed += 1
-                } else if test == nil {
-                    missing += 1
-                } else {
-                    passed += 1
-                }
-            }
-
-            var passRate: String {
-                NumberFormatter.localizedString(from: (Double(passed) / Double(total)) as NSNumber, number: .percent)
-            }
-        }
 
         var allXunitStats: [Stats] = []
         var allJunitStats: [Stats] = []
@@ -144,7 +147,7 @@ extension TestCommand {
                 // .build/plugins/outputs/skip-zip/SkipZipTests/skipstone/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
                 junitFolder = URL(fileURLWithPath: junit, isDirectory: true)
             } else {
-                var packageName = try await packageName()
+                var packageName = try packageName.get()
                 // FIXME: the "name" attribute in the Package.swift file does not seem to dictate the name of the local outputs folder in CLI SPM like it does in Xcode; rather, the outputs seem to go to the enclosing directory name for the package
                 let folderName = URL(fileURLWithPath: project).standardizedFileURL.lastPathComponent
                 if packageName != folderName {
@@ -206,83 +209,26 @@ extension TestCommand {
                 matchedCases.append((xunit: xunitCase, junit: cases.first))
             }
 
-            // now output all of the test cases
-            var outputColumns: [[String]] = [[], [], [], []]
-
-            func addSeparator() {
-                (0..<outputColumns.count).forEach({ outputColumns[$0].append("-") }) // add header dashes
-            }
-
-            /// Add a row with the given columns
-            func addRow(_ values: [String]) {
-                values.enumerated().forEach({ outputColumns[$0.offset].append($0.element) })
-            }
-
-            //addSeparator()
-            addRow(["Test", "Case", "Swift", "Kotlin"])
-            addSeparator()
-
-            var (xunitStats, junitStats) = (Stats(), Stats())
-            defer {
-                allXunitStats.append(xunitStats)
-                allJunitStats.append(junitStats)
-            }
-
-            for (xunit, junit) in matchedCases.sorted(by: { testNameComparison($0.xunit, $1.xunit) }) {
-                let testName = xunit.name
-                outputColumns[0].append(xunit.classname.split(separator: ".").last?.description ?? "")
-                outputColumns[1].append(testName)
-
-                xunitStats.update(xunit)
-                junitStats.update(junit)
-
-                func desc(_ test: GradleDriver.TestCase?) -> String {
-                    guard let test = test else {
-                        return "????" // unmatched
-                    }
-                    let result = (test.skipped == true ? "SKIP" : test.failures.count > 0 ? "FAIL" : "PASS")
-                    //result += " (" + ((round(test.time * 1000) / 1000).description) + ")"
-                    return result
-
-                }
-
-                outputColumns[2].append(desc(xunit))
-                outputColumns[3].append(desc(junit))
-            }
-
-            // add summary
-            //addSeparator()  // add footer dashes
-            addRow(["", "", xunitStats.passRate, junitStats.passRate])
-            //addSeparator()  // add footer dashes
-
-            // pad all the columns for nice output
-            let lengths = outputColumns.map({ $0.reduce(0, { max($0, $1.count) })})
-            for (index, length) in lengths.enumerated() {
-                outputColumns[index] = outputColumns[index].map { $0.pad(min(length, maxColumnLength), paddingCharacter: $0 == "-" ? "-" : " ") }
-            }
-
-            let rowCount = outputColumns.map({ $0.count }).min() ?? 0
-            var testsTable = ""
-            for row in 0..<rowCount {
-                let row = outputColumns.map({ $0[row] })
-
-                // these look nice in the terminal, but they don't generate valid markdown tables
-                // header columns are all "-"
-                //let sep = Set(row.flatMap({ Array($0) })) == ["-"] ? "-" : " "
-                // corners of headers are "+"
-                //let term = sep == "-" ? "+" : "|"
-
-                let sep = " "
-                let div = "|"
-
-                testsTable += div
-                for cell in row {
-                    testsTable += sep + cell + sep + div
-                }
-                testsTable += "\n"
-            }
-
+            let (testsTable, xunit, junit) = createTestSummaryTable(columnLength: maxColumnLength, matchedCases, testNameComparison)
+            allXunitStats.append(xunit)
+            allJunitStats.append(junit)
             await out.write(status: nil, testsTable)
+
+            // when we are running in CI, the "GITHUB_STEP_SUMMARY" contains the path of a file that can be used to write a markdown summary of the tests
+            // https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary
+            if let summaryFile = self.summaryFile ?? ProcessInfo.processInfo.environment["GITHUB_STEP_SUMMARY"] ?? ProcessInfo.processInfo.environment["CI_STEP_SUMMARY"], !summaryFile.isEmpty {
+                let (summaryTable, _, _) = createTestSummaryTable(columnLength: 1024, matchedCases, testNameComparison)
+
+                if !FileManager.default.fileExists(atPath: summaryFile) {
+                    FileManager.default.createFile(atPath: summaryFile, contents: nil, attributes: nil)
+                }
+
+                if let handle = FileHandle(forWritingAtPath: summaryFile) {
+                    defer { try? handle.close() }
+                    handle.seekToEndOfFile()
+                    try? handle.write(contentsOf: (summaryTable + "\n").utf8Data)
+                }
+            }
         }
 
         let exitCode = try? testResult?.get().exitCode
@@ -313,6 +259,83 @@ extension TestCommand {
         }
         #endif
     }
+
+    private func createTestSummaryTable(columnLength: Int, _ matchedCases: [(xunit: GradleDriver.TestCase, junit: GradleDriver.TestCase?)], _ testNameComparison: (GradleDriver.TestCase, GradleDriver.TestCase) -> Bool) -> (table: String, xunit: Stats, junit: Stats) {
+        // now output all of the test cases
+        var outputColumns: [[String]] = [[], [], [], []]
+
+        func addSeparator() {
+            (0..<outputColumns.count).forEach({ outputColumns[$0].append("-") }) // add header dashes
+        }
+
+        /// Add a row with the given columns
+        func addRow(_ values: [String]) {
+            values.enumerated().forEach({ outputColumns[$0.offset].append($0.element) })
+        }
+
+        //addSeparator()
+        addRow(["Test", "Case", "Swift", "Kotlin"])
+        addSeparator()
+
+        var (xunitStats, junitStats) = (Stats(), Stats())
+        for (xunit, junit) in matchedCases.sorted(by: { testNameComparison($0.xunit, $1.xunit) }) {
+            let testName = xunit.name
+            outputColumns[0].append(xunit.classname.split(separator: ".").last?.description ?? "")
+            outputColumns[1].append(testName)
+
+            xunitStats.update(xunit)
+            junitStats.update(junit)
+
+            func desc(_ test: GradleDriver.TestCase?) -> String {
+                guard let test = test else {
+                    return "????" // unmatched
+                }
+                let result = (test.skipped == true ? "SKIP" : test.failures.count > 0 ? "FAIL" : "PASS")
+                //result += " (" + ((round(test.time * 1000) / 1000).description) + ")"
+                return result
+
+            }
+
+            outputColumns[2].append(desc(xunit))
+            outputColumns[3].append(desc(junit))
+        }
+
+        // add summary
+        //addSeparator()  // add footer dashes
+        addRow(["", "", xunitStats.passRate, junitStats.passRate])
+        //addSeparator()  // add footer dashes
+
+        // pad all the columns for nice output
+        let lengths = outputColumns.map({ $0.reduce(0, { max($0, $1.count) })})
+        for (index, length) in lengths.enumerated() {
+            outputColumns[index] = outputColumns[index].map { $0.pad(min(length, columnLength), paddingCharacter: $0 == "-" ? "-" : " ") }
+        }
+
+        let rowCount = outputColumns.map({ $0.count }).min() ?? 0
+        var testsTable = ""
+        for row in 0..<rowCount {
+            let row = outputColumns.map({ $0[row] })
+
+            // these look nice in the terminal, but they don't generate valid markdown tables
+            // header columns are all "-"
+            //let sep = Set(row.flatMap({ Array($0) })) == ["-"] ? "-" : " "
+            // corners of headers are "+"
+            //let term = sep == "-" ? "+" : "|"
+
+            let sep = " "
+            let div = "|"
+
+            testsTable += div
+            for cell in row {
+                testsTable += sep + cell + sep + div
+            }
+            testsTable += "\n"
+        }
+
+        return (testsTable, xunitStats, junitStats)
+    }
+
+
 }
 
 
