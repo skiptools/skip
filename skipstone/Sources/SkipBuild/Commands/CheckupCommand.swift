@@ -75,7 +75,7 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
         if status == .pass {
             msg += " (\(startTime.timingSecondsSinceNow))"
         } else {
-            msg += " log: \(logPath)"
+            msg += " \(status.rawValue) (log: \(logPath))\nSee \(outputOptions.term.yellow("https://skip.tools/docs/faq")) and \(outputOptions.term.yellow("https://community.skip.tools")) for resolution"
         }
         await out.write(status: status, msg)
     }
