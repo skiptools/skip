@@ -846,6 +846,7 @@ extension String {
     }
 }
 
+
 /// A new string that replaces the current home directory portion of the current path with a tilde (~) character.
 ///
 /// On non-macOS systems, returns the string itself
