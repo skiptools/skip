@@ -2676,7 +2676,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         } else {
             kstatement.mayBeSharedMutableStruct = true
         }
-        if statement.apiFlags.contains(.writeable) && kstatement.mayBeSharedMutableStruct {
+        if statement.apiFlags.contains(.writeable) && kstatement.mayBeSharedMutableStruct && !kstatement.attributes.contains(.unavailable) {
             // Use a closure to build onUpdate code on-demand in case our property name is changed
             kstatement.onUpdate = { [weak kstatement] in
                 guard let kstatement else {
