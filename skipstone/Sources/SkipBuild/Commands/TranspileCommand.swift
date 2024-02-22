@@ -759,7 +759,11 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 let components = try RelativePath(validating: resourceSourceURL.relativePath).components.dropFirst(1)
                 let resourceSourcePath = try RelativePath(validating: components.joined(separator: "/"))
 
-                if sourcePath.extension == "xcstrings" {
+                if sourcePath.parentDirectory.basename == buildSrcFolderName {
+                    trace("skipping resource linking for buildSrc/")
+                } else if isCMakeProject {
+                    trace("skipping resource linking for CMake project")
+                } else if sourcePath.extension == "xcstrings" {
                     // process the .xcstrings in the same way that Xcode does: parse the JSON and use the localizations keys to synthesize a LANG.lproj/TABLENAME.strings file
                     let xcstrings = try JSONDecoder().decode(LocalizableStringsDictionary.self, from: Data(contentsOf: resourceSourceURL))
                     let locales = Set(xcstrings.strings.values.compactMap(\.localizations?.keys).joined())
@@ -792,7 +796,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                             resourcesIndex.append(lproj)
                         }
                     }
-                } else if !isCMakeProject { // non-processed resources are just linked directly from the package
+                } else { // non-processed resources are just linked directly from the package
                     resourcesIndex.append(resourceSourcePath)
                     let destinationPath = destinationBasePath.appending(resourceSourcePath)
 

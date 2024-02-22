@@ -37,11 +37,11 @@ extension ToolOptionsCommand {
     func runDoctor(with out: MessageQueue) async {
 
         /// Invokes the given command and attempts to parse the output against the given regular expression pattern to validate that it is a semantic version string
-        func checkVersion(title: String, cmd: [String], min: Version? = nil, pattern: String, watch: Bool = false) async {
+        func checkVersion(title: String, cmd: [String], min: Version? = nil, pattern: String, watch: Bool = false, hint: String? = nil) async {
 
             func parseVersion(_ result: Result<ProcessOutput, Error>?) -> (result: Result<ProcessOutput, Error>?, message: MessageBlock?) {
                 guard let res = try? result?.get() else {
-                    return (result: result, message: MessageBlock(status: .fail, title + ": error executing \(cmd.first ?? "")"))
+                    return (result: result, message: MessageBlock(status: .fail, title + ": error executing \(cmd.first ?? "")\(hint ?? "")"))
                 }
 
                 let output = res.stdout.trimmingCharacters(in: .newlines) + res.stderr.trimmingCharacters(in: .newlines)
@@ -67,7 +67,11 @@ extension ToolOptionsCommand {
                 }
 
                 if let min = min {
-                    return (result: result, message: MessageBlock(status: semver < min ? .warn : .pass, "\(title) \(outputVersion) (\(semver < min ? "<" : semver > min ? ">" : "=") \(min))"))
+                    if semver < min {
+                        return (result: result, message: MessageBlock(status: .warn, "\(title) \(outputVersion) (< \(min))\(hint ?? "")"))
+                    } else {
+                        return (result: result, message: MessageBlock(status: .pass, "\(title) \(outputVersion) (\(semver > min ? ">" : "=") \(min))"))
+                    }
                 } else {
                     return (result: result, message: MessageBlock(status: .pass, "\(title) \(semver)"))
                 }
@@ -76,21 +80,39 @@ extension ToolOptionsCommand {
             await run(with: out, title, cmd, watch: watch, resultHandler: parseVersion)
         }
 
+        /// check for stale Intel Homebrew installations of tools (java, etc.) on ARM (https://github.com/skiptools/skip/issues/97)
+        func checkForRosetta() async {
+
+            func checkResult(_ result: Result<ProcessOutput, Error>?) -> (result: Result<ProcessOutput, Error>?, message: MessageBlock?) {
+                guard let res = try? result?.get() else {
+                    return (result: result, message: MessageBlock(status: .fail, "Error running sysctl"))
+                }
+                let stdout = res.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+                if stdout != "0" {
+                    return (result: result, message: MessageBlock(status: .fail, "System compatibility: wrong architecture \(stdout), Rosetta must not be enabled for process"))
+                } else {
+                    return (result: result, message: MessageBlock(status: .pass, "System compatibility: PASS"))
+                }
+            }
+
+            await run(with: out, "System compatibility", ["sysctl", "-n", "sysctl.proc_translated"], watch: false, resultHandler: checkResult)
+        }
+
         //await checkVersion(title: "ECHO2 VERSION", cmd: ["sh", "-c", "echo ONE ; sleep 1; echo TWO ; sleep 1; echo THREE ; sleep 1; echo 3.2.1"], min: Version("1.2.3"), pattern: "([0-9.]+)", watch: true)
 
         await checkVersion(title: "Skip version", cmd: ["skip", "version"], min: Version(skipVersion), pattern: "Skip version ([0-9.]+)")
         await checkVersion(title: "macOS version", cmd: ["sw_vers", "--productVersion"], min: Version("13.5.0"), pattern: "([0-9.]+)")
         await checkVersion(title: "Swift version", cmd: ["swift", "-version"], min: Version("5.9.0"), pattern: "Swift version ([0-9.]+)")
         // TODO: add advice to run `xcode-select -s /Applications/Xcode.app/Contents/Developer` to work around https://github.com/skiptools/skip/issues/18
-        await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)")
+        await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)", hint: " (install from: https://developer.apple.com/xcode/)")
         await checkXcodeCommandLineTools(with: out)
-        await checkVersion(title: "Homebrew version", cmd: ["brew", "--version"], min: Version("4.1.0"), pattern: "Homebrew ([0-9.]+)")
-        await checkVersion(title: "Gradle version", cmd: ["gradle", "-version"], min: Version("8.6.0"), pattern: "Gradle ([0-9.]+)")
-        await checkVersion(title: "Java version", cmd: ["java", "-version"], min: Version("21.0.0"), pattern: "version \"([0-9._]+)\"") // we don't necessarily need java in the path (which it doesn't seem to be by default with Homebrew)
+        await checkVersion(title: "Homebrew version", cmd: ["brew", "--version"], min: Version("4.1.0"), pattern: "Homebrew ([0-9.]+)", hint: " (install from: https://brew.sh)")
+        await checkForRosetta()
+        await checkVersion(title: "Gradle version", cmd: ["gradle", "-version"], min: Version("8.6.0"), pattern: "Gradle ([0-9.]+)", hint: " (install with: brew install gradle)")
+        await checkVersion(title: "Java version", cmd: ["java", "-version"], min: Version("21.0.0"), pattern: "version \"([0-9._]+)\"", hint: ProcessInfo.processInfo.environment["JAVA_HOME"] == nil ? nil : " (check JAVA_HOME envrionment: \(ProcessInfo.processInfo.environment["JAVA_HOME"] ?? "unset"))") // we don't necessarily need java in the path (which it doesn't seem to be by default with Homebrew)
         await checkVersion(title: "Android Debug Bridge version", cmd: ["adb", "version"], min: Version("1.0.40"), pattern: "version ([0-9.]+)")
         await checkAndroidStudioVersion(with: out)
 
-        // TODO: check for stale Intel Homebrew installations of tools (java, etc.) on ARM
     }
 
     func checkXcodeCommandLineTools(with out: MessageQueue) async {
