@@ -14,11 +14,13 @@ let package = Package(
     products: [
         .executable(name: "skip", targets: ["skip"]),
         .plugin(name: "skipstone", targets: ["skipstone"]),
+        .plugin(name: "skiplink", targets: ["skiplink"]),
         .library(name: "SkipDrive", targets: ["SkipDrive"]),
         .library(name: "SkipTest", targets: ["SkipTest"]),
     ],
     targets: [
         .plugin(name: "skipstone", capability: .buildTool(), dependencies: ["skip"], path: "Plugins/SkipPlugin"),
+        .plugin(name: "skiplink", capability: .command(intent: .custom(verb: "SkipLink", description: "Create local links to transpiled output"), permissions: [.writeToPackageDirectory(reason: "This command will create local links to the skipstone output for the specified package(s), enabling access to the transpiled Kotlin")]), dependencies: ["skip"], path: "Plugins/SkipLink"),
         .target(name: "SkipDrive", dependencies: ["skipstone", .target(name: "skip")]),
         .target(name: "SkipTest", dependencies: [.target(name: "SkipDrive", condition: .when(platforms: [.macOS]))]),
         .testTarget(name: "SkipTestTests", dependencies: ["SkipTest"]),
