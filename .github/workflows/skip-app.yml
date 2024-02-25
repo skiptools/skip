@@ -167,6 +167,8 @@ jobs:
         run: |
           APPNAME="${SKIP_MODULE}"
 
+          mkdir -p ${RELDIR}/
+          cp -a .build/skip-export ${RELDIR}/
           # merge the ipa and apk zips into a single archive
           cd ${RELDIR}/
           ls -la
