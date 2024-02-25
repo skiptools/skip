@@ -465,9 +465,13 @@ final class BuiltinTypeTests: XCTestCase {
 
     func testExpressibleByStringInterpolationMatch() async throws {
         try await check(supportingSwift: """
-        protocol ExpressibleByStringInterpolation {
+        protocol ExpressibleByStringLiteral {
+        }
+        protocol ExpressibleByStringInterpolation: ExpressibleByStringLiteral {
         }
         struct LocalizedKey: ExpressibleByStringInterpolation {
+            init(stringLiteral: String) {
+            }
             init(stringInterpolation: Interpolation) {
             }
             struct Interpolation {
@@ -488,16 +492,22 @@ final class BuiltinTypeTests: XCTestCase {
         func localize(key: LocalizedKey, comment: String? = nil) {
         }
         """, swift: """
+        let str = ""
         Text("Hello!")
         Text("Hello \\(name)!")
+        Text(str)
         NSLocalizedString("Hello!")
         NSLocalizedString("Hello \\(name)!")
+        NSLocalizedString(str)
         localize(key: "Hello!")
         localize(key: "Hello!", comment: "Comment")
+        localize(key: str, comment: "Comment")
         localize(key: "Hello \\(name)!")
         localize(key: "Hello \\(name)!", comment: "Comment")
+        localize(key: str, comment: "Comment")
         """, kotlin: """
-        Text("Hello!")
+        internal val str = ""
+        Text(LocalizedKey(stringLiteral = "Hello!"))
         Text({
             val str = LocalizedKey.Interpolation(literalCapacity = 0, interpolationCount = 0)
             str.appendLiteral("Hello ")
@@ -505,7 +515,8 @@ final class BuiltinTypeTests: XCTestCase {
             str.appendLiteral("!")
             LocalizedKey(stringInterpolation = str)
         }())
-        NSLocalizedString("Hello!")
+        Text(str)
+        NSLocalizedString(LocalizedKey(stringLiteral = "Hello!"))
         NSLocalizedString({
             val str = LocalizedKey.Interpolation(literalCapacity = 0, interpolationCount = 0)
             str.appendLiteral("Hello ")
@@ -513,8 +524,10 @@ final class BuiltinTypeTests: XCTestCase {
             str.appendLiteral("!")
             LocalizedKey(stringInterpolation = str)
         }())
-        localize(key = "Hello!")
-        localize(key = "Hello!", comment = "Comment")
+        NSLocalizedString(str)
+        localize(key = LocalizedKey(stringLiteral = "Hello!"))
+        localize(key = LocalizedKey(stringLiteral = "Hello!"), comment = "Comment")
+        localize(key = str, comment = "Comment")
         localize(key = {
             val str = LocalizedKey.Interpolation(literalCapacity = 0, interpolationCount = 0)
             str.appendLiteral("Hello ")
@@ -529,6 +542,7 @@ final class BuiltinTypeTests: XCTestCase {
             str.appendLiteral("!")
             LocalizedKey(stringInterpolation = str)
         }(), comment = "Comment")
+        localize(key = str, comment = "Comment")
         """)
     }
 }

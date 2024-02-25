@@ -450,8 +450,12 @@ struct TypeInferenceContext {
             // TODO: Handle other Expressible types
             switch expression.type {
             case .stringLiteral:
-                if parameterType.isNamedType, let stringLiteral = expression as? StringLiteral, let interpolationType = interpolationType(for: parameterType) {
-                    stringLiteral.expressibleByStringInterpolationType = (parameterType, interpolationType)
+                if parameterType.isNamedType, let stringLiteral = expression as? StringLiteral {
+                    if stringLiteral.isInterpolated, let interpolationType = interpolationType(for: parameterType) {
+                        stringLiteral.expressibleByStringInterpolationType = (parameterType, interpolationType)
+                    } else {
+                        stringLiteral.expressibleByStringLiteralType = parameterType
+                    }
                 }
             default:
                 break
@@ -589,14 +593,7 @@ struct TypeInferenceContext {
         // TODO: Handle other Expressible types
         switch expression.type {
         case .stringLiteral:
-            let isInterpolated = (expression as! StringLiteral).segments.contains(where: {
-                if case .expression = $0 {
-                    return true
-                } else {
-                    return false
-                }
-            })
-            return ArgumentValue(type: inferredType, isLiteral: true, isInterpolated: isInterpolated)
+            return ArgumentValue(type: inferredType, isLiteral: true, isInterpolated: (expression as! StringLiteral).isInterpolated)
         default:
             return ArgumentValue(type: inferredType)
         }

@@ -1250,8 +1250,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         let strippedTarget = target.asTypealiased(nil).withoutOptionality().withModuleName(nil)
         if type == strippedTarget && maybeSameModule {
             if type == .string {
-                // Favor using ExpressibleByStringInterpolation for interpolated strings
-                return isInterpolated ? 1.95 : 2.0
+                // Favor using ExpressibleByStringLiteral or ExpressibleByStringInterpolation for literals
+                return isLiteral ? 1.95 : 2.0
             } else {
                 return 2.0
             }
@@ -1364,6 +1364,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 return 1.0
             }
             if isInterpolated, target.compatibilityScore(target: .named("ExpressibleByStringInterpolation", []), codebaseInfo: codebaseInfo) != nil {
+                return 2.0
+            } else if isLiteral, target.compatibilityScore(target: .named("ExpressibleByStringLiteral", []), codebaseInfo: codebaseInfo) != nil {
                 return 2.0
             }
         case .tuple(_, let types):

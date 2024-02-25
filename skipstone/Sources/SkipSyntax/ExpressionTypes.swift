@@ -1685,7 +1685,17 @@ final class PrefixOperator: Expression {
 final class StringLiteral: Expression {
     let segments: [StringLiteralSegment<Expression>]
     let isMultiline: Bool
+    var expressibleByStringLiteralType: TypeSignature?
     var expressibleByStringInterpolationType: (TypeSignature, TypeSignature)?
+    var isInterpolated: Bool {
+        return segments.contains {
+            if case .expression = $0 {
+                return true
+            } else {
+                return false
+            }
+        }
+    }
 
     init(segments: [StringLiteralSegment<Expression>], isMultiline: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.segments = segments

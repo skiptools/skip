@@ -2487,6 +2487,7 @@ final class KotlinStringLiteral: KotlinExpression {
     var segments: [StringLiteralSegment<KotlinExpression>] = []
     var isMultiline = false
     var isCharacter = false
+    var expressibleByStringLiteralType: TypeSignature?
     var expressibleByStringInterpolationType: (TypeSignature, TypeSignature)?
 
     static func translate(expression: StringLiteral, translator: KotlinTranslator) -> KotlinStringLiteral {
@@ -2505,6 +2506,7 @@ final class KotlinStringLiteral: KotlinExpression {
         kexpression.segments = segments
         kexpression.isMultiline = expression.isMultiline
         kexpression.isCharacter = expression.inferredType == .character
+        kexpression.expressibleByStringLiteralType = expression.expressibleByStringLiteralType
         kexpression.expressibleByStringInterpolationType = expression.expressibleByStringInterpolationType
         return kexpression
     }
@@ -2579,6 +2581,8 @@ final class KotlinStringLiteral: KotlinExpression {
     override func append(to output: OutputGenerator, indentation: Indentation) {
         if let expressibleByStringInterpolationType {
             appendExpressibleByStringInterpolation(expressibleByStringInterpolationType, to: output, indentation: indentation)
+        } else if let expressibleByStringLiteralType {
+            appendExpressibleByStringLiteral(expressibleByStringLiteralType, to: output, indentation: indentation)
         } else {
             appendInlineInterpolation(to: output, indentation: indentation)
         }
@@ -2599,6 +2603,12 @@ final class KotlinStringLiteral: KotlinExpression {
             }
         }
         output.append(delimiter)
+    }
+
+    private func appendExpressibleByStringLiteral(_ type: TypeSignature, to output: OutputGenerator, indentation: Indentation) {
+        output.append(type.kotlin).append("(stringLiteral = ")
+        appendInlineInterpolation(to: output, indentation: indentation)
+        output.append(")")
     }
 
     private func appendExpressibleByStringInterpolation(_ types: (expressible: TypeSignature, interpolation: TypeSignature), to output: OutputGenerator, indentation: Indentation) {
