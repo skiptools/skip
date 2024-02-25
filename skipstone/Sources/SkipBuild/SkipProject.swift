@@ -158,12 +158,265 @@ class FrameworkProjectLayout {
                 let sourceResourcesDir = try sourceDir.append(path: resourceFolder, create: true)
                 let sourceResourcesFile = sourceResourcesDir.appending(path: "Localizable.xcstrings")
                 try """
-                {
-                  "sourceLanguage" : "en",
-                  "strings" : {},
-                  "version" : "1.0"
-                }
-                """.write(to: sourceResourcesFile, atomically: true, encoding: .utf8)
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Hello %@!" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¡Hola %@!"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bonjour %@!"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "こんにちは、%@!"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你好，%@!"
+          }
+        }
+      }
+    },
+    "Home" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accueil"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホーム"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主页"
+          }
+        }
+      }
+    },
+    "Item %lld" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elemento %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Élément %lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイテム %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "项目 %lld"
+          }
+        }
+      }
+    },
+    "Mode" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mode"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モード"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模式"
+          }
+        }
+      }
+    },
+    "Name" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nombre"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "姓名"
+          }
+        }
+      }
+    },
+    "Powered by %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Potenciado por %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Propulsé par %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@動力"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由%@提供动力"
+          }
+        }
+      }
+    },
+    "Screen %lld" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pantalla %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écran %lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面 %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "屏幕 %lld"
+          }
+        }
+      }
+    },
+    "Settings" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configuración"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paramètres"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置"
+          }
+        }
+      }
+    },
+    "Welcome" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bienvenido"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bienvenue"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ようこそ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "欢迎"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
+""".write(to: sourceResourcesFile, atomically: true, encoding: .utf8)
             }
 
 
@@ -584,47 +837,49 @@ class AppProjectLayout : FrameworkProjectLayout {
         let primaryModuleAppMainURL = appProject.darwinMainAppSwift
         let appMainSwiftFileName = primaryModuleAppMainURL.lastPathComponent
         let primaryModuleAppMainPath = primaryModuleAppMainURL.deletingLastPathComponent().lastPathComponent + "/" + appMainSwiftFileName
+        let _ = primaryModuleAppMainPath
         let primaryModuleSources = sourcesFolderName + "/" + primaryModuleName
         let entitlements_name = appProject.darwinEntitlementsPlist.lastPathComponent
         let entitlements_path = entitlements_name // same folder
+        let _ = entitlements_path
 
         // Sources/PlaygroundApp/Entitlements.plist
         let appEntitlementsContents = """
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-        </dict>
-        </plist>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+</dict>
+</plist>
 
-        """
+"""
 
         try appEntitlementsContents.write(to: appProject.darwinEntitlementsPlist.createParentDirectory(), atomically: true, encoding: .utf8)
 
         // create the top-level Skip.env which is the source or truth for Xcode and Gradle
         let skipEnvContents = """
-        // The configuration file for your Skip App (https://skip.tools)
-        // Properties specified here are shared between Darwin/\(appModuleName).xcconfig and Android/settings.gradle.kts
+// The configuration file for your Skip App (https://skip.tools)
+// Properties specified here are shared between Darwin/\(appModuleName).xcconfig and Android/settings.gradle.kts
 
-        // The name of the project, which must match the SPM project name in Package.swift
-        SKIP_PROJECT_NAME = \(projectName)
+// The name of the project, which must match the SPM project name in Package.swift
+SKIP_PROJECT_NAME = \(projectName)
 
-        // PRODUCT_NAME is the default title of the app
-        PRODUCT_NAME = \(appModuleName)
+// PRODUCT_NAME is the default title of the app
+PRODUCT_NAME = \(appModuleName)
 
-        // PRODUCT_BUNDLE_IDENTIFIER is the unique id for both the iOS and Android app
-        PRODUCT_BUNDLE_IDENTIFIER = \(appid)
+// PRODUCT_BUNDLE_IDENTIFIER is the unique id for both the iOS and Android app
+PRODUCT_BUNDLE_IDENTIFIER = \(appid)
 
-        // The semantic version of the app
-        MARKETING_VERSION = \(version ?? "0.0.1")
+// The semantic version of the app
+MARKETING_VERSION = \(version ?? "0.0.1")
 
-        // The build number specifying the internal app version
-        CURRENT_PROJECT_VERSION = 1
+// The build number specifying the internal app version
+CURRENT_PROJECT_VERSION = 1
 
-        // The package name for the Android entry point, referenced by the AndroidManifest.xml
-        ANDROID_PACKAGE_NAME = \(appModulePackage)
+// The package name for the Android entry point, referenced by the AndroidManifest.xml
+ANDROID_PACKAGE_NAME = \(appModulePackage)
 
-        """
+"""
 
         try skipEnvContents.write(to: appProject.skipEnv, atomically: true, encoding: .utf8)
         //let skipEnvFileName = appProject.skipEnv.lastPathComponent
@@ -634,51 +889,51 @@ class AppProjectLayout : FrameworkProjectLayout {
 
         // create the top-level ModuleName.xcconfig which is the source or truth for the iOS and Android builds
         let configContents = """
-        #include "\(skipEnvFileName)"
+#include "\(skipEnvFileName)"
 
-        // Set the action that will be executed as part of the Xcode Run Script phase
-        // Setting to "launch" will build and run the app in the first open Android emulator or device
-        // Setting to "build" will just run gradle build, but will no launc the app
-        SKIP_ACTION = launch
-        //SKIP_ACTION = build
+// Set the action that will be executed as part of the Xcode Run Script phase
+// Setting to "launch" will build and run the app in the first open Android emulator or device
+// Setting to "build" will just run gradle build, but will no launc the app
+SKIP_ACTION = launch
+//SKIP_ACTION = build
 
-        ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
-        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
+ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor
 
-        GENERATE_INFOPLIST_FILE = YES
+GENERATE_INFOPLIST_FILE = YES
 
-        // The user-visible name of the app (localizable)
-        //INFOPLIST_KEY_CFBundleDisplayName = App Name
-        //INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.utilities
+// The user-visible name of the app (localizable)
+//INFOPLIST_KEY_CFBundleDisplayName = App Name
+//INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.utilities
 
-        // iOS-specific Info.plist property keys
-        INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphone*] = YES
-        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphone*] = YES
-        INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphone*] = YES
-        INFOPLIST_KEY_UIStatusBarStyle[sdk=iphone*] = UIStatusBarStyleDefault
-        INFOPLIST_KEY_UISupportedInterfaceOrientations[sdk=iphone*] = UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown
+// iOS-specific Info.plist property keys
+INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphone*] = YES
+INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphone*] = YES
+INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphone*] = YES
+INFOPLIST_KEY_UIStatusBarStyle[sdk=iphone*] = UIStatusBarStyleDefault
+INFOPLIST_KEY_UISupportedInterfaceOrientations[sdk=iphone*] = UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown
 
-        IPHONEOS_DEPLOYMENT_TARGET = 16.0
-        MACOSX_DEPLOYMENT_TARGET = 13.0
+IPHONEOS_DEPLOYMENT_TARGET = 16.0
+MACOSX_DEPLOYMENT_TARGET = 13.0
 
-        // the name of the product module; this can be anything, but cannot conflict with any Swift module names
-        PRODUCT_MODULE_NAME = $(PRODUCT_NAME:c99extidentifier)App
+// the name of the product module; this can be anything, but cannot conflict with any Swift module names
+PRODUCT_MODULE_NAME = $(PRODUCT_NAME:c99extidentifier)App
 
-        // On-device testing may need to override the bundle ID
-        // PRODUCT_BUNDLE_IDENTIFIER[config=Debug][sdk=iphoneos*] = cool.beans.BundleIdentifer
+// On-device testing may need to override the bundle ID
+// PRODUCT_BUNDLE_IDENTIFIER[config=Debug][sdk=iphoneos*] = cool.beans.BundleIdentifer
 
-        // Development team ID for on-device testing
-        CODE_SIGNING_REQUIRED = NO
-        CODE_SIGN_STYLE = Automatic
-        CODE_SIGN_ENTITLEMENTS = Entitlements.plist
-        //CODE_SIGNING_IDENTITY = -
-        //DEVELOPMENT_TEAM =
+// Development team ID for on-device testing
+CODE_SIGNING_REQUIRED = NO
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_ENTITLEMENTS = Entitlements.plist
+//CODE_SIGNING_IDENTITY = -
+//DEVELOPMENT_TEAM =
 
-        """
+"""
 
         try configContents.write(to: appProject.darwinProjectConfig, atomically: true, encoding: .utf8)
         let xcconfigFileName = appProject.darwinProjectConfig.lastPathComponent
-
+        let _ = xcconfigFileName
 
         // Darwin/Sources/MODULEAppMain.swift
         let appMainContents = """
@@ -694,47 +949,47 @@ class AppProjectLayout : FrameworkProjectLayout {
 
         // Sources/Playground/PlaygroundApp.swift
         let appExtContents = """
-        \(sourceHeader)import Foundation
-        import OSLog
-        import SwiftUI
+\(sourceHeader)import Foundation
+import OSLog
+import SwiftUI
 
-        let logger: Logger = Logger(subsystem: "\(appid)", category: "\(primaryModuleName)")
+let logger: Logger = Logger(subsystem: "\(appid)", category: "\(primaryModuleName)")
 
-        /// The Android SDK number we are running against, or `nil` if not running on Android
-        let androidSDK = ProcessInfo.processInfo.environment["android.os.Build.VERSION.SDK_INT"].flatMap({ Int($0) })
+/// The Android SDK number we are running against, or `nil` if not running on Android
+let androidSDK = ProcessInfo.processInfo.environment["android.os.Build.VERSION.SDK_INT"].flatMap({ Int($0) })
 
-        /// The shared top-level view for the app, loaded from the platform-specific App delegates below.
-        ///
-        /// The default implementation merely loads the `ContentView` for the app and logs a message.
-        public struct RootView : View {
-            public init() {
+/// The shared top-level view for the app, loaded from the platform-specific App delegates below.
+///
+/// The default implementation merely loads the `ContentView` for the app and logs a message.
+public struct RootView : View {
+    public init() {
+    }
+
+    public var body: some View {
+        ContentView()
+            .task {
+                logger.log("Welcome to Skip on \\(androidSDK != nil ? "Android" : "Darwin")!")
+                logger.warning("Skip app logs are viewable in the Xcode console for iOS; Android logs can be viewed in Studio or using adb logcat")
             }
-        
-            public var body: some View {
-                ContentView()
-                    .task {
-                        logger.log("Welcome to Skip on \\(androidSDK != nil ? "Android" : "Darwin")!")
-                        logger.warning("Skip app logs are viewable in the Xcode console for iOS; Android logs can be viewed in Studio or using adb logcat")
-                    }
-            }
-        }
+    }
+}
 
-        #if !SKIP
-        public protocol \(primaryModuleAppTarget) : App {
-        }
+#if !SKIP
+public protocol \(primaryModuleAppTarget) : App {
+}
 
-        /// The entry point to the \(primaryModuleName) app.
-        /// The concrete implementation is in the \(primaryModuleName)App module.
-        public extension \(primaryModuleAppTarget) {
-            var body: some Scene {
-                WindowGroup {
-                    RootView()
-                }
-            }
+/// The entry point to the \(primaryModuleName) app.
+/// The concrete implementation is in the \(primaryModuleName)App module.
+public extension \(primaryModuleAppTarget) {
+    var body: some Scene {
+        WindowGroup {
+            RootView()
         }
-        #endif
+    }
+}
+#endif
 
-        """
+"""
 
         let appModuleApplicationStubFileBase = primaryModuleAppTarget + ".swift"
         let appModuleApplicationStubFilePath = primaryModuleSources + "/" + appModuleApplicationStubFileBase
@@ -746,63 +1001,79 @@ class AppProjectLayout : FrameworkProjectLayout {
 
         // Sources/Playground/PlaygroundApp.swift
         let contentViewContents = """
-        \(sourceHeader)import SwiftUI
+\(sourceHeader)import SwiftUI
 
-        public struct ContentView: View {
-            @AppStorage("setting") var setting = true
+public struct ContentView: View {
+    @State var mode = false
+    @AppStorage("tab") var tab = Tab.welcome
+    @AppStorage("name") var name = "Skipper"
 
-            public init() {
+    public init() {
+    }
+
+    public var body: some View {
+        TabView(selection: $tab) {
+            VStack {
+                Text("Hello \\(name)!")
+                Image(systemName: "heart.fill")
+                    .foregroundStyle(.red)
             }
+            .font(.largeTitle)
+            .tabItem { Label("Welcome", systemImage: "heart.fill") }
+            .tag(Tab.welcome)
 
-            public var body: some View {
-                TabView {
-                    VStack {
-                        Text("Welcome Skipper!")
-                        Image(systemName: "heart.fill")
-                            .foregroundStyle(.red)
+            NavigationStack {
+                List {
+                    ForEach(1..<1_000) { i in
+                        NavigationLink("Item \\(i)", value: i)
                     }
-                    .font(.largeTitle)
-                    .tabItem { Label("Welcome", systemImage: "heart.fill") }
-
-                    NavigationStack {
-                        List {
-                            ForEach(1..<1_000) { i in
-                                NavigationLink("Home \\(i)", value: i)
-                            }
-                        }
-                        .navigationTitle("Navigation")
-                        .navigationDestination(for: Int.self) { i in
-                            Text("Destination \\(i)")
-                                .font(.title)
-                                .navigationTitle("Navigation \\(i)")
-                        }
-                    }
-                    .tabItem { Label("Home", systemImage: "house.fill") }
-
-                    NavigationStack {
-                        Form {
-                            Toggle("Option", isOn: $setting)
-                            #if SKIP
-                            ComposeView { ctx in
-                                androidx.compose.material3.Text("Powered by Jetpack Compose", modifier: ctx.modifier, color: Color.gray.colorImpl())
-                            }
-                            #else
-                            Text("Powered by SwiftUI")
-                                .foregroundStyle(.gray)
-                            #endif
-                        }
-                        .navigationTitle("Settings")
-                    }
-                    .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                }
+                .navigationTitle("Home")
+                .navigationDestination(for: Int.self) { i in
+                    Text("Item \\(i)")
+                        .font(.title)
+                        .navigationTitle("Screen \\(i)")
                 }
             }
-        }
+            .tabItem { Label("Home", systemImage: "house.fill") }
+            .tag(Tab.home)
 
-        #Preview {
-            ContentView()
+            NavigationStack {
+                Form {
+                    TextField("Name", text: $name)
+                    Toggle("Mode", isOn: $mode).onChange(of: mode) { _ in
+                        logger.log("Toggled mode to: \\(mode)")
+                    }
+                    HStack {
+                        #if SKIP
+                        ComposeView { ctx in
+                            androidx.compose.material3.Text("💚", modifier: ctx.modifier)
+                        }
+                        #else
+                        Text(verbatim: "💙")
+                        #endif
+                        Text("Powered by \\(androidSDK != nil ? "Jetpack Compose" : "SwiftUI")")
+                    }
+                    .foregroundStyle(.gray)
+                    .bold(mode)
+                }
+                .navigationTitle("Settings")
+            }
+            .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+            .tag(Tab.settings)
         }
+    }
+}
 
-        """
+enum Tab : String, Hashable {
+    case welcome, home, settings
+}
+
+#Preview {
+    ContentView()
+}
+
+"""
 
         let contentViewFileBase = "ContentView.swift"
         let contentViewRelativePath = primaryModuleSources + "/" + contentViewFileBase
@@ -815,32 +1086,33 @@ class AppProjectLayout : FrameworkProjectLayout {
         let Assets_xcassets_URL = try appProject.darwinAssetsFolder.createDirectory()
         let Assets_xcassets_name = appProject.darwinAssetsFolder.lastPathComponent
         let Assets_xcassets_path = Assets_xcassets_name // the path is in the root Darwin/ folder
+        let _ = Assets_xcassets_path
 
         let Assets_xcassets_Contents_URL = appProject.darwinAssetsContents
         let Assets_xcassets_Contents = """
-        {
-          "info" : {
-            "author" : "xcode",
-            "version" : 1
-          }
-        }
-        """
+{
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
+"""
         try Assets_xcassets_Contents.write(to: Assets_xcassets_Contents_URL, atomically: true, encoding: .utf8)
 
         let Assets_xcassets_AccentColor = try Assets_xcassets_URL.append(path: "AccentColor.colorset", create: true)
         let Assets_xcassets_AccentColor_Contents = """
-        {
-          "colors" : [
-            {
-              "idiom" : "universal"
-            }
-          ],
-          "info" : {
-            "author" : "xcode",
-            "version" : 1
-          }
-        }
-        """
+{
+  "colors" : [
+    {
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
+"""
 
 
         let Assets_xcassets_AccentColor_ContentsURL = Assets_xcassets_AccentColor.appending(path: "Contents.json")
@@ -891,505 +1163,517 @@ class AppProjectLayout : FrameworkProjectLayout {
             }
 
             Assets_xcassets_AppIcon_Contents = """
-            {
-              "images" : [
-                {
-                  "filename" : "AppIcon-20@2x.png",
-                  "idiom" : "iphone",
-                  "scale" : "2x",
-                  "size" : "20x20"
-                },
-                {
-                  "filename" : "AppIcon-20@3x.png",
-                  "idiom" : "iphone",
-                  "scale" : "3x",
-                  "size" : "20x20"
-                },
-                {
-                  "filename" : "AppIcon-29.png",
-                  "idiom" : "iphone",
-                  "scale" : "1x",
-                  "size" : "29x29"
-                },
-                {
-                  "filename" : "AppIcon-29@2x.png",
-                  "idiom" : "iphone",
-                  "scale" : "2x",
-                  "size" : "29x29"
-                },
-                {
-                  "filename" : "AppIcon-29@3x.png",
-                  "idiom" : "iphone",
-                  "scale" : "3x",
-                  "size" : "29x29"
-                },
-                {
-                  "filename" : "AppIcon-40@2x.png",
-                  "idiom" : "iphone",
-                  "scale" : "2x",
-                  "size" : "40x40"
-                },
-                {
-                  "filename" : "AppIcon-40@3x.png",
-                  "idiom" : "iphone",
-                  "scale" : "3x",
-                  "size" : "40x40"
-                },
-                {
-                  "filename" : "AppIcon@2x.png",
-                  "idiom" : "iphone",
-                  "scale" : "2x",
-                  "size" : "60x60"
-                },
-                {
-                  "filename" : "AppIcon@3x.png",
-                  "idiom" : "iphone",
-                  "scale" : "3x",
-                  "size" : "60x60"
-                },
-                {
-                  "filename" : "AppIcon-20~ipad.png",
-                  "idiom" : "ipad",
-                  "scale" : "1x",
-                  "size" : "20x20"
-                },
-                {
-                  "filename" : "AppIcon-20@2x~ipad.png",
-                  "idiom" : "ipad",
-                  "scale" : "2x",
-                  "size" : "20x20"
-                },
-                {
-                  "filename" : "AppIcon-29~ipad.png",
-                  "idiom" : "ipad",
-                  "scale" : "1x",
-                  "size" : "29x29"
-                },
-                {
-                  "filename" : "AppIcon-29@2x~ipad.png",
-                  "idiom" : "ipad",
-                  "scale" : "2x",
-                  "size" : "29x29"
-                },
-                {
-                  "filename" : "AppIcon-40~ipad.png",
-                  "idiom" : "ipad",
-                  "scale" : "1x",
-                  "size" : "40x40"
-                },
-                {
-                  "filename" : "AppIcon-40@2x~ipad.png",
-                  "idiom" : "ipad",
-                  "scale" : "2x",
-                  "size" : "40x40"
-                },
-                {
-                  "filename" : "AppIcon~ipad.png",
-                  "idiom" : "ipad",
-                  "scale" : "1x",
-                  "size" : "76x76"
-                },
-                {
-                  "filename" : "AppIcon@2x~ipad.png",
-                  "idiom" : "ipad",
-                  "scale" : "2x",
-                  "size" : "76x76"
-                },
-                {
-                  "filename" : "AppIcon-83.5@2x~ipad.png",
-                  "idiom" : "ipad",
-                  "scale" : "2x",
-                  "size" : "83.5x83.5"
-                },
-                {
-                  "filename" : "AppIcon~ios-marketing.png",
-                  "idiom" : "ios-marketing",
-                  "scale" : "1x",
-                  "size" : "1024x1024"
-                }
-              ],
-              "info" : {
-                "author" : "xcode",
-                "version" : 1
-              }
-            }
+{
+  "images" : [
+    {
+      "filename" : "AppIcon-20@2x.png",
+      "idiom" : "iphone",
+      "scale" : "2x",
+      "size" : "20x20"
+    },
+    {
+      "filename" : "AppIcon-20@3x.png",
+      "idiom" : "iphone",
+      "scale" : "3x",
+      "size" : "20x20"
+    },
+    {
+      "filename" : "AppIcon-29.png",
+      "idiom" : "iphone",
+      "scale" : "1x",
+      "size" : "29x29"
+    },
+    {
+      "filename" : "AppIcon-29@2x.png",
+      "idiom" : "iphone",
+      "scale" : "2x",
+      "size" : "29x29"
+    },
+    {
+      "filename" : "AppIcon-29@3x.png",
+      "idiom" : "iphone",
+      "scale" : "3x",
+      "size" : "29x29"
+    },
+    {
+      "filename" : "AppIcon-40@2x.png",
+      "idiom" : "iphone",
+      "scale" : "2x",
+      "size" : "40x40"
+    },
+    {
+      "filename" : "AppIcon-40@3x.png",
+      "idiom" : "iphone",
+      "scale" : "3x",
+      "size" : "40x40"
+    },
+    {
+      "filename" : "AppIcon@2x.png",
+      "idiom" : "iphone",
+      "scale" : "2x",
+      "size" : "60x60"
+    },
+    {
+      "filename" : "AppIcon@3x.png",
+      "idiom" : "iphone",
+      "scale" : "3x",
+      "size" : "60x60"
+    },
+    {
+      "filename" : "AppIcon-20~ipad.png",
+      "idiom" : "ipad",
+      "scale" : "1x",
+      "size" : "20x20"
+    },
+    {
+      "filename" : "AppIcon-20@2x~ipad.png",
+      "idiom" : "ipad",
+      "scale" : "2x",
+      "size" : "20x20"
+    },
+    {
+      "filename" : "AppIcon-29~ipad.png",
+      "idiom" : "ipad",
+      "scale" : "1x",
+      "size" : "29x29"
+    },
+    {
+      "filename" : "AppIcon-29@2x~ipad.png",
+      "idiom" : "ipad",
+      "scale" : "2x",
+      "size" : "29x29"
+    },
+    {
+      "filename" : "AppIcon-40~ipad.png",
+      "idiom" : "ipad",
+      "scale" : "1x",
+      "size" : "40x40"
+    },
+    {
+      "filename" : "AppIcon-40@2x~ipad.png",
+      "idiom" : "ipad",
+      "scale" : "2x",
+      "size" : "40x40"
+    },
+    {
+      "filename" : "AppIcon~ipad.png",
+      "idiom" : "ipad",
+      "scale" : "1x",
+      "size" : "76x76"
+    },
+    {
+      "filename" : "AppIcon@2x~ipad.png",
+      "idiom" : "ipad",
+      "scale" : "2x",
+      "size" : "76x76"
+    },
+    {
+      "filename" : "AppIcon-83.5@2x~ipad.png",
+      "idiom" : "ipad",
+      "scale" : "2x",
+      "size" : "83.5x83.5"
+    },
+    {
+      "filename" : "AppIcon~ios-marketing.png",
+      "idiom" : "ios-marketing",
+      "scale" : "1x",
+      "size" : "1024x1024"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
 
-            """
+"""
 
         } else {
             // no icon specified
             Assets_xcassets_AppIcon_Contents = """
-            {
-              "images" : [
-                {
-                  "idiom" : "universal",
-                  "platform" : "ios",
-                  "size" : "1024x1024"
-                }
-              ],
-              "info" : {
-                "author" : "xcode",
-                "version" : 1
-              }
-            }
+{
+  "images" : [
+    {
+      "idiom" : "universal",
+      "platform" : "ios",
+      "size" : "1024x1024"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
 
-            """
+"""
         }
 
         try Assets_xcassets_AppIcon_Contents.write(to: appProject.darwinAppIconContents.createParentDirectory(), atomically: true, encoding: .utf8)
 
         func createXcodeProj() -> String {
             // the .xcodeproj file is located in the Darwin/ folder
-            let relativeSwiftPackageRoot = ".."
-
             let skipGradleLaunchScript = """
-            if [ "${SKIP_ZERO}" != "" ]; then
-                echo "note: skipping skip due to SKIP_ZERO"
-                exit 0
-            fi
-            if [ "${ENABLE_PREVIEWS}" == "YES" ]; then
-                echo "note: skipping skip due to ENABLE_PREVIEWS"
-                exit 0
-            fi
-            if [ "${ACTION}" = "install" ]; then
-                SKIP_ACTION="build"
-            else
-                SKIP_ACTION="${SKIP_ACTION:-launch}"
-            fi
-            PATH=${BUILD_ROOT}/Debug:${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin
-            echo "note: running gradle build with: $(which skip) gradle -p ${PWD}/../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}"
-            skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
+if [ "${SKIP_ZERO}" != "" ]; then
+    echo "note: skipping skip due to SKIP_ZERO"
+    exit 0
+fi
+if [ "${ENABLE_PREVIEWS}" == "YES" ]; then
+    echo "note: skipping skip due to ENABLE_PREVIEWS"
+    exit 0
+fi
+if [ "${ACTION}" = "install" ]; then
+    SKIP_ACTION="build"
+else
+    SKIP_ACTION="${SKIP_ACTION:-launch}"
+fi
+PATH=${BUILD_ROOT}/Debug:${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin
+echo "note: running gradle build with: $(which skip) gradle -p ${PWD}/../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}"
+skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 
-            """
-                .replacingOccurrences(of: "\n", with: "\\n")
-                .replacingOccurrences(of: "\"", with: "\\\"")
+"""
+    .replacingOccurrences(of: "\n", with: "\\n")
+    .replacingOccurrences(of: "\"", with: "\\\"")
 
+
+            let APP = appModuleName
 
             return """
-    // !$*UTF8*$!
-    {
-        archiveVersion = 1;
-        classes = {
+// !$*UTF8*$!
+{
+    archiveVersion = 1;
+    classes = {
+    };
+    objectVersion = 56;
+    objects = {
+
+/* Begin PBXBuildFile section */
+        49231BAC2AC5BCEF00F98ADF /* \(APP)App in Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(APP)App */; };
+        49231BAD2AC5BCEF00F98ADF /* \(APP)App in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(APP)App */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+        496BDBEE2B8A7E9C00C09264 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 496BDBED2B8A7E9C00C09264 /* Localizable.xcstrings */; };
+        499CD43B2AC5B799001AE8D8 /* \(APP)AppMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* \(APP)AppMain.swift */; };
+        499CD4402AC5B799001AE8D8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 49F90C2F2A52156300F06D93 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+        499CD44A2AC5B9C6001AE8D8 /* Embed Frameworks */ = {
+            isa = PBXCopyFilesBuildPhase;
+            buildActionMask = 2147483647;
+            dstPath = "";
+            dstSubfolderSpec = 10;
+            files = (
+                49231BAD2AC5BCEF00F98ADF /* \(APP)App in Embed Frameworks */,
+            );
+            name = "Embed Frameworks";
+            runOnlyForDeploymentPostprocessing = 0;
         };
-        objectVersion = 56;
-        objects = {
+/* End PBXCopyFilesBuildPhase section */
 
-    /* Begin PBXBuildFile section */
-            49231BAC2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) in Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) */; };
-            49231BAD2AC5BCEF00F98ADF /* \(primaryModuleAppTarget)App in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-            493568292B71C19600D01714 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 493568282B71C19600D01714 /* Localizable.xcstrings */; };
-            499CD43B2AC5B799001AE8D8 /* \(appMainSwiftFileName) in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* \(appMainSwiftFileName) */; };
-            499CD4402AC5B799001AE8D8 /* \(Assets_xcassets_name) in Resources */ = {isa = PBXBuildFile; fileRef = 49F90C2F2A52156300F06D93 /* \(Assets_xcassets_name) */; };
-    /* End PBXBuildFile section */
+/* Begin PBXFileReference section */
+        493609562A6B7EAE00C401E2 /* \(APP) */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = \(APP); path = ..; sourceTree = "<group>"; };
+        496BDBEB2B89A47800C09264 /* \(APP).app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = \(APP).app; sourceTree = BUILT_PRODUCTS_DIR; };
+        496BDBED2B8A7E9C00C09264 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = Localizable.xcstrings; path = ../Sources/\(APP)/Resources/Localizable.xcstrings; sourceTree = "<group>"; };
+        496EB72F2A6AE4DE00C1253A /* Skip.env */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Skip.env; path = ../Skip.env; sourceTree = "<group>"; };
+        496EB72F2A6AE4DE00C1253B /* \(APP).xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = \(APP).xcconfig; sourceTree = "<group>"; };
+        496EB72F2A6AE4DE00C1253C /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../README.md; sourceTree = "<group>"; };
+        499AB9082B0581F4005E8330 /* plugins */ = {isa = PBXFileReference; lastKnownFileType = folder; name = plugins; path = ../../../SourcePackages/plugins; sourceTree = BUILT_PRODUCTS_DIR; };
+        49F90C2B2A52156200F06D93 /* \(APP)AppMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = \(APP)AppMain.swift; path = Sources/\(APP)AppMain.swift; sourceTree = SOURCE_ROOT; };
+        49F90C2F2A52156300F06D93 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+        49F90C312A52156300F06D93 /* Entitlements.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Entitlements.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
 
-    /* Begin PBXCopyFilesBuildPhase section */
-            499CD44A2AC5B9C6001AE8D8 /* Embed Frameworks */ = {
-                isa = PBXCopyFilesBuildPhase;
-                buildActionMask = 2147483647;
-                dstPath = "";
-                dstSubfolderSpec = 10;
-                files = (
-                    49231BAD2AC5BCEF00F98ADF /* \(appModuleName) in Embed Frameworks */,
-                );
-                name = "Embed Frameworks";
-                runOnlyForDeploymentPostprocessing = 0;
-            };
-    /* End PBXCopyFilesBuildPhase section */
-
-    /* Begin PBXFileReference section */
-            493609562A6B7EAE00C401E2 /* \(appModuleName) */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = \(appModuleName); path = \(relativeSwiftPackageRoot); sourceTree = "<group>"; };
-            496EB72F2A6AE4DE00C1253A /* \(skipEnvBaseName) */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = \(skipEnvBaseName); path = \(skipEnvFileName); sourceTree = "<group>"; };
-            496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = \(xcconfigFileName); sourceTree = "<group>"; };
-            496EB72F2A6AE4DE00C1253C /* README.md */ = {isa = PBXFileReference; name = README.md; path = ../README.md; sourceTree = "<group>"; };
-            4990AB3B2A91AFC5005777FD /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
-            499CD4442AC5B799001AE8D8 /* \(appModuleName).app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = \(appModuleName).app; sourceTree = BUILT_PRODUCTS_DIR; };
-            499AB9082B0581F4005E8330 /* plugins */ = {isa = PBXFileReference; lastKnownFileType = folder; name = plugins; path = ../../../SourcePackages/plugins; sourceTree = BUILT_PRODUCTS_DIR; };
-            49F90C2B2A52156200F06D93 /* \(appMainSwiftFileName) */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = \(appMainSwiftFileName); path = \(primaryModuleAppMainPath); sourceTree = SOURCE_ROOT; };
-            49F90C2F2A52156300F06D93 /* \(Assets_xcassets_name) */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = \(Assets_xcassets_name); path = \(Assets_xcassets_path); sourceTree = "<group>"; };
-            49F90C312A52156300F06D93 /* \(entitlements_name) */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = \(entitlements_name); path = \(entitlements_path); sourceTree = "<group>"; };
-    /* End PBXFileReference section */
-
-    /* Begin PBXFrameworksBuildPhase section */
-            499CD43C2AC5B799001AE8D8 /* Frameworks */ = {
-                isa = PBXFrameworksBuildPhase;
-                buildActionMask = 2147483647;
-                files = (
-                    49231BAC2AC5BCEF00F98ADF /* \(appModuleName)App in Frameworks */,
-                );
-                runOnlyForDeploymentPostprocessing = 0;
-            };
-    /* End PBXFrameworksBuildPhase section */
-
-    /* Begin PBXGroup section */
-            49AB54462B066A7E007B79B2 /* SkipStone */ = {
-                    isa = PBXGroup;
-                    children = (
-                            499AB9082B0581F4005E8330 /* plugins */,
-                    );
-                    name = SkipStone;
-                    sourceTree = "<group>";
-            };
-            49F90C1F2A52156200F06D93 = {
-                isa = PBXGroup;
-                children = (
-                    493568282B71C19600D01714 /* Localizable.xcstrings */,
-                    496EB72F2A6AE4DE00C1253C /* README.md */,
-                    496EB72F2A6AE4DE00C1253A /* \(skipEnvBaseName) */,
-                    496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */,
-                    493609562A6B7EAE00C401E2 /* \(appModuleName) */,
-                    49F90C2A2A52156200F06D93 /* App */,
-                    49AB54462B066A7E007B79B2 /* SkipStone */,
-                );
-                sourceTree = "<group>";
-            };
-            49F90C2A2A52156200F06D93 /* App */ = {
-                isa = PBXGroup;
-                children = (
-                    49F90C2B2A52156200F06D93 /* \(appMainSwiftFileName) */,
-                    49F90C2F2A52156300F06D93 /* \(Assets_xcassets_name) */,
-                    49F90C312A52156300F06D93 /* \(entitlements_name) */,
-                );
-                name = App;
-                sourceTree = "<group>";
-            };
-    /* End PBXGroup section */
-
-    /* Begin PBXNativeTarget section */
-            499CD4382AC5B799001AE8D8 /* \(appModuleName) */ = {
-                isa = PBXNativeTarget;
-                buildConfigurationList = 499CD4412AC5B799001AE8D8 /* Build configuration list for PBXNativeTarget "\(appModuleName)" */;
-                buildPhases = (
-                    499CD43A2AC5B799001AE8D8 /* Sources */,
-                    499CD43C2AC5B799001AE8D8 /* Frameworks */,
-                    499CD43E2AC5B799001AE8D8 /* Resources */,
-                    499CD4452AC5B869001AE8D8 /* Run skip gradle */,
-                    499CD44A2AC5B9C6001AE8D8 /* Embed Frameworks */,
-                );
-                buildRules = (
-                );
-                dependencies = (
-                );
-                name = \(appModuleName);
-                packageProductDependencies = (
-                    49231BAB2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) */,
-                );
-                productName = App;
-                productReference = 499CD4442AC5B799001AE8D8 /* \(appModuleName).app */;
-                productType = "com.apple.product-type.application";
-            };
-    /* End PBXNativeTarget section */
-
-    /* Begin PBXProject section */
-            49F90C202A52156200F06D93 /* Project object */ = {
-                isa = PBXProject;
-                attributes = {
-                    BuildIndependentTargetsInParallel = 1;
-                    LastSwiftUpdateCheck = 1430;
-                    LastUpgradeCheck = 1500;
-                };
-                buildConfigurationList = 49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(appModuleName)" */;
-                compatibilityVersion = "Xcode 14.0";
-                developmentRegion = en;
-                hasScannedForEncodings = 0;
-                knownRegions = (
-                    en,
-                    Base,
-                );
-                mainGroup = 49F90C1F2A52156200F06D93;
-                packageReferences = (
-                );
-                productRefGroup = 49F90C292A52156200F06D93 /* Products */;
-                projectDirPath = "";
-                projectRoot = "";
-                targets = (
-                    499CD4382AC5B799001AE8D8 /* \(appModuleName) */,
-                );
-            };
-    /* End PBXProject section */
-
-    /* Begin PBXResourcesBuildPhase section */
-            499CD43E2AC5B799001AE8D8 /* Resources */ = {
-                isa = PBXResourcesBuildPhase;
-                buildActionMask = 2147483647;
-                files = (
-                    499CD4402AC5B799001AE8D8 /* \(Assets_xcassets_name) in Resources */,
-                    493568292B71C19600D01714 /* Localizable.xcstrings in Resources */,
-                );
-                runOnlyForDeploymentPostprocessing = 0;
-            };
-    /* End PBXResourcesBuildPhase section */
-
-    /* Begin PBXShellScriptBuildPhase section */
-            499CD4452AC5B869001AE8D8 /* Run skip gradle */ = {
-                isa = PBXShellScriptBuildPhase;
-                alwaysOutOfDate = 1;
-                buildActionMask = 2147483647;
-                files = (
-                );
-                inputFileListPaths = (
-                );
-                inputPaths = (
-                );
-                name = "Run skip gradle";
-                outputFileListPaths = (
-                );
-                outputPaths = (
-                );
-                runOnlyForDeploymentPostprocessing = 0;
-                shellPath = "/bin/sh -e";
-                shellScript = "\(skipGradleLaunchScript)";
-            };
-    /* End PBXShellScriptBuildPhase section */
-
-    /* Begin PBXSourcesBuildPhase section */
-            499CD43A2AC5B799001AE8D8 /* Sources */ = {
-                isa = PBXSourcesBuildPhase;
-                buildActionMask = 2147483647;
-                files = (
-                    499CD43B2AC5B799001AE8D8 /* \(appMainSwiftFileName) in Sources */,
-                );
-                runOnlyForDeploymentPostprocessing = 0;
-            };
-    /* End PBXSourcesBuildPhase section */
-
-    /* Begin XCBuildConfiguration section */
-            491FCC8E2AD18D38002FB1E1 /* Skippy */ = {
-                isa = XCBuildConfiguration;
-                baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */;
-                buildSettings = {
-                    ALWAYS_SEARCH_USER_PATHS = NO;
-                    ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-                    COPY_PHASE_STRIP = NO;
-                    DEBUG_INFORMATION_FORMAT = dwarf;
-                    ENABLE_BITCODE = NO;
-                    ENABLE_NS_ASSERTIONS = NO;
-                    ENABLE_STRICT_OBJC_MSGSEND = YES;
-                    ENABLE_USER_SCRIPT_SANDBOXING = NO;
-                    LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                    MTL_ENABLE_DEBUG_INFO = NO;
-                    MTL_FAST_MATH = YES;
-                    SWIFT_COMPILATION_MODE = wholemodule;
-                };
-                name = Skippy;
-            };
-            491FCC8F2AD18D38002FB1E1 /* Skippy */ = {
-                isa = XCBuildConfiguration;
-                buildSettings = {
-                    ENABLE_PREVIEWS = YES;
-                    LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-                    "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-                    SDKROOT = auto;
-                    SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
-                    SWIFT_EMIT_LOC_STRINGS = YES;
-                    SWIFT_VERSION = 5.0;
-                    TARGETED_DEVICE_FAMILY = "1,2";
-                };
-                name = Skippy;
-            };
-            499CD4422AC5B799001AE8D8 /* Debug */ = {
-                isa = XCBuildConfiguration;
-                buildSettings = {
-                    ENABLE_PREVIEWS = YES;
-                    LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-                    "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-                    SDKROOT = auto;
-                    SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
-                    SWIFT_EMIT_LOC_STRINGS = YES;
-                    SWIFT_VERSION = 5.0;
-                    TARGETED_DEVICE_FAMILY = "1,2";
-                };
-                name = Debug;
-            };
-            499CD4432AC5B799001AE8D8 /* Release */ = {
-                isa = XCBuildConfiguration;
-                buildSettings = {
-                    ENABLE_PREVIEWS = YES;
-                    LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-                    "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-                    SDKROOT = auto;
-                    SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
-                    SWIFT_EMIT_LOC_STRINGS = YES;
-                    SWIFT_VERSION = 5.0;
-                    TARGETED_DEVICE_FAMILY = "1,2";
-                };
-                name = Release;
-            };
-            49F90C4B2A52156300F06D93 /* Debug */ = {
-                isa = XCBuildConfiguration;
-                baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */;
-                buildSettings = {
-                    ALWAYS_SEARCH_USER_PATHS = NO;
-                    ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-                    COPY_PHASE_STRIP = NO;
-                    DEBUG_INFORMATION_FORMAT = dwarf;
-                    ENABLE_BITCODE = NO;
-                    ENABLE_STRICT_OBJC_MSGSEND = YES;
-                    ENABLE_TESTABILITY = YES;
-                    ENABLE_USER_SCRIPT_SANDBOXING = NO;
-                    LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                    MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
-                    MTL_FAST_MATH = YES;
-                    ONLY_ACTIVE_ARCH = YES;
-                    SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
-                    SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-                };
-                name = Debug;
-            };
-            49F90C4C2A52156300F06D93 /* Release */ = {
-                isa = XCBuildConfiguration;
-                baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(xcconfigFileName) */;
-                buildSettings = {
-                    ALWAYS_SEARCH_USER_PATHS = NO;
-                    ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-                    COPY_PHASE_STRIP = NO;
-                    DEBUG_INFORMATION_FORMAT = dwarf;
-                    ENABLE_BITCODE = NO;
-                    ENABLE_NS_ASSERTIONS = NO;
-                    ENABLE_STRICT_OBJC_MSGSEND = YES;
-                    ENABLE_USER_SCRIPT_SANDBOXING = NO;
-                    LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                    MTL_ENABLE_DEBUG_INFO = NO;
-                    MTL_FAST_MATH = YES;
-                    SWIFT_COMPILATION_MODE = wholemodule;
-                };
-                name = Release;
-            };
-    /* End XCBuildConfiguration section */
-
-    /* Begin XCConfigurationList section */
-            499CD4412AC5B799001AE8D8 /* Build configuration list for PBXNativeTarget "\(appModuleName)" */ = {
-                isa = XCConfigurationList;
-                buildConfigurations = (
-                    499CD4422AC5B799001AE8D8 /* Debug */,
-                    499CD4432AC5B799001AE8D8 /* Release */,
-                    491FCC8F2AD18D38002FB1E1 /* Skippy */,
-                );
-                defaultConfigurationIsVisible = 0;
-                defaultConfigurationName = Release;
-            };
-            49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(appModuleName)" */ = {
-                isa = XCConfigurationList;
-                buildConfigurations = (
-                    49F90C4B2A52156300F06D93 /* Debug */,
-                    49F90C4C2A52156300F06D93 /* Release */,
-                    491FCC8E2AD18D38002FB1E1 /* Skippy */,
-                );
-                defaultConfigurationIsVisible = 0;
-                defaultConfigurationName = Release;
-            };
-    /* End XCConfigurationList section */
-
-    /* Begin XCSwiftPackageProductDependency section */
-            49231BAB2AC5BCEF00F98ADF /* \(primaryModuleAppTarget) */ = {
-                isa = XCSwiftPackageProductDependency;
-                productName = \(primaryModuleAppTarget);
-            };
-    /* End XCSwiftPackageProductDependency section */
+/* Begin PBXFrameworksBuildPhase section */
+        499CD43C2AC5B799001AE8D8 /* Frameworks */ = {
+            isa = PBXFrameworksBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+                49231BAC2AC5BCEF00F98ADF /* \(APP)App in Frameworks */,
+            );
+            runOnlyForDeploymentPostprocessing = 0;
         };
-        rootObject = 49F90C202A52156200F06D93 /* Project object */;
-    }
+/* End PBXFrameworksBuildPhase section */
 
-    """
+/* Begin PBXGroup section */
+        496BDBEC2B89A47800C09264 /* Products */ = {
+            isa = PBXGroup;
+            children = (
+                496BDBEB2B89A47800C09264 /* \(APP).app */,
+            );
+            name = Products;
+            sourceTree = "<group>";
+        };
+        49AB54462B066A7E007B79B2 /* SkipStone */ = {
+            isa = PBXGroup;
+            children = (
+                499AB9082B0581F4005E8330 /* plugins */,
+            );
+            name = SkipStone;
+            sourceTree = "<group>";
+        };
+        49F90C1F2A52156200F06D93 = {
+            isa = PBXGroup;
+            children = (
+                496EB72F2A6AE4DE00C1253C /* README.md */,
+                496EB72F2A6AE4DE00C1253A /* Skip.env */,
+                496EB72F2A6AE4DE00C1253B /* \(APP).xcconfig */,
+                496BDBED2B8A7E9C00C09264 /* Localizable.xcstrings */,
+                493609562A6B7EAE00C401E2 /* \(APP) */,
+                49F90C2A2A52156200F06D93 /* App */,
+                49AB54462B066A7E007B79B2 /* SkipStone */,
+                496BDBEC2B89A47800C09264 /* Products */,
+            );
+            sourceTree = "<group>";
+        };
+        49F90C2A2A52156200F06D93 /* App */ = {
+            isa = PBXGroup;
+            children = (
+                49F90C2B2A52156200F06D93 /* \(APP)AppMain.swift */,
+                49F90C2F2A52156300F06D93 /* Assets.xcassets */,
+                49F90C312A52156300F06D93 /* Entitlements.plist */,
+            );
+            name = App;
+            sourceTree = "<group>";
+        };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+        499CD4382AC5B799001AE8D8 /* \(APP) */ = {
+            isa = PBXNativeTarget;
+            buildConfigurationList = 499CD4412AC5B799001AE8D8 /* Build configuration list for PBXNativeTarget "\(APP)" */;
+            buildPhases = (
+                499CD43A2AC5B799001AE8D8 /* Sources */,
+                499CD43C2AC5B799001AE8D8 /* Frameworks */,
+                499CD43E2AC5B799001AE8D8 /* Resources */,
+                499CD4452AC5B869001AE8D8 /* Run skip gradle */,
+                499CD44A2AC5B9C6001AE8D8 /* Embed Frameworks */,
+            );
+            buildRules = (
+            );
+            dependencies = (
+            );
+            name = \(APP);
+            packageProductDependencies = (
+                49231BAB2AC5BCEF00F98ADF /* \(APP)App */,
+            );
+            productName = App;
+            productReference = 496BDBEB2B89A47800C09264 /* \(APP).app */;
+            productType = "com.apple.product-type.application";
+        };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+        49F90C202A52156200F06D93 /* Project object */ = {
+            isa = PBXProject;
+            attributes = {
+                BuildIndependentTargetsInParallel = 1;
+                LastSwiftUpdateCheck = 1430;
+                LastUpgradeCheck = 1500;
+            };
+            buildConfigurationList = 49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(APP)" */;
+            compatibilityVersion = "Xcode 14.0";
+            developmentRegion = en;
+            hasScannedForEncodings = 0;
+            knownRegions = (
+                en,
+                Base,
+                es,
+                ja,
+                "zh-Hans",
+            );
+            mainGroup = 49F90C1F2A52156200F06D93;
+            packageReferences = (
+            );
+            productRefGroup = 496BDBEC2B89A47800C09264 /* Products */;
+            projectDirPath = "";
+            projectRoot = "";
+            targets = (
+                499CD4382AC5B799001AE8D8 /* \(APP) */,
+            );
+        };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+        499CD43E2AC5B799001AE8D8 /* Resources */ = {
+            isa = PBXResourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+                499CD4402AC5B799001AE8D8 /* Assets.xcassets in Resources */,
+                496BDBEE2B8A7E9C00C09264 /* Localizable.xcstrings in Resources */,
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+        499CD4452AC5B869001AE8D8 /* Run skip gradle */ = {
+            isa = PBXShellScriptBuildPhase;
+            alwaysOutOfDate = 1;
+            buildActionMask = 2147483647;
+            files = (
+            );
+            inputFileListPaths = (
+            );
+            inputPaths = (
+            );
+            name = "Run skip gradle";
+            outputFileListPaths = (
+            );
+            outputPaths = (
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+            shellPath = "/bin/sh -e";
+            shellScript = "\(skipGradleLaunchScript)";
+        };
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+        499CD43A2AC5B799001AE8D8 /* Sources */ = {
+            isa = PBXSourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (
+                499CD43B2AC5B799001AE8D8 /* \(APP)AppMain.swift in Sources */,
+            );
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+        491FCC8E2AD18D38002FB1E1 /* Skippy */ = {
+            isa = XCBuildConfiguration;
+            baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(APP).xcconfig */;
+            buildSettings = {
+                ALWAYS_SEARCH_USER_PATHS = NO;
+                ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+                COPY_PHASE_STRIP = NO;
+                DEBUG_INFORMATION_FORMAT = dwarf;
+                ENABLE_BITCODE = NO;
+                ENABLE_NS_ASSERTIONS = NO;
+                ENABLE_STRICT_OBJC_MSGSEND = YES;
+                ENABLE_USER_SCRIPT_SANDBOXING = NO;
+                LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+                MTL_ENABLE_DEBUG_INFO = NO;
+                MTL_FAST_MATH = YES;
+                SWIFT_COMPILATION_MODE = wholemodule;
+            };
+            name = Skippy;
+        };
+        491FCC8F2AD18D38002FB1E1 /* Skippy */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ENABLE_PREVIEWS = YES;
+                LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+                "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+                SDKROOT = auto;
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+                SWIFT_EMIT_LOC_STRINGS = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+            };
+            name = Skippy;
+        };
+        499CD4422AC5B799001AE8D8 /* Debug */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ENABLE_PREVIEWS = YES;
+                LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+                "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+                SDKROOT = auto;
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+                SWIFT_EMIT_LOC_STRINGS = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+            };
+            name = Debug;
+        };
+        499CD4432AC5B799001AE8D8 /* Release */ = {
+            isa = XCBuildConfiguration;
+            buildSettings = {
+                ENABLE_PREVIEWS = YES;
+                LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+                "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+                SDKROOT = auto;
+                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+                SWIFT_EMIT_LOC_STRINGS = YES;
+                SWIFT_VERSION = 5.0;
+                TARGETED_DEVICE_FAMILY = "1,2";
+            };
+            name = Release;
+        };
+        49F90C4B2A52156300F06D93 /* Debug */ = {
+            isa = XCBuildConfiguration;
+            baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(APP).xcconfig */;
+            buildSettings = {
+                ALWAYS_SEARCH_USER_PATHS = NO;
+                ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+                COPY_PHASE_STRIP = NO;
+                DEBUG_INFORMATION_FORMAT = dwarf;
+                ENABLE_BITCODE = NO;
+                ENABLE_STRICT_OBJC_MSGSEND = YES;
+                ENABLE_TESTABILITY = YES;
+                ENABLE_USER_SCRIPT_SANDBOXING = NO;
+                LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+                MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+                MTL_FAST_MATH = YES;
+                ONLY_ACTIVE_ARCH = YES;
+                SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+                SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+            };
+            name = Debug;
+        };
+        49F90C4C2A52156300F06D93 /* Release */ = {
+            isa = XCBuildConfiguration;
+            baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(APP).xcconfig */;
+            buildSettings = {
+                ALWAYS_SEARCH_USER_PATHS = NO;
+                ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+                COPY_PHASE_STRIP = NO;
+                DEBUG_INFORMATION_FORMAT = dwarf;
+                ENABLE_BITCODE = NO;
+                ENABLE_NS_ASSERTIONS = NO;
+                ENABLE_STRICT_OBJC_MSGSEND = YES;
+                ENABLE_USER_SCRIPT_SANDBOXING = NO;
+                LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+                MTL_ENABLE_DEBUG_INFO = NO;
+                MTL_FAST_MATH = YES;
+                SWIFT_COMPILATION_MODE = wholemodule;
+            };
+            name = Release;
+        };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+        499CD4412AC5B799001AE8D8 /* Build configuration list for PBXNativeTarget "\(APP)" */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                499CD4422AC5B799001AE8D8 /* Debug */,
+                499CD4432AC5B799001AE8D8 /* Release */,
+                491FCC8F2AD18D38002FB1E1 /* Skippy */,
+            );
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+        49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(APP)" */ = {
+            isa = XCConfigurationList;
+            buildConfigurations = (
+                49F90C4B2A52156300F06D93 /* Debug */,
+                49F90C4C2A52156300F06D93 /* Release */,
+                491FCC8E2AD18D38002FB1E1 /* Skippy */,
+            );
+            defaultConfigurationIsVisible = 0;
+            defaultConfigurationName = Release;
+        };
+/* End XCConfigurationList section */
+
+/* Begin XCSwiftPackageProductDependency section */
+        49231BAB2AC5BCEF00F98ADF /* \(APP)App */ = {
+            isa = XCSwiftPackageProductDependency;
+            productName = \(APP)App;
+        };
+/* End XCSwiftPackageProductDependency section */
+    };
+    rootObject = 49F90C202A52156200F06D93 /* Project object */;
+}
+
+"""
         }
 
         let xcodeProjectContents = createXcodeProj()
@@ -1410,29 +1694,24 @@ class AppProjectLayout : FrameworkProjectLayout {
         let sourceMainKotlinSourceFile = sourceMainKotlinPackage.appendingPathComponent("Main.kt")
         try createKotlinMain(appModulePackage: appModulePackage, appModuleName: appModuleName).write(to: sourceMainKotlinSourceFile.createParentDirectory(), atomically: true, encoding: .utf8)
 
-//        if gitRepo == true {
-//            func createGitRepo(url: URL) throws -> CheckStatus {
-//                // create the .gitignore file
-//                let gitignore = """
-//                .*.swp
-//                .DS_Store
-//                .build
-//                build
-//                /Packages
-//                xcuserdata/
-//                DerivedData/
-//                .swiftpm/configuration/registries.json
-//                .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
-//                .netrc
-//
-//                """
-//
-//                try gitignore.write(to: projectURL.appending(path: ".gitignore"), atomically: true, encoding: .utf8)
-//                return CheckStatus(status: .pass, message: "Create git repository")
-//            }
-//
-//            await checkFile(projectURL, with: out, title: "Create git repository", handle: createGitRepo)
-//        }
+        if gitRepo == true {
+            // create the .gitignore file
+            let gitignore = """
+.*.swp
+.DS_Store
+.build
+build
+/Packages
+xcuserdata/
+DerivedData/
+.swiftpm/configuration/registries.json
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+.netrc
+
+"""
+
+            try gitignore.write(to: projectURL.appending(path: ".gitignore"), atomically: true, encoding: .utf8)
+        }
 
         return (projectURL, appProject)
     }
