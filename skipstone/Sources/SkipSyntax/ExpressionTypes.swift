@@ -298,6 +298,10 @@ final class BinaryOperator: Expression {
             rhs.inferTypes(context: context, expecting: lhs.inferredType)
             doubleCheckLHS()
             resultType = .void
+
+            if op.symbol == "=", let apiExpression = lhs as? APICallExpression, let match = apiExpression.apiMatch {
+                context.assignLiteralExpressibleType(match.signature, to: rhs)
+            }
         case .ternary:
             // Handled by TernaryOperator
             break
@@ -829,7 +833,8 @@ final class FunctionCall: Expression, APICallExpression, MemberAccessExpression 
                     match = refinedMatch
                 }
             }
-            context.assignLiteralExpressibleTypes(in: match.1, to: arguments.map(\.value))
+            let parameterTypes = match.1.signature.parameters.map(\.type)
+            context.assignLiteralExpressibleTypes(parameterTypes, to: arguments.map(\.value))
 
             isInit = match.1.declarationType == .initDeclaration
             apiMatch = match.1
@@ -1400,6 +1405,7 @@ final class NilLiteral: Expression {
 final class NumericLiteral: Expression {
     let literal: String
     let isFloatingPoint: Bool
+    var isAssignedToFloatingPoint = false
 
     init(literal: String, isFloatingPoint: Bool, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.literal = literal

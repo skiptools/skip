@@ -463,7 +463,7 @@ final class BuiltinTypeTests: XCTestCase {
         """)
     }
 
-    func testExpressibleByStringInterpolationMatch() async throws {
+    func testExpressibleByStringLiteralParameters() async throws {
         try await check(supportingSwift: """
         protocol ExpressibleByStringLiteral {
         }
@@ -543,6 +543,83 @@ final class BuiltinTypeTests: XCTestCase {
             LocalizedKey(stringInterpolation = str)
         }(), comment = "Comment")
         localize(key = str, comment = "Comment")
+        """)
+    }
+
+    func testIntAssignedToFloatingPoint() async throws {
+        try await check(supportingSwift: """
+        func f(a: Int, b: Double) {
+        }
+        """, swift: """
+        func g() {
+            f(a: 1, b: 1.0)
+            f(a: 1, b: 1)
+            let b = 2
+            f(a: 1, b: b)
+        }
+        """, kotlin: """
+        internal fun g() {
+            f(a = 1, b = 1.0)
+            f(a = 1, b = 1.0)
+            val b = 2
+            f(a = 1, b = b)
+        }
+        """)
+
+        try await check(supportingSwift: """
+        func f(a: Int, b: Double) {
+        }
+        func f(a: Int, b: Int) {
+        }
+        """, swift: """
+        func g() {
+            f(a: 1, b: 1.1)
+            f(a: 1, b: 1)
+        }
+        """, kotlin: """
+        internal fun g() {
+            f(a = 1, b = 1.1)
+            f(a = 1, b = 1)
+        }
+        """)
+
+        try await check(supportingSwift: """
+        class C {
+            var a = 1
+            var b = 1.0
+        }
+        """, swift: """
+        let c = C()
+        c.a = 1
+        c.b = 1
+        """, kotlin: """
+        internal val c = C()
+        c.a = 1
+        c.b = 1.0
+        """)
+
+        try await check(swift: """
+        let a = 1
+        let b: Int = 1
+        let c: Double = 1.1
+        let d: Double = 1
+        """, kotlin: """
+        internal val a = 1
+        internal val b: Int = 1
+        internal val c: Double = 1.1
+        internal val d: Double = 1.0
+        """)
+
+        try await check(swift: """
+        func f() {
+            var a: Double = -1
+            a = 2
+        }
+        """, kotlin: """
+        internal fun f() {
+            var a: Double = -1.0
+            a = 2.0
+        }
         """)
     }
 }

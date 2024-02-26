@@ -438,28 +438,41 @@ struct TypeInferenceContext {
     }
 
     /// When a call match is found, set any Expressible types on the literal expressions that will need to build them.
-    func assignLiteralExpressibleTypes(in match: APIMatch, to expressions: [Expression]) {
-        let parameters = match.signature.parameters
-        guard parameters.count == expressions.count else {
+    func assignLiteralExpressibleType(_ type: TypeSignature, to expression: Expression) {
+        // TODO: Handle other Expressible types
+        switch expression.type {
+        case .numericLiteral:
+            if type.isFloatingPoint {
+                if let numericLiteral = expression as? NumericLiteral {
+                    numericLiteral.isAssignedToFloatingPoint = true
+                }
+            }
+        case .prefixOperator:
+            if type.isFloatingPoint {
+                if let prefixOperator = expression as? PrefixOperator, prefixOperator.operatorSymbol == "-", let numericLiteral = prefixOperator.target as? NumericLiteral {
+                    numericLiteral.isAssignedToFloatingPoint = true
+                }
+            }
+        case .stringLiteral:
+            if type.isNamedType, let stringLiteral = expression as? StringLiteral {
+                if stringLiteral.isInterpolated, let interpolationType = interpolationType(for: type) {
+                    stringLiteral.expressibleByStringInterpolationType = (type, interpolationType)
+                } else {
+                    stringLiteral.expressibleByStringLiteralType = type
+                }
+            }
+        default:
+            break
+        }
+    }
+
+    /// When a call match is found, set any Expressible types on the literal expressions that will need to build them.
+    func assignLiteralExpressibleTypes(_ types: [TypeSignature], to expressions: [Expression]) {
+        guard types.count == expressions.count else {
             return
         }
-
         for i in 0..<expressions.count {
-            let expression = expressions[i]
-            let parameterType = parameters[i].type
-            // TODO: Handle other Expressible types
-            switch expression.type {
-            case .stringLiteral:
-                if parameterType.isNamedType, let stringLiteral = expression as? StringLiteral {
-                    if stringLiteral.isInterpolated, let interpolationType = interpolationType(for: parameterType) {
-                        stringLiteral.expressibleByStringInterpolationType = (parameterType, interpolationType)
-                    } else {
-                        stringLiteral.expressibleByStringLiteralType = parameterType
-                    }
-                }
-            default:
-                break
-            }
+            assignLiteralExpressibleType(types[i], to: expressions[i])
         }
     }
 

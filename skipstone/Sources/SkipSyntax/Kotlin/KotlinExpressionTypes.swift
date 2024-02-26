@@ -2144,17 +2144,20 @@ final class KotlinNullLiteral: KotlinExpression {
 final class KotlinNumericLiteral: KotlinExpression {
     var literal: String
     var isFloatingPoint: Bool
+    var isAssignedToFloatingPoint: Bool
     var suffix: String = ""
 
-    init(literal: String, isFloatingPoint: Bool = false, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+    init(literal: String, isFloatingPoint: Bool = false, isAssignedToFloatingPoint: Bool = false, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.literal = literal
         self.isFloatingPoint = isFloatingPoint
+        self.isAssignedToFloatingPoint = isAssignedToFloatingPoint
         super.init(type: .numericLiteral, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
     init(expression: NumericLiteral) {
         self.literal = expression.literal
         self.isFloatingPoint = expression.isFloatingPoint
+        self.isAssignedToFloatingPoint = expression.isAssignedToFloatingPoint
         super.init(type: .numericLiteral, expression: expression)
     }
 
@@ -2168,6 +2171,9 @@ final class KotlinNumericLiteral: KotlinExpression {
             }
         } else {
             output.append(literal)
+            if !isFloatingPoint, isAssignedToFloatingPoint {
+                output.append(".0")
+            }
         }
         output.append(suffix)
     }
