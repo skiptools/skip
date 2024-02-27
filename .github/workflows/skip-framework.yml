@@ -33,7 +33,7 @@ jobs:
 
       - name: Export project
         run: |
-          skip export
+          skip export || skip export -v
 
           # output exported AAR sizes table to the job summary
           echo "Artifact | Size" >> $GITHUB_STEP_SUMMARY
