@@ -78,6 +78,9 @@ jobs:
       - name: Verify Skip App
         run: skip verify
 
+      - name: Run Tests
+        run: test ! -d Tests || skip test || skip test -v
+
       - name: Export project
         run: |
           skip export
@@ -91,10 +94,6 @@ jobs:
             echo "\`$fileName\` | \`$fileSize\`" >> $GITHUB_STEP_SUMMARY
           done
           echo "" >> $GITHUB_STEP_SUMMARY
-
-      - name: Run Tests
-        # "null cannot be cast to non-null type kotlin.String"
-        run: test ! -d Tests || skip test || skip test -v
 
       - name: Build iOS ipa
         run: |
