@@ -151,17 +151,6 @@ jobs:
           # verify that the template can be used to derive a new app
           #skip app create --template-file "${TEMPLATE_FILE}" --build --test $(mktemp -d)
 
-
-      - name: Archive Kotlin Source
-        run: |
-          #cd .build/Darwin/DerivedData/SourcePackages/plugins/*.output/${SKIP_MODULE}*/skipstone/
-          cd .build/plugins/outputs/*/${SKIP_MODULE}/skipstone/
-          rm -rf .gradle .build */.build
-          # create the zip file with predictable timestamps for reproducibility
-          find . -exec touch -d "${COMMIT_DATE:0:19}" {} \;
-          zip -9 -r "${OLDPWD}/${RELDIR}/App-android-source.zip" . -x ".build/*" -x "*/.gradle/*" -x "*/.build/*" -x "*/build/*"
-          cd -
-
       - name: Prepare Artifacts
         run: |
           APPNAME="${SKIP_MODULE}"
