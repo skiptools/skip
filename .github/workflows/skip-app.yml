@@ -192,8 +192,8 @@ jobs:
           mv -v ${APPNAME}-Debug.ipa ${APPNAME}-ios-${RELTAG}-debug.ipa
 
           # fix artifact names for release (retain App-Source.zip for template)
-          mv -v App-Source.zip ${APPNAME}-ios-${RELTAG}-source.zip
-          mv -v App-android-source.zip ${APPNAME}-android-${RELTAG}-source.zip
+          #mv -v App-Source.zip ${APPNAME}-ios-${RELTAG}-source.zip
+          #mv -v App-android-source.zip ${APPNAME}-android-${RELTAG}-source.zip
 
           mv -v ${APPZ} ${APPNAME}-${RELTAG}.appz
 
