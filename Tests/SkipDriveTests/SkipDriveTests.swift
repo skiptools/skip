@@ -68,7 +68,7 @@ class SkipCommandTests : XCTestCase {
             XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
         }
 
-        XCTAssertEqual(msgs.dropLast(1).last ?? "", """
+        XCTAssertEqual(msgs.dropLast(2).last ?? "", """
         .
         ├─ Android
         │  ├─ app
@@ -170,7 +170,7 @@ class SkipCommandTests : XCTestCase {
         let project = try await loadProjectPackage(dir)
         XCTAssertEqual(name, project.name)
 
-        XCTAssertEqual(msgs.dropLast(1).last ?? "", """
+        XCTAssertEqual(msgs.dropLast(2).last ?? "", """
         .
         ├─ Package.resolved
         ├─ Package.swift
@@ -265,7 +265,7 @@ class SkipCommandTests : XCTestCase {
         let exportPath = try mktmp()
         let exported = try await skip("export", "-jA", "-v", "--show-tree", "--project", tempDir + "/" + name, "-d", exportPath)
         let exportedJSON = try exported.out.parseJSONMessages()
-        let fileTree = exportedJSON.dropLast(1).last ?? ""
+        let fileTree = exportedJSON.dropLast(2).last ?? ""
 
         XCTAssertTrue(fileTree.contains("DemoFramework-release.aar"), "missing expected aar in \(fileTree)")
         XCTAssertTrue(fileTree.contains("DemoFramework-debug.aar"), "missing expected aar in \(fileTree)")
@@ -293,7 +293,7 @@ class SkipCommandTests : XCTestCase {
         let exportPath = try mktmp()
         let exported = try await skip("export", "-jA", "-v", "--show-tree", "--project", tempDir + "/" + name, "-d", exportPath)
         let exportedJSON = try exported.out.parseJSONMessages()
-        let fileTree = exportedJSON.dropLast(1).last ?? ""
+        let fileTree = exportedJSON.dropLast(2).last ?? ""
 
         XCTAssertTrue(fileTree.contains("Demo-debug.apk"), "missing expected apk in \(fileTree)")
         XCTAssertTrue(fileTree.contains("Demo-release.apk"), "missing expected apk in \(fileTree)")
