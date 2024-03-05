@@ -21,11 +21,13 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
     @Flag(help: ArgumentHelp("Check twice that sample build outputs produce identical artifacts", valueName: "verify"))
     var doubleCheck: Bool = false
 
-    func performCommand(with out: MessageQueue) async throws {
-        let startTime = Date.now
-        let logPath = "/tmp/skip-checkup-\(ISO8601DateFormatter.string(from: startTime, timeZone: TimeZone.current)).txt"
-        outputOptions.streams.logFile = try .init(.init(validating: logPath))
+    func performCommand(with out: MessageQueue) async {
+        await withLogStream(with: out) {
+            try await runCheckup(with: out)
+        }
+    }
 
+    func runCheckup(with out: MessageQueue) async throws {
         await runDoctor(with: out)
 
         @Sendable func buildSampleProject(packageResolvedURL: URL? = nil) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
@@ -65,19 +67,6 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
                 await out.write(status: .fail, "Double-check APK failed due to missing artifacts")
             }
         }
-
-        let messages = await out.elements.compactMap({ try? $0.get() })
-        let statuses = Dictionary(grouping: messages, by: \.status)
-        let failCount = statuses[.fail]?.count ?? 0
-        let warnCount = statuses[.warn]?.count ?? 0
-        let status: MessageBlock.Status = failCount > 0 ? .fail : warnCount > 0 ? .warn : .pass
-        var msg = "Skip \(skipVersion) checkup"
-        if status == .pass {
-            msg += " (\(startTime.timingSecondsSinceNow))"
-        } else {
-            msg += " \(status.rawValue) (log: \(logPath))\nSee \(outputOptions.term.yellow("https://skip.tools/docs/faq")) and \(outputOptions.term.yellow("https://community.skip.tools")) for resolution"
-        }
-        await out.write(status: status, msg)
     }
 }
 

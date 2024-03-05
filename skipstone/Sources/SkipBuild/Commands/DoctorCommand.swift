@@ -21,14 +21,15 @@ struct DoctorCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
     var toolOptions: ToolOptions
 
     func performCommand(with out: MessageQueue) async {
-        await out.yield(MessageBlock(status: nil, "Skip Doctor"))
+        await withLogStream(with: out) {
+            await out.yield(MessageBlock(status: nil, "Skip Doctor"))
 
-        await runDoctor(with: out)
-        let latestVersion = await checkSkipUpdates(with: out)
-        if let latestVersion = latestVersion, latestVersion != skipVersion {
-            await out.yield(MessageBlock(status: .warn, "A new version is Skip (\(latestVersion)) is available to update with: skip upgrade"))
+            await runDoctor(with: out)
+            let latestVersion = await checkSkipUpdates(with: out)
+            if let latestVersion = latestVersion, latestVersion != skipVersion {
+                await out.yield(MessageBlock(status: .warn, "A new version is Skip (\(latestVersion)) is available to update with: skip upgrade"))
+            }
         }
-        await reportMessageQueue(with: out, title: "Skip (\(skipVersion)) checks complete")
     }
 }
 

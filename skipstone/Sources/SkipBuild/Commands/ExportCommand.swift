@@ -48,7 +48,13 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Perform debug build", valueName: "debug"))
     var debug: Bool = true
 
-    func performCommand(with out: MessageQueue) async throws {
+    func performCommand(with out: MessageQueue) async {
+        await withLogStream(with: out) {
+            try await runExport(with: out)
+        }
+    }
+
+    func runExport(with out: MessageQueue) async throws {
         let startTime = Date.now
         let variants = [debug ? "debug" : nil, release ? "release" : nil].compactMap({ $0 })
         if variants.isEmpty {

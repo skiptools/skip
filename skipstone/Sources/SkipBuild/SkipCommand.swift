@@ -414,11 +414,37 @@ actor MessageQueue {
 }
 
 extension StreamingCommand {
-    @discardableResult func reportMessageQueue(with out: MessageQueue, title: String) async -> [Result<MessageStream.Element, Error>] {
+
+    /// Perform the given operation, logging to a temporary file and displaying the results of the command once it has completed.
+    /// - Parameters:
+    ///   - out: the message queue for outputting messages and statuses
+    ///   - operation: the operation to execute
+    func withLogStream(with out: MessageQueue, operation: () async throws -> ()) async {
+        let cmdname = Self.configuration.commandName ?? "cmd"
+        let startTime = Date.now
+
+        let dateFormatter = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withInternetDateTime]
+        let dateString = dateFormatter.string(from: startTime)
+
+        let logPath = "/tmp/skip-\(cmdname)-\(dateString).txt"
+
+        outputOptions.streams.logFile = try? .init(AbsolutePath(validating: logPath))
+        defer {
+            outputOptions.streams.logFile = nil
+        }
+
+        do {
+            try await operation()
+        } catch {
+            await out.yield(MessageBlock(status: .fail, error.localizedDescription))
+        }
+
+        let title = "Skip \(skipVersion) \(cmdname)"
         let messages = await out.elements
 
         if messages.isEmpty {
-            await out.yield(MessageBlock(status: .fail, "No checks were performed"))
+            await out.yield(MessageBlock(status: .fail, "No command output"))
         } else {
             //let total = messages.count
             let warnings = messages.filter({ $0.messageStatus == .warn }).count
@@ -427,16 +453,20 @@ extension StreamingCommand {
             var msg = title
             if warnings > 0 || errors > 0 {
                 if errors > 0 {
-                    msg += " with \(errors) error\(warnings == 1 ? "" : "s")"
+                    msg += " failed with \(errors) error\(errors == 1 ? "" : "s")"
+                    msg += "\nOutput logged to: \(logPath)"
+                    msg += "\nSee \(outputOptions.term.yellow("https://skip.tools/docs/faq")) and \(outputOptions.term.yellow("https://community.skip.tools")) for help"
                 }
                 if warnings > 0 {
                     msg += " \(errors > 0 ? "and" : "with") \(warnings) warning\(warnings == 1 ? "" : "s")"
                 }
+
+            } else {
+                msg += " succeeded in \(startTime.timingSecondsSinceNow)"
             }
 
             await out.yield(MessageBlock(status: errors > 0 ? .fail : warnings > 0 ? .warn : .pass, msg))
         }
-        return messages
     }
 }
 

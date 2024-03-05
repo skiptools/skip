@@ -95,13 +95,9 @@ public struct OutputOptions: ParsableArguments {
         var err: WritableByteStream = stderrStream
         var outFile: LocalFileOutputByteStream? = nil
         var logFile: LocalFileOutputByteStream? = nil
+        private let logFileLock = NSLock()
 
         private var _currentOutput: (lines: [String], lock: NSLock) = ([], NSLock())
-
-        deinit {
-            try? outFile?.close()
-            try? logFile?.close()
-        }
 
         /// Returns the current output line, optionally also setting it; guarded behind a lock
         @discardableResult func outputBuffer(add line: String? = nil, reset: Bool = false) -> [String] {
@@ -143,8 +139,10 @@ public struct OutputOptions: ParsableArguments {
         /// The closure that will output a message to the log file, if it has been configured for the current operation
         func writeLog(_ message: String, terminator: String = "\n") {
             if let stream = self.logFile {
-                stream.write(message + terminator)
-                if !terminator.isEmpty { stream.flush() }
+                logFileLock.withLock {
+                    stream.write(message + terminator)
+                    if !terminator.isEmpty { stream.flush() }
+                }
             }
         }
 

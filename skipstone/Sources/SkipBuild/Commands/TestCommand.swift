@@ -51,8 +51,10 @@ struct TestCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
     @Option(name: [.long], help: ArgumentHelp("Output summary table", valueName: "path"))
     var summaryFile: String?
 
-    func performCommand(with out: MessageQueue) async throws {
-        try await runTestCommand(with: out)
+    func performCommand(with out: MessageQueue) async {
+        await withLogStream(with: out) {
+            try await runTestCommand(with: out)
+        }
     }
 }
 
@@ -96,6 +98,8 @@ extension TestCommand {
         let xunit = xunit ?? ".build/xcunit-\(UUID().uuidString).xml"
 
         let packageName = await Result(catchingAsync: { try await parseSwiftPackage(with: out, at: project).name })
+
+        await run(with: out, "Build Project", ["swift", "build", "--build-tests", "--verbose", "--configuration", configuration, "--package-path", project])
 
         var testResult: Result<ProcessOutput, Error>? = nil
         if test == true {

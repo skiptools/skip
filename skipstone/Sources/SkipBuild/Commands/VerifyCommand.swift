@@ -21,12 +21,9 @@ struct VerifyCommand: SkipCommand, StreamingCommand, ProjectCommand, ToolOptions
     var project: String = "."
 
     func performCommand(with out: MessageQueue) async {
-        do {
+        await withLogStream(with: out) {
             try await performVerifyCommand(project: project, with: out)
-        } catch {
-            await out.yield(MessageBlock(status: .fail, error.localizedDescription))
         }
-        await reportMessageQueue(with: out, title: "Verify skip project (\(skipVersion)) checks complete")
     }
 }
 

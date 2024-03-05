@@ -227,10 +227,11 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 5.9
-        // This is free software: you can redistribute and/or modify it
-        // under the terms of the GNU Lesser General Public License 3.0
-        // as published by the Free Software Foundation https://fsf.org
-        
+        // This is a Skip (https://skip.tools) package,
+        // containing a Swift Package Manager project
+        // that will use the Skip build plugin to transpile the
+        // Swift Package, Sources, and Tests into an
+        // Android Gradle Project with Kotlin sources and JUnit tests.
         import PackageDescription
 
         let package = Package(
@@ -289,7 +290,7 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ Entitlements.plist
         │  └─ Sources
         │     └─ APPNAMEAppMain.swift
-        ├─ LICENSE.LGPL
+        ├─ LICENSE.GPL
         ├─ Package.swift
         ├─ README.md
         ├─ Skip.env
@@ -382,7 +383,7 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ Entitlements.plist
         │  └─ Sources
         │     └─ APPNAMEAppMain.swift
-        ├─ LICENSE.LGPL
+        ├─ LICENSE.GPL
         ├─ Package.swift
         ├─ README.md
         ├─ Skip.env
@@ -783,7 +784,7 @@ final class SkipCommandTests: XCTestCase {
         let created = try await skipstone(cmd).json()
         XCTAssertEqual(created.array?.first, ["msg": .string("Initializing Skip \(appid == nil ? "library" : "application") \(projectName)")])
         // return the tree output, which is in the 2nd-to-last message
-       return (projectURL: tmpDir.appendingPathComponent(projectName, isDirectory: true), projectTree: created.array?.dropLast().last?["msg"]?.string)
+       return (projectURL: tmpDir.appendingPathComponent(projectName, isDirectory: true), projectTree: created.array?.dropLast(2).last?["msg"]?.string)
     }
 }
 

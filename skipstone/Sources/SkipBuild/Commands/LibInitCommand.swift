@@ -68,7 +68,13 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, Too
         (self.createOptions.dir ?? ".")
     }
 
-    func performCommand(with out: MessageQueue) async throws {
+    func performCommand(with out: MessageQueue) async {
+        await withLogStream(with: out) {
+            try await runInit(with: out)
+        }
+    }
+
+    func runInit(with out: MessageQueue) async throws {
         await out.yield(MessageBlock(status: nil, "Initializing Skip \(appid == nil ? "library" : "application") \(self.projectName)"))
 
         let dir = URL(fileURLWithPath: self.createOptions.dir ?? ".", isDirectory: true)
