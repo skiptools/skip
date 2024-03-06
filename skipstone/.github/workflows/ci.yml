@@ -87,7 +87,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           echo "Creating release: ${RELTAG}"
-          cd ${RELDIR}/
           gh release create "${RELTAG}" -t "Release ${RELTAG}" --generate-notes .build/dist/*.*
 
       - name: "Upload Build Artifacts"
