@@ -28,6 +28,9 @@ jobs:
       - name: Get swift version
         run: swift --version
 
+      - name: Install dependencies
+        run: sudo apt-get install -y libcurl4-openssl-dev
+
       # checkout both skipstone.git and skip.git for the linked SkipDrive
       - name: Checkout skipstone.git
         uses: actions/checkout@v4
@@ -47,8 +50,14 @@ jobs:
         working-directory: skipstone
         run: KOTLINC=kotlinc swift test -v -c debug --parallel
 
-      - name: Swift Build (Release)
+      - name: Swift Build (Debug)
         #if: false
+        #if: startsWith(github.ref, 'refs/tags/')
+        working-directory: skipstone
+        run: swift build --product SkipRunner -c debug --static-swift-stdlib
+
+      - name: Swift Build (Release)
+        if: false
         #if: startsWith(github.ref, 'refs/tags/')
         working-directory: skipstone
         run: swift build --product SkipRunner -c release --static-swift-stdlib
@@ -60,7 +69,7 @@ jobs:
         run: |
           tree .build/x86_64-unknown-linux-gnu/
           mkdir -p .build/dist/
-          cp -a .build/x86_64-unknown-linux-gnu/release/SkipRunner .build/dist/skip
+          cp -a .build/x86_64-unknown-linux-gnu/*/SkipRunner .build/dist/skip
           cd .build/dist/
           zip -9 -q --symlinks skip skip-linux-ubuntu-focal.zip
           ls -lah
