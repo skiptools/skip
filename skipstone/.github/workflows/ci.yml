@@ -25,11 +25,30 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      - uses: swift-actions/setup-swift@v1
+
       - name: Get swift version
         run: swift --version
 
       - name: Install dependencies
-        run: sudo apt-get install -y libcurl4-openssl-dev
+        run: sudo apt-get install -y \
+          libcurl4-openssl-dev \
+          binutils \
+          git \
+          gnupg2 \
+          libc6-dev \
+          libcurl4 \
+          libedit2 \
+          libgcc-9-dev \
+          libpython2.7 \
+          libsqlite3-0 \
+          libstdc++-9-dev \
+          libxml2 \
+          libz3-dev \
+          pkg-config \
+          tzdata \
+          uuid-dev \
+          zlib1g-dev
 
       # checkout both skipstone.git and skip.git for the linked SkipDrive
       - name: Checkout skipstone.git
@@ -46,15 +65,15 @@ jobs:
       - name: Check kotlinc
         run: which kotlinc
 
-      - name: Swift Test (Debug)
-        working-directory: skipstone
-        run: KOTLINC=kotlinc swift test -v -c debug --parallel
-
       - name: Swift Build (Debug)
         #if: false
         #if: startsWith(github.ref, 'refs/tags/')
         working-directory: skipstone
         run: swift build --product SkipRunner -c debug --static-swift-stdlib
+
+      - name: Swift Test (Debug)
+        working-directory: skipstone
+        run: KOTLINC=kotlinc swift test -v -c debug --parallel
 
       - name: Swift Build (Release)
         if: false
