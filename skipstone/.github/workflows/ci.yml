@@ -25,8 +25,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: swift-actions/setup-swift@v1
-
+      #- uses: swift-actions/setup-swift@v1
       - name: Get swift version
         run: swift --version
 
@@ -53,7 +52,7 @@ jobs:
         run: KOTLINC=kotlinc swift test -v -c debug --parallel
 
       - name: Build SkipRunner (Release)
-        #if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
         working-directory: skipstone
         run: |
           # needs a clean build or else we get linker errors
@@ -73,8 +72,7 @@ jobs:
       - name: "Upload Build Artifacts"
         # TODO: hand off to macBuild, which will publish the linux plugin
         # alongside the macOS one (once swift supports plugins on Linux)
-        #if: startsWith(github.ref, 'refs/tags/')
-        #if: false
+        if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
         with: 
           path: skipstone/.build/dist
