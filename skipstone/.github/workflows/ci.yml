@@ -78,10 +78,16 @@ jobs:
           cd .build/dist/
           zip -9 -q skip-linux-ubuntu-focal-${RELTAG}.zip skip
           ls -lah
+          rm skip
           cd -
 
       - name: "Release"
-        if: startsWith(github.ref, 'refs/tags/')
+        # disabled due to "HTTP 403: Resource not accessible by integration"
+        # what we should do is add the file to the public release created at
+        # https://github.com/skiptools/skip/releases
+        # using a token with perimission to add to that repo
+        if: false
+        #if: startsWith(github.ref, 'refs/tags/')
         working-directory: skipstone
         env: 
           GH_TOKEN: ${{ github.token }}
@@ -92,8 +98,8 @@ jobs:
       - name: "Upload Build Artifacts"
         # TODO: hand off to macBuild, which will publish the linux plugin
         # alongside the macOS one (once swift supports plugins on Linux)
-        if: false
-        # if: startsWith(github.ref, 'refs/tags/')
+        # if: false
+        if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
         with: 
           path: skipstone/.build/dist
