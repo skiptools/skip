@@ -56,6 +56,7 @@ jobs:
         if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
         working-directory: skipstone
         run: |
+          rm -rf .build
           swift build --product SkipRunner -c debug --static-swift-stdlib
           ls -lah .build/x86_64-unknown-linux-gnu/debug/SkipRunner
           .build/x86_64-unknown-linux-gnu/debug/SkipRunner version
@@ -64,6 +65,7 @@ jobs:
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         working-directory: skipstone
         run: |
+          rm -rf .build
           swift build --product SkipRunner -c release --static-swift-stdlib
           ls -lah .build/x86_64-unknown-linux-gnu/release/SkipRunner
           .build/x86_64-unknown-linux-gnu/release/SkipRunner version
