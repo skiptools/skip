@@ -687,7 +687,7 @@ final class CodableTests: XCTestCase {
 
         internal class S: Codable {
             internal val i: Int
-            internal var a = arrayOf("foo")
+            internal val a = arrayOf("foo")
 
             constructor(i: Int) {
                 this.i = i
@@ -707,7 +707,6 @@ final class CodableTests: XCTestCase {
             constructor(from: Decoder) {
                 val container = from.container(keyedBy = CodingKeys::class)
                 this.i = container.decode(Int::class, forKey = CodingKeys.i)
-                this.a = container.decode(Array::class, elementType = String::class, forKey = CodingKeys.a)
             }
 
             companion object: DecodableCompanion<S> {
@@ -717,6 +716,88 @@ final class CodableTests: XCTestCase {
                     return when (rawValue) {
                         "i" -> CodingKeys.i
                         "a" -> CodingKeys.a
+                        else -> null
+                    }
+                }
+            }
+        }
+        """)
+    }
+
+    func testUncodedProperties() async throws {
+        try await check(swift: """
+        struct S: Codable {
+            let i = 100
+            var s = "str"
+            let j = 200
+            var t = "string"
+
+            enum CodingKeys: CodingKey {
+                case j, t
+            }
+        }
+        """, kotlin: """
+        internal class S: Codable, MutableStruct {
+            internal val i: Int
+            internal var s: String
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+            internal val j: Int
+            internal var t: String
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            internal enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+                j("j"),
+                t("t");
+            }
+
+            constructor(s: String = "str", t: String = "string") {
+                this.i = 100
+                this.j = 200
+                this.s = s
+                this.t = t
+            }
+
+            private constructor(copy: MutableStruct) {
+                @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as S
+                this.i = copy.i
+                this.s = copy.s
+                this.j = copy.j
+                this.t = copy.t
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S(this as MutableStruct)
+
+            override fun encode(to: Encoder) {
+                val container = to.container(keyedBy = CodingKeys::class)
+                container.encode(j, forKey = CodingKeys.j)
+                container.encode(t, forKey = CodingKeys.t)
+            }
+
+            constructor(from: Decoder) {
+                this.i = 100
+                this.j = 200
+                val container = from.container(keyedBy = CodingKeys::class)
+                this.s = "str"
+                this.t = container.decode(String::class, forKey = CodingKeys.t)
+            }
+
+            companion object: DecodableCompanion<S> {
+                override fun init(from: Decoder): S = S(from = from)
+
+                internal fun CodingKeys(rawValue: String): S.CodingKeys? {
+                    return when (rawValue) {
+                        "j" -> CodingKeys.j
+                        "t" -> CodingKeys.t
                         else -> null
                     }
                 }
@@ -928,19 +1009,19 @@ final class CodableTests: XCTestCase {
             }
 
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
-                namecodingkey("name"),
+                name_("name"),
                 package_("package");
             }
 
             override fun encode(to: Encoder) {
                 val container = to.container(keyedBy = CodingKeys::class)
-                container.encode(name, forKey = CodingKeys.namecodingkey)
+                container.encode(name, forKey = CodingKeys.name_)
                 container.encode(package_, forKey = CodingKeys.package_)
             }
 
             constructor(from: Decoder) {
                 val container = from.container(keyedBy = CodingKeys::class)
-                this.name = container.decode(String::class, forKey = CodingKeys.namecodingkey)
+                this.name = container.decode(String::class, forKey = CodingKeys.name_)
                 this.package_ = container.decode(String::class, forKey = CodingKeys.package_)
             }
 
@@ -949,7 +1030,7 @@ final class CodableTests: XCTestCase {
 
                 private fun CodingKeys(rawValue: String): CodingKeys? {
                     return when (rawValue) {
-                        "name" -> CodingKeys.namecodingkey
+                        "name" -> CodingKeys.name_
                         "package" -> CodingKeys.package_
                         else -> null
                     }

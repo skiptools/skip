@@ -1016,7 +1016,7 @@ final class KotlinClassDeclaration: KotlinStatement {
         }
         kstatement.members = kmembers // Setting assigns companion information on members
         if statement.type == .enumDeclaration {
-            kstatement.processEnumCaseDeclarations(messagesSource: translator.syntaxTree.source)
+            kstatement.processEnumCaseDeclarations()
         }
 
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
@@ -1044,7 +1044,7 @@ final class KotlinClassDeclaration: KotlinStatement {
     }
 
     /// Assign raw values and other attributes to enum case members.
-    func processEnumCaseDeclarations(messagesSource: Source? = nil) {
+    func processEnumCaseDeclarations() {
         guard declarationType == .enumDeclaration else {
             return
         }
@@ -1068,12 +1068,6 @@ final class KotlinClassDeclaration: KotlinStatement {
                 }
             }
             caseDeclaration.isLastDeclaration = index == caseDeclarations.count - 1
-
-            // Note that a transformer may force this enum into a sealed enum later, so we can only warn on the likelihood that
-            // this will turn into an enum case and cause an error
-            if let messagesSource, !isSealedClassesEnum && KotlinEnumCaseDeclaration.disallowedCaseNames.contains(caseDeclaration.preEscapedName ?? caseDeclaration.name) {
-                caseDeclaration.messages.append(.kotlinEnumCaseName(caseDeclaration, source: messagesSource))
-            }
         }
     }
 
@@ -1299,7 +1293,7 @@ final class KotlinClassDeclaration: KotlinStatement {
 
 final class KotlinEnumCaseDeclaration: KotlinStatement {
     /// Names that aren't hard reserved words but cause errors as enum cases.
-    static let disallowedCaseNames: Set<String> = ["const", "data", "description", "name", "ordinal", "segmented"]
+    static let disallowedCaseNames: Set<String> = ["const", "data", "description", "header", "internal", "name", "ordinal", "private", "public", "segmented", "value"]
 
     var name: String
     var preEscapedName: String?
@@ -2531,7 +2525,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
             names = [newValue]
         }
     }
-    var preEscapePropertyName: String?
+    var preEscapedPropertyName: String?
     var propertyType: TypeSignature {
         get {
             return variableTypes.first ?? .none
@@ -2629,6 +2623,8 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
             } else {
                 if kstatement.modifiers.isOverride {
                     kstatement.role = .superclassOverrideProperty
+                } else if owningDeclarationType == .enumDeclaration && statement.propertyName == "name" && translator.codebaseInfo?.isSealedClassesEnum(type: owningSignature).0 == true {
+                    kstatement.messages.append(.kotlinEnumNameProperty(kstatement, source: translator.syntaxTree.source))
                 } else if translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningSignature) == true {
                     kstatement.modifiers.isOverride = true
                 }

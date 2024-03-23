@@ -9,6 +9,9 @@ final class KotlinEnumTransformer: KotlinTransformer {
 
     private func visit(_ node: KotlinSyntaxNode, in syntaxTree: KotlinSyntaxTree, codebaseInfo: CodebaseInfo.Context) -> VisitResult<KotlinSyntaxNode> {
         if let classDeclaration = node as? KotlinClassDeclaration, classDeclaration.declarationType == .enumDeclaration {
+            if !classDeclaration.isSealedClassesEnum {
+                escapeCaseNames(for: classDeclaration)
+            }
             handleConstructors(for: classDeclaration)
             synthesizeCaseIterable(for: classDeclaration, in: syntaxTree, codebaseInfo: codebaseInfo)
         } else if let functionCall = node as? KotlinFunctionCall, functionCall.isOptionalInit {
@@ -16,8 +19,25 @@ final class KotlinEnumTransformer: KotlinTransformer {
             if codebaseInfo.declarationType(forNamed: functionCall.inferredType)?.type == .enumDeclaration {
                 functionCall.isOptionalInit = false
             }
+        } else if let memberAccess = node as? KotlinMemberAccess, let apiMatch = memberAccess.apiMatch, apiMatch.declarationType == .enumCaseDeclaration {
+            let fixedMember = memberAccess.member.fixingKeyword(in: KotlinEnumCaseDeclaration.disallowedCaseNames)
+            if memberAccess.member != fixedMember, !codebaseInfo.isSealedClassesEnum(type: memberAccess.baseType).0 {
+                memberAccess.member = fixedMember
+            }
         }
         return .recurse(nil)
+    }
+
+    private func escapeCaseNames(for classDeclaration: KotlinClassDeclaration) {
+        for caseDeclaration in classDeclaration.members.compactMap({ $0 as? KotlinEnumCaseDeclaration }) {
+            let fixedName = caseDeclaration.name.fixingKeyword(in: KotlinEnumCaseDeclaration.disallowedCaseNames)
+            if caseDeclaration.name != fixedName {
+                if caseDeclaration.preEscapedName == nil {
+                    caseDeclaration.preEscapedName = caseDeclaration.name
+                }
+                caseDeclaration.name = fixedName
+            }
+        }
     }
 
     private func handleConstructors(for classDeclaration: KotlinClassDeclaration) {

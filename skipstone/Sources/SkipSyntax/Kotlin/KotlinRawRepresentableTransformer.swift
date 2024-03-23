@@ -55,7 +55,9 @@ final class KotlinRawRepresentableTransformer: KotlinTransformer {
                     let identifier = KotlinIdentifier(name: classDeclaration.enumInheritedRawValueType.kotlin)
                     rawValue = KotlinFunctionCall(function: identifier, arguments: [LabeledValue(value: rawValue)])
                 }
-                let statement = KotlinRawStatement(sourceCode: "\(classDeclaration.name).\(enumCase.name)")
+                // We're run before the enum transformer, so our case names aren't fixed yet
+                let fixedName = enumCase.name.fixingKeyword(in: KotlinEnumCaseDeclaration.disallowedCaseNames)
+                let statement = KotlinRawStatement(sourceCode: "\(classDeclaration.name).\(fixedName)")
                 return KotlinCase(patterns: [rawValue], body: KotlinCodeBlock(statements: [statement]))
             }
         cases.append(KotlinCase(patterns: [KotlinRawExpression(sourceCode: "else")], body: KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: "null")])))

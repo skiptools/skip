@@ -46,16 +46,21 @@ final class KotlinCodableTransformer: KotlinTransformer {
         }
 
         if (isEncodable && encodeDeclaration == nil) || (isDecodable && decodeDeclaration == nil) {
+            let storedVariableDeclarations = storedVariableDeclarations(of: classDeclaration)
             // The developer may use a bespoke name for their coding keys enum if they implement their own encode/decode,
             // so we only synthesize or look for coding keys after knowing we need to generate a coding function
             let rawValueType = classDeclaration.rawValueType
-            let codingKeys = synthesizeCodingKeys(for: classDeclaration, rawValueType: rawValueType, isDecodable: isDecodable)
-            let typedCodingKeys = codingKeys.map { $0.map { ($0, propertyType(for: $0, in: classDeclaration, source: source)) } }
+            let codingKeys = synthesizeCodingKeys(for: classDeclaration, with: storedVariableDeclarations, rawValueType: rawValueType, isDecodable: isDecodable)
+            let matchedCodingKeys = matchCodingKeys(codingKeys, to: storedVariableDeclarations, source: source)
+            let matchedCodingKeysByName = matchedCodingKeys?.reduce(into: [String: (KotlinEnumCaseDeclaration, KotlinVariableDeclaration)]()) { result, entry in
+                result[entry.1.propertyName] = entry
+            }
+
             if isEncodable && encodeDeclaration == nil {
-                synthesizeEncode(for: classDeclaration, codingKeys: typedCodingKeys, rawValueType: rawValueType, source: source)
+                synthesizeEncode(for: classDeclaration, codingKeys: matchedCodingKeys, rawValueType: rawValueType, source: source)
             }
             if isDecodable && decodeDeclaration == nil {
-                synthesizeDecode(for: classDeclaration, codingKeys: typedCodingKeys, rawValueType: rawValueType, source: source)
+                synthesizeDecode(for: classDeclaration, storedVariableDeclarations: storedVariableDeclarations, codingKeysByName: matchedCodingKeysByName, rawValueType: rawValueType, source: source)
             }
         }
         if isDecodable {
@@ -63,7 +68,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
         }
     }
 
-    private func synthesizeCodingKeys(for classDeclaration: KotlinClassDeclaration, rawValueType: TypeSignature, isDecodable: Bool) -> [KotlinEnumCaseDeclaration]? {
+    private func synthesizeCodingKeys(for classDeclaration: KotlinClassDeclaration, with storedVariableDeclarations: [KotlinVariableDeclaration], rawValueType: TypeSignature, isDecodable: Bool) -> [KotlinEnumCaseDeclaration]? {
         // Does the user have a custom enum?
         if let existingKeys = classDeclaration.members.first(where: {
             guard let memberClassDeclaration = $0 as? KotlinClassDeclaration else {
@@ -77,32 +82,16 @@ final class KotlinCodableTransformer: KotlinTransformer {
             return nil
         }
 
-        // Create cases for all stored variables
-        var storedVariableDeclarations: [KotlinVariableDeclaration] = []
-        for member in classDeclaration.members {
-            guard let variableDeclaration = member as? KotlinVariableDeclaration, !variableDeclaration.isStatic && !variableDeclaration.isGenerated else {
-                continue
-            }
-            guard variableDeclaration.getter == nil else {
-                continue
-            }
-            if isDecodable && variableDeclaration.value != nil {
-                // Make let vars writeable so that we can decode them. We decode in a constructor, so this is only needed
-                // if the vars have initial values that would otherwise not be re-assignable
-                variableDeclaration.isAssignFromWriteable = true
-            }
-            storedVariableDeclarations.append(variableDeclaration)
-        }
-
         let enumDeclaration = KotlinClassDeclaration(name: "CodingKeys", signature: .named("CodingKeys", []), declarationType: .enumDeclaration)
         enumDeclaration.inherits = [.string, .named("CodingKey", [])]
         enumDeclaration.modifiers.visibility = .private
         enumDeclaration.extras = .singleNewline
         enumDeclaration.isGenerated = true
         let caseDeclarations = storedVariableDeclarations.map {
-            let caseDeclaration = KotlinEnumCaseDeclaration(forPropertyName: $0.propertyName)
-            if let preEscapePropertyName = $0.preEscapePropertyName {
-                caseDeclaration.rawValue = KotlinStringLiteral(literal: preEscapePropertyName)
+            let caseDeclaration = KotlinEnumCaseDeclaration(name: $0.propertyName)
+            if let preEscapedPropertyName = $0.preEscapedPropertyName {
+                caseDeclaration.preEscapedName = preEscapedPropertyName
+                caseDeclaration.rawValue = KotlinStringLiteral(literal: preEscapedPropertyName)
             }
             return caseDeclaration
         }
@@ -115,6 +104,27 @@ final class KotlinCodableTransformer: KotlinTransformer {
         return caseDeclarations
     }
 
+    private func matchCodingKeys(_ codingKeys: [KotlinEnumCaseDeclaration]?, to storedVariableDeclarations: [KotlinVariableDeclaration], source: Source) -> [(KotlinEnumCaseDeclaration, KotlinVariableDeclaration)]? {
+        guard let codingKeys else {
+            return nil
+        }
+        let mappedVariableDeclarations = storedVariableDeclarations.reduce(into: [String: KotlinVariableDeclaration]()) { result, variableDeclaration in
+            result[variableDeclaration.propertyName] = variableDeclaration
+        }
+        var matchedCodingKeys: [(KotlinEnumCaseDeclaration, KotlinVariableDeclaration)] = []
+        for codingKey in codingKeys {
+            if let variableDeclaration = mappedVariableDeclarations[codingKey.forPropertyName] {
+                if variableDeclaration.propertyType == .none {
+                    variableDeclaration.messages.append(.kotlinCodablePropertyType(variableDeclaration, source: source))
+                }
+                matchedCodingKeys.append((codingKey, variableDeclaration))
+            } else {
+                codingKey.messages.append(.kotlinCodablePropertyForKey(codingKey, source: source))
+            }
+        }
+        return matchedCodingKeys
+    }
+
     private func fixupCodingKey(enumDeclaration: KotlinClassDeclaration) {
         // Coding keys are strings by default
         if enumDeclaration.enumInheritedRawValueType == .none {
@@ -123,7 +133,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
         }
     }
 
-    private func synthesizeEncode(for classDeclaration: KotlinClassDeclaration, codingKeys: [(KotlinEnumCaseDeclaration, TypeSignature)]?, rawValueType: TypeSignature, source: Source) {
+    private func synthesizeEncode(for classDeclaration: KotlinClassDeclaration, codingKeys: [(KotlinEnumCaseDeclaration, KotlinVariableDeclaration)]?, rawValueType: TypeSignature, source: Source) {
         let encode = KotlinFunctionDeclaration(name: "encode")
         encode.extras = .singleNewline
         encode.modifiers.visibility = .public
@@ -134,11 +144,11 @@ final class KotlinCodableTransformer: KotlinTransformer {
         var statements: [KotlinStatement] = []
         if let codingKeys {
             statements.append(KotlinRawStatement(sourceCode: "val container = to.container(keyedBy = CodingKeys::class)"))
-            statements += codingKeys.map {
-                let name = $0.0.forPropertyName
-                let caseName = $0.0.name
-                let encodeFunction = $0.1.isOptional ? "encodeIfPresent" : "encode"
-                return KotlinRawStatement(sourceCode: "container.\(encodeFunction)(\(name), forKey = CodingKeys.\(caseName))")
+            statements += codingKeys.map { entry in
+                // We're run before the enum transformer, so our case names aren't fixed yet
+                let caseName = entry.0.name.fixingKeyword(in: KotlinEnumCaseDeclaration.disallowedCaseNames)
+                let encodeFunction = entry.1.propertyType.isOptional ? "encodeIfPresent" : "encode"
+                return KotlinRawStatement(sourceCode: "container.\(encodeFunction)(\(entry.1.propertyName), forKey = CodingKeys.\(caseName))")
             }
         } else if rawValueType != .none {
             statements.append(KotlinRawStatement(sourceCode: "val container = to.singleValueContainer()"))
@@ -154,7 +164,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
         encode.assignParentReferences()
     }
 
-    private func synthesizeDecode(for classDeclaration: KotlinClassDeclaration, codingKeys: [(KotlinEnumCaseDeclaration, TypeSignature)]?, rawValueType: TypeSignature, source: Source) {
+    private func synthesizeDecode(for classDeclaration: KotlinClassDeclaration, storedVariableDeclarations: [KotlinVariableDeclaration], codingKeysByName: [String: (KotlinEnumCaseDeclaration, KotlinVariableDeclaration)]?, rawValueType: TypeSignature, source: Source) {
         let decode: KotlinFunctionDeclaration
         if classDeclaration.declarationType == .enumDeclaration {
             decode = KotlinFunctionDeclaration(name: classDeclaration.name)
@@ -169,11 +179,23 @@ final class KotlinCodableTransformer: KotlinTransformer {
         decode.parameters = [Parameter<KotlinExpression>(externalLabel: "from", declaredType: .named("Decoder", []))]
 
         var statements: [KotlinStatement] = []
-        if let codingKeys { // Must be a non-RawRepresentable, non-enum type
-            if !codingKeys.isEmpty {
+        if let codingKeysByName { // Must be a non-RawRepresentable, non-enum type
+            if !codingKeysByName.isEmpty {
                 statements.append(KotlinRawStatement(sourceCode: "val container = from.container(keyedBy = CodingKeys::class)"))
             }
-            statements += codingKeys.map { synthesizeDecodeStatement(for: $0) }
+            for variableDeclaration in storedVariableDeclarations {
+                if let entry = codingKeysByName[variableDeclaration.propertyName] {
+                    if !variableDeclaration.isLet || (variableDeclaration.constructionValue == nil && variableDeclaration.value == nil) {
+                        statements.append(synthesizeDecodeStatement(for: entry.0, with: entry.1))
+                    }
+                } else if !variableDeclaration.isLet, let constructionValue = variableDeclaration.constructionValue {
+                    // Make sure that any uncoded variables are also initialized. 'let' vars will already be initialized by the
+                    // constructor transformer
+                    let access = KotlinMemberAccess(base: KotlinIdentifier(name: "self"), member: variableDeclaration.propertyName)
+                    let assignment = KotlinBinaryOperator(op: .with(symbol: "="), lhs: access, rhs: constructionValue)
+                    statements.append(KotlinExpressionStatement(expression: assignment))
+                }
+            }
             decode.body = KotlinCodeBlock(statements: statements)
 
             classDeclaration.members.append(decode)
@@ -206,10 +228,10 @@ final class KotlinCodableTransformer: KotlinTransformer {
         decode.assignParentReferences()
     }
 
-    private func synthesizeDecodeStatement(for codingKey: (KotlinEnumCaseDeclaration, TypeSignature)) -> KotlinStatement {
-        let name = codingKey.0.forPropertyName
-        let caseName = codingKey.0.name
-        let type = codingKey.1
+    private func synthesizeDecodeStatement(for codingKey: KotlinEnumCaseDeclaration, with variableDeclaration: KotlinVariableDeclaration) -> KotlinStatement {
+        // We're run before the enum transformer, so our case names aren't fixed yet
+        let caseName = codingKey.name.fixingKeyword(in: KotlinEnumCaseDeclaration.disallowedCaseNames)
+        let type = variableDeclaration.propertyType.or(.any)
         let decodeFunction = type.isOptional ? "decodeIfPresent" : "decode"
         let decodeType = type.asOptional(false)
         let typeArguments: String
@@ -243,7 +265,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
         default:
             typeArguments = "\(decodeType.withGenerics([]).kotlin)::class"
         }
-        return KotlinRawStatement(sourceCode: "this.\(name) = container.\(decodeFunction)(\(typeArguments), forKey = CodingKeys.\(caseName))")
+        return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.propertyName) = container.\(decodeFunction)(\(typeArguments), forKey = CodingKeys.\(caseName))")
     }
 
     private func synthesizeDecodableCompanion(for classDeclaration: KotlinClassDeclaration) {
@@ -268,16 +290,10 @@ final class KotlinCodableTransformer: KotlinTransformer {
         factory.assignParentReferences()
     }
 
-    private func propertyType(for codingKey: KotlinEnumCaseDeclaration, in classDeclaration: KotlinClassDeclaration, source: Source) -> TypeSignature {
-        guard let variableDeclaration = classDeclaration.members.first(where: { ($0 as? KotlinVariableDeclaration)?.propertyName == codingKey.forPropertyName }) as? KotlinVariableDeclaration else {
-            codingKey.messages.append(.kotlinCodablePropertyForKey(codingKey, source: source))
-            return .any
-        }
-        guard variableDeclaration.propertyType != .none else {
-            variableDeclaration.messages.append(.kotlinCodablePropertyType(variableDeclaration, source: source))
-            return .any
-        }
-        return variableDeclaration.propertyType
+    private func storedVariableDeclarations(of classDeclaration: KotlinClassDeclaration) -> [KotlinVariableDeclaration] {
+        return classDeclaration.members
+            .compactMap { $0 as? KotlinVariableDeclaration }
+            .filter { !$0.isStatic && !$0.isGenerated && $0.getter == nil }
     }
 
     private func fixupDecode(functionCall: KotlinFunctionCall) {
@@ -330,16 +346,8 @@ final class KotlinCodableTransformer: KotlinTransformer {
 extension KotlinEnumCaseDeclaration {
     private static let disallowedCaseNameCodingKeySuffix = "codingkey"
 
-    fileprivate convenience init(forPropertyName name: String) {
-        if Self.disallowedCaseNames.contains(name) {
-            self.init(name: name + Self.disallowedCaseNameCodingKeySuffix)
-            self.rawValue = KotlinStringLiteral(literal: name)
-        } else {
-            self.init(name: name)
-        }
-    }
-
     fileprivate var forPropertyName: String {
+        // Retain this for backwards compatibility: we used to encourage users to add this suffix
         guard name.count > Self.disallowedCaseNameCodingKeySuffix.count && name.hasSuffix(Self.disallowedCaseNameCodingKeySuffix) else {
             return name
         }

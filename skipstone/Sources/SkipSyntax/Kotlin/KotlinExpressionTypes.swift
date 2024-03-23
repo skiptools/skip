@@ -1813,12 +1813,21 @@ final class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, Kotl
                 }
                 baseIdentifier.generics = []
             } else if kexpression.member == "self" {
+                let toIdentifier: (KotlinExpression) -> KotlinIdentifier? = {
+                    if let identifier = $0 as? KotlinIdentifier {
+                        return identifier
+                    } else if let memberAccess = $0 as? KotlinMemberAccess, memberAccess.baseType != .none {
+                        return KotlinIdentifier(name: TypeSignature.member(memberAccess.baseType, .named(memberAccess.member, [])).name)
+                    } else {
+                        return nil
+                    }
+                }
                 if let baseArrayLiteral = kexpression.base as? KotlinArrayLiteral, baseArrayLiteral.elements.count == 1 {
                     // [Int].self
-                    kexpression.classReferenceGenerics = baseArrayLiteral.elements.compactMap { $0 as? KotlinIdentifier }
+                    kexpression.classReferenceGenerics = baseArrayLiteral.elements.compactMap(toIdentifier)
                 } else if let baseDictionaryLiteral = kexpression.base as? KotlinDictionaryLiteral, baseDictionaryLiteral.entries.count == 1 {
                     // [Int: String].self
-                    kexpression.classReferenceGenerics = baseDictionaryLiteral.entries.flatMap { [$0.key, $0.value] }.compactMap { $0 as? KotlinIdentifier }
+                    kexpression.classReferenceGenerics = baseDictionaryLiteral.entries.flatMap { [$0.key, $0.value] }.compactMap(toIdentifier)
                 }
             }
         }

@@ -14,13 +14,7 @@ private final class EscapeKeywordsVisitor {
     ]
 
     func fixKeyword(name: String) -> String {
-        var name = name.removingBacktickEscaping
-        // check against already suffixed keywords, e.g. turn: `null` into `null_`, but also turn `null_` into `null__`
-        let unsuffixedName = String(name.reversed().drop(while: { $0 == "_" }).reversed())
-        if Self.hardKeywords.contains(unsuffixedName) {
-            name = name + "_"
-        }
-        return name
+        return name.fixingKeyword(in: Self.hardKeywords)
     }
 
     func fixParameter<T>(param: Parameter<T>) -> Parameter<T> {
@@ -58,7 +52,7 @@ private final class EscapeKeywordsVisitor {
                 $0.map(fixKeyword)
             }
             if node.propertyName != propertyName {
-                node.preEscapePropertyName = propertyName
+                node.preEscapedPropertyName = propertyName
             }
         } else if let node = node as? KotlinEnumCaseDeclaration {
             let name = node.name

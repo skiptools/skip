@@ -108,9 +108,8 @@ extension Message {
         return Message(kind: .error, message: "Kotlin cannot satisfy a protocol init requirement with a generic constructor", sourceDerived: sourceDerived, source: source)
     }
 
-    // Idea: automatically re-map uses of this case
-    static func kotlinEnumCaseName(_ sourceDervied: SourceDerived, source: Source) -> Message {
-        return Message(kind: .warning, message: "This enum case name may cause compilation errors in Kotlin. Consider using another name. If this is a CodingKey, you can append 'codingkey' and Skip will strip that suffix to find the matching property", sourceDerived: sourceDervied, source: source)
+    static func kotlinEnumNameProperty(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "The Kotlin enum base type has a 'name' property which cannot be overridden. Consider changing the name of this property", sourceDerived: sourceDerived, source: source)
     }
 
     // Idea: generate an internal ordinal member var and synthesize code to use it and associated values to conform

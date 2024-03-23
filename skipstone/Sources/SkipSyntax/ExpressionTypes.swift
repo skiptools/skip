@@ -1506,7 +1506,7 @@ final class OptionalBinding: Expression, BindingExpression {
         if names.count == 1, let name = names[0], !context.isLocalOrSelfIdentifier(name), value == nil || (value as? Identifier)?.name == name {
             if let (signature, match) = context.identifier(name, messagesNode: nil) {
                 // For some reason Kotlin considers all closure members unstable
-                nameShadowsUnstableValue = match.memberOf != nil && (match.apiFlags.contains(.writeable) || signature.isFunction)
+                nameShadowsUnstableValue = match.memberOf != nil && (match.apiFlags.contains(.writeable) || match.apiFlags.contains(.computed) || signature.isFunction)
             } else {
                 nameShadowsUnstableValue = true // Better safe than sorry
             }
@@ -1740,7 +1740,7 @@ final class StringLiteral: Expression {
             }
         }
         // A character can be an escaped value or \u{...} unicode sequence
-        if expecting == .character && segments.count == 1, case .string(let string) = segments[0], string.count == 1 || string.first == "\\" {
+        if expecting.asOptional(false) == .character && segments.count == 1, case .string(let string) = segments[0], string.count == 1 || string.first == "\\" {
             literalType = .character
         }
         return context

@@ -674,15 +674,58 @@ final class EnumTests: XCTestCase {
     }
 
     func testDisallowedCaseNames() async throws {
-        try await checkProducesMessage(preflight: true, swift: """
-        enum E {
+        try await check(swift: """
+        enum E: String, CaseIterable {
             case name
+        }
+
+        func f(e: E) {
+            switch e {
+            case .name:
+                print("name")
+            }
+            if case .name = e {
+                print("name")
+            }
+            f(e: .name)
+        }
+        """, kotlin: """
+        internal enum class E(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CaseIterable, RawRepresentable<String> {
+            name_("name");
+        }
+
+        internal fun E(rawValue: String): E? {
+            return when (rawValue) {
+                "name" -> E.name_
+                else -> null
+            }
+        }
+
+        internal fun f(e: E) {
+            when (e) {
+                E.name_ -> print("name")
+            }
+            if (e == E.name_) {
+                print("name")
+            }
+            f(e = E.name_)
         }
         """)
 
         try await check(swift: """
         enum E {
             case name(String)
+        }
+
+        func f(e: E) {
+            switch e {
+            case .name(let name):
+                print(name)
+            }
+            if case .name(let name) = e {
+                print(name)
+            }
+            f(e: .name("x"))
         }
         """, kotlin: """
         internal sealed class E {
@@ -692,6 +735,20 @@ final class EnumTests: XCTestCase {
             companion object {
                 fun name(associated0: String): E = NameCase(associated0)
             }
+        }
+
+        internal fun f(e: E) {
+            when (e) {
+                is E.NameCase -> {
+                    val name = e.associated0
+                    print(name)
+                }
+            }
+            if (e is E.NameCase) {
+                val name = e.associated0
+                print(name)
+            }
+            f(e = E.name("x"))
         }
         """)
     }

@@ -41,12 +41,13 @@ struct APIFlags: OptionSet, Hashable, Codable {
     static let viewBuilder = APIFlags(rawValue: 1 << 4)
     static let writeable = APIFlags(rawValue: 1 << 5)
     static let swiftUIBindable = APIFlags(rawValue: 1 << 6)
+    static let computed = APIFlags(rawValue: 1 << 7)
 
     init(rawValue: Int) {
         self.rawValue = rawValue
     }
 
-    init(isAsync: Bool = false, isThrows: Bool = false, isMainActor: Bool = false, isSwiftUIBindable: Bool = false, isViewBuilder: Bool = false, isWriteable: Bool = false) {
+    init(isAsync: Bool = false, isThrows: Bool = false, isMainActor: Bool = false, isSwiftUIBindable: Bool = false, isViewBuilder: Bool = false, isComputed: Bool = false, isWriteable: Bool = false) {
         var apiFlags: APIFlags = []
         if isAsync {
             apiFlags.insert(.async)
@@ -62,6 +63,9 @@ struct APIFlags: OptionSet, Hashable, Codable {
         }
         if isViewBuilder {
             apiFlags.insert(.viewBuilder)
+        }
+        if isComputed {
+            apiFlags.insert(.computed)
         }
         if isWriteable {
             apiFlags.insert(.writeable)
@@ -1081,5 +1085,16 @@ extension String {
     /// Whether this identifier represents the projected value of a property wrapper.
     var isProjectedValue: Bool {
         return hasPrefix("$") && Int(dropFirst()) == nil
+    }
+
+    /// Modify this string so that it isn't in the given keyword set.
+    func fixingKeyword(in keywords: Set<String>) -> String {
+        var name = removingBacktickEscaping
+        // Check against already suffixed keywords, e.g. turn: `null` into `null_`, but also turn `null_` into `null__`
+        let unsuffixedName = String(name.reversed().drop(while: { $0 == "_" }).reversed())
+        if keywords.contains(unsuffixedName) {
+            name = name + "_"
+        }
+        return name
     }
 }
