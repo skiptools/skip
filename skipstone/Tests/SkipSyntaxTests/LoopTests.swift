@@ -41,7 +41,7 @@ final class LoopTests: XCTestCase {
         }
         """, kotlin: """
         {
-            var i: Int?
+            var i: Int? = null
             while ((i != null) && (i < 5)) {
                 doSomething()
             }
@@ -57,7 +57,7 @@ final class LoopTests: XCTestCase {
         }
         """, kotlin: """
         {
-            var i: Int?
+            var i: Int? = null
             while ((i != null) && (i < 5)) {
                 doSomething()
             }

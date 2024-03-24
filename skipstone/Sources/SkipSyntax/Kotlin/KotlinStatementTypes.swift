@@ -3052,7 +3052,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
             return true
         } else {
             // In Swift an optional var defaults to nil, but not so in Kotlin
-            if (role.isProperty && role != .protocolProperty) || role == .global, declaredType.isOptional, !isLet, getter == nil {
+            if role != .protocolProperty, declaredType.isOptional, !isLet, getter == nil {
                 output.append(" = null")
                 return true
             } else {
