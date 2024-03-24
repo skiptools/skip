@@ -34,6 +34,7 @@ public final class CodebaseInfo {
         "Foundation": ["SkipFoundation"],
         "JavaScriptCore": ["SkipScript"],
         "Observation": ["SkipModel"],
+        "os": ["SkipFoundation"],
         "OSLog": ["SkipFoundation"],
         "Swift": ["SkipLib"],
         "SwiftUI": ["SkipUI", "SkipFoundation", "SkipModel"],
