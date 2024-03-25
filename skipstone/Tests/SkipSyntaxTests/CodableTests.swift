@@ -1,8 +1,14 @@
 import XCTest
 
 final class CodableTests: XCTestCase {
+    private let codableDeclaration = """
+    protocol Encodable {}
+    protocol Decodable {}
+    protocol Codable: Encodable, Decodable {}
+    """
+
     func testImmutableStructSynthesis() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         struct S: Codable {
             let i: Int
             let s: String
@@ -50,7 +56,7 @@ final class CodableTests: XCTestCase {
     }
 
     func testMutableStructSynthesis() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         struct S: Codable {
             var i = 0
             var s = ""
@@ -112,7 +118,7 @@ final class CodableTests: XCTestCase {
     }
 
     func testCustomCodingKeys() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         struct S: Codable {
             let i: Int
             let d: Double
@@ -165,7 +171,7 @@ final class CodableTests: XCTestCase {
         }
         """)
 
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         struct S: Codable {
             let i: Int
             let d: Double
@@ -220,7 +226,7 @@ final class CodableTests: XCTestCase {
     }
 
     func testCustomCodable() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         struct S: Codable {
             let i: Int
             let s: String
@@ -271,7 +277,7 @@ final class CodableTests: XCTestCase {
     }
 
     func testGenerics() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         struct S: Codable {
             let a: [Int]
             let d: [String: S]
@@ -335,7 +341,7 @@ final class CodableTests: XCTestCase {
     }
 
     func testEncodableOnlySynthesis() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         struct S: Encodable {
             let i: Int
             let s: String
@@ -376,7 +382,7 @@ final class CodableTests: XCTestCase {
     }
 
     func testCustomEncodable() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         struct S: Codable {
             let i: Int
             let s: String
@@ -440,7 +446,7 @@ final class CodableTests: XCTestCase {
     }
 
     func testDecodableOnlySynthesis() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         struct S: Decodable {
             let i: Int
             let s: String
@@ -482,7 +488,7 @@ final class CodableTests: XCTestCase {
     }
 
     func testCustomDecodable() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         struct S: Codable {
             let i: Int
             let s: String
@@ -534,7 +540,7 @@ final class CodableTests: XCTestCase {
     }
 
     func testCustomCodableGenerics() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         struct S: Codable {
             let a: [Int]
             let d: [String: S]
@@ -620,7 +626,7 @@ final class CodableTests: XCTestCase {
     }
 
     func testOptional() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         struct S: Codable {
             let i: Int?
             let s: String?
@@ -677,7 +683,7 @@ final class CodableTests: XCTestCase {
     }
 
     func testConstantBecomesWritable() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         struct S: Codable {
             let i: Int
             let a = ["foo"]
@@ -725,7 +731,7 @@ final class CodableTests: XCTestCase {
     }
 
     func testUncodedProperties() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         struct S: Codable {
             let i = 100
             var s = "str"
@@ -807,7 +813,7 @@ final class CodableTests: XCTestCase {
     }
 
     func testSubclass() async throws {
-        try await check(supportingSwift: """
+        try await check(supportingSwift: codableDeclaration +  """
         class Base {
             var i = 100
         }
@@ -848,7 +854,7 @@ final class CodableTests: XCTestCase {
     }
 
     func testRawValueEnum() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         enum E: Int, Codable {
             case a, b
         }
@@ -882,7 +888,7 @@ final class CodableTests: XCTestCase {
         }
         """)
 
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         enum E: Int, Codable {
             case a, b
 
@@ -918,13 +924,13 @@ final class CodableTests: XCTestCase {
     }
 
     func testNonRawValueEnum() async throws {
-        try await checkProducesMessage(swift: """
+        try await checkProducesMessage(swift: codableDeclaration + """
         enum E: Codable {
             case a, b
         }
         """)
 
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         enum E: Codable {
             case a, b
 
@@ -952,14 +958,14 @@ final class CodableTests: XCTestCase {
     }
 
     func testAssociatedValueEnum() async throws {
-        try await checkProducesMessage(swift: """
+        try await checkProducesMessage(swift: codableDeclaration + """
         enum E: Codable {
             case a(Int)
             case b
         }
         """)
 
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         enum E: Codable {
             case a(Int)
             case b
@@ -993,7 +999,7 @@ final class CodableTests: XCTestCase {
     }
 
     func testDisallowedEnumCaseNames() async throws {
-        try await check(swift: """
+        try await check(supportingSwift: codableDeclaration, swift: """
         struct S: Codable {
             let name: String
             let package: String

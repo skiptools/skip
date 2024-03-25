@@ -1022,8 +1022,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         var owningType = type
         return mappingTypes {
             if $0 == .named("Self", []) {
-                if owningType == nil {
-                    owningType = node?.owningTypeDeclaration?.signature
+                if owningType == nil, let owningTypeDeclaration = node?.owningTypeDeclaration {
+                    if owningTypeDeclaration.signature.generics.isEmpty {
+                        owningType = owningTypeDeclaration.signature.withGenerics(owningTypeDeclaration.generics.entries.map { $0.constrainedType(ifEqual: true) })
+                    } else {
+                        owningType = owningTypeDeclaration.signature
+                    }
                 }
                 return owningType
             }
@@ -1535,7 +1539,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                     return .none
                 }
             }
-            return TypeResolutionContext().resolve(.named(name, genericTypes), in: baseType)
+            if baseType == .named("Self", []) {
+                return self.for(name: name, genericTypes: genericTypes)
+            } else {
+                return TypeResolutionContext().resolve(.named(name, genericTypes), in: baseType)
+            }
         case .metatypeType:
             guard let metaType = syntax.as(MetatypeTypeSyntax.self) else {
                 return .none

@@ -1463,7 +1463,7 @@ final class KotlinIf: KotlinExpression {
             output.append(body, indentation: indentation.inc())
             output.append(indentation).append("}")
             if conditionSet.isConditionBeforeBinding, let optionalBindingVariable = conditionSet.optionalBindingVariable {
-                output.append("\n")
+                output.append("\n").append(indentation)
                 optionalBindingVariable.append(to: output, indentation: indentation)
             }
             if !conditionSet.caseBindingVariables.isEmpty {

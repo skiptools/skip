@@ -433,7 +433,9 @@ final class ErrorHandlingTests: XCTestCase {
         }
         """)
 
-        try await check(swift: """
+        try await check(supportingSwift: """
+        protocol Codable {}
+        """, swift: """
         struct S: Error, Codable {
             let i: Int
 

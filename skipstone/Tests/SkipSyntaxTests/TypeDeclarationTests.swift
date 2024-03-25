@@ -633,6 +633,45 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
+    func testGenericSelfType() async throws {
+        try await check(swift: """
+        class C<T> {
+            var c: Self? {
+                return nil
+            }
+        }
+        extension C<Int> {
+            var i: Self? {
+                return nil
+            }
+        }
+        """, kotlin: """
+        internal open class C<T> {
+            internal open val c: C<T>?
+                get() = null
+        }
+
+        internal val C<Int>.i: C<Int>?
+            get() = null
+        """)
+
+        try await check(swift: """
+        class C<T> {
+        }
+        extension C where Self.T == Int {
+            var c: Self? {
+                return nil
+            }
+        }
+        """, kotlin: """
+        internal open class C<T> {
+        }
+
+        internal val C<Int>.c: C<Int>?
+            get() = null
+        """)
+    }
+
     func testGenericExtension() async throws {
         try await check(swift: """
         class C<T> {
@@ -680,6 +719,26 @@ final class TypeDeclarationTests: XCTestCase {
         internal val C<Int>.v: Int
             get() = 1
         internal fun C<Int>.plusOne(): Int = (f() ?: 0) + 1
+        """)
+
+        try await check(swift: """
+        class C<T> {
+            func f() -> T? {
+                return nil
+            }
+        }
+        extension C where Self.T == Int {
+            var v: Int {
+                return 1
+            }
+        }
+        """, kotlin: """
+        internal open class C<T> {
+            internal open fun f(): T? = null
+        }
+
+        internal val C<Int>.v: Int
+            get() = 1
         """)
 
         try await check(supportingSwift: """

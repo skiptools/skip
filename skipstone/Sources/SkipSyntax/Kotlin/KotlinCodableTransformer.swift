@@ -6,7 +6,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
                 if classDeclaration.declarationType == .enumDeclaration && classDeclaration.inherits.contains(where: \.isCodingKey) {
                     fixupCodingKey(enumDeclaration: classDeclaration)
                 } else {
-                    synthesizeCodable(for: classDeclaration, source: translator.syntaxTree.source)
+                    synthesizeCodable(for: classDeclaration, translator: translator)
                 }
             } else if let functionCall = $0 as? KotlinFunctionCall {
                 fixupDecode(functionCall: functionCall)
@@ -15,10 +15,16 @@ final class KotlinCodableTransformer: KotlinTransformer {
         }
     }
 
-    private func synthesizeCodable(for classDeclaration: KotlinClassDeclaration, source: Source) {
+    private func synthesizeCodable(for classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
         // We don't need to worry about extensions because they will have already been merged into the class
-        let isEncodable = classDeclaration.inherits.contains(where: \.isCodable) || classDeclaration.inherits.contains(where: \.isEncodable)
-        let isDecodable = classDeclaration.inherits.contains(where: \.isCodable) || classDeclaration.inherits.contains(where: \.isDecodable)
+        let inherits: [TypeSignature]
+        if let codebaseInfo = translator.codebaseInfo {
+            inherits = codebaseInfo.global.protocolSignatures(forNamed: classDeclaration.signature)
+        } else {
+            inherits = classDeclaration.inherits
+        }
+        let isEncodable = inherits.contains(where: \.isCodable) || inherits.contains(where: \.isEncodable)
+        let isDecodable = inherits.contains(where: \.isCodable) || inherits.contains(where: \.isDecodable)
         guard isEncodable || isDecodable else {
             return
         }
@@ -51,16 +57,16 @@ final class KotlinCodableTransformer: KotlinTransformer {
             // so we only synthesize or look for coding keys after knowing we need to generate a coding function
             let rawValueType = classDeclaration.rawValueType
             let codingKeys = synthesizeCodingKeys(for: classDeclaration, with: storedVariableDeclarations, rawValueType: rawValueType, isDecodable: isDecodable)
-            let matchedCodingKeys = matchCodingKeys(codingKeys, to: storedVariableDeclarations, source: source)
+            let matchedCodingKeys = matchCodingKeys(codingKeys, to: storedVariableDeclarations, source: translator.syntaxTree.source)
             let matchedCodingKeysByName = matchedCodingKeys?.reduce(into: [String: (KotlinEnumCaseDeclaration, KotlinVariableDeclaration)]()) { result, entry in
                 result[entry.1.propertyName] = entry
             }
 
             if isEncodable && encodeDeclaration == nil {
-                synthesizeEncode(for: classDeclaration, codingKeys: matchedCodingKeys, rawValueType: rawValueType, source: source)
+                synthesizeEncode(for: classDeclaration, codingKeys: matchedCodingKeys, rawValueType: rawValueType, source: translator.syntaxTree.source)
             }
             if isDecodable && decodeDeclaration == nil {
-                synthesizeDecode(for: classDeclaration, storedVariableDeclarations: storedVariableDeclarations, codingKeysByName: matchedCodingKeysByName, rawValueType: rawValueType, source: source)
+                synthesizeDecode(for: classDeclaration, storedVariableDeclarations: storedVariableDeclarations, codingKeysByName: matchedCodingKeysByName, rawValueType: rawValueType, source: translator.syntaxTree.source)
             }
         }
         if isDecodable {

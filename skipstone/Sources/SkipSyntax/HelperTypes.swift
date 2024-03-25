@@ -648,7 +648,7 @@ struct Generic: Equatable, Codable {
     /// The constrained type of this generic.
     ///
     /// - Parameters:
-    ///   - whereEqual: If true, only equality constraints are considered.
+    ///   - ifEqual: If true, only equality constraints are considered.
     /// - Returns: `.composition(types)` for multiple constraints. If there are no constraints, returns itself as a `.named` type or the given fallback.
     func constrainedType(ifEqual: Bool = false, fallback: TypeSignature? = nil) -> TypeSignature {
         if let whereEqual {
