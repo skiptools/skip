@@ -31,6 +31,9 @@ jobs:
       - name: Verify Skip Framework
         run: skip verify
 
+      - name: Build Package
+        run: swift build
+
       - name: Test macOS & Robolectric (local)
         run: skip test --verbose
 
