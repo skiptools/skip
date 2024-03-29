@@ -209,7 +209,7 @@ class FrameworkProjectLayout {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "暗黑"
+            "value" : "暗"
           }
         }
       }
@@ -321,7 +321,7 @@ class FrameworkProjectLayout {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "明亮"
+            "value" : "光"
           }
         }
       }
@@ -461,7 +461,7 @@ class FrameworkProjectLayout {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "系统颜"
+            "value" : "系统"
           }
         }
       }
@@ -979,7 +979,7 @@ ANDROID_PACKAGE_NAME = \(appModulePackage)
 
 // Set the action that will be executed as part of the Xcode Run Script phase
 // Setting to "launch" will build and run the app in the first open Android emulator or device
-// Setting to "build" will just run gradle build, but will no launc the app
+// Setting to "build" will just run gradle build, but will not launch the app
 SKIP_ACTION = launch
 //SKIP_ACTION = build
 
