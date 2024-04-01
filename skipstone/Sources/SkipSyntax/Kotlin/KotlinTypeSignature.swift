@@ -1,14 +1,4 @@
 extension TypeSignature {
-    /// The types from the standard library that must be explicitly imported as dependencies because Kotlin implicitly imports
-    /// same-named types.
-    static let kotlinSkipLibImports: Set<String> = [
-        "Array",
-        "Collection",
-        "MutableCollection",
-        "Sequence",
-        "Set"
-    ]
-
     /// Kotlin description of this type.
     var kotlin: String {
         var signature = self
@@ -356,7 +346,7 @@ extension TypeSignature {
                 type.insertDependencies(into: &dependencies, isModuleQualified: true)
                 return .skip
             case .named(let name, _):
-                if !isModuleQualified && Self.kotlinSkipLibImports.contains(name) {
+                if !isModuleQualified && CodebaseInfo.kotlinSkipLibBuiltinNames.contains(name) {
                     dependencies.insertSkipLibType(name)
                 }
             case .set:

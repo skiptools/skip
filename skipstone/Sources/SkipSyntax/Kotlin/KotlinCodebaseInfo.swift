@@ -8,9 +8,70 @@ extension CodebaseInfo {
             languageAdditions = newValue
         }
     }
+
+    /// The types from the standard library that must be explicitly imported as dependencies because they conflict with
+    /// Kotlin builtin names.
+    static let kotlinSkipLibBuiltinNames: Set<String> = [
+        "Array",
+        "Collection",
+        "MutableCollection",
+        "Sequence",
+        "Set"
+    ]
+
+    /// Names of built-in Kotlin types. These must be explicitly imported if defined by Swift modules.
+    static let kotlinAdditionalBuiltinNames: Set<String> = [
+        "Annotation",
+        // "Array",
+        // "Boolean",
+        "BooleanArray",
+        // "Byte",
+        "ByteArray",
+        // "Char",
+        "CharArray",
+        "CharSequence",
+        // "Collection",
+        "Comparable",
+        // "Double",
+        "DoubleArray",
+        "Enum",
+        // "Float",
+        "FloatArray",
+        // "Int",
+        "IntArray",
+        "Iterable",
+        "Iterator",
+        "List",
+        // "Long",
+        "LongArray",
+        "Map",
+        // "MutableCollection",
+        "MutableIterable",
+        "MutableList",
+        "MutableMap",
+        "MutableSet",
+        // "Nothing",
+        "Number",
+        // "Sequence",
+        // "Set",
+        // "Short",
+        "ShortArray",
+        // "Throwable"
+    ]
 }
 
 extension CodebaseInfo.Context {
+    /// Return any top-level names in the given **imported** module that conflict with builtin Kotlin symbols.
+    ///
+    /// Does not return results for the current module, as current-module symbols override builtin ones already.
+    func kotlinBuiltinNameConflicts(in module: String) -> [String] {
+        assert(global.kotlin != nil)
+        guard let conflicts = global.kotlin?.builtinNameConflictsByModule[module] else {
+            return []
+        }
+        return conflicts.sorted()
+    }
+
     /// Return all extensions of a given type that can move into its definition.
     func moveableExtensions(of type: TypeSignature, in syntaxTree: SyntaxTree) -> [(ExtensionDeclaration, [TypeSignature], [[String]])] {
         assert(global.kotlin != nil)
@@ -308,12 +369,46 @@ public final class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseIn
     /// The package being generated.
     public let packageName: String?
 
+    fileprivate var builtinNameConflictsByModule: [String: Set<String>] = [:]
+
     // Warning: for performance, this set may contain interface names as well as the intended class names
     fileprivate var subclassedTypeNames: Set<String> = []
     fileprivate var selfTypeExtensionAdditions: [String: [ExtensionAdditions]] = [:]
 
     init(packageName: String? = nil) {
         self.packageName = packageName
+    }
+
+    func prepareForUse(codebaseInfo: CodebaseInfo) {
+        for moduleExport in codebaseInfo.dependentModules {
+            // SkipLib conflicts are special cased so that we don't constantly add additional unused imports for Array, etc.
+            // See KotlinIdentifier, KotlinTypeSignature
+            guard let moduleName = moduleExport.moduleName, moduleName != "SkipLib" else {
+                continue
+            }
+            var builtinNameConflicts: Set<String> = []
+            for typeInfo in moduleExport.rootTypes {
+                if CodebaseInfo.kotlinAdditionalBuiltinNames.contains(typeInfo.name) {
+                    builtinNameConflicts.insert(typeInfo.name)
+                }
+            }
+            for typealiasInfo in moduleExport.rootTypealiases {
+                if CodebaseInfo.kotlinAdditionalBuiltinNames.contains(typealiasInfo.name) {
+                    builtinNameConflicts.insert(typealiasInfo.name)
+                }
+            }
+            for variableInfo in moduleExport.rootVariables {
+                if CodebaseInfo.kotlinAdditionalBuiltinNames.contains(variableInfo.name) {
+                    builtinNameConflicts.insert(variableInfo.name)
+                }
+            }
+            for functionInfo in moduleExport.rootFunctions {
+                if CodebaseInfo.kotlinAdditionalBuiltinNames.contains(functionInfo.name) {
+                    builtinNameConflicts.insert(functionInfo.name)
+                }
+            }
+            builtinNameConflictsByModule[moduleName] = builtinNameConflicts
+        }
     }
 
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: TypeDeclaration, syntaxTree: SyntaxTree) {

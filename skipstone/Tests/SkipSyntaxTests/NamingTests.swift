@@ -197,6 +197,26 @@ final class NamingTests: XCTestCase {
         """)
     }
 
+
+    func testExplicitImportKotlinBuiltinNamedType() async throws {
+        let moduleOne = try CodebaseInfo.ModuleExport(of: codebaseInfo(moduleName: "ModuleOne", swift: """
+        public class List {
+        }
+        """))
+
+        try await check(dependentModules: [moduleOne], swift: """
+        import ModuleOne
+
+        func f(l: List) {
+        }
+        """, kotlin: """
+        import module.one.*
+        import module.one.List
+
+        internal fun f(l: List) = Unit
+        """)
+    }
+
     private func codebaseInfo(moduleName: String, swift: String) throws -> CodebaseInfo {
         let srcFile = try tmpFile(named: "Source_\(moduleName).swift", contents: swift)
         let source = Source(file: Source.FilePath(path: srcFile.path), content: swift)

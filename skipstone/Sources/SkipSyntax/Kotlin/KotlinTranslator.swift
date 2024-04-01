@@ -144,7 +144,7 @@ public final class KotlinTranslator {
             case .functionDeclaration:
                 return [KotlinFunctionDeclaration.translate(statement: statement as! FunctionDeclaration, translator: self)]
             case .importDeclaration:
-                return [KotlinImportDeclaration(statement: statement as! ImportDeclaration)]
+                return [KotlinImportDeclaration.translate(statement: statement as! ImportDeclaration, translator: self)]
             case .initDeclaration:
                 return [KotlinFunctionDeclaration.translate(statement: statement as! FunctionDeclaration, translator: self)]
             case .protocolDeclaration:
@@ -347,6 +347,7 @@ public final class KotlinTranslator {
         syntaxTree.root.statements.forEach {
             if let importDeclaration = $0 as? KotlinImportDeclaration {
                 modulePathStrings.remove(importDeclaration.modulePathString)
+                importDeclaration.additionalImports.forEach { modulePathStrings.remove($0) }
             }
         }
 

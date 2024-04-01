@@ -1209,7 +1209,7 @@ final class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, Kotlin
 
     override func insertDependencies(into dependencies: inout KotlinDependencies) {
         generics?.forEach { $0.insertDependencies(into: &dependencies) }
-        if TypeSignature.kotlinSkipLibImports.contains(name) {
+        if CodebaseInfo.kotlinSkipLibBuiltinNames.contains(name) {
             dependencies.insertSkipLibType(name)
         }
     }

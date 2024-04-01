@@ -2246,6 +2246,16 @@ final class KotlinImportDeclaration: KotlinStatement {
             }
         }
     }
+    var additionalImports: [String] = []
+
+    static func translate(statement: ImportDeclaration, translator: KotlinTranslator) -> KotlinImportDeclaration {
+        let kstatement = KotlinImportDeclaration(statement: statement)
+        if kstatement.modulePath.count == 1, let builtinConflicts = translator.codebaseInfo?.kotlinBuiltinNameConflicts(in: kstatement.modulePath[0]), !builtinConflicts.isEmpty {
+            let packageName = KotlinTranslator.packageName(forModule: kstatement.modulePath[0])
+            kstatement.additionalImports = builtinConflicts.map { packageName + "." + $0 }
+        }
+        return kstatement
+    }
 
     init(modulePath: [String], sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.modulePath = modulePath
@@ -2265,6 +2275,12 @@ final class KotlinImportDeclaration: KotlinStatement {
         output.append("import ")
         output.append(modulePathString)
         output.append("\n")
+        for additionalImport in additionalImports {
+            output.append(indentation)
+            output.append("import ")
+            output.append(additionalImport)
+            output.append("\n")
+        }
     }
 }
 
