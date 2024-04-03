@@ -40,10 +40,9 @@ final class KotlinTupleLabelTransformer: KotlinTransformer {
             return .recurse(nil)
         }
         if !localLabels.isEmpty {
-            let frozenLabels = localLabels // Satisfy compiler
-            tupleLabelsLock.withLock {
-                mergeTupleLabels(frozenLabels, into: &tupleLabels)
-            }
+            tupleLabelsLock.lock()
+            mergeTupleLabels(localLabels, into: &tupleLabels)
+            tupleLabelsLock.unlock()
         }
     }
 
