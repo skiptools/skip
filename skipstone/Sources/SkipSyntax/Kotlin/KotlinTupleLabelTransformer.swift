@@ -1,4 +1,4 @@
-import os
+import Foundation
 
 /// Determine tuple labels used within the module and generate extension properites to support them.
 ///
@@ -8,7 +8,7 @@ final class KotlinTupleLabelTransformer: KotlinTransformer {
     private typealias TupleLabels = [Int: [Int: Set<String>]]
 
     private var tupleLabels: TupleLabels = [:]
-    private let tupleLabelsLock = OSAllocatedUnfairLock()
+    private let tupleLabelsLock = NSLock()
     private var packageSourceFile: Source.FilePath? = nil
     private var packageMessages: [Message] = []
 
