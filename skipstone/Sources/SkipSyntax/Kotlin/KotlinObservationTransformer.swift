@@ -191,7 +191,9 @@ final class KotlinObservationTransformer: KotlinTransformer {
         let propertyWrapperTypeName = isPublished ? "skip.model.Published" : "skip.model.Observed"
         storage.appendStorage = { variable, output, indentation in
             let stateType = propertyType.asPropertyWrapper(propertyWrapperTypeName).kotlin
-            output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName).append(": ").append(stateType)
+            var modifiers = variable.modifiers
+            modifiers.isOverride = false
+            output.append(indentation).append(modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName).append(": ").append(stateType)
             if let value = variable.value {
                 output.append(" = \(propertyWrapperTypeName)(")
                 value.append(to: output, indentation: indentation)

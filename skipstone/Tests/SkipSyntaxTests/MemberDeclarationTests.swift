@@ -1765,6 +1765,35 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
+    func testCallAsFunction() async throws {
+        try await check(swift: """
+        struct S {
+            func callAsFunction() -> Int {
+                callAsFunction(i: 1) + self.callAsFunction(i: 2)
+            }
+
+            func callAsFunction(i: Int) -> Int {
+                Self.callAsFunction(value: i)
+            }
+
+            static func callAsFunction(value: Int) -> Int {
+                return value
+            }
+        }
+        """, kotlin: """
+        internal class S {
+            internal operator fun invoke(): Int = invoke(i = 1) + this.invoke(i = 2)
+
+            internal operator fun invoke(i: Int): Int = Companion.invoke(value = i)
+
+            companion object {
+
+                internal operator fun invoke(value: Int): Int = value
+            }
+        }
+        """)
+    }
+
     func testLocalFunction() async throws {
         try await check(supportingSwift: """
         extension Int {

@@ -927,7 +927,15 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .function(let parameters, let returnType, let apiFlags, let attributes):
             return .function(parameters.map { $0.mappingTypes(with: map) }, returnType.mappingTypes(with: map), apiFlags, attributes)
         case .member(let base, let type):
-            return type.mappingTypes(with: map).asMember(of: base.mappingTypes(with: map))
+            let base = base.mappingTypes(with: map)
+            // Do not map 'type' alone because it will be confused for any non-member type with the same name.
+            // Only map its generics if needed
+            if case .named(let name, let generics) = type {
+                let type: TypeSignature = .named(name, generics.map { $0.mappingTypes(with: map) })
+                return type.asMember(of: base)
+            } else {
+                return type.asMember(of: base)
+            }
         case .metaType(let type):
             return type.mappingTypes(with: map).asMetaType(true)
         case .module(let moduleName, let type):

@@ -1148,6 +1148,9 @@ final class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, Kotlin
         } else if expression.inferredType.isMetaType && expression.apiMatch?.declarationType == .typealiasDeclaration {
             kexpression.isTypealiasFor = expression.inferredType.resolvingSelf(in: expression).asMetaType(false)
         }
+        if kexpression.name == "callAsFunction", kexpression.isCalledAsFunction || kexpression.isFunctionReference {
+            kexpression.name = "invoke"
+        }
         return kexpression
     }
 
@@ -1798,6 +1801,9 @@ final class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, Kotl
             } else {
                 kexpression.isStaticReferenceOrTypeName = expression.baseType.isMetaType
             }
+        }
+        if kexpression.member == "callAsFunction", expression.isCalledAsFunction || kexpression.isFunctionReference {
+            kexpression.member = "invoke"
         }
 
         // Kotlin member access never includes generics on the owning type unless we're referencing a function

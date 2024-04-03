@@ -1117,4 +1117,36 @@ final class TypeDeclarationTests: XCTestCase {
         XCTAssertEqual(TypeSignature.for(name: "Array<S<String>>", genericTypes: []), .array(.named("S", [.string])))
         XCTAssertEqual(TypeSignature.for(name: "Dictionary<S<String>, Array<Int>>", genericTypes: []), .dictionary(.named("S", [.string]), .array(.int)))
     }
+
+    func testNestedTypeMatchingGenericTypeName() async throws {
+        try await check(supportingSwift: """
+        struct Result<Success, Failure> {
+        }
+        """, swift: """
+        struct Action {
+            struct Result {
+                static let success = Result()
+                static func failure(error: Error) -> Result {
+                    return Result.success
+                }
+            }
+            let handler: () -> Result
+        }
+        """, kotlin: """
+        internal class Action {
+            internal class Result {
+
+                companion object {
+                    internal val success = Result()
+                    internal fun failure(error: Error): Action.Result = Result.success
+                }
+            }
+            internal val handler: () -> Action.Result
+
+            constructor(handler: () -> Action.Result) {
+                this.handler = handler
+            }
+        }
+        """)
+    }
 }

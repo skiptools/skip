@@ -286,4 +286,31 @@ final class TupleTests: XCTestCase {
         }
         """)
     }
+
+    func testDictionaryElementInferredClosureType() async throws {
+        try await check(supportingSwift: """
+        extension Int {
+            static var min: Int { 0 }
+        }
+        struct Dictionary<Key, Value>: Collection {
+            typealias Element = (key: Key, value: Value)
+        }
+        protocol Collection {
+            associatedtype Element
+            func compactMap<RE>(transform: (Element) -> RE?) -> [RE] {
+            }
+        }
+        """, swift: """
+        func f(d: [String: Int]) {
+            let a = d.compactMap { $0.value == .min }
+        }
+        """, kotlin: """
+        internal fun f(d: Dictionary<String, Int>) {
+            val a = d.compactMap { it -> it.value == Int.min }
+        }
+        """, packageSupportKotlin: """
+        internal val <E0, E1> Tuple2<E0, E1>.value: E1
+            get() = element1
+        """)
+    }
 }

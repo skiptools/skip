@@ -1745,6 +1745,10 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
                 kstatement.role = .global
             }
         }
+        if kstatement.name == "callAsFunction" {
+            kstatement.name = "invoke"
+            kstatement.role = .operator
+        }
         translateBody(declaration: kstatement, from: statement, body: statement.body, returnType: statement.returnType, asyncBehavior: statement.asyncBehavior, translator: translator)
 
         // Warnings and fixups
@@ -3138,7 +3142,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
 
         var storagePrefix = ""
         if let extends {
-            storagePrefix = extends.0.name
+            storagePrefix = extends.0.name.replacingOccurrences(of: ".", with: "_")
             if modifiers.isStatic {
                 storagePrefix += "Companion"
             }

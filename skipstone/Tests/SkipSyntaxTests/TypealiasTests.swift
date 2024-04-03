@@ -416,6 +416,9 @@ final class TypealiasTests: XCTestCase {
                 }
             }
         }
+        """, packageSupportKotlin: """
+        internal val <E0, E1> Tuple2<E0, E1>.value: E1
+            get() = element1
         """)
     }
 
