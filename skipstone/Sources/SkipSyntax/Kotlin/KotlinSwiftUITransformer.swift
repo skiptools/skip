@@ -266,6 +266,10 @@ private final class TranslateVisitor {
         var viewBuilder: KotlinCodeBlock? = nil
         if let viewDeclaration = KotlinSwiftUITransformer.viewForBody(statement, codebaseInfo: translator.codebaseInfo) {
             statement.apiFlags.insert(.viewBuilder)
+            // Re-map e.g. ToolbarContent to base View type, because we always return a ComposeBuiler
+            if !statement.declaredType.isNamed("View", moduleName: "SwiftUI") {
+                statement.declaredType = .named("View", [])
+            }
             // We perform our View transformations when we find the body
             transform(classDeclaration: viewDeclaration, body: statement)
             viewBuilder = statement.getter?.body
@@ -413,7 +417,9 @@ private final class TranslateVisitor {
         }
 
         var valueSourceCode: String
-        if entry.isObject {
+        if entry.key == "self" {
+            valueSourceCode = "EnvironmentValues.shared"
+        } else if entry.isObject {
             valueSourceCode = "EnvironmentValues.shared.environmentObject(type = \(entry.key))"
             if variable.declaredType.isOptional == false {
                 valueSourceCode += "!!"

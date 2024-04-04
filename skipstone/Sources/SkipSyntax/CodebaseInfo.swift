@@ -1862,7 +1862,11 @@ public final class CodebaseInfo {
                 }
             } else if let environmentAttribute = typeInferenceValue as? Attribute {
                 if let environmentValuesProperty = environmentAttribute.environmentValuesProperty {
-                    v.signature = varContext.member(environmentValuesProperty, in: .named("EnvironmentValues", []), messagesNode: nil)?.0 ?? .none
+                    if environmentValuesProperty == "self" {
+                        v.signature = .named("EnvironmentValues", [])
+                    } else {
+                        v.signature = varContext.member(environmentValuesProperty, in: .named("EnvironmentValues", []), messagesNode: nil)?.0 ?? .none
+                    }
                 }
                 v.typeInferenceValue = nil
             }

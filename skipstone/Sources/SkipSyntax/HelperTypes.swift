@@ -148,7 +148,7 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
                 attributes.append(attribute)
             case .mainActor:
                 apiFlags.insert(.mainActor)
-            case .viewBuilder:
+            case .viewBuilder, .toolbarContentBuilder:
                 apiFlags.insert(.viewBuilder)
             case .unknown:
                 attributes.append(attribute)
@@ -269,6 +269,7 @@ struct Attribute: Hashable, Codable {
         case published
         case state
         case stateObject
+        case toolbarContentBuilder
         case unavailable
         case unknown
         case viewBuilder
@@ -336,6 +337,8 @@ struct Attribute: Hashable, Codable {
             return .state
         case "StateObject":
             return .stateObject
+        case "ToolbarContentBuilder":
+            return .toolbarContentBuilder
         case "ViewBuilder":
             return .viewBuilder
         default:
@@ -374,7 +377,8 @@ struct Attribute: Hashable, Codable {
 
     /// If the first token is "T.self", return `T` as a type signature.
     var tokenTypeSignature: TypeSignature? {
-        guard let token = tokens.first, token.hasSuffix(".self") else {
+        // Do not match '\.self'
+        guard let token = tokens.first, token.hasSuffix(".self") && !token.hasPrefix("\\") else {
             return nil
         }
         return TypeSignature.for(name: String(token.dropLast(".self".count)), genericTypes: [])

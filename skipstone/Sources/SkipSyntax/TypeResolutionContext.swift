@@ -54,7 +54,11 @@ struct TypeResolutionContext {
         guard let codebaseInfo, let propertyName = environment.environmentValuesProperty else {
             return nil
         }
-        return codebaseInfo.matchIdentifier(name: propertyName, inConstrained: .named("EnvironmentValues", []))?.signature
+        if propertyName == "self" {
+            return .named("EnvironmentValues", [])
+        } else {
+            return codebaseInfo.matchIdentifier(name: propertyName, inConstrained: .named("EnvironmentValues", []))?.signature
+        }
     }
 
     /// Reutrn the declaration type for the given named type, if known.
