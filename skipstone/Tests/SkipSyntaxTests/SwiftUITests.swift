@@ -743,12 +743,19 @@ final class SwiftUITests: XCTestCase {
     }
 
     func testKeyedEnvironmentVariable() async throws {
-        try await check(supportingSwift: baseSupportingSwift, swift: """
+        try await check(supportingSwift: baseSupportingSwift + """
+        extension Int {
+            static let min = 0
+        }
+        """, swift: """
         import SwiftUI
         struct V: View {
             @Environment(\\.envvalue) var envvalue
             var body: some View {
                 Text("Value: \\(envvalue)")
+            }
+            var isMin: Bool {
+                return envvalue == .min
             }
         }
         """, kotlin: """
@@ -775,6 +782,8 @@ final class SwiftUITests: XCTestCase {
 
                 super.ComposeContent(composectx)
             }
+            internal val isMin: Boolean
+                get() = envvalue == Int.min
         }
         """)
     }

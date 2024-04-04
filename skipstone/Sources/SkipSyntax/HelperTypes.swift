@@ -183,6 +183,16 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
         return contains(.appStorage) || contains(.bindable) || contains(.binding) || contains(.environment) || contains(.environmentObject) || contains(.nonmutating) || contains(.observedObject) || contains(.state) || contains(.stateObject)
     }
 
+    /// Convenience to retrieve any @Environment or @EnvironmentObject attribute.
+    var environmentAttribute: Attribute? {
+        return attributes.first(where: { $0.kind == .environment || $0.kind == .environmentObject })
+    }
+
+    /// Convenience to retrieve any @State or @StateObject attribute.
+    var stateAttribute: Attribute? {
+        return attributes.first(where: { $0.kind == .state || $0.kind == .stateObject })
+    }
+
     func resolved(in node: SyntaxNode? = nil, context: TypeResolutionContext) -> Attributes {
         return Attributes(attributes: attributes.map { $0.resolved(in: node, context: context) })
     }
@@ -368,6 +378,20 @@ struct Attribute: Hashable, Codable {
             return nil
         }
         return TypeSignature.for(name: String(token.dropLast(".self".count)), genericTypes: [])
+    }
+
+    /// Convenience to retrieve the EnvironmentValues property.
+    var environmentValuesProperty: String? {
+        guard let key = tokens.first else {
+            return nil
+        }
+        if key.hasPrefix("\\EnvironmentValues.") {
+            return String(key.dropFirst("\\EnvironmentValues.".count))
+        } else if key.hasPrefix("\\.") {
+            return String(key.dropFirst(2))
+        } else {
+            return nil
+        }
     }
 }
 

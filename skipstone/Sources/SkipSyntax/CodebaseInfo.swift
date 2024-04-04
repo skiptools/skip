@@ -1797,7 +1797,7 @@ public final class CodebaseInfo {
 
         let isInitializable: Bool
         let hasValue: Bool
-        var value: Expression?
+        var typeInferenceValue: Any?
         var isGenerated = false
 
         private enum CodingKeys: String, CodingKey {
@@ -1817,9 +1817,15 @@ public final class CodebaseInfo {
             self.apiFlags = statement.apiFlags
             self.isInitializable = !statement.modifiers.isStatic && !statement.modifiers.isOverride && statement.getter == nil && (!statement.isLet || statement.value == nil)
             self.hasValue = self.signature.isOptional || statement.value != nil
-            if !self.signature.isFullySpecified, self.sourceFile != nil {
+            if !self.signature.isFullySpecified, self.sourceFile != nil, let value = statement.value {
                 // We'll try to infer the type after gathering all info
-                self.value = statement.value
+                self.typeInferenceValue = value
+            } else if self.signature == .none, let environmentAttribute = attributes.environmentAttribute {
+                if let environmentType = environmentAttribute.tokenTypeSignature {
+                    self.signature = environmentType
+                } else {
+                    self.typeInferenceValue = environmentAttribute
+                }
             }
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
         }
@@ -1839,34 +1845,41 @@ public final class CodebaseInfo {
         }
 
         fileprivate var needsTypeInference: Bool {
-            return value != nil
+            return typeInferenceValue != nil
         }
 
         fileprivate func inferType(with context: TypeInferenceContext) -> VariableInfo {
-            var v = self
-            guard let value = v.value else {
-                return v
+            guard typeInferenceValue != nil else {
+                return self
             }
+            var v = self
             let varContext = v.isStatic ? context.pushingBlock(isStatic: true) : context
-            value.inferTypes(context: varContext, expecting: .none)
-            v.signature = value.inferredType
-            if v.signature.isFullySpecified {
-                v.value = nil
+            if let value = typeInferenceValue as? Expression {
+                value.inferTypes(context: varContext, expecting: .none)
+                v.signature = value.inferredType
+                if v.signature.isFullySpecified {
+                    v.typeInferenceValue = nil
+                }
+            } else if let environmentAttribute = typeInferenceValue as? Attribute {
+                if let environmentValuesProperty = environmentAttribute.environmentValuesProperty {
+                    v.signature = varContext.member(environmentValuesProperty, in: .named("EnvironmentValues", []), messagesNode: nil)?.0 ?? .none
+                }
+                v.typeInferenceValue = nil
             }
             return v
         }
 
         fileprivate func cleanupTypeInference(source: Source, messages: inout [Source.FilePath: [Message]]) -> VariableInfo {
-            guard value != nil else {
+            guard typeInferenceValue != nil else {
                 return self
             }
-            if let sourceFile {
+            if let sourceFile, let value = typeInferenceValue as? Expression {
                 var fileMessages = messages[sourceFile, default: []]
-                fileMessages.append(.variableNeedsTypeDeclaration(value!, source: source))
+                fileMessages.append(.variableNeedsTypeDeclaration(value, source: source))
                 messages[sourceFile] = fileMessages
             }
             var v = self
-            v.value = nil
+            v.typeInferenceValue = nil
             return v
         }
 

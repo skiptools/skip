@@ -203,7 +203,7 @@ private final class TranslateVisitor {
         }
         for member in classDeclaration.members {
             if let variable = member as? KotlinVariableDeclaration, variable.propertyName == variableName {
-                if variable.attributes.contains(.state) || variable.attributes.contains(.stateObject) {
+                if variable.attributes.stateAttribute != nil {
                     return ("_" + variableName, "skip.ui.State")
                 } else if variable.attributes.contains(.bindable) || variable.attributes.contains(.observedObject) {
                     return ("_" + variableName, "skip.ui.Bindable")
@@ -285,8 +285,8 @@ private final class TranslateVisitor {
     /// Perform `View` and `ViewModifier` transformations.
     private func transform(classDeclaration: KotlinClassDeclaration, isModifier: Bool = false, body: KotlinStatement) {
         let variableDeclarations = classDeclaration.members.compactMap { $0 as? KotlinVariableDeclaration }
-        let stateVariables = variableDeclarations.filter { $0.attributes.contains(.state) || $0.attributes.contains(.stateObject) }
-        let environmentVariables = variableDeclarations.filter { $0.attributes.contains(.environment) || $0.attributes.contains(.environmentObject) }
+        let stateVariables = variableDeclarations.filter { $0.attributes.stateAttribute != nil }
+        let environmentVariables = variableDeclarations.filter { $0.attributes.environmentAttribute != nil }
         let bindingVariables = variableDeclarations.filter { $0.attributes.contains(.binding) }
         let bindableVariables = variableDeclarations.filter { $0.attributes.contains(.bindable) || $0.attributes.contains(.observedObject) }
         let appStorageVariables = variableDeclarations.filter { $0.attributes.contains(.appStorage) }
@@ -388,54 +388,34 @@ private final class TranslateVisitor {
 
     /// Create code to initialize an environment variable.
     private func synthesizeEnvironmentSync(variable: KotlinVariableDeclaration) -> KotlinStatement? {
-        let entry: (key: String, type: TypeSignature?, isObject: Bool)
-        if let environment = (variable.attributes.of(kind: .environment) + variable.attributes.of(kind: .environmentObject)).first {
-            if let environmentType = environment.tokenTypeSignature {
-                entry = (environmentType.withGenerics([]).kotlin + "::class", environmentType, true)
+        let entry: (key: String, isObject: Bool)
+        if let environment = variable.attributes.environmentAttribute {
+            if let environmentEntry = environmentEntry(for: variable, environment: environment) {
+                entry = environmentEntry
             } else {
-                let rawKey = environment.tokens.first ?? ""
-                if let environmentEntry = environmentEntry(for: variable, key: rawKey) {
-                    entry = environmentEntry
-                } else {
-                    variable.messages.append(.kotlinEnvironmentKeyType(variable, source: translator.syntaxTree.source))
-                    return nil
-                }
+                variable.messages.append(.kotlinEnvironmentKeyType(variable, source: translator.syntaxTree.source))
+                return nil
             }
         } else {
             return nil
         }
 
-        // Handle the fact that environment vars do not have an initial value and may not have a declared type
-        let environmentType = variable.declaredType == .none ? entry.type : variable.declaredType
+        // Handle the fact that environment vars do not have an initial value
         if variable.value == nil {
-            var updatedType: TypeSignature? = nil
-            if let environmentType, let defaultValue = environmentType.kotlinDefaultValue {
-                if variable.declaredType == .none {
-                    updatedType = environmentType
-                    variable.declaredType = environmentType
-                    variable.propertyType = environmentType
-                }
+            if let defaultValue = variable.declaredType.kotlinDefaultValue {
                 variable.value = KotlinRawExpression(sourceCode: defaultValue)
-            } else if let environmentType {
-                if variable.declaredType == .none {
-                    updatedType = environmentType
-                }
-                variable.declaredType = environmentType.asUnwrappedOptional(true)
-                variable.propertyType = environmentType.asUnwrappedOptional(true)
+            } else if variable.declaredType != .none {
+                variable.declaredType = variable.declaredType.asUnwrappedOptional(true)
+                variable.propertyType = variable.declaredType.asUnwrappedOptional(true)
             } else {
                 variable.messages.append(.kotlinEnvironmentDeclaredType(variable, source: translator.syntaxTree.source))
-            }
-            // Erase handling of mutable struct property if the actual type is not a mutable struct
-            if let updatedType, let codebaseInfo = translator.codebaseInfo, variable.mayBeSharedMutableStruct && !updatedType.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo) {
-                variable.mayBeSharedMutableStruct = false
-                variable.onUpdate = nil
             }
         }
 
         var valueSourceCode: String
         if entry.isObject {
             valueSourceCode = "EnvironmentValues.shared.environmentObject(type = \(entry.key))"
-            if environmentType?.isOptional == false {
+            if variable.declaredType.isOptional == false {
                 valueSourceCode += "!!"
             }
         } else {
@@ -445,21 +425,17 @@ private final class TranslateVisitor {
     }
 
     /// Given a Swift `@Environment` property wrapper key, return the Kotlin key and the expected value type.
-    private func environmentEntry(for variableDeclaration: KotlinVariableDeclaration, key: String) -> (key: String, type: TypeSignature?, isObject: Bool)? {
-        guard !key.isEmpty else {
+    private func environmentEntry(for variableDeclaration: KotlinVariableDeclaration, environment: Attribute) -> (key: String, isObject: Bool)? {
+        if let environmentType = environment.tokenTypeSignature {
+            return (environmentType.withGenerics([]).kotlin + "::class", true)
+        } else if let propertyName = environment.environmentValuesProperty {
+            return (propertyName, false)
+        } else if environment.tokens.first?.isEmpty != false {
             let type = variableDeclaration.declaredType
-            return type == .none ? nil : (type.withGenerics([]).kotlin + "::class", type, true)
-        }
-        let propertyName: String
-        if key.hasPrefix("\\EnvironmentValues.") {
-            propertyName = String(key.dropFirst("\\EnvironmentValues.".count))
-        } else if key.hasPrefix("\\.") {
-            propertyName = String(key.dropFirst(2))
+            return type == .none ? nil : (type.withGenerics([]).kotlin + "::class", true)
         } else {
             return nil
         }
-        let type = translator.codebaseInfo?.matchIdentifier(name: propertyName, inConstrained: .named("EnvironmentValues", []))?.signature
-        return (propertyName, type, false)
     }
 
     /// Create the additional property synthesized for `@State` and similar variables.

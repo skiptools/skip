@@ -180,7 +180,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         var bodyStatements: [KotlinStatement] = []
         bodyStatements += variableDeclarations.map { variableDeclaration in
             var assignment: String
-            if variableDeclaration.attributes.contains(.state) || variableDeclaration.attributes.contains(.stateObject) {
+            if variableDeclaration.attributes.stateAttribute != nil {
                 var value = variableDeclaration.propertyName
                 if variableDeclaration.mayBeSharedMutableStruct {
                     value += ".sref()"
@@ -303,7 +303,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         if !variableDeclarations.isEmpty {
             bodyStatements.append(KotlinRawStatement(sourceCode: "@Suppress(\"NAME_SHADOWING\", \"UNCHECKED_CAST\") val copy = copy as \(classDeclaration.signature.kotlin)"))
             bodyStatements += variableDeclarations.map { variableDeclaration in
-                if variableDeclaration.attributes.contains(.state) || variableDeclaration.attributes.contains(.stateObject) {
+                if variableDeclaration.attributes.stateAttribute != nil {
                     return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.State(copy.\(variableDeclaration.propertyName))")
                 } else if variableDeclaration.attributes.contains(.appStorage) || variableDeclaration.attributes.contains(.binding) {
                     return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = copy._\(variableDeclaration.propertyName)")
@@ -441,7 +441,7 @@ final class KotlinStructTransformer: KotlinTransformer {
 
     private func selfAssignStatements(from copy: String, storedVariableDeclarations: [KotlinVariableDeclaration]) -> [KotlinStatement] {
         return storedVariableDeclarations.map { variableDeclaration in
-            if variableDeclaration.attributes.contains(.state) || variableDeclaration.attributes.contains(.stateObject) {
+            if variableDeclaration.attributes.stateAttribute != nil {
                 return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.State(\(copy).\(variableDeclaration.propertyName))")
             } else if variableDeclaration.attributes.contains(.appStorage) || variableDeclaration.attributes.contains(.binding) {
                 return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = \(copy)._\(variableDeclaration.propertyName)")

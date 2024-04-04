@@ -45,6 +45,18 @@ struct TypeResolutionContext {
         }
     }
 
+    /// Return the type of the given @Environment attribute if known.
+    func resolve(environment: Attribute) -> TypeSignature? {
+        // Note that we repeat this general logic in CodebaseInfo when inferring variable types there
+        if let tokenType = environment.tokenTypeSignature {
+            return tokenType
+        }
+        guard let codebaseInfo, let propertyName = environment.environmentValuesProperty else {
+            return nil
+        }
+        return codebaseInfo.matchIdentifier(name: propertyName, inConstrained: .named("EnvironmentValues", []))?.signature
+    }
+
     /// Reutrn the declaration type for the given named type, if known.
     func declarationType(forNamed type: TypeSignature) -> StatementType? {
         return codebaseInfo?.declarationType(forNamed: type)?.type

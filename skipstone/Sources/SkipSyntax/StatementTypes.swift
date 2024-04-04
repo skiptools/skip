@@ -1540,8 +1540,8 @@ final class VariableDeclaration: Statement {
 
     override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
         // If there is no declared type but the @Environment attribute specifies a type, use it
-        if declaredType == .none, let environmentDeclaredType = attributes.attributes.first(where: { $0.kind == .environment || $0.kind == .environmentObject })?.tokenTypeSignature {
-            declaredType = environmentDeclaredType
+        if declaredType == .none, let environment = attributes.environmentAttribute, let environmentType = context.resolve(environment: environment) {
+            declaredType = environmentType
         }
         declaredType = declaredType.resolved(in: self, context: context)
         attributes = attributes.resolved(in: self, context: context)
