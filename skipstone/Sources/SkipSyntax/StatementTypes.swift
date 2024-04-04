@@ -1017,7 +1017,12 @@ final class FunctionDeclaration: Statement {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        parameters.forEach { $0.defaultValue?.inferTypes(context: context, expecting: $0.declaredType) }
+        for parameter in parameters {
+            if let value = parameter.defaultValue {
+                value.inferTypes(context: context, expecting: parameter.declaredType)
+                context.assignLiteralExpressibleType(parameter.declaredType, to: value)
+            }
+        }
         if let body {
             let bodyContext = context.pushing(self)
             let _ = body.inferTypes(context: bodyContext, expecting: body.statements.count == 1 && bodyContext.expectedReturn != .void ? bodyContext.expectedReturn : .none)

@@ -551,14 +551,14 @@ final class BuiltinTypeTests: XCTestCase {
         func f(a: Int, b: Double) {
         }
         """, swift: """
-        func g() {
+        func g(p: Double = 1) {
             f(a: 1, b: 1.0)
             f(a: 1, b: 1)
             let b = 2
             f(a: 1, b: b)
         }
         """, kotlin: """
-        internal fun g() {
+        internal fun g(p: Double = 1.0) {
             f(a = 1, b = 1.0)
             f(a = 1, b = 1.0)
             val b = 2

@@ -1484,6 +1484,10 @@ final class KotlinEnumCaseDeclaration: KotlinStatement {
 struct KotlinExtensionDeclaration {
     static func translate(statement: ExtensionDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
         var extends = statement.generics.selfType ?? statement.extends
+        // We typealias some extendable types, for example CGFloat to Double
+        if case .typealiased(_, let type) = translator.codebaseInfo?.resolveTypealias(for: extends) {
+            extends = type
+        }
         var kstatements: [KotlinStatement] = []
         let declarationType = translator.codebaseInfo?.declarationType(forNamed: extends)
         if declarationType?.type == .protocolDeclaration {

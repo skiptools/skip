@@ -437,4 +437,19 @@ final class TypealiasTests: XCTestCase {
         }
         """)
     }
+
+    func testTypealiasExtension() async throws {
+        try await check(swift: """
+        typealias CGFloat = Double
+        extension CGFloat {
+            static let x = 1
+        }
+        """, kotlin: """
+        internal typealias CGFloat = Double
+
+        internal val Double.Companion.x: Int
+            get() = DoubleCompanionxstorage
+        private val DoubleCompanionxstorage = 1
+        """)
+    }
 }
