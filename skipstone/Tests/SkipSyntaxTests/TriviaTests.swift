@@ -270,7 +270,7 @@ final class TriviaTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f() {
-            val c = {
+            val c = { ->
                 print("Hello")
                 print("Here")
                 print("From Kotlin!")
@@ -362,18 +362,18 @@ final class TriviaTests: XCTestCase {
 
         internal fun closure(c: () -> Unit) = Unit
         internal fun i() {
-            c({
+            c({ ->
                 // Comment
                 f()
             })
         }
         internal fun j() {
-            c({
+            c({ ->
                 f() // Comment
             })
         }
         internal fun k() {
-            c({ f() })
+            c({ -> f() })
         }
         """)
     }

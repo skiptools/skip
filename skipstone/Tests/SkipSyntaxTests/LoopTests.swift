@@ -40,7 +40,7 @@ final class LoopTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             while ((i != null) && (i < 5)) {
                 doSomething()
@@ -56,7 +56,7 @@ final class LoopTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             while ((i != null) && (i < 5)) {
                 doSomething()
@@ -77,7 +77,7 @@ final class LoopTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             while (true) {
                 val x_0 = f()
                 if ((x_0 == null) || (x_0 >= 5)) {
@@ -210,7 +210,7 @@ final class LoopTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
-        {
+        { ->
             val a = arrayOf(1, 2, 3)
             for (i in a.sref()) {
                 print(i)
@@ -227,7 +227,7 @@ final class LoopTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             val d = dictionaryOf(Tuple2(1, "a"), Tuple2(2, "b"), Tuple2(3, "c"))
             for ((key, value) in d.sref()) {
                 print(key)
@@ -245,7 +245,7 @@ final class LoopTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
-        {
+        { ->
             for (i in arrayOf(a, b, c)) {
                 print(i.sref())
             }
@@ -325,7 +325,7 @@ final class LoopTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
-        {
+        { ->
             val a: Array<Int?> = arrayOf(1, null, 3)
             for (i_0 in a.sref()) {
                 var i = i_0

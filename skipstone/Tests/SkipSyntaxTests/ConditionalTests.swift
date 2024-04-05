@@ -112,7 +112,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             if (i != null) {
                 print(i)
@@ -128,7 +128,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             if (i != null) {
                 print(i)
@@ -145,7 +145,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             var j = 0
             if ((j != 0) && (i != null)) {
@@ -164,7 +164,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             i?.let { x ->
                 print(x)
@@ -181,7 +181,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             var j = 0
             if (j != 0) {
@@ -200,7 +200,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             i?.let { x ->
                 if (x > 0) {
@@ -347,7 +347,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             val i: S?
             if (i != null) {
                 print(i)
@@ -364,7 +364,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             val i: S?
             i.sref()?.let { i ->
                 var i = i
@@ -386,7 +386,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             f()?.let { i ->
                 print(i)
             }
@@ -405,7 +405,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             if (i != null) {
                 print(i)
@@ -425,7 +425,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             if (i != null) {
                 val x = i
@@ -449,7 +449,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             val i: S?
             if (i != null) {
                 print(i)
@@ -470,7 +470,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             val i: S?
             if (i != null) {
                 var i = i.sref()
@@ -496,7 +496,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             val matchtarget_0 = f()
             if (matchtarget_0 != null) {
                 val i = matchtarget_0
@@ -523,7 +523,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             if (x > 0) {
                 print("positive")
@@ -552,7 +552,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             if (i != null) {
                 var i = i
@@ -579,7 +579,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             if (i != null) {
                 var i = i
@@ -605,7 +605,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             i?.let { i ->
                 var i = i
@@ -628,7 +628,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             if (i != null) {
                 var i = i
@@ -657,7 +657,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             if ((i != null) && (i > 5)) {
                 print(i)
@@ -691,7 +691,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             var j: String? = null
             var k: Int? = null
@@ -747,7 +747,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var c: C? = null
             c?.let { x ->
                 x.related?.let { related ->
@@ -775,7 +775,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var c: C? = null
             if (c != null) {
                 val x = c
@@ -974,7 +974,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             val e: E
             if (i != null) {
@@ -1008,7 +1008,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             if (i != null) {
                 print(i)
@@ -1047,7 +1047,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             if (i != null) {
                 val x = i
@@ -1078,7 +1078,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             val i = 0
             val j = if (i < 0) {
                 "Negative"
@@ -1102,7 +1102,7 @@ final class ConditionalTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             var i: Int? = null
             val j = if (i != null) {
                 "Non-Nil"
@@ -1311,7 +1311,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(i: Int) {
-            val c = {
+            val c = { ->
                 if (i != null) {
                     val x = i
                     print(x)
@@ -1334,7 +1334,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(i: Int) {
-            val c = {
+            val c = { ->
                 if (i != null) {
                     val x = i
                     x + 1
@@ -1380,7 +1380,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(i: Int) {
-            val c: () -> Int = {
+            val c: () -> Int = { ->
                 if (i != null) {
                     val x = i
                     x + 1
@@ -1403,7 +1403,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(i: Int) {
-            val c: () -> Int = l@{
+            val c: () -> Int = l@{ ->
                 if (i != null) {
                     val x = i
                     return@l x + 1
@@ -1426,7 +1426,7 @@ final class ConditionalTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(i: Int) {
-            val c: () -> Int = l@{
+            val c: () -> Int = l@{ ->
                 return@l if (i != null) {
                     val x = i
                     x + 1
@@ -1515,7 +1515,7 @@ final class ConditionalTests: XCTestCase {
             print(i + 1)
         }
         """, kotlin: """
-        l@{
+        l@{ ->
             var i: Int? = null
             if (i == null) {
                 print(i)
@@ -1535,7 +1535,7 @@ final class ConditionalTests: XCTestCase {
             print(i + 1)
         }
         """, kotlin: """
-        l@{
+        l@{ ->
             var i: Int? = null
             if (i == null) {
                 print(i)
@@ -1555,7 +1555,7 @@ final class ConditionalTests: XCTestCase {
             print(i + 1)
         }
         """, kotlin: """
-        l@{
+        l@{ ->
             var i: Int? = null
             var i_0 = i
             if (i_0 == null) {
@@ -1686,7 +1686,7 @@ final class ConditionalTests: XCTestCase {
             print(i)
         }
         """, kotlin: """
-        l@{
+        l@{ ->
             val i: S?
             if (i == null) {
                 print(i)
@@ -1705,7 +1705,7 @@ final class ConditionalTests: XCTestCase {
             print(x)
         }
         """, kotlin: """
-        l@{
+        l@{ ->
             val x_0 = i.sref()
             if (x_0 == null) {
                 print(i)
@@ -1731,7 +1731,7 @@ final class ConditionalTests: XCTestCase {
             print(doublerelated)
         }
         """, kotlin: """
-        l@{
+        l@{ ->
             var c: C? = null
             var c_0 = c
             if ((c_0 == null) || (c_0 <= 5)) {
@@ -1769,7 +1769,7 @@ final class ConditionalTests: XCTestCase {
             print(i)
         }
         """, kotlin: """
-        l@{
+        l@{ ->
             var i: Int? = null
             var i_0 = i
             if (i_0 == null) {
@@ -1875,7 +1875,7 @@ final class ConditionalTests: XCTestCase {
             print(e)
         }
         """, kotlin: """
-        l@{
+        l@{ ->
             val e: E
             if (e != E.case1) {
                 print("no")
@@ -2062,7 +2062,7 @@ final class ConditionalTests: XCTestCase {
         default: return "other"
         }
         """, kotlin: """
-        internal val x = { 1 }()
+        internal val x = { -> 1 }()
         when (x) {
             0 -> return "zero"
             1 -> return "one"

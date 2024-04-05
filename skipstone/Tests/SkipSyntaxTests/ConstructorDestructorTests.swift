@@ -738,7 +738,7 @@ final class ConstructorDestructorTests: XCTestCase {
         internal open class C {
             internal constructor(c: () -> Unit) {
             }
-            internal constructor(x: Double): this(c = { print("delegating") }) {
+            internal constructor(x: Double): this(c = { -> print("delegating") }) {
                 print("double")
             }
         }

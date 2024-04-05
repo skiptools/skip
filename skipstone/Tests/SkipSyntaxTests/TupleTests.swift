@@ -94,7 +94,7 @@ final class TupleTests: XCTestCase {
             print(b)
         }
         """, kotlin: """
-        {
+        { ->
             val (a, b) = Tuple2(1, 2)
             print(a)
             print(b)
@@ -109,7 +109,7 @@ final class TupleTests: XCTestCase {
             print(b)
         }
         """, kotlin: """
-        {
+        { ->
             val t = Tuple2(1, 2)
             val (a, b) = t
             print(a)
@@ -124,7 +124,7 @@ final class TupleTests: XCTestCase {
             print(a)
         }
         """, kotlin: """
-        {
+        { ->
             val t = Tuple2(1, 2)
             val (a, _) = t
             print(a)
@@ -140,7 +140,7 @@ final class TupleTests: XCTestCase {
             print(b)
         }
         """, kotlin: """
-        {
+        { ->
             val (a, b) = Tuple2(x.sref(), y.sref())
             print(a)
             print(b)
@@ -154,7 +154,7 @@ final class TupleTests: XCTestCase {
             print(b)
         }
         """, kotlin: """
-        {
+        { ->
             val (a, b) = t.sref()
             print(a)
             print(b)
@@ -240,7 +240,7 @@ final class TupleTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             val dict = dictionaryOf(Tuple2("a", 1), Tuple2("b", 2))
             dict.forEach { (key, value) ->
                 print(key)
@@ -259,7 +259,7 @@ final class TupleTests: XCTestCase {
             let d = t.2
         }
         """, kotlin: """
-        {
+        { ->
             val t = Tuple3(1, "s", 0.5)
             val i = t.element0
             val s = t.element1
@@ -278,7 +278,7 @@ final class TupleTests: XCTestCase {
             let d = t.2
         }
         """, kotlin: """
-        {
+        { ->
             val t = Tuple3(a.sref(), b.sref(), c.sref())
             val i = t.element0
             val s = t.element1

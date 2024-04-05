@@ -23,11 +23,11 @@ final class FeatureSupportTests: XCTestCase {
             return ""
         }, kotlin: """
             fun JetpackCompose() {
-                Card {
-                    var expanded = remember { mutableStateOf(false) }
-                    Column(Modifier.clickable { expanded.value = !expanded.value }) {
+                Card { ->
+                    var expanded = remember { -> mutableStateOf(false) }
+                    Column(Modifier.clickable { -> expanded.value = !expanded.value }) { ->
                         Image(painterResource(R.drawable.jetpack_compose))
-                        AnimatedVisibility(expanded) { Text(text = "Jetpack Compose", style = MaterialTheme.typography.bodyLarge) }
+                        AnimatedVisibility(expanded) { -> Text(text = "Jetpack Compose", style = MaterialTheme.typography.bodyLarge) }
                     }
                 }
             }

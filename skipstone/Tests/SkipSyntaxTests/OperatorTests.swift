@@ -271,7 +271,7 @@ final class OperatorTests: XCTestCase {
             let b = host!.i == .myZero
         }
         """, kotlin: """
-        {
+        { ->
             val host: OperatorTestsOptionalHost? = null
             val i = host!!.i + 1
             val b = host!!.i == Int.myZero
@@ -286,7 +286,7 @@ final class OperatorTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
-        {
+        { ->
             val a: Array<Int>? = null
             val b = a!![0] == Int.myZero
         }
@@ -300,7 +300,7 @@ final class OperatorTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
-        {
+        { ->
             val a: Array<OperatorTestsOptionalHost?> = arrayOf()
             val b = a[0]!!.i == Int.myZero
         }
@@ -325,7 +325,7 @@ final class OperatorTests: XCTestCase {
             let b = host?.i == .myZero
         }
         """, kotlin: """
-        {
+        { ->
             val host: OperatorTestsOptionalHost? = null
             val b = host?.i == Int.myZero
         }
@@ -339,7 +339,7 @@ final class OperatorTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
-        {
+        { ->
             val a: Array<Int>? = null
             val b = a?.get(0) == Int.myZero
         }
@@ -353,7 +353,7 @@ final class OperatorTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
-        {
+        { ->
             val a: Array<OperatorTestsOptionalHost?> = arrayOf()
             val b = a[0]?.i == Int.myZero
         }

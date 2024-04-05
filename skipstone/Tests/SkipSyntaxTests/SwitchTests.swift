@@ -266,7 +266,7 @@ final class SwitchTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             val a: Any
             when (a) {
                 is Int -> print("Int")
@@ -293,7 +293,7 @@ final class SwitchTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             val a: Any
             when (a) {
                 is Int -> {
@@ -328,7 +328,7 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
-        {
+        { ->
             val a: Any
             when (a) {
                 is Array<*> -> print("Array")
@@ -350,7 +350,7 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
-        {
+        { ->
             val a: Any
             when (a) {
                 is Array<*> -> {
@@ -794,7 +794,7 @@ final class SwitchTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f(i: Int) {
-            val c1 = l@{
+            val c1 = l@{ ->
                 val matchtarget_0 = g()
                 when (matchtarget_0) {
                     is Int -> {

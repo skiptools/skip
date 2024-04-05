@@ -204,9 +204,9 @@ final class ConcurrencyTests: XCTestCase {
         }
         """, kotlin: """
         internal suspend fun f(): Unit = Async.run {
-            MainActor.run { print("main") }
-            val x = MainActor.run { 1 }
-            val y = MainActor.run l@{ return@l 1 }
+            MainActor.run { -> print("main") }
+            val x = MainActor.run { -> 1 }
+            val y = MainActor.run l@{ -> return@l 1 }
         }
         """)
 
@@ -218,8 +218,8 @@ final class ConcurrencyTests: XCTestCase {
         }
         """, kotlin: """
         internal suspend fun f(): Unit = Async.run {
-            MainActor.run {
-                Task { print("here") }
+            MainActor.run { ->
+                Task { -> print("here") }
             }
         }
         """)
@@ -290,16 +290,16 @@ final class ConcurrencyTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f() {
-            Task { C().a().mainactor { it.m() } }
-            Task(isMainActor = true) { C().a().m() }
-            Task.detached { C().a().mainactor { it.m() } }
-            Task.detached { MainActor.run { C().a().m() } }
+            Task { -> C().a().mainactor { it.m() } }
+            Task(isMainActor = true) { -> C().a().m() }
+            Task.detached { -> C().a().mainactor { it.m() } }
+            Task.detached { -> MainActor.run { C().a().m() } }
         }
         internal fun g() {
-            Task(isMainActor = true) { C().a().m() }
-            Task(isMainActor = true) { C().a().m() }
-            Task.detached { C().a().mainactor { it.m() } }
-            Task.detached { MainActor.run { C().a().m() } }
+            Task(isMainActor = true) { -> C().a().m() }
+            Task(isMainActor = true) { -> C().a().m() }
+            Task.detached { -> C().a().mainactor { it.m() } }
+            Task.detached { -> MainActor.run { C().a().m() } }
         }
         """)
 
@@ -337,20 +337,20 @@ final class ConcurrencyTests: XCTestCase {
         }
         """, kotlin: """
         internal fun f() {
-            val c = { print("any") }
-            val a: suspend () -> Unit = { Async.run { print("async") } }
-            val m1: () -> Unit = { print("main") }
-            val m2 = { print("main") }
-            val ma: suspend () -> Unit = { MainActor.run { print("main") } }
+            val c = { -> print("any") }
+            val a: suspend () -> Unit = { -> Async.run { print("async") } }
+            val m1: () -> Unit = { -> print("main") }
+            val m2 = { -> print("main") }
+            val ma: suspend () -> Unit = { -> MainActor.run { print("main") } }
 
-            Task {
+            Task { ->
                 c()
                 a()
                 MainActor.run { m1() }
                 MainActor.run { m2() }
                 ma()
             }
-            Task(isMainActor = true) {
+            Task(isMainActor = true) { ->
                 c()
                 a()
                 m1()
@@ -360,7 +360,7 @@ final class ConcurrencyTests: XCTestCase {
         }
 
         internal fun g(c: () -> Unit, a: suspend () -> Unit, m: () -> Unit, ma: suspend () -> Unit) {
-            Task(isMainActor = true) {
+            Task(isMainActor = true) { ->
                 c()
                 a()
                 m()
@@ -417,7 +417,7 @@ final class ConcurrencyTests: XCTestCase {
         }
         """, kotlin: """
         internal suspend fun f(): Int = Async.run l@{
-            val task = Task { 10 }
+            val task = Task { -> 10 }
             return@l task.value()
         }
         """)
@@ -428,7 +428,7 @@ final class ConcurrencyTests: XCTestCase {
         }
         """, kotlin: """
         internal suspend fun f(): Int = Async.run l@{
-            return@l Task { 10 }.value()
+            return@l Task { -> 10 }.value()
         }
         """)
 
@@ -441,7 +441,7 @@ final class ConcurrencyTests: XCTestCase {
         }
         """, kotlin: """
         internal suspend fun f(): Int = Async.run l@{
-            val task = Task(isMainActor = true) l@{ return@l 10 }
+            val task = Task(isMainActor = true) l@{ -> return@l 10 }
             return@l task.value()
         }
         """)
@@ -487,13 +487,13 @@ final class ConcurrencyTests: XCTestCase {
 
         internal suspend fun f(): Array<Int> = Async.run l@{
             return@l withThrowingTaskGroup(of = Int::class) l@{ group ->
-                group.addTask l@{
+                group.addTask l@{ ->
                     return@l delayedInt(millis = 200)
                 }
-                group.addTask l@{
+                group.addTask l@{ ->
                     return@l delayedInt(millis = 100)
                 }
-                group.addTask l@{
+                group.addTask l@{ ->
                     return@l delayedInt(millis = 400)
                 }
                 var results: Array<Int> = arrayOf()
@@ -804,9 +804,9 @@ final class ConcurrencyTests: XCTestCase {
         internal fun f1(c: suspend () -> Unit) = Unit
         internal fun f2(c: suspend (Int) -> Unit) = Unit
         internal fun g() {
-            val c1: suspend () -> Unit = { MainActor.run { m(p = 1) } }
+            val c1: suspend () -> Unit = { -> MainActor.run { m(p = 1) } }
             f1(c = c1)
-            f1(c = { MainActor.run { m(p = 1) } })
+            f1(c = { -> MainActor.run { m(p = 1) } })
             val c2: suspend (Int) -> Unit = { it -> MainActor.run { m(p = it) } }
             f2(c = c2)
             f2(c = { it -> MainActor.run { m(p = it) } })
@@ -830,7 +830,7 @@ final class ConcurrencyTests: XCTestCase {
         internal fun f2(c: suspend () -> Int) = Unit
         internal fun g() {
             f1(c = fun(): Int = 1)
-            f2(c = { Async.run { 1 } })
+            f2(c = { -> Async.run { 1 } })
         }
         """)
 

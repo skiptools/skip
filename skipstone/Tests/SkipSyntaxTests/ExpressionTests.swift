@@ -190,7 +190,7 @@ final class ExpressionTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
         
-        {
+        { ->
             val arr = arrayOf(1, 2, 3)
             val result = arr.reduce(initialResult = 0, { it, it_1 -> it + it_1 })
         }
@@ -367,8 +367,8 @@ final class ExpressionTests: XCTestCase {
         f(s: "") { i in print(i) } b: { 2 }
         """, kotlin: """
         f(s = "") { _ -> 1 }
-        f(s = "", b = { 2 })
-        f(s = "", a = { i -> print(i) }, b = { 2 })
+        f(s = "", b = { -> 2 })
+        f(s = "", a = { i -> print(i) }, b = { -> 2 })
         """)
     }
 
@@ -492,7 +492,7 @@ final class ExpressionTests: XCTestCase {
             var x: Int, y, z: Double
         }
         """, kotlin: """
-        {
+        { ->
             var a: Int
             var b: Int
             var c: Int

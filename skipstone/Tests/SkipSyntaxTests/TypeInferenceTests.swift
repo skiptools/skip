@@ -152,7 +152,7 @@ final class TypeInferenceTests: XCTestCase {
             let b = holder.dictionaryOfDictionaries["a"]!["b"] == .myZero
         }
         """, kotlin: """
-        {
+        { ->
             val holder = DictionaryHolder()
             holder.dictionaryOfDictionaries["a"] = dictionaryOf(Tuple2("a", 1), Tuple2("b", 2), Tuple2("c", 3))
             val b = holder.dictionaryOfDictionaries["a"]!!["b"] == Int.myZero
@@ -176,7 +176,7 @@ final class TypeInferenceTests: XCTestCase {
             cParamFunc(.init(v: 101))
         }
         """, kotlin: """
-        {
+        { ->
             val c: C = C(v = 100)
             cParamFunc(C(v = 101))
         }
@@ -270,7 +270,7 @@ final class TypeInferenceTests: XCTestCase {
             let b = C.returnEnum() == .case1
         }
         """, kotlin: """
-        {
+        { ->
             val b = C.returnEnum() == E.case1
         }
         """)
@@ -404,7 +404,7 @@ final class TypeInferenceTests: XCTestCase {
             let b2 = c2.v == .myZero
         }
         """, kotlin: """
-        {
+        { ->
             val c1 = C(v = 1)
             val b1 = c1.v == Int.myZero
             val c2 = C<Int>(v = 2)
@@ -430,7 +430,7 @@ final class TypeInferenceTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
-        {
+        { ->
             val c = C(array = arrayOf(1, 2, 3))
             val b = c.single == Int.myZero
         }
@@ -453,7 +453,7 @@ final class TypeInferenceTests: XCTestCase {
             let b2 = max("a", "b") == .myValue
         }
         """, kotlin: """
-        {
+        { ->
             val b1 = max(1, 2) == Int.myValue
             val b2 = max("a", "b") == String.myValue
         }
@@ -518,7 +518,7 @@ final class TypeInferenceTests: XCTestCase {
             let b = C(t: 1).f() == .myZero
         }
         """, kotlin: """
-        {
+        { ->
             val b = C(t = 1).f() == Int.myZero
         }
         """)
@@ -550,7 +550,7 @@ final class TypeInferenceTests: XCTestCase {
             let b2 = C(t: "1").f() == .myValue
         }
         """, kotlin: """
-        {
+        { ->
             val b1 = C(t = 1).f() == Int.myValue
             val b2 = C(t = "1").f() == String.myValue
         }
@@ -614,7 +614,7 @@ final class TypeInferenceTests: XCTestCase {
             let b = a[0] == .myValue
         }
         """, kotlin: """
-        {
+        { ->
             val c = Container<String>()
             val a = c.map { it -> it.length }
             val b = a[0] == Int.myValue
@@ -630,7 +630,7 @@ final class TypeInferenceTests: XCTestCase {
             let b = a[0].id == .myValue
         }
         """, kotlin: """
-        {
+        { ->
             val c = Container<Int>()
             val a = c.map l@{ i -> return@l Element(id = i) }
             val b = a[0].id == Int.myValue
@@ -643,7 +643,7 @@ final class TypeInferenceTests: XCTestCase {
             let b = enums[1] == .two
         }
         """, kotlin: """
-        {
+        { ->
             val enums = Container<String>().map { it -> ElementEnum(rawValue = it) }
             val b = enums[1] == ElementEnum.two
         }
@@ -676,7 +676,7 @@ final class TypeInferenceTests: XCTestCase {
             let b = result[1] == .myValue
         }
         """, kotlin: """
-        {
+        { ->
             val c = Container<Int>()
             val result = c.reduce(into = Dictionary<Int, String>()) { result, i -> result.value[i] = "${i}" }
             val b = result[1] == String.myValue
@@ -1007,7 +1007,7 @@ final class TypeInferenceTests: XCTestCase {
         """, swift: """
         let b = f(a: 1) { } == .zero
         """, kotlin: """
-        internal val b = f(a = 1) {  } == Int.zero
+        internal val b = f(a = 1) { ->  } == Int.zero
         """)
     }
 

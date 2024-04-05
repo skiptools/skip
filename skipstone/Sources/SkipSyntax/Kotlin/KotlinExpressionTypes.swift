@@ -737,6 +737,7 @@ final class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         output.append("{")
         let isSingleStatement = !useMultilineFormatting
         if parameters.isEmpty && implicitParameterCount == 0 {
+            output.append(" ->")
             if isMainActor {
                 output.append(" MainActor.run \(returnLabel){")
             } else if isAsync {

@@ -665,6 +665,7 @@ private final class TranslateVisitor {
         let code = "EnvironmentValues.shared.set\(property)(it)"
         let codeBlock = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: code)])
         let closure = KotlinClosure(body: codeBlock, sourceFile: keyPath.sourceFile, sourceRange: keyPath.sourceRange)
+        closure.implicitParameterCount = 1
         closure.returnType = .void
         closure.inferredReturnType = .void
         closure.parent = functionCall

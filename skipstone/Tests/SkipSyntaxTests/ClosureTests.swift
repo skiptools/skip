@@ -7,7 +7,7 @@ final class ClosureTests: XCTestCase {
             print("f")
         }
         """, kotlin: """
-        call { print("f") }
+        call { -> print("f") }
         """)
 
         try await check(swift: """
@@ -15,13 +15,13 @@ final class ClosureTests: XCTestCase {
             print("f")
         }
         """, kotlin: """
-        call(100) { print("f") }
+        call(100) { -> print("f") }
         """)
 
         try await check(swift: """
         call(100, { print("f") })
         """, kotlin: """
-        call(100, { print("f") })
+        call(100, { -> print("f") })
         """)
     }
 
@@ -97,8 +97,8 @@ final class ClosureTests: XCTestCase {
             let x = { 1 }()
         }
         """, kotlin: """
-        {
-            val x = { 1 }()
+        { ->
+            val x = { -> 1 }()
         }
         """)
 
@@ -107,7 +107,7 @@ final class ClosureTests: XCTestCase {
             let x = { (i: Int) in i }(1)
         }
         """, kotlin: """
-        {
+        { ->
             val x = { i: Int -> i }(1)
         }
         """)
@@ -123,7 +123,7 @@ final class ClosureTests: XCTestCase {
             }(1)
         }
         """, kotlin: """
-        {
+        { ->
             val x = linvoke(1) l@{ it ->
                 if (it % 2 == 0) {
                     return@l "YES"
@@ -158,7 +158,7 @@ final class ClosureTests: XCTestCase {
             let i = c?("s")
         }
         """, kotlin: """
-        {
+        { ->
             val c: ((String) -> Int)? = null
             val i = c?.invoke("s")
         }
@@ -172,7 +172,7 @@ final class ClosureTests: XCTestCase {
             }
         }
         """, kotlin: """
-        {
+        { ->
             val c: ((String) -> Int)? = null
             if (c != null) {
                 val i = c("s")
@@ -287,7 +287,7 @@ final class ClosureTests: XCTestCase {
         """, kotlin: """
         internal open class C {
             internal open fun f() {
-                val c = {
+                val c = { ->
                     this?.let { strongSelf ->
                         strongSelf.g()
                     }
@@ -313,7 +313,7 @@ final class ClosureTests: XCTestCase {
         internal open class C {
             internal open fun f() {
                 val o = C()
-                val c = {
+                val c = { ->
                     val weakSelf = this
                     val weakO = o
                     weakSelf?.let { strongSelf ->
@@ -365,7 +365,7 @@ final class ClosureTests: XCTestCase {
         """, kotlin: """
         internal open class C {
             internal open fun f() {
-                val c = l@{
+                val c = l@{ ->
                     if (this == null) {
                         return@l
                     }
@@ -390,7 +390,7 @@ final class ClosureTests: XCTestCase {
         """, kotlin: """
         internal open class C {
             internal open fun f() {
-                val c = {
+                val c = { ->
                     if (this != null) {
                         this.g()
                     }
@@ -508,7 +508,7 @@ final class ClosureTests: XCTestCase {
             .trailing()
         """, kotlin: """
         Base()
-            .trailing {
+            .trailing { ->
                 Base()
                     .trailing()
             }
@@ -526,8 +526,8 @@ final class ClosureTests: XCTestCase {
         .trailing()
         .trailing()
         """, kotlin: """
-        Base {
-            Inner().trailing {
+        Base { ->
+            Inner().trailing { ->
                 X()
                 Y()
             }
@@ -568,7 +568,7 @@ final class ClosureTests: XCTestCase {
         """, kotlin: """
         internal fun invoke() {
             val s = S()
-            s.f { print("none") }
+            s.f { -> print("none") }
             s.f { it -> print(it) }
             s.f { _ -> print("one") }
             s.f { it, it_1 ->

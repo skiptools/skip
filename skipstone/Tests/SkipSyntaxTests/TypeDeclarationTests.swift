@@ -893,7 +893,7 @@ final class TypeDeclarationTests: XCTestCase {
             let strindex: String.Index = 0
         }
         """, kotlin: """
-        {
+        { ->
             val encoding: StringEncoding = StringEncoding.utf8
             val whatever: String.Whatever = String.Whatever.abcd.sref()
             val strindex: Int = 0

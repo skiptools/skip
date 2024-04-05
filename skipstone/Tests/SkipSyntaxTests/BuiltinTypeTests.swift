@@ -24,7 +24,7 @@ final class BuiltinTypeTests: XCTestCase {
             var v: Void
         }
         """, kotlin: """
-        {
+        { ->
             var a: Any
             var ao: Any
             var b: Boolean
@@ -70,7 +70,7 @@ final class BuiltinTypeTests: XCTestCase {
         import skip.lib.Array
         import skip.lib.Set
 
-        {
+        { ->
             var a: Array<Any>
             var ai: Array<Int>
             var ai2: Array<Int>
@@ -291,7 +291,7 @@ final class BuiltinTypeTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
-        {
+        { ->
             val a = arrayOf(1, 2, 3)
         }
         """)
@@ -303,7 +303,7 @@ final class BuiltinTypeTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
-        {
+        { ->
             val a: Array<Int> = arrayOf(x, y, z)
         }
         """)
@@ -316,7 +316,7 @@ final class BuiltinTypeTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
-        {
+        { ->
             val a = Array<Int>()
             val a = Array<Array<Tuple2<String, String>>>()
         }
@@ -334,7 +334,7 @@ final class BuiltinTypeTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
-        {
+        { ->
             val a = arrayOf(
                 S(),
                 S()
@@ -349,7 +349,7 @@ final class BuiltinTypeTests: XCTestCase {
             let d = [1: "a", 2: "b", 3: "c"]
         }
         """, kotlin: """
-        {
+        { ->
             val d = dictionaryOf(Tuple2(1, "a"), Tuple2(2, "b"), Tuple2(3, "c"))
         }
         """)
@@ -359,7 +359,7 @@ final class BuiltinTypeTests: XCTestCase {
             let d: [Int: String] = [x: a, y: b, z: c]
         }
         """, kotlin: """
-        {
+        { ->
             val d: Dictionary<Int, String> = dictionaryOf(Tuple2(x, a), Tuple2(y, b), Tuple2(z, c))
         }
         """)
@@ -372,7 +372,7 @@ final class BuiltinTypeTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
         
-        {
+        { ->
             val d = Dictionary<Int, String>()
             val d = Dictionary<Array<Int>, Tuple2<String, String>>()
         }
@@ -388,7 +388,7 @@ final class BuiltinTypeTests: XCTestCase {
             ]
         }
         """, kotlin: """
-        {
+        { ->
             val d = dictionaryOf(
                 Tuple2(1, S()),
                 Tuple2(2, S())
@@ -410,7 +410,7 @@ final class BuiltinTypeTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Set
 
-        {
+        { ->
             val s: Set<Int> = setOf(1, 2, 3)
             setf(set = s)
             setf(set = setOf(1, 2, 3))
@@ -429,7 +429,7 @@ final class BuiltinTypeTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Set
 
-        {
+        { ->
             val s: Set<Char> = setOf('1', '2', '3')
             setf(set = s)
             setf(set = setOf('1', '2', '\\n'))
@@ -456,7 +456,7 @@ final class BuiltinTypeTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
-        {
+        { ->
             val atype = Array::class
             val dtype = Dictionary::class
         }
