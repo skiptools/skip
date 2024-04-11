@@ -27,7 +27,9 @@ final class KotlinErrorToExceptionTransformer: KotlinTransformer {
         for member in classDeclaration.members {
             if member.type == .constructorDeclaration, let constructorDeclaration = member as? KotlinFunctionDeclaration {
                 hasConstructors = true
-                constructorDeclaration.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super()")
+                if constructorDeclaration.delegatingConstructorCall == nil {
+                    constructorDeclaration.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super()")
+                }
             } else if member.type == .variableDeclaration, let variableDeclaration = member as? KotlinVariableDeclaration {
                 if variableDeclaration.propertyName == "message" {
                     variableDeclaration.modifiers.isOverride = true

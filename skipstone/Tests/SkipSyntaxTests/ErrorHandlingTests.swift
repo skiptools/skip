@@ -479,6 +479,29 @@ final class ErrorHandlingTests: XCTestCase {
         """)
     }
 
+    func testErrorStructWithDelegatingInit() async throws {
+        try await check(swift: """
+        struct S: Error {
+            let codeString: String
+            init(codeString: String) {
+                self.codeString = codeString
+            }
+            init(code: Int) {
+                self.init(codeString: String(describing: code))
+            }
+        }
+        """, kotlin: """
+        internal class S: Exception, Error {
+            internal val codeString: String
+            internal constructor(codeString: String): super() {
+                this.codeString = codeString
+            }
+            internal constructor(code: Int): this(codeString = String(describing = code)) {
+            }
+        }
+        """)
+    }
+
     func testErrorEnum() async throws {
         try await check(swift: """
         enum E: Error {
