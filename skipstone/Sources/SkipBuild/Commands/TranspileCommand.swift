@@ -594,7 +594,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
                     // now do some manual configuration of the android properties
                     manifestConfigLines += ["""
-                    applicationId = manifestPlaceholders["PRODUCT_BUNDLE_IDENTIFIER"]?.toString()
+                    applicationId = manifestPlaceholders["PRODUCT_BUNDLE_IDENTIFIER"]?.toString().replace("-", "_")
                     """]
 
                     manifestConfigLines += ["""

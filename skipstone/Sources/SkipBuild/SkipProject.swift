@@ -898,6 +898,18 @@ class AppProjectLayout : FrameworkProjectLayout {
 
         let sourceHeader = free ? freeLicenseHeader(type: nil) : ""
 
+        if modules.contains(where: { module in
+            module.moduleName == projectName
+        }) {
+            throw InitError(errorDescription: "ModuleName and project-name must be different: \(projectName)")
+        }
+
+        if let appid = appid {
+            if !appid.contains(".") {
+                throw InitError(errorDescription: "Appid must be a valid bundle identifier containing at least one dot: \(appid)")
+            }
+        }
+
         let projectURL = try createSkipLibrary(projectName: projectName, productName: productName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: appid != nil, moduleTests: moduleTests, packageResolved: packageResolvedURL)
 
         let projectPath = try projectURL.absolutePath
