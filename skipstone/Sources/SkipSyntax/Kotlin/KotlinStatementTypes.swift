@@ -2750,7 +2750,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
             }
         } else if let functionDeclaration = statement.parent?.parent as? FunctionDeclaration {
             if functionDeclaration.parameters.contains(where: { kstatement.names.contains($0.internalLabel) && $0.internalLabel != $0.externalLabel && $0.externalLabel != nil }) {
-                kstatement.messages.append(.kotlinVariableMirrorInternalParameter(kstatement, source: translator.syntaxTree.source))
+                kstatement.messages.append(.kotlinVariableShadowInternalParameter(kstatement, source: translator.syntaxTree.source))
             }
         }
         return kstatement

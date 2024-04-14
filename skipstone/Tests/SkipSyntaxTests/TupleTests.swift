@@ -132,6 +132,20 @@ final class TupleTests: XCTestCase {
         """)
     }
 
+    func testDestructuringReassignment() async throws {
+        try await check(swift: """
+        {
+            var (a, b) = (1, 2)
+            (a, b) = (3, 4))
+        }
+        """, kotlin: """
+        { ->
+            var (a, b) = Tuple2(1, 2)
+            for (unusedi in 0..0) { val tmptuple = Tuple2(3, 4); a = tmptuple.element0; b = tmptuple.element1 }
+        }
+        """)
+    }
+
     func testDestructuringSharedMutableStruct() async throws {
         try await check(swift: """
         {

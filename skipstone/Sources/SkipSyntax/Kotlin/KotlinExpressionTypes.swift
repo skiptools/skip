@@ -335,14 +335,39 @@ final class KotlinBinaryOperator: KotlinExpression, KotlinSingleStatementVetoing
     }
 
     override func append(to output: OutputGenerator, indentation: Indentation) {
-        let kotlinSymbol = op.kotlinSymbol
-        output.append(lhs, indentation: indentation)
-        if kotlinSymbol == ".." {
-            output.append(kotlinSymbol)
+        if let tuple = reassignmentToTuple {
+            // Kotlin cannot use a destructuring statement to reassign existing vars, so we use a single-iteration loop to have
+            // a dedicated single-statement scope in which to create a temporary tuple and assign each value from that. A loop
+            // is less probematic than e.g. an immediately-executing closure, which can't contain async calls, etc
+            output.append("for (unusedi in 0..0) { val tmptuple = ")
+            output.append(rhs, indentation: indentation)
+            for (i, value) in tuple.values.enumerated() {
+                output.append("; ")
+                if let sref = value as? KotlinSRef {
+                    output.append(sref.base, indentation: indentation)
+                } else {
+                    output.append(value, indentation: indentation)
+                }
+                output.append(" = tmptuple.element\(i)")
+            }
+            output.append(" }")
         } else {
-            output.append(" \(kotlinSymbol) ")
+            let kotlinSymbol = op.kotlinSymbol
+            output.append(lhs, indentation: indentation)
+            if kotlinSymbol == ".." {
+                output.append(kotlinSymbol)
+            } else {
+                output.append(" \(kotlinSymbol) ")
+            }
+            output.append(rhs, indentation: indentation)
         }
-        output.append(rhs, indentation: indentation)
+    }
+
+    private var reassignmentToTuple: KotlinTupleLiteral? {
+        guard op.symbol == "=", let tuple = lhs as? KotlinTupleLiteral else {
+            return nil
+        }
+        return tuple
     }
 }
 
