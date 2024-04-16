@@ -418,6 +418,11 @@ public final class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseIn
     }
 
     func codebaseInfo(_ codebaseInfo: CodebaseInfo, didGather typeInfo: CodebaseInfo.TypeInfo, from statement: ExtensionDeclaration, syntaxTree: SyntaxTree) {
+        // Special case for CGFloat, which we typealias to Double but users often extend
+        if typeInfo.name == "CGFloat" {
+            typeInfo.name = "Double"
+            typeInfo.signature = .double
+        }
         // Keep the extension statement around so we can move it to the extended declarations
         let extensionAdditions = ExtensionAdditions(extensionDeclaration: statement, syntaxTree: syntaxTree)
         if let selfType = typeInfo.generics.selfType {

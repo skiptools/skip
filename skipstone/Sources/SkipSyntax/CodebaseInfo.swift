@@ -289,6 +289,9 @@ public final class CodebaseInfo {
 
         /// Whether the given type is a class, struct, etc, optionally limiting results to this module.
         func declarationType(forNamed type: TypeSignature, resolveTypealias: Bool = true, unknownTypealiasFallback: StatementType = .classDeclaration) -> (type: StatementType, isInModule: Bool)? {
+            guard type.isNamedType else {
+                return nil
+            }
             if !resolveTypealias {
                 let members = ranked(global.lookup(name: type.name, qualifiedMatch: true))
                 guard let match = members.first(where: { ($0 is TypeInfo || $0 is TypealiasInfo) }) else {
@@ -1467,7 +1470,7 @@ public final class CodebaseInfo {
     ///
     /// - Note: Unlike the other `CodebaseInfoItem` datastructures, types are modeled as `class` instances so that we can mutate them in place.
     final class TypeInfo: CodebaseInfoItem, Hashable, Codable {
-        let name: String
+        var name: String
         let declarationType: StatementType
         var signature: TypeSignature
         let moduleName: String?

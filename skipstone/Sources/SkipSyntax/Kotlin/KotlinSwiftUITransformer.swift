@@ -584,13 +584,21 @@ private final class TranslateVisitor {
 
         // We may need to use a return label when moving the code block to a closure
         var needsReturnLabel = false
-        if !codeBlock.updateRemovingSingleStatementReturn() {
+        var needsReturnValue = false
+        if codeBlock.updateRemovingSingleStatementReturn() {
+            if let expression = (codeBlock.statements.first as? KotlinExpressionStatement)?.expression {
+                needsReturnValue = expression is KotlinIf || expression is KotlinWhen
+            }
+        } else {
             if let closure {
                 needsReturnLabel = closure.hasReturnLabel
             } else {
                 needsReturnLabel = codeBlock.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel))
             }
-            // Add a final return value just in case the closure logic doesn't guarantee one
+            needsReturnValue = true
+        }
+        // Add a final return value if the closure logic may not guarantee one
+        if needsReturnValue {
             codeBlock.statements.append(KotlinRawStatement(sourceCode: "ComposeResult.ok"))
         }
 

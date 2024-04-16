@@ -350,8 +350,11 @@ struct TypeInferenceContext {
         }
 
         // Not a known member function. Check functions that can be invoked without a target type
-        if let (localFunction, _) = localIdentifierTypes[name], case .function = localFunction {
+        if var (localFunction, _) = localIdentifierTypes[name], case .function = localFunction {
             if let codebaseInfo {
+                if let localType = path.last?.typeSignature?.asMetaType(path.last?.isStatic == true).constrainedTypeWithGenerics(generics) {
+                    localFunction = localFunction.resolvingSelf(in: nil, to: localType)
+                }
                 if let callSignature = codebaseInfo.callableSignature(of: localFunction, generics: generics, arguments: constrainedArguments) {
                     return [APIMatch(signature: callSignature, apiFlags: localFunction.apiFlags, declarationType: .functionDeclaration)]
                 }
@@ -588,12 +591,12 @@ struct TypeInferenceContext {
     private func findUnqualifiedArgumentMatch(in matches: [(TypeSignature, APIMatch)], arguments: [LabeledValue<Expression>]) -> (TypeSignature, APIMatch)? {
         // Look for arguments that are unqualified member accesses and see if we can match them to members
         for i in 0..<arguments.count {
-            guard arguments[i].value.inferredType == .none, let memberAccess = arguments[i].value as? MemberAccess, memberAccess.base == nil else {
+            guard arguments[i].value.inferredType == .none, let memberAccess = arguments[i].value as? MemberAccess, let unqualifiedRootMemberAccess = memberAccess.unqualifiedRootMemberAccess else {
                 continue
             }
             for match in matches {
                 let parameters = match.0.parameters
-                if parameters.count > i && parameters[i].type != .none && member(memberAccess.member, in: parameters[i].type.asMetaType(true), messagesNode: nil) != nil {
+                if parameters.count > i && parameters[i].type != .none && member(unqualifiedRootMemberAccess.member, in: parameters[i].type.asMetaType(true), messagesNode: nil) != nil {
                     return match
                 }
             }

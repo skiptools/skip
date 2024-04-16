@@ -929,6 +929,27 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
+    func testUnqualifiedMemberMatchWithMultipleAndTypeliasCandidates() async throws {
+        try await check(supportingSwift: """
+        typealias CGFloat = Double
+        extension CGFloat {
+            static let pad = 0.0
+        }
+        struct Inset {
+        }
+        func padding(_ i: Inset) {
+        }
+        func padding(_ p: CGFloat? = nil) {
+        }
+        """, swift: """
+        func f() {
+            padding(.pad)
+        }
+        """, kotlin: """
+        internal fun f(): Unit = padding(Double.pad)
+        """)
+    }
+
     func testUnqualifiedMemberChain() async throws {
         try await check(supportingSwift: """
         struct S {
@@ -961,6 +982,34 @@ final class TypeInferenceTests: XCTestCase {
             val b5 = g(S.s.ifactory().ifactory().is_)
         }
         internal fun g(s: S) = Unit
+        """)
+    }
+
+    func testParameterSpecificityWithInheritanceAndOverloads() async throws {
+        try await check(supportingSwift: """
+        protocol View {
+            func background(_ view: View) {
+            }
+            func background(_ style: ShapeStyle) {
+            }
+        }
+        protocol ShapeStyle: View {
+        }
+        struct Color: ShapeStyle {
+        }
+        extension ShapeStyle where Self == Color {
+            static let red = Color()
+        }
+        """, swift: """
+        func f(v: View) {
+            v.background(.red)
+            v.background(Color.red)
+        }
+        """, kotlin: """
+        internal fun f(v: View) {
+            v.background(Color.red)
+            v.background(Color.red)
+        }
         """)
     }
 

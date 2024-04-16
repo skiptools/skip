@@ -496,6 +496,74 @@ final class SwiftUITests: XCTestCase {
             }
         }
         """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        import SwiftUI
+        @ViewBuilder func f(i: Int?) -> some View {
+            if let i {
+                V()
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
+        internal fun f(i: Int?): View {
+            return ComposeBuilder { composectx: ComposeContext ->
+                if (i != null) {
+                    V().Compose(composectx)
+                }
+                ComposeResult.ok
+            }
+        }
+        """)
+    }
+
+    func testGenericConstrainedToView() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            @ViewBuilder func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+                if condition {
+                    transform(self)
+                } else {
+                    self
+                }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
+        internal class V: View {
+            internal fun <Content> if_(condition: Boolean, transform: (V) -> Content): View where Content: View {
+                return ComposeBuilder { composectx: ComposeContext ->
+                    if (condition) {
+                        transform(this).Compose(composectx)
+                    } else {
+                        this.Compose(composectx)
+                    }
+                    ComposeResult.ok
+                }
+            }
+        }
+        """)
     }
 
     func testTypeInferenceMessage() async throws {
@@ -723,6 +791,7 @@ final class SwiftUITests: XCTestCase {
                             return@l Text("no").Compose(composectx)
                         }
                     }
+                    ComposeResult.ok
                 }
             }
 

@@ -1417,19 +1417,23 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     private func inheritanceCompatibilityScore(target: TypeSignature, codebaseInfo: CodebaseInfo.Context) -> Double? {
         // TODO: Match on generics
         let target = target.withGenerics([])
-        // Take away a tenth of a point for each level down the inheritance chain, so that less derived matches score lower.
-        // This will allow another function with a more specific parameter type to score higher
-        let inherits = codebaseInfo.global.inheritanceChainSignatures(forNamed: self)
-        if inherits.count > 1 {
-            for i in 1..<inherits.count {
-                if inherits[i].withGenerics([]).isSameType(as: target) {
-                    return 2.0 - (Double(i) * 0.1)
+
+        // Perform a breadth-first search to find a matching inherited type
+        var queue: [TypeSignature] = [self]
+        var level = 1.0
+        while !queue.isEmpty {
+            let candidate = queue.removeFirst()
+            for typeInfo in codebaseInfo.typeInfos(forNamed: candidate) {
+                for inherit in typeInfo.inherits {
+                    // Take away a tenth of a point for each level down the inheritance chain, so that less derived matches score lower.
+                    // This will allow another function with a more specific parameter type to score higher
+                    if inherit.withGenerics([]).isSameType(as: target) {
+                        return 2.0 - level * 0.1
+                    }
+                    queue.append(inherit)
                 }
             }
-        }
-        let protocols = codebaseInfo.global.protocolSignatures(forNamed: self).map { $0.withGenerics([]) }
-        if protocols.contains(where: { $0.isSameType(as: target) }) {
-            return 1.5
+            level += 1.0
         }
         return nil
     }
