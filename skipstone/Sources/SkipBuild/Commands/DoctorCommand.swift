@@ -168,14 +168,24 @@ extension ToolOptionsCommand {
     func androidInfoPlist() throws -> [String: Any]? {
         let appsFolder = FileManager.default.urls(for: .applicationDirectory, in: .localDomainMask).first?.path ?? "/Applications"
 
+
+        func studioProps(for path: String) throws -> [String: Any]? {
+            try PropertyListSerialization.propertyList(from: Data(contentsOf: URL(fileURLWithPath: path)), format: nil) as? [String: Any]
+        }
+
         do {
-            return try PropertyListSerialization.propertyList(from: Data(contentsOf: URL(fileURLWithPath: "\(appsFolder)/Android Studio.app/Contents/Info.plist")), format: nil) as? [String: Any]
+            return try studioProps(for: "\(appsFolder)/Android Studio.app/Contents/Info.plist")
         } catch let e1 {
             do {
-                // Check for /Applications/JetBrains Toolbox/Android Studio.app as well: https://github.com/skiptools/skip/issues/15
-                return try PropertyListSerialization.propertyList(from: Data(contentsOf: URL(fileURLWithPath: "\(appsFolder)/JetBrains Toolbox/Android Studio.app/Contents/Info.plist")), format: nil) as? [String: Any]
+                // Check for /Applications/JetBrains Toolbox/Android Studio.app: https://github.com/skiptools/skip/issues/15
+                return try studioProps(for: "\(appsFolder)/JetBrains Toolbox/Android Studio.app/Contents/Info.plist")
             } catch {
-                throw e1
+                do {
+                    // Check for ~/Applications/Android Studio.app: https://github.com/skiptools/skip/issues/107
+                    return try studioProps(for: ("~/Applications/Android Studio.app/Contents/Info.plist" as NSString).expandingTildeInPath)
+                } catch {
+                    throw e1
+                }
             }
         }
     }
