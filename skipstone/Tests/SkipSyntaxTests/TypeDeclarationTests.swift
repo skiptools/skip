@@ -947,17 +947,28 @@ final class TypeDeclarationTests: XCTestCase {
             return s.contains(.s1)
         }
         """, kotlin: """
-        internal class S: OptionSet<S, Int> {
+        internal class S: OptionSet<S, Int>, MutableStruct {
             override var rawValue: Int
 
             override val rawvaluelong: ULong
                 get() = ULong(rawValue)
             override fun makeoptionset(rawvaluelong: ULong): S = S(rawValue = Int(rawvaluelong))
-            override fun assignoptionset(target: S): Unit = assignfrom(target)
+            override fun assignoptionset(target: S) {
+                willmutate()
+                try {
+                    assignfrom(target)
+                } finally {
+                    didmutate()
+                }
+            }
 
             constructor(rawValue: Int) {
                 this.rawValue = rawValue
             }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S(rawValue)
 
             private fun assignfrom(target: S) {
                 this.rawValue = target.rawValue
@@ -988,17 +999,28 @@ final class TypeDeclarationTests: XCTestCase {
             static let all: S = [.s1, .s2]
         }
         """, kotlin: """
-        internal class S: OptionSet<S, ULong> {
+        internal class S: OptionSet<S, ULong>, MutableStruct {
             internal var rawValue: ULong
 
             override val rawvaluelong: ULong
                 get() = rawValue
             override fun makeoptionset(rawvaluelong: ULong): S = S(rawValue = rawvaluelong)
-            override fun assignoptionset(target: S): Unit = assignfrom(target)
+            override fun assignoptionset(target: S) {
+                willmutate()
+                try {
+                    assignfrom(target)
+                } finally {
+                    didmutate()
+                }
+            }
 
             constructor(rawValue: ULong) {
                 this.rawValue = rawValue
             }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S(rawValue)
 
             private fun assignfrom(target: S) {
                 this.rawValue = target.rawValue
@@ -1076,17 +1098,28 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal class Outer {
-            internal class S: OptionSet<Outer.S, Int> {
+            internal class S: OptionSet<Outer.S, Int>, MutableStruct {
                 override var rawValue: Int
 
                 override val rawvaluelong: ULong
                     get() = ULong(rawValue)
                 override fun makeoptionset(rawvaluelong: ULong): Outer.S = S(rawValue = Int(rawvaluelong))
-                override fun assignoptionset(target: Outer.S): Unit = assignfrom(target)
+                override fun assignoptionset(target: Outer.S) {
+                    willmutate()
+                    try {
+                        assignfrom(target)
+                    } finally {
+                        didmutate()
+                    }
+                }
 
                 constructor(rawValue: Int) {
                     this.rawValue = rawValue
                 }
+
+                override var supdate: ((Any) -> Unit)? = null
+                override var smutatingcount = 0
+                override fun scopy(): MutableStruct = Outer.S(rawValue)
 
                 private fun assignfrom(target: Outer.S) {
                     this.rawValue = target.rawValue

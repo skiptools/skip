@@ -212,7 +212,11 @@ extension CodebaseInfo.Context {
             guard !structInfo.attributes.kotlinHasDirective(.nocopy) else {
                 return false
             }
-            return structInfo.variables.contains(where: { $0.apiFlags?.contains(.writeable) == true && !$0.attributes.isNonMutating }) || structInfo.functions.contains(where: \.isMutating)
+            if structInfo.variables.contains(where: { $0.apiFlags?.contains(.writeable) == true && !$0.attributes.isNonMutating }) || structInfo.functions.contains(where: \.isMutating) {
+                return true
+            }
+            // Special case for OptionSets, where the transpiler adds mutability
+            return global.protocolSignatures(forNamed: type).contains { $0.isNamed("OptionSet", moduleName: "Swift") }
         } else if typeInfos.contains(where: { $0.declarationType == .protocolDeclaration && !$0.attributes.kotlinHasDirective(.nocopy) }) {
             // If this is a protocol that is constrained to class impls, then it isn't a mutable struct. Otherwise it could be
             return !global.protocolSignatures(forNamed: type).contains(.anyObject)

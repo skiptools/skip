@@ -44,6 +44,6 @@
       location = "group:../skipapp-weather/Darwin/SkipWeather.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-cubes/Darwin/SkipCubes.xcodeproj">
+      location = "group:../skipapp-bookings/Darwin/TravelBookings.xcodeproj">
    </FileRef>
 </Workspace>

@@ -29,6 +29,8 @@ final class KotlinCodebaseInfoTests: XCTestCase {
         XCTAssertEqual(true, context.mayBeMutableStruct(type: .named("TestsNonAnyObjectRestrictedProtocol", [])))
         XCTAssertEqual(false, context.mayBeMutableStruct(type: .named("TestsAnyObjectRestrictedProtocol", [])))
         XCTAssertEqual(false, context.mayBeMutableStruct(type: .named("TestsTransitiveAnyObjectRestrictedProtocol", [])))
+
+        XCTAssertEqual(true, context.mayBeMutableStruct(type: .named("MyOptionSet", [])))
     }
 
     func testEnumHasAssociatedValues() async throws {
@@ -94,6 +96,11 @@ struct TestsMutableFuncStruct {
     mutating func f() -> Int {
         return 1
     }
+}
+
+struct MyOptionSet: OptionSet, RawRepresentable {
+    let rawValue: Int
+    static let someValue = MyOptionSet(rawValue: 1)
 }
 
 protocol TestsNonAnyObjectRestrictedProtocol: Codable {}

@@ -1798,7 +1798,8 @@ final class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, Kotl
         if let base = expression.base {
             let kbase = translator.translateExpression(base)
             kexpression.base = kbase
-            kexpression.useMultilineFormatting = expression.useMultilineFormatting
+            // Kotlin cannot break the ?. operator between lines
+            kexpression.useMultilineFormatting = expression.useMultilineFormatting && kbase.optionalChain == .none
             if let functionCall = kbase as? KotlinFunctionCall, functionCall.optionalChain == .implicit {
                 // f({ ... })?.member is cleaner and simpler for us than (f() { ... })?.member
                 functionCall.hasTrailingClosures = false

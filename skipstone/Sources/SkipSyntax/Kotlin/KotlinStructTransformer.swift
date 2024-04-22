@@ -2,7 +2,7 @@
 ///
 /// - Seealso: `SkipLib/Struct.kt`
 final class KotlinStructTransformer: KotlinTransformer {
-    private let mutationFunctionNames = ("willmutate", "didmutate")
+    static let mutationFunctionNames = ("willmutate", "didmutate")
 
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         syntaxTree.root.visit { visit($0, translator: translator) }
@@ -15,14 +15,14 @@ final class KotlinStructTransformer: KotlinTransformer {
             }
         } else if let variableDeclaration = node as? KotlinVariableDeclaration {
             if !variableDeclaration.isStatic, variableDeclaration.apiFlags.contains(.writeable) && !variableDeclaration.attributes.isNonMutating, let extends = variableDeclaration.extends, translator.codebaseInfo?.mayBeMutableStruct(type: extends.0) == true {
-                variableDeclaration.mutationFunctionNames = mutationFunctionNames
+                variableDeclaration.mutationFunctionNames = Self.mutationFunctionNames
             }
             return .skip
         } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
             if functionDeclaration.modifiers.isMutating {
                 handleSelfAssignments(in: functionDeclaration, translator: translator)
                 if let extends = functionDeclaration.extends, translator.codebaseInfo?.mayBeMutableStruct(type: extends.0) == true {
-                    functionDeclaration.mutationFunctionNames = mutationFunctionNames
+                    functionDeclaration.mutationFunctionNames = Self.mutationFunctionNames
                 }
             } else if functionDeclaration.type == .constructorDeclaration, (functionDeclaration.parent as? KotlinClassDeclaration)?.declarationType == .structDeclaration {
                 handleSelfAssignments(in: functionDeclaration, translator: translator)
@@ -36,12 +36,13 @@ final class KotlinStructTransformer: KotlinTransformer {
         let isNoCopy = classDeclaration.attributes.kotlinHasDirective(.nocopy)
         var hasConstructors = false
         var isMutable = false
+        var hasMutableStructCopyConstructor = false
         var initializableVariableDeclarations: [KotlinVariableDeclaration] = []
         var copyableVariableDeclarations: [KotlinVariableDeclaration] = []
         for member in classDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
                 if !isNoCopy && !variableDeclaration.isStatic && ((variableDeclaration.apiFlags.contains(.writeable) && !variableDeclaration.attributes.isNonMutating && variableDeclaration.getter == nil) || variableDeclaration.modifiers.isLazy) && !variableDeclaration.isGenerated {
-                    variableDeclaration.mutationFunctionNames = mutationFunctionNames
+                    variableDeclaration.mutationFunctionNames = Self.mutationFunctionNames
                     isMutable = true
                 }
                 if variableDeclaration.value == nil && (variableDeclaration.attributes.contains(.environment) || variableDeclaration.attributes.contains(.environmentObject)) {
@@ -54,26 +55,32 @@ final class KotlinStructTransformer: KotlinTransformer {
                         initializableVariableDeclarations.append(variableDeclaration)
                     }
                 }
-            } else if let functionDeclaration = member as? KotlinFunctionDeclaration, !functionDeclaration.isGenerated {
-                if functionDeclaration.type == .constructorDeclaration {
-                    // Decodable constructor and overridden copy constructor don't count
-                    if !functionDeclaration.isDecodableConstructor && !functionDeclaration.isMutableStructCopyConstructor {
-                        hasConstructors = true
+            } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
+                if functionDeclaration.isMutableStructCopyConstructor {
+                    hasMutableStructCopyConstructor = true
+                } else if !functionDeclaration.isGenerated {
+                    if functionDeclaration.type == .constructorDeclaration {
+                        // Decodable constructor doesn't count
+                        if !functionDeclaration.isDecodableConstructor {
+                            hasConstructors = true
+                        }
+                    } else if !isNoCopy && functionDeclaration.modifiers.isMutating {
+                        functionDeclaration.mutationFunctionNames = Self.mutationFunctionNames
+                        isMutable = true
                     }
-                } else if !isNoCopy && functionDeclaration.modifiers.isMutating {
-                    functionDeclaration.mutationFunctionNames = mutationFunctionNames
-                    isMutable = true
                 }
             }
         }
+        let isOptionSet = classDeclaration.inherits.contains { $0.isNamed("OptionSet", moduleName: "Swift") }
+        isMutable = isMutable || isOptionSet
 
         let needsMemberwiseConstructor = !hasConstructors && !initializableVariableDeclarations.isEmpty
         if needsMemberwiseConstructor {
             addMemberwiseConstructor(to: classDeclaration, variableDeclarations: initializableVariableDeclarations, translator: translator)
         }
         let needsMutableStructCopyConstructor = isMutable && ((!needsMemberwiseConstructor && !copyableVariableDeclarations.isEmpty) || (needsMemberwiseConstructor && copyableVariableDeclarations.count > initializableVariableDeclarations.count))
-        if needsMutableStructCopyConstructor {
-            addMutableStructCopyConstructor(to: classDeclaration, variableDeclarations: copyableVariableDeclarations)
+        if needsMutableStructCopyConstructor && !hasMutableStructCopyConstructor {
+            addMutableStructCopyConstructor(to: classDeclaration, isOptionSet: isOptionSet, variableDeclarations: copyableVariableDeclarations)
         }
         if !hasConstructors && !needsMemberwiseConstructor && needsMutableStructCopyConstructor {
             // If we add a copy constructor, be sure to also have a default constructor
@@ -283,16 +290,8 @@ final class KotlinStructTransformer: KotlinTransformer {
         }
     }
 
-    private func addMutableStructCopyConstructor(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration]) {
-        // We use a parameter of type 'MutableStruct' to avoid conflicts with any user-defined constructor. Allow the user to
-        // define their own custom copy constructor with this signature
-        for member in classDeclaration.members where member.type == .constructorDeclaration {
-            let constructor = member as! KotlinFunctionDeclaration
-            if constructor.isMutableStructCopyConstructor {
-                return
-            }
-        }
-
+    private func addMutableStructCopyConstructor(to classDeclaration: KotlinClassDeclaration, isOptionSet: Bool, variableDeclarations: [KotlinVariableDeclaration]) {
+        // We use a parameter of type 'MutableStruct' to avoid conflicts with any user-defined constructor
         let constructor = KotlinFunctionDeclaration(name: "constructor")
         constructor.parameters = [Parameter(externalLabel: "copy", declaredType: .named("MutableStruct", []))]
         constructor.modifiers = Modifiers(visibility: .private)
@@ -300,8 +299,12 @@ final class KotlinStructTransformer: KotlinTransformer {
         constructor.isGenerated = true
 
         var bodyStatements: [KotlinStatement] = []
-        if !variableDeclarations.isEmpty {
-            bodyStatements.append(KotlinRawStatement(sourceCode: "@Suppress(\"NAME_SHADOWING\", \"UNCHECKED_CAST\") val copy = copy as \(classDeclaration.signature.kotlin)"))
+        let castStatement = KotlinRawStatement(sourceCode: "@Suppress(\"NAME_SHADOWING\", \"UNCHECKED_CAST\") val copy = copy as \(classDeclaration.signature.kotlin)")
+        if isOptionSet {
+            bodyStatements.append(castStatement)
+            bodyStatements.append(KotlinRawStatement(sourceCode: "this.rawValue = copy.rawValue"))
+        } else if !variableDeclarations.isEmpty {
+            bodyStatements.append(castStatement)
             bodyStatements += variableDeclarations.map { variableDeclaration in
                 if variableDeclaration.attributes.stateAttribute != nil {
                     return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.State(copy.\(variableDeclaration.propertyName))")

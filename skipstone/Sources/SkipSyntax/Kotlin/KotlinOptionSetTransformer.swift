@@ -78,6 +78,7 @@ final class KotlinOptionSetTransformer: KotlinTransformer {
         assign.modifiers.isMutating = true
         assign.isGenerated = true
         assign.parameters = [Parameter<KotlinExpression>(externalLabel: "target", declaredType: classDeclaration.signature)]
+        assign.mutationFunctionNames = KotlinStructTransformer.mutationFunctionNames
 
         // Use structured statements so that subsequent transformers can detect and translate the self assignment
         let selfAssignment = KotlinBinaryOperator(op: .with(symbol: "="), lhs: KotlinIdentifier(name: "self"), rhs: KotlinIdentifier(name: "target"))
