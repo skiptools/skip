@@ -2026,7 +2026,7 @@ extension FrameworkProjectLayout {
 
             override fun onCreate(savedInstanceState: android.os.Bundle?) {
                 super.onCreate(savedInstanceState)
-                //enableEdgeToEdge()
+                enableEdgeToEdge()
 
                 setContent {
                     val saveableStateHolder = rememberSaveableStateHolder()
