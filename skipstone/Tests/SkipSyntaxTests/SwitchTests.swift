@@ -467,6 +467,33 @@ final class SwitchTests: XCTestCase {
         """)
     }
 
+    func testLetBindingTypeInference() async throws {
+        try await check(supportingSwift: """
+        extension Int {
+            static let min = 0
+        }
+        enum E {
+            case i(Int)
+        }
+        """, swift: """
+        func f(e: E) {
+            switch e {
+            case let .i(value):
+                let b = value == .min
+            }
+        }
+        """, kotlin: """
+        internal fun f(e: E) {
+            when (e) {
+                is E.ICase -> {
+                    val value = e.associated0
+                    val b = value == Int.min
+                }
+            }
+        }
+        """)
+    }
+
     func testPartialBinding() async throws {
         // Note: we don't support this for the same reason we don't support 'where' clauses in case statements:
         // we'd have to match the general case and then use an 'if' in the case body, but that could prevent a

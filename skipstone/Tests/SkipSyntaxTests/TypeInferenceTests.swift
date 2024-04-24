@@ -1013,6 +1013,37 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
+    func testConstrainedExtensionFunctionParameters() async throws {
+        try await check(supportingSwift: """
+        extension Int {
+            static let min = 0
+        }
+        protocol View {
+            func background(_ style: ShapeStyle) {
+            }
+        }
+        protocol ShapeStyle: View {
+        }
+        struct Color: ShapeStyle {
+            static let red = Color()
+        }
+        struct LinearGradient: ShapeStyle {
+        }
+        extension ShapeStyle where Self == LinearGradient {
+            static func linearGradient(colors: [Color], start: Int, end: Int) -> LinearGradient {
+            }
+        }
+        """, swift: """
+        func f(v: View) {
+            v.background(.linearGradient(colors: [.red], start: .min, end: .min))
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        internal fun f(v: View): Unit = v.background(LinearGradient.linearGradient(colors = arrayOf(Color.red), start = Int.min, end = Int.min))
+        """)
+    }
+
     func testInferUsingCollectionElementType() async throws {
         try await check(supportingSwift: """
         func s(_ s: String) {

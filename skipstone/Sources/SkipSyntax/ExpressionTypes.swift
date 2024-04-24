@@ -1331,7 +1331,7 @@ final class MemberAccess: Expression, APICallExpression, MemberAccessExpression 
                 baseIdentifier.isModuleNameFor = memberType
                 self.baseType = .module(baseIdentifier.name, .none)
             } else if base == nil, let selfType = match.memberOf?.selfType {
-                self.baseType = selfType
+                self.baseType = selfType.asMetaType(true)
             }
         } else if let generics, !generics.isEmpty {
             memberType = .named(member, generics).asMember(of: self.baseType)
