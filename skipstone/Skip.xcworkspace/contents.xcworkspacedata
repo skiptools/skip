@@ -2,9 +2,6 @@
 <Workspace
    version = "1.0">
    <FileRef
-      location = "group:../../scratch/TranspilationSample.swift">
-   </FileRef>
-   <FileRef
       location = "group:">
    </FileRef>
    <FileRef
@@ -35,13 +32,7 @@
       location = "group:../skipapp-hello/Darwin/HelloSkip.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-databake/Darwin/DataBake.xcodeproj">
-   </FileRef>
-   <FileRef
       location = "group:../skipapp-showcase/Darwin/Showcase.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "group:../skipapp-weather/Darwin/SkipWeather.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:../skipapp-bookings/Darwin/TravelBookings.xcodeproj">

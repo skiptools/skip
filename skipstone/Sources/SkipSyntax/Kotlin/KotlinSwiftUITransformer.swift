@@ -567,16 +567,24 @@ private final class TranslateVisitor {
                     kwhen.nestingClosureFunction = "linvokeComposable"
                 }
                 return .recurse(nil)
-            } else if let apiCall = node as? APICallExpression, let expressionStatement = node.parent as? KotlinExpressionStatement, !isInAssignmentExpression(expressionStatement, in: codeBlock) {
-                // Add our compose tail call to expressions that evaluate to Views and are used as statements
-                if let apiMatch = apiCall.apiMatch {
-                    if isSwiftUIType(named: "View", type: apiMatch.signature, codebaseInfo: translator.codebaseInfo) || isSwiftUIType(named: "View", type: apiMatch.signature.returnType, codebaseInfo: translator.codebaseInfo) {
-                        addComposeTailCall(to: node as! KotlinExpression, statement: expressionStatement)
-                    }
-                } else {
-                    node.messages.append(.kotlinSwiftUITypeInference(node, source: translator.syntaxTree.source))
+            } else if let apiCall = node as? APICallExpression {
+                var parent = node.parent
+                if parent is KotlinSRef {
+                    parent = parent?.parent
                 }
-                return .skip
+                if let expressionStatement = parent as? KotlinExpressionStatement, !isInAssignmentExpression(expressionStatement, in: codeBlock) {
+                    // Add our compose tail call to expressions that evaluate to Views and are used as statements
+                    if let apiMatch = apiCall.apiMatch {
+                        if isSwiftUIType(named: "View", type: apiMatch.signature, codebaseInfo: translator.codebaseInfo) || isSwiftUIType(named: "View", type: apiMatch.signature.returnType, codebaseInfo: translator.codebaseInfo) {
+                            addComposeTailCall(to: node as! KotlinExpression, statement: expressionStatement)
+                        }
+                    } else {
+                        node.messages.append(.kotlinSwiftUITypeInference(node, source: translator.syntaxTree.source))
+                    }
+                    return .skip
+                } else {
+                    return .recurse(nil)
+                }
             } else {
                 return .recurse(nil)
             }

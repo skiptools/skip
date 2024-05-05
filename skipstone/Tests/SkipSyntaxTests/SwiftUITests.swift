@@ -2288,6 +2288,11 @@ final class SwiftUITests: XCTestCase {
                     .mod()
             }
         }
+        struct PassthroughModifier: ViewModifier {
+            func body(content: Content) -> some View {
+                content
+            }
+        }
         """, kotlin: """
         import androidx.compose.runtime.Composable
         import androidx.compose.runtime.getValue
@@ -2325,6 +2330,11 @@ final class SwiftUITests: XCTestCase {
 
             constructor(isPresented: Boolean = false) {
                 this._isPresented = skip.ui.State(isPresented)
+            }
+        }
+        internal class PassthroughModifier: ViewModifier {
+            override fun body(content: View): View {
+                return ComposeBuilder { composectx: ComposeContext -> content.Compose(composectx) }
             }
         }
         """)
