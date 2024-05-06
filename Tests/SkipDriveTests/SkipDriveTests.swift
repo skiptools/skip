@@ -293,10 +293,17 @@ class SkipCommandTests : XCTestCase {
         let exportPath = try mktmp()
         let exported = try await skip("export", "-jA", "-v", "--show-tree", "--project", tempDir + "/" + name, "-d", exportPath)
         let exportedJSON = try exported.out.parseJSONMessages()
-        let fileTree = exportedJSON.dropLast(2).last ?? ""
+        let fileTree = exportedJSON.dropLast(1).last ?? ""
 
-        XCTAssertTrue(fileTree.contains("Demo-debug.apk"), "missing expected apk in \(fileTree)")
-        XCTAssertTrue(fileTree.contains("Demo-release.apk"), "missing expected apk in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-debug.apk"), "missing expected Demo-debug.apk in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-release.apk"), "missing expected Demo-release.apk in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-debug.aab"), "missing expected Demo-debug.aab in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-release.aab"), "missing expected Demo-release.aab in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-debug.ipa"), "missing expected Demo-debug.ipa in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-release.ipa"), "missing expected Demo-release.ipa in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-debug.xcarchive.zip"), "missing expected Demo-debug.xcarchive.zip in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-release.xcarchive.zip"), "missing expected Demo-release.xcarchive.zip in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-project.zip"), "missing expected Demo-project.zip in \(fileTree)")
     }
 
     func DISABLEDtestSkipTestReport() async throws {
