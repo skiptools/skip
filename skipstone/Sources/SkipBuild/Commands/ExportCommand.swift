@@ -36,6 +36,9 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
     @Option(help: ArgumentHelp("Project folder", valueName: "dir"))
     var project: String = "."
 
+    @Option(help: ArgumentHelp("Output summary path", valueName: "file"))
+    var summaryFile: String? = nil
+
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Build the Swift project before exporting"))
     var build: Bool = true
 
@@ -48,6 +51,12 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Perform debug build", valueName: "debug"))
     var debug: Bool = true
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Export project sources", valueName: "source"))
+    var exportProject: Bool = true
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Output folders to variant sub-folders", valueName: "nest"))
+    var nested: Bool = false
+
     func performCommand(with out: MessageQueue) async {
         await withLogStream(with: out) {
             try await runExport(with: out)
@@ -56,7 +65,8 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
 
     func runExport(with out: MessageQueue) async throws {
         let startTime = Date.now
-        let variants = [debug ? "debug" : nil, release ? "release" : nil].compactMap({ $0 })
+        var createdURLs: [URL] = []
+        let variants: [BuildConfiguration] = [debug ? .debug : nil, release ? .release : nil].compactMap({ $0 })
         if variants.isEmpty {
             throw error("must specify at least one of --release or --debug")
         }
@@ -90,52 +100,114 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
 
         let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths // environment that includes a default ANDROID_HOME
 
-        let assembleAction = variants == ["debug"] ? "assembleDebug" : variants == ["release"] ? "assembleRelease" : "assemble"
-        let bundleAction = variants == ["debug"] ? "bundleDebug" : variants == ["release"] ? "bundleRelease" : "bundle"
+        let assembleAction = variants == [.debug] ? "assembleDebug" : variants == [.release] ? "assembleRelease" : "assemble"
+        let bundleAction = variants == [.debug] ? "bundleDebug" : variants == [.release] ? "bundleRelease" : "bundle"
 
-        // as well as the app itself, also output each of the specified modules (or all the modules if they are not specified)
-        for moduleName in moduleNames {
-            var gradleArgs: [String] = []
-            let skipOutputFolder = buildFolderAbsolute.appending(components: ["plugins", "outputs", packageName, moduleName, "skipstone"])
+        if isAppProject, let appModuleName = moduleNames.first {
+            let projectURL = URL(fileURLWithPath: self.project)
 
-            if !fs.isDirectory(skipOutputFolder) {
-                throw error("The transpilation output folder \(skipOutputFolder.pathString) does not exist. Please ensure the project can be transpiled by running swift test")
-            }
+            let projectLayout = try AppProjectLayout(moduleName: appModuleName, root: projectURL)
 
-            gradleArgs += ["--project-dir", skipOutputFolder.pathString]
-            gradleArgs += ["--console=plain"]
+            do { // greate iOS .ipa
+                for variant in variants {
+                    let outputFolder = !nested ? outputFolderAbsolute : outputFolderAbsolute.appending(components: [variant.rawValue, "ipa"])
+                    try fs.createDirectory(outputFolder, recursive: true)
+                    let outputName = "\(appModuleName)-\(variant)"
+                    let ipaOutputPath = outputFolder.appending(component: outputName + ".ipa")
+                    let xcarchiveOutputPath = outputFolder.appending(component: outputName + ".xcarchive.zip")
 
-            await run(with: out, "Assemble frameworks for \(moduleName)", ["gradle", assembleAction] + gradleArgs, environment: env)
+                    _ = try await createIPA(configuration: variant, primaryModuleName: appModuleName, cfgSuffix: "-" + variant.rawValue, projectURL: projectURL, out: out, prefix: "", xcodeProjectURL: projectLayout.darwinProjectFolder, ipaURL: ipaOutputPath.asURL, xcarchiveURL: xcarchiveOutputPath.asURL, verifyFile: false, returnHashes: false)
 
-            for variant in variants {
-                let aarOutputFolder = outputFolderAbsolute.appending(components: [variant, "aar"])
-                try fs.createDirectory(aarOutputFolder, recursive: true)
-
-                let depModuleNames = try fs.getDirectoryContents(skipOutputFolder).sorted()
-                for depModuleName in depModuleNames {
-                    let aarBuildOutputFolder = skipOutputFolder.appending(components: [depModuleName, "build", "outputs", "aar"])
-                    if !fs.isDirectory(aarBuildOutputFolder) {
-                        // ignore non-module output folders (e.g., "gradle")
-                        continue
-                    }
-
-                    let aarName = "\(depModuleName)-\(variant).aar"
-                    let aarBuildOutputPath = aarBuildOutputFolder.appending(component: aarName)
-
-                    let aarOutputPath = aarOutputFolder.appending(component: aarName)
-
-                    await outputOptions.monitor(with: out, "Export \(aarName)") { _ in
-                        try? fs.removeFileTree(aarOutputPath) // copy will fail if it already exists
-                        try fs.copy(from: aarBuildOutputPath, to: aarOutputPath)
-                        return try aarOutputPath.asURL.fileSizeString
-                    }
+                    createdURLs.append(ipaOutputPath.asURL)
+                    createdURLs.append(xcarchiveOutputPath.asURL)
                 }
             }
 
-            await outputOptions.monitor(with: out, "Export project for \(moduleName)", resultHandler: { result in
-                (result, MessageBlock(status: result?.messageStatusAny, "Export project for \(moduleName)"))
+            var gradleArgs: [String] = []
+            gradleArgs += ["--project-dir", androidFolderAbsolute.pathString]
+            gradleArgs += ["--console=plain"]
+
+            await run(with: out, "Assemble Android app \(appModuleName)", ["gradle", assembleAction] + gradleArgs, environment: env)
+            try await exportAndroidArtifact(type: "apk")
+
+            await run(with: out, "Bundle Android app \(appModuleName)", ["gradle", bundleAction] + gradleArgs, environment: env)
+            try await exportAndroidArtifact(type: "bundle")
+
+            func exportAndroidArtifact(type: String) async throws {
+                for variant in variants {
+                    let outputFolder = !nested ? outputFolderAbsolute : outputFolderAbsolute.appending(components: [variant.rawValue, type])
+                    try fs.createDirectory(outputFolder, recursive: true)
+
+                    let ext = type == "bundle" ? "aab" : type
+                    // when the user has set up signing in their build.gradle.kts it will not be called "unsigned"
+                    let names = variant == .release ? ["app-release.\(ext)", "app-release-unsigned.\(ext)"] : ["app-debug.\(ext)"]
+
+                    let outputName = "\(appModuleName)-\(variant).\(ext)"
+                    let outputPath = outputFolder.appending(component: outputName)
+
+                    await outputOptions.monitor(with: out, "Export \(outputName)") { _ in
+                        try? fs.removeFileTree(outputPath) // copy will fail if it already exists
+                        // try each of the names, to handle signed and unsigned artifacts
+                        let buildOutputFolder = buildFolderAbsolute.appending(components: ["Android", "app", "outputs", type, variant.rawValue])
+                        for name in names {
+                            try? fs.copy(from: buildOutputFolder.appending(component: name), to: outputPath)
+                        }
+                        createdURLs.append(outputPath.asURL)
+                        return try outputPath.asURL.fileSizeString
+                    }
+                }
+            }
+        } else { // not an app project; export the individual modules instead
+            for moduleName in moduleNames {
+                var gradleArgs: [String] = []
+                let skipOutputFolder = buildFolderAbsolute.appending(components: ["plugins", "outputs", packageName, moduleName, "skipstone"])
+
+                if !fs.isDirectory(skipOutputFolder) {
+                    throw error("The transpilation output folder \(skipOutputFolder.pathString) does not exist. Please ensure the project can be transpiled by running swift test")
+                }
+
+                gradleArgs += ["--project-dir", skipOutputFolder.pathString]
+                gradleArgs += ["--console=plain"]
+
+                await run(with: out, "Assemble frameworks for \(moduleName)", ["gradle", assembleAction] + gradleArgs, environment: env)
+
+                for variant in variants {
+                    let aarOutputFolder = !nested ? outputFolderAbsolute : outputFolderAbsolute.appending(components: [variant.rawValue, "aar"])
+                    try fs.createDirectory(aarOutputFolder, recursive: true)
+
+                    let depModuleNames = try fs.getDirectoryContents(skipOutputFolder).sorted()
+                    for depModuleName in depModuleNames {
+                        let aarBuildOutputFolder = skipOutputFolder.appending(components: [depModuleName, "build", "outputs", "aar"])
+                        if !fs.isDirectory(aarBuildOutputFolder) {
+                            // ignore non-module output folders (e.g., "gradle")
+                            continue
+                        }
+
+                        let aarName = "\(depModuleName)-\(variant).aar"
+                        let aarBuildOutputPath = aarBuildOutputFolder.appending(component: aarName)
+
+                        let aarOutputPath = aarOutputFolder.appending(component: aarName)
+
+                        await outputOptions.monitor(with: out, "Export \(aarName)") { _ in
+                            try? fs.removeFileTree(aarOutputPath) // copy will fail if it already exists
+                            try fs.copy(from: aarBuildOutputPath, to: aarOutputPath)
+                            createdURLs.append(aarOutputPath.asURL)
+                            return try aarOutputPath.asURL.fileSizeString
+                        }
+                    }
+                }
+            }
+        }
+
+        if exportProject, let moduleName = moduleNames.first {
+            let skipOutputFolder = buildFolderAbsolute.appending(components: ["plugins", "outputs", packageName, moduleName, "skipstone"])
+
+            let projectOutputBaseFolder = outputFolderAbsolute.appending(components: ["project"])
+            let projectOutputFolder = projectOutputBaseFolder.appending(components: [moduleName])
+
+            await outputOptions.monitor(with: out, "Export project \(moduleName)", resultHandler: { result in
+                return (result, MessageBlock(status: result?.messageStatusAny, "Export project for \(moduleName)"))
             }) { log in
-                let projectOutputFolder = outputFolderAbsolute.appending(components: ["project", moduleName])
                 if fs.exists(projectOutputFolder) || fs.isDirectory(projectOutputFolder) {
                     try fs.removeFileTree(projectOutputFolder)
                 }
@@ -143,63 +215,43 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
 
                 try FileManager.default.copyItem(at: skipOutputFolder.asURL, to: projectOutputFolder.asURL, traverseLinks: true, excludeNames: ["build"])
             }
+
+            let projectExportZip = outputFolderAbsolute.appending(components: ["\(moduleName)-project.zip"])
+
+            await zipFolder(with: out, message: "Archive project source \(projectExportZip.asURL.lastPathComponent)", zipFile: projectExportZip.asURL, folder: projectOutputFolder.asURL)
+            createdURLs.append(projectExportZip.asURL)
+
+            try fs.removeFileTree(projectOutputBaseFolder) // only export the zip file; remove the sources
         }
 
-        if isAppProject, let appModuleName = moduleNames.first {
-            var gradleArgs: [String] = []
-            gradleArgs += ["--project-dir", androidFolderAbsolute.pathString]
-            gradleArgs += ["--console=plain"]
+        let outputFolderTitle = outputFolder.abbreviatingWithTilde
 
-            await run(with: out, "Assemble app \(appModuleName)", ["gradle", assembleAction] + gradleArgs, environment: env)
+        await out.write(status: .pass, "Skip export \(packageName) to \(outputFolderTitle) (\(startTime.timingSecondsSinceNow))")
 
-            for variant in variants {
-                let apkBuildOutputFolder = buildFolderAbsolute.appending(components: ["Android", "app", "outputs", "apk", variant])
-                let apkOutputFolder = outputFolderAbsolute.appending(components: [variant, "apk"])
-                try fs.createDirectory(apkOutputFolder, recursive: true)
+        // output the summary file to the given path (e.g., $GITHUB_STEP_SUMMARY or "-" for stdout)
+        if let summaryFile = summaryFile {
+            var summary = """
+            Artifact | Size
+            --- | ---
 
-                // when the user has set up signing in their build.gradle.kts it will not be called "unsigned"
-                let apkNames = variant == "release" ? ["app-release.apk", "app-release-unsigned.apk"] : ["app-debug.apk"]
-                let apkOutputName = "\(appModuleName)-\(variant).apk"
-                let apkOutputPath = apkOutputFolder.appending(component: apkOutputName)
+            """
 
-                await outputOptions.monitor(with: out, "Export \(apkOutputName)") { _ in
-                    try? fs.removeFileTree(apkOutputPath) // copy will fail if it already exists
-                    // try each of the names, to handle signed and unsigned artifacts
-                    for apkName in apkNames {
-                        try? fs.copy(from: apkBuildOutputFolder.appending(component: apkName), to: apkOutputPath)
-                    }
-                    return try apkOutputPath.asURL.fileSizeString
-                }
+            // show the output of each of the generated files in a table
+            for createdURL in createdURLs {
+                summary += try createdURL.lastPathComponent + " | " + createdURL.fileSizeString + "\n"
             }
 
-            await run(with: out, "Bundle app \(appModuleName)", ["gradle", bundleAction] + gradleArgs, environment: env)
-
-            for variant in variants {
-                let aabBuildOutputFolder = buildFolderAbsolute.appending(components: ["Android", "app", "outputs", "bundle", variant])
-                let aabOutputFolder = outputFolderAbsolute.appending(components: [variant, "bundle"])
-                try fs.createDirectory(aabOutputFolder, recursive: true)
-
-                // when the user has set up signing in their build.gradle.kts it will not be called "unsigned"
-                let aabNames = variant == "release" ? ["app-release.aab", "app-release-unsigned.aab"] : ["app-debug.aab"]
-                let aabOutputName = "\(appModuleName)-\(variant).aab"
-                let aabOutputPath = aabOutputFolder.appending(component: aabOutputName)
-
-                await outputOptions.monitor(with: out, "Export \(aabOutputName)") { _ in
-                    try? fs.removeFileTree(aabOutputPath) // copy will fail if it already exists
-                    // try each of the names, to handle signed and unsigned artifacts
-                    for aabName in aabNames {
-                        try? fs.copy(from: aabBuildOutputFolder.appending(component: aabName), to: aabOutputPath)
-                    }
-                    return try aabOutputPath.asURL.fileSizeString
-                }
+            if summaryFile == "-" {
+                print(summary)
+            } else {
+                try summary.write(toFile: summary, atomically: false, encoding: .utf8)
             }
         }
 
         if showTree {
-            await showFileTree(in: outputFolderAbsolute, with: out)
+            await showFileTree(in: outputFolderAbsolute, folderName: outputFolderTitle, with: out)
         }
-
-        await out.write(status: .pass, "Skip export \(packageName) to \(outputFolder.abbreviatingWithTilde) (\(startTime.timingSecondsSinceNow))")
+        
     }
 }
 

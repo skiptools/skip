@@ -108,6 +108,7 @@ enum BuildConfiguration : String, ExpressibleByArgument {
     case debug, release
 }
 
+
 extension ToolOptionsCommand {
 
     func createAPK(projectURL: URL, appModuleName: String, configuration: BuildConfiguration, out: MessageQueue, primaryModuleName: String, cfgSuffix: String, returnHashes: Bool, prefix re: String) async -> [URL : String?] {
@@ -147,18 +148,23 @@ extension ToolOptionsCommand {
     
     /// Zip up the given folder.
     @discardableResult func zipFolder(with out: MessageQueue, message msg: String, compressionLevel: Int = 9, zipFile: URL, folder: URL) async -> Result<ProcessOutput, Error> {
-        return await run(with: out, msg, ["zip", "-\(compressionLevel)", "-r", zipFile.path, folder.lastPathComponent], in: folder.deletingLastPathComponent())
+        func returnFileSize(_ result: Result<ProcessOutput, Error>?) -> (result: Result<ProcessOutput, Error>?, message: MessageBlock?) {
+            do {
+                return (result: result, message: MessageBlock(status: .pass, try "\(msg) \(zipFile.fileSizeString)"))
+            } catch {
+                return (result: result, message: MessageBlock(status: .fail, msg))
+            }
+        }
+        return await run(with: out, msg, ["zip", "-\(compressionLevel)", "-r", zipFile.path, folder.lastPathComponent], in: folder.deletingLastPathComponent(), resultHandler: returnFileSize)
     }
     
-    func createIPA(configuration: BuildConfiguration, primaryModuleName: String, sdk: String = "iphoneos", cfgSuffix: String, projectURL: URL, out: MessageQueue, prefix re: String, xcodeProjectURL: URL, returnHashes: Bool) async throws -> [URL : String?] {
+    func createIPA(configuration: BuildConfiguration, primaryModuleName: String, sdk: String = "iphoneos", cfgSuffix: String, projectURL: URL, out: MessageQueue, prefix re: String, xcodeProjectURL: URL, ipaURL ipaOutputURL: URL? = nil, xcarchiveURL: URL? = nil, teamID: String? = nil, verifyFile: Bool = true, returnHashes: Bool) async throws -> [URL : String?] {
         // xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
         let cfg = configuration.rawValue.capitalized
         let archiveBasePath = darwinBuildFolder + "/Archives/" + cfg
 
         let archivePath = archiveBasePath + "/" + primaryModuleName + ".xcarchive"
-        let ipaPath = archiveBasePath + "/" + primaryModuleName + cfgSuffix + ".ipa"
-        let ipaURL = projectURL.appending(path: ipaPath)
-        
+
         // note that derivedDataPath and archivePath are relative to CWD rather than
         let fullArchivePath = projectURL.path + "/" + archivePath
         let fullDerivedDataPath = projectURL.path + "/" + darwinBuildFolder + "/DerivedData"
@@ -198,12 +204,39 @@ extension ToolOptionsCommand {
         try FileManager.default.copyItem(at: archiveAppURL, to: archiveAppContentsURL)
         try FileManager.default.zeroFileTimes(under: archiveAppPayloadURL)
         
+        let ipaURL = ipaOutputURL ?? projectURL.appending(path: archiveBasePath + "/" + primaryModuleName + cfgSuffix + ".ipa")
+
+        // TODO: check whether a teamid is specified, and if so, create an ExportOptions.plist and export with xcodebuild
+        if let teamID = teamID {
+            let exportOptions = """
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>app-store-connect</string>
+    <key>teamID</key>
+    <string>\(teamID)</string>
+</dict>
+</plist>
+"""
+            // TODO: run xcodebuild -exportArchive -archivePath ARCHIVE.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath ~/Desktop
+        }
+
+        // if no teamid is specified, then just zip up the output folder
         await zipFolder(with: out, message: "\(re)Assemble \(ipaURL.lastPathComponent)", zipFile: ipaURL, folder: archiveAppPayloadURL)
 
-        await checkFile(ipaURL, with: out, title: "\(re)Verifying \(ipaURL.lastPathComponent)") { url in
-            CheckStatus(status: .pass, message: try "Verify \(ipaURL.lastPathComponent) \(url.fileSizeString)")
+        // also zip up the .xcarchive path
+        if let xcarchiveURL = xcarchiveURL {
+            await zipFolder(with: out, message: "\(re)Archive \(xcarchiveURL.lastPathComponent)", zipFile: xcarchiveURL, folder: URL(fileURLWithPath: fullArchivePath))
         }
-        
+
+        if verifyFile {
+            await checkFile(ipaURL, with: out, title: "\(re)Verifying \(ipaURL.lastPathComponent)") { url in
+                CheckStatus(status: .pass, message: try "Verify \(ipaURL.lastPathComponent) \(url.fileSizeString)")
+            }
+        }
+
         var hashes: [URL : String?] = [:]
         hashes[ipaURL] = nil
         if returnHashes {

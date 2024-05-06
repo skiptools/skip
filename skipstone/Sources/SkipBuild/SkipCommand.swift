@@ -1166,9 +1166,9 @@ extension FileSystem {
     }
 
     /// Output the filesystem tree of the given path.
-    public func treeASCIIRepresentation(at path: AbsolutePath, hideHiddenFiles: Bool = true) throws -> String {
+    public func treeASCIIRepresentation(at path: AbsolutePath, folderName: String = ".", hideHiddenFiles: Bool = true) throws -> String {
         var writer: String = ""
-        print(".", to: &writer)
+        print(folderName, to: &writer)
         try treeASCIIRepresent(fs: self, path: path, hideHiddenFiles: hideHiddenFiles, to: &writer)
         return writer
     }
