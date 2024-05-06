@@ -265,7 +265,7 @@ class SkipCommandTests : XCTestCase {
         let exportPath = try mktmp()
         let exported = try await skip("export", "-jA", "-v", "--show-tree", "--project", tempDir + "/" + name, "-d", exportPath)
         let exportedJSON = try exported.out.parseJSONMessages()
-        let fileTree = exportedJSON.dropLast(2).last ?? ""
+        let fileTree = exportedJSON.dropLast(1).last ?? ""
 
         XCTAssertTrue(fileTree.contains("DemoFramework-release.aar"), "missing expected aar in \(fileTree)")
         XCTAssertTrue(fileTree.contains("DemoFramework-debug.aar"), "missing expected aar in \(fileTree)")
