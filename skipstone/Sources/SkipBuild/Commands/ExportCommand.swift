@@ -112,7 +112,8 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
                 for variant in variants {
                     let outputFolder = !nested ? outputFolderAbsolute : outputFolderAbsolute.appending(components: [variant.rawValue, "ipa"])
                     try fs.createDirectory(outputFolder, recursive: true)
-                    let outputName = "\(appModuleName)-\(variant)"
+                    let variantSuffix = variant == .release ? "" : "-\(variant)"
+                    let outputName = "\(appModuleName)\(variantSuffix)"
                     let ipaOutputPath = outputFolder.appending(component: outputName + ".ipa")
                     let xcarchiveOutputPath = outputFolder.appending(component: outputName + ".xcarchive.zip")
 
@@ -142,13 +143,14 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
                     // when the user has set up signing in their build.gradle.kts it will not be called "unsigned"
                     let names = variant == .release ? ["app-release.\(ext)", "app-release-unsigned.\(ext)"] : ["app-debug.\(ext)"]
 
-                    let outputName = "\(appModuleName)-\(variant).\(ext)"
+                    let variantSuffix = variant == .release ? "" : "-\(variant)"
+                    let outputName = "\(appModuleName)\(variantSuffix).\(ext)"
                     let outputPath = outputFolder.appending(component: outputName)
 
+                    let buildOutputFolder = buildFolderAbsolute.appending(components: ["Android", "app", "outputs", type, variant.rawValue])
                     await outputOptions.monitor(with: out, "Export \(outputName)") { _ in
                         try? fs.removeFileTree(outputPath) // copy will fail if it already exists
                         // try each of the names, to handle signed and unsigned artifacts
-                        let buildOutputFolder = buildFolderAbsolute.appending(components: ["Android", "app", "outputs", type, variant.rawValue])
                         for name in names {
                             try? fs.copy(from: buildOutputFolder.appending(component: name), to: outputPath)
                         }
@@ -183,7 +185,8 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
                             continue
                         }
 
-                        let aarName = "\(depModuleName)-\(variant).aar"
+                        let variantSuffix = variant == .release ? "" : "-\(variant)"
+                        let aarName = "\(depModuleName)\(variantSuffix).aar"
                         let aarBuildOutputPath = aarBuildOutputFolder.appending(component: aarName)
 
                         let aarOutputPath = aarOutputFolder.appending(component: aarName)
@@ -237,7 +240,9 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
             """
 
             // show the output of each of the generated files in a table
-            for createdURL in createdURLs {
+            for createdURL in createdURLs.sorted(by: {
+                $0.lastPathComponent < $1.lastPathComponent
+            }) {
                 summary += try createdURL.lastPathComponent + " | " + createdURL.fileSizeString + "\n"
             }
 
