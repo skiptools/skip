@@ -267,11 +267,11 @@ class SkipCommandTests : XCTestCase {
         let exportedJSON = try exported.out.parseJSONMessages()
         let fileTree = exportedJSON.dropLast(1).last ?? ""
 
-        XCTAssertTrue(fileTree.contains("DemoFramework-release.aar"), "missing expected aar in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("DemoFramework.aar"), "missing expected aar in \(fileTree)")
         XCTAssertTrue(fileTree.contains("DemoFramework-debug.aar"), "missing expected aar in \(fileTree)")
 
+        XCTAssertTrue(fileTree.contains("SkipFoundation.aar"), "missing expected aar in \(fileTree)")
         XCTAssertTrue(fileTree.contains("SkipFoundation-debug.aar"), "missing expected aar in \(fileTree)")
-        XCTAssertTrue(fileTree.contains("SkipFoundation-release.aar"), "missing expected aar in \(fileTree)")
     }
 
     func testSkipExportApp() async throws {
@@ -295,14 +295,18 @@ class SkipCommandTests : XCTestCase {
         let exportedJSON = try exported.out.parseJSONMessages()
         let fileTree = exportedJSON.dropLast(1).last ?? ""
 
+        XCTAssertTrue(fileTree.contains("Demo.apk"), "missing expected Demo.apk in \(fileTree)")
         XCTAssertTrue(fileTree.contains("Demo-debug.apk"), "missing expected Demo-debug.apk in \(fileTree)")
-        XCTAssertTrue(fileTree.contains("Demo-release.apk"), "missing expected Demo-release.apk in \(fileTree)")
+
+        XCTAssertTrue(fileTree.contains("Demo.aab"), "missing expected Demo.aab in \(fileTree)")
         XCTAssertTrue(fileTree.contains("Demo-debug.aab"), "missing expected Demo-debug.aab in \(fileTree)")
-        XCTAssertTrue(fileTree.contains("Demo-release.aab"), "missing expected Demo-release.aab in \(fileTree)")
+
+        XCTAssertTrue(fileTree.contains("Demo.ipa"), "missing expected Demo.ipa in \(fileTree)")
         XCTAssertTrue(fileTree.contains("Demo-debug.ipa"), "missing expected Demo-debug.ipa in \(fileTree)")
-        XCTAssertTrue(fileTree.contains("Demo-release.ipa"), "missing expected Demo-release.ipa in \(fileTree)")
+
+        XCTAssertTrue(fileTree.contains("Demo.xcarchive.zip"), "missing expected Demo.xcarchive.zip in \(fileTree)")
         XCTAssertTrue(fileTree.contains("Demo-debug.xcarchive.zip"), "missing expected Demo-debug.xcarchive.zip in \(fileTree)")
-        XCTAssertTrue(fileTree.contains("Demo-release.xcarchive.zip"), "missing expected Demo-release.xcarchive.zip in \(fileTree)")
+        
         XCTAssertTrue(fileTree.contains("Demo-project.zip"), "missing expected Demo-project.zip in \(fileTree)")
     }
 
