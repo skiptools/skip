@@ -244,7 +244,7 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
             if summaryFile == "-" {
                 print(summary)
             } else {
-                try summary.write(toFile: summary, atomically: false, encoding: .utf8)
+                try summary.write(toFile: summaryFile, atomically: false, encoding: .utf8)
             }
         }
 
