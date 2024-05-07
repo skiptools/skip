@@ -208,7 +208,7 @@ extension ToolOptionsCommand {
 
         // TODO: check whether a teamid is specified, and if so, create an ExportOptions.plist and export with xcodebuild
         if let teamID = teamID {
-            let exportOptions = """
+            let _ = """
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
