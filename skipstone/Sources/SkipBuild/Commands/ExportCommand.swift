@@ -112,7 +112,7 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
                 for variant in variants {
                     let outputFolder = !nested ? outputFolderAbsolute : outputFolderAbsolute.appending(components: [variant.rawValue, "ipa"])
                     try fs.createDirectory(outputFolder, recursive: true)
-                    let variantSuffix = variant == .release ? "" : "-\(variant)"
+                    let variantSuffix = /* variant == .release ? "" : */ "-\(variant)"
                     let outputName = "\(appModuleName)\(variantSuffix)"
                     let ipaOutputPath = outputFolder.appending(component: outputName + ".ipa")
                     let xcarchiveOutputPath = outputFolder.appending(component: outputName + ".xcarchive.zip")
@@ -143,7 +143,7 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
                     // when the user has set up signing in their build.gradle.kts it will not be called "unsigned"
                     let names = variant == .release ? ["app-release.\(ext)", "app-release-unsigned.\(ext)"] : ["app-debug.\(ext)"]
 
-                    let variantSuffix = variant == .release ? "" : "-\(variant)"
+                    let variantSuffix = /* variant == .release ? "" : */ "-\(variant)"
                     let outputName = "\(appModuleName)\(variantSuffix).\(ext)"
                     let outputPath = outputFolder.appending(component: outputName)
 
@@ -185,7 +185,7 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
                             continue
                         }
 
-                        let variantSuffix = variant == .release ? "" : "-\(variant)"
+                        let variantSuffix = /* variant == .release ? "" : */ "-\(variant)"
                         let aarName = "\(depModuleName)\(variantSuffix).aar"
                         let aarBuildOutputPath = aarBuildOutputFolder.appending(component: aarName)
 
