@@ -307,7 +307,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
             return
         }
         // .decode(_, from:) for e.g. JSONDecoder or .decode(_, forKey:) for KeyedDecodingContainer
-        guard functionCall.arguments.count == 2, functionCall.arguments[0].label == nil, functionCall.arguments[1].label == "from" || functionCall.arguments[1].label == "forKey" else {
+        guard functionCall.arguments.first?.label == nil, functionCall.arguments.count == 1 || (functionCall.arguments.count == 2 && (functionCall.arguments[1].label == "from" || functionCall.arguments[1].label == "forKey")) else {
             return
         }
         // Type.self
