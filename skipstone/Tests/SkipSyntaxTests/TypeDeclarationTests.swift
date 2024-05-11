@@ -257,6 +257,18 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
+    func testBuiltinTypeExtension() async throws {
+        try await check(swift: """
+        extension Double {
+            public static func now() -> Double {
+                return 0.0
+            }
+        }
+        """, kotlin: """
+        fun Double.Companion.now(): Double = 0.0
+        """)
+    }
+
     func testProtocol() async throws {
         try await check(swift: """
         protocol P {

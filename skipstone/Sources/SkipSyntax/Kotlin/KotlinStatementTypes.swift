@@ -1517,7 +1517,7 @@ struct KotlinExtensionDeclaration {
             kstatements.append(KotlinMessageStatement(message: message, statement: statement))
         }
         var generics = statement.generics.resolvingSelf(in: statement)
-        var visibility = statement.modifiers.visibility
+        var visibility: Modifiers.Visibility? = nil
         if let extendedTypeInfo = translator.codebaseInfo?.primaryTypeInfo(forNamed: extends) {
             // Set the extended type to match its primary type and put the complete set of constraints into the generics object
             extends = extendedTypeInfo.signature
@@ -1534,7 +1534,7 @@ struct KotlinExtensionDeclaration {
         return kstatements + kextensionMembers
     }
 
-    static func translateExtensionMembers(_ members: [Statement], of extends: TypeSignature, visibility: Modifiers.Visibility, generics: Generics, declarationType: StatementType?, companionType: KotlinCompanionType, translator: KotlinTranslator, extensionPlacement: KotlinExtensionPlacement? = nil) -> [KotlinStatement] {
+    static func translateExtensionMembers(_ members: [Statement], of extends: TypeSignature, visibility: Modifiers.Visibility?, generics: Generics, declarationType: StatementType?, companionType: KotlinCompanionType, translator: KotlinTranslator, extensionPlacement: KotlinExtensionPlacement? = nil) -> [KotlinStatement] {
         var canAddStaticMembers: Bool? = nil
         if let extensionPlacement, !extensionPlacement.canMove {
             canAddStaticMembers = declarationType != .protocolDeclaration || extensionPlacement.isInModule != false || translator.codebaseInfo == nil || companionType.isInterface
@@ -1575,7 +1575,7 @@ struct KotlinExtensionDeclaration {
                 }
 
                 // Reduce the visibility of the extended member to that of the extended type
-                if visibility < memberDeclaration.visibility {
+                if let visibility, visibility < memberDeclaration.visibility {
                     memberDeclaration.visibility = visibility
                 }
 

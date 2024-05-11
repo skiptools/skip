@@ -37,4 +37,7 @@
    <FileRef
       location = "group:../skipapp-bookings/Darwin/TravelBookings.xcodeproj">
    </FileRef>
+   <FileRef
+      location = "group:../skipapp-scrumdinger/Darwin/ScrumDinger.xcodeproj">
+   </FileRef>
 </Workspace>
