@@ -280,6 +280,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         // the standard base name for resources, which will be linked from a path like: src/main/resources/package/name/resname.ext
         let resourcesOutputFolder = try AbsolutePath(outputFolderPath, validating: "resources")
 
+        // Android-specific resources like res/values/strings.xml
+        let resOutputFolder = try AbsolutePath(outputFolderPath, validating: "res")
+
         if !fs.isDirectory(kotlinOutputFolder) {
             // e.g.: ~Library/Developer/Xcode/DerivedData/PACKAGE-ID/SourcePackages/plugins/skiphub.output/SkipFoundationKotlinTests/skipstone/SkipFoundation/src/test/kotlin
             //throw error("Folder specified by --output-folder did not exist: \(outputFolder)")
@@ -738,7 +741,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         /// Links each of the resource files passed to the transpiler to the underlying source files.
         /// - Returns: the list of root resource folder(s) that contain the link(s) for the resources
         func linkResources() throws {
-            let destinationBasePath = resourcesOutputFolder
+            let resourcesBasePath = resourcesOutputFolder
                 .appending(components: packageName.split(separator: ".").map(\.description))
                 .appending(component: "Resources")
 
@@ -755,8 +758,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 let sourcePath = try AbsolutePath(validating: resourceSourceURL.path)
 
 
+                let resourceComponents = try RelativePath(validating: resourceSourceURL.relativePath).components
                 // all resources get put into a single "Resources/" folder in the jar, so drop the first item and replace it with "Resources/"
-                let components = try RelativePath(validating: resourceSourceURL.relativePath).components.dropFirst(1)
+                let components = resourceComponents.dropFirst(1)
                 let resourceSourcePath = try RelativePath(validating: components.joined(separator: "/"))
 
                 if sourcePath.parentDirectory.basename == buildSrcFolderName {
@@ -764,41 +768,16 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 } else if isCMakeProject {
                     trace("skipping resource linking for CMake project")
                 } else if sourcePath.extension == "xcstrings" {
-                    // process the .xcstrings in the same way that Xcode does: parse the JSON and use the localizations keys to synthesize a LANG.lproj/TABLENAME.strings file
-                    let xcstrings = try JSONDecoder().decode(LocalizableStringsDictionary.self, from: Data(contentsOf: resourceSourceURL))
-                    let locales = Set(xcstrings.strings.values.compactMap(\.localizations?.keys).joined())
-                    for localeId in locales {
-                        var locdict: [String: String] = [:]
-                        for key in xcstrings.strings.keys.sorted() {
-                            if let value = xcstrings.strings[key]?.localizations?[localeId]?.stringUnit?.value {
-                                locdict[key] = value
-                            }
-                        }
-
-                        if !locdict.isEmpty {
-                            let lproj = try RelativePath(validating: localeId + ".lproj" + "/" + sourcePath.basenameWithoutExt + ".strings") // e.g., fr.lproj/Localizable.strings
-                            let destinationPath = destinationBasePath.appending(lproj)
-
-                            func escape(_ string: String) throws -> String? {
-                                // escape quotes and newlines; we just use a JSON string fragment for this
-                                try String(data: JSONSerialization.data(withJSONObject: string, options: .fragmentsAllowed), encoding: .utf8)
-                            }
-
-                            var stringsContent = ""
-                            for (key, value) in locdict.sorted(by: { $0.key < $1.key }) {
-                                if let keyString = try escape(key), let valueString = try escape(value) {
-                                    stringsContent += keyString + " = " + valueString + ";\n"
-                                }
-                            }
-                            try fs.createDirectory(destinationPath.parentDirectory, recursive: true)
-                            info("create \(lproj.pathString) from \(sourcePath.pathString)", sourceFile: destinationPath.sourceFile)
-                            try writeChanges(tag: lproj.pathString, to: destinationPath, contents: stringsContent.utf8Data, readOnly: false)
-                            resourcesIndex.append(lproj)
-                        }
-                    }
+                    try convertStrings(resourceSourceURL: resourceSourceURL, sourcePath: sourcePath)
+                //} else if sourcePath.extension == "xcassets" {
+                    // TODO: convert various assets into Android res/ folder
                 } else { // non-processed resources are just linked directly from the package
-                    resourcesIndex.append(resourceSourcePath)
-                    let destinationPath = destinationBasePath.appending(resourceSourcePath)
+                    // the Android "res" folder is special: it is intended to store Android-specific resources like values/strings.xml, and will be linked into the archive's res/ folder
+                    let isAndroidRes = resourceComponents.first == "res"
+                    if !isAndroidRes {
+                        resourcesIndex.append(resourceSourcePath)
+                    }
+                    let destinationPath = (isAndroidRes ? resOutputFolder : resourcesBasePath).appending(resourceSourcePath)
 
                     // only create links for files that exist
                     if fs.isFile(sourcePath) {
@@ -809,7 +788,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 }
             }
 
-            let indexPath = destinationBasePath.appending(component: "resources.lst")
+            let indexPath = resourcesBasePath.appending(component: "resources.lst")
 
             if !resourcesIndex.isEmpty {
                 // write out the resources index file that acts as the directory for Java/Android resources
@@ -819,6 +798,43 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 // remove the resources file if it should be empty
                 try? fs.removeFileTree(indexPath)
             }
+
+            func convertStrings(resourceSourceURL: URL, sourcePath: AbsolutePath) throws {
+                // process the .xcstrings in the same way that Xcode does: parse the JSON and use the localizations keys to synthesize a LANG.lproj/TABLENAME.strings file
+                let xcstrings = try JSONDecoder().decode(LocalizableStringsDictionary.self, from: Data(contentsOf: resourceSourceURL))
+                let locales = Set(xcstrings.strings.values.compactMap(\.localizations?.keys).joined())
+                for localeId in locales {
+                    var locdict: [String: String] = [:]
+                    for key in xcstrings.strings.keys.sorted() {
+                        if let value = xcstrings.strings[key]?.localizations?[localeId]?.stringUnit?.value {
+                            locdict[key] = value
+                        }
+                    }
+
+                    if !locdict.isEmpty {
+                        let lproj = try RelativePath(validating: localeId + ".lproj" + "/" + sourcePath.basenameWithoutExt + ".strings") // e.g., fr.lproj/Localizable.strings
+                        let destinationPath = resourcesBasePath.appending(lproj)
+
+                        func escape(_ string: String) throws -> String? {
+                            // escape quotes and newlines; we just use a JSON string fragment for this
+                            try String(data: JSONSerialization.data(withJSONObject: string, options: .fragmentsAllowed), encoding: .utf8)
+                        }
+
+                        var stringsContent = ""
+                        for (key, value) in locdict.sorted(by: { $0.key < $1.key }) {
+                            if let keyString = try escape(key), let valueString = try escape(value) {
+                                stringsContent += keyString + " = " + valueString + ";\n"
+                            }
+                        }
+                        try fs.createDirectory(destinationPath.parentDirectory, recursive: true)
+                        info("create \(lproj.pathString) from \(sourcePath.pathString)", sourceFile: destinationPath.sourceFile)
+                        try writeChanges(tag: lproj.pathString, to: destinationPath, contents: stringsContent.utf8Data, readOnly: false)
+                        resourcesIndex.append(lproj)
+                    }
+                }
+            }
+
+
         }
 
         // NOTE: when linking between modules, SPM and Xcode will use different output paths:
@@ -985,9 +1001,10 @@ extension FileManager {
     public func enumeratedURLs(of folderURL: URL) throws -> [URL] {
         var childFileURLs: [URL] = []
 
-        if let fileURLs = self.enumerator(at: folderURL, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles, .skipsPackageDescendants]) {
+        if let fileURLs = self.enumerator(at: folderURL, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles, .skipsPackageDescendants]) {
             for case let fileURL as URL in fileURLs {
-                if try fileURL.resourceValues(forKeys:[.isRegularFileKey]).isRegularFile == true {
+                let attrs = try fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+                if attrs.isRegularFile == true || attrs.isSymbolicLink == true {
                     childFileURLs.append(fileURL)
                 }
             }
