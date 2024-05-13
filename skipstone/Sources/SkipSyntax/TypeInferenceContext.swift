@@ -368,10 +368,14 @@ struct TypeInferenceContext {
             }
             let signature = typeSignature.asMetaType(pathEntry.isStatic)
             if let codebaseInfo {
-                let matches = codebaseInfo.matchFunction(name: name, inConstrained: signature.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
+                let constrainedType = signature.constrainedTypeWithGenerics(generics)
+                let matches = codebaseInfo.matchFunction(name: name, inConstrained: constrainedType, arguments: constrainedArguments)
                 if !matches.isEmpty {
                     addUnavailableMessages(to: messagesNode, for: matches.map(\.availability))
                     return matches
+                } else if let match = codebaseInfo.matchIdentifier(name: name, inConstrained: constrainedType), codebaseInfo.callableSignature(of: match.signature, arguments: constrainedArguments) != nil {
+                    addUnavailableMessages(to: messagesNode, for: [match.availability])
+                    return [match]
                 }
             } else if let match = unavailableAPI?.knownUnavailableFunction(name, in: signature, arguments: arguments) {
                 addUnavailableMessages(to: messagesNode, for: [match.availability])
@@ -380,8 +384,15 @@ struct TypeInferenceContext {
         }
         if let codebaseInfo {
             let matches = codebaseInfo.matchFunction(name: name, arguments: constrainedArguments)
-            addUnavailableMessages(to: messagesNode, for: matches.map(\.availability))
-            return matches
+            if !matches.isEmpty {
+                addUnavailableMessages(to: messagesNode, for: matches.map(\.availability))
+                return matches
+            } else if let match = codebaseInfo.matchIdentifier(name: name), codebaseInfo.callableSignature(of: match.signature, arguments: constrainedArguments) != nil {
+                addUnavailableMessages(to: messagesNode, for: [match.availability])
+                return [match]
+            } else {
+                return []
+            }
         } else if let match = unavailableAPI?.knownUnavailableFunction(name, in: nil, arguments: arguments) {
             addUnavailableMessages(to: messagesNode, for: [match.availability])
             return [match]

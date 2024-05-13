@@ -2339,4 +2339,79 @@ final class SwiftUITests: XCTestCase {
         }
         """)
     }
+
+    func testViewBuilderContentBlock() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct Stack<Content: View>: View {
+            var content: @ViewBuilder  () -> Content
+
+            var body: some View {
+                VStack {
+                    content()
+                }
+            }
+        }
+        struct V: View {
+            var body: some View {
+                Stack {
+                    Text("1")
+                    Text("2")
+                }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
+        internal class Stack<Content>: View, MutableStruct where Content: View {
+            internal var content: () -> Content
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+
+            override fun body(): View {
+                return ComposeBuilder { composectx: ComposeContext ->
+                    VStack { ->
+                        ComposeBuilder { composectx: ComposeContext ->
+                            content().Compose(composectx)
+                            ComposeResult.ok
+                        }
+                    }.Compose(composectx)
+                }
+            }
+
+            constructor(content: () -> Content) {
+                this.content = content
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = Stack<Content>(content)
+        }
+        internal class V: View {
+            override fun body(): View {
+                return ComposeBuilder { composectx: ComposeContext ->
+                    Stack { ->
+                        ComposeBuilder { composectx: ComposeContext ->
+                            Text("1").Compose(composectx)
+                            Text("2").Compose(composectx)
+                            ComposeResult.ok
+                        }
+                    }.Compose(composectx)
+                }
+            }
+        }
+        """)
+    }
 }

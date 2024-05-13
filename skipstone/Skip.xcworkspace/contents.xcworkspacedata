@@ -29,6 +29,9 @@
       location = "group:../skip-sql">
    </FileRef>
    <FileRef
+      location = "group:../skip-firebase">
+   </FileRef>
+   <FileRef
       location = "group:../skipapp-hello/Darwin/HelloSkip.xcodeproj">
    </FileRef>
    <FileRef
@@ -36,6 +39,12 @@
    </FileRef>
    <FileRef
       location = "group:../skipapp-bookings/Darwin/TravelBookings.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:../skipapp-weather/Darwin/SkipWeather.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:../skipapp-fireside/Darwin/FireSide.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:../skipapp-scrumdinger/Darwin/ScrumDinger.xcodeproj">
