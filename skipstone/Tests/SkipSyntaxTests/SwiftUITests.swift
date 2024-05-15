@@ -2344,7 +2344,7 @@ final class SwiftUITests: XCTestCase {
         try await check(supportingSwift: baseSupportingSwift, swift: """
         import SwiftUI
         struct Stack<Content: View>: View {
-            var content: @ViewBuilder  () -> Content
+            @ViewBuilder var content: () -> Content
 
             var body: some View {
                 VStack {

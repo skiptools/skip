@@ -2812,7 +2812,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
             appendDeclaration(to: output, indentation: indentation, storage: storage, isDelegatingToCompanion: false)
         }
 
-        if apiFlags.contains(.viewBuilder) || apiFlags.contains(.async), let getterBody = getter?.body {
+        if isAppendAsFunction, let getterBody = getter?.body {
             appendAsFunctionDefinition(getterBody, to: output, indentation: indentation)
         } else {
             appendPropertyDefinition(to: output, indentation: indentation, storage: storage)
@@ -3130,7 +3130,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
     }
 
     private var isAppendAsFunction: Bool {
-        return apiFlags.contains(.viewBuilder) || (apiFlags.contains(.async) && !isAsyncLet)
+        return (apiFlags.contains(.viewBuilder) && !propertyType.isFunction) || (apiFlags.contains(.async) && !isAsyncLet)
     }
 
     private func initializeStorage() -> KotlinVariableStorage? {

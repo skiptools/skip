@@ -1331,6 +1331,8 @@ public final class CodebaseInfo {
             if variable.attributes.contains(.binding) {
                 parameterType = parameterType.asBinding()
             }
+            // Transfer attributes if variable is a closure, e.g. @ViewBuilder
+            parameterType = variable.attributes.apply(toFunction: parameterType)
             return TypeSignature.Parameter(label: variable.name, type: parameterType, hasDefaultValue: variable.hasValue)
         }
         let initSignature: TypeSignature = .function(parameters, typeInfo.signature, typeInfo.apiFlags ?? [], nil)
