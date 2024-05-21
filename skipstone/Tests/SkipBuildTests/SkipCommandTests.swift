@@ -500,7 +500,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitApp3ModuleCommand() async throws {
-        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", tests: true, appid: "some.cool.app", moduleNames: "TOP_MODULE", "MIDDLE_MODULE", "BOTTOM_MODULE")
+        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: true, tests: true, appid: "some.cool.app", moduleNames: "TOP_MODULE", "MIDDLE_MODULE", "BOTTOM_MODULE")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
