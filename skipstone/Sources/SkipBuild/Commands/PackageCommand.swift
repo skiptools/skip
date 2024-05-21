@@ -66,7 +66,7 @@ struct CreateOptions : ParsableArguments {
     var chain: Bool = true
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Add SKIP_ZERO environment check to Package.swift", valueName: "zero"))
-    var zero: Bool = true
+    var zero: Bool = false
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Create a local git repository for the app", valueName: "create"))
     var gitRepo: Bool = false
