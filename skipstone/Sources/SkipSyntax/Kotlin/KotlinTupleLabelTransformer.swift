@@ -4,6 +4,9 @@ import Foundation
 ///
 /// This transformer also generates errors for label conflicts, i.e. the same label being used to access different elements of the same N-tuple.
 final class KotlinTupleLabelTransformer: KotlinTransformer {
+    /// Used in testing.
+    static var gatherLabelsFromTypeSignatures = true
+
     // Tuple arity -> Element -> Labels
     private typealias TupleLabels = [Int: [Int: Set<String>]]
 
@@ -17,6 +20,9 @@ final class KotlinTupleLabelTransformer: KotlinTransformer {
     }
 
     func gather(from syntaxTree: SyntaxTree) {
+        guard Self.gatherLabelsFromTypeSignatures else {
+            return
+        }
         syntaxTree.root.visit { node in
             if let variableDeclaration = node as? VariableDeclaration {
                 variableDeclaration.variableTypes.forEach { gatherTupleLabels(from: $0, into: &tupleLabels) }
@@ -35,6 +41,19 @@ final class KotlinTupleLabelTransformer: KotlinTransformer {
             if let memberAccess = node as? KotlinMemberAccess {
                 if case .tuple(let labels, _) = memberAccess.baseType, let element = labels.firstIndex(of: memberAccess.member) {
                     gatherTupleLabel(memberAccess.member, forElement: element, ofArity: labels.count, into: &localLabels)
+                }
+            } else if let keyPath = node as? KotlinKeyPathLiteral {
+                var baseType = keyPath.root
+                for component in keyPath.components {
+                    switch component {
+                    case .property(let name, let type):
+                        if case .tuple(let labels, _) = baseType, let element = labels.firstIndex(of: name) {
+                            gatherTupleLabel(name, forElement: element, ofArity: labels.count, into: &localLabels)
+                            baseType = type
+                        }
+                    default:
+                        break
+                    }
                 }
             }
             return .recurse(nil)

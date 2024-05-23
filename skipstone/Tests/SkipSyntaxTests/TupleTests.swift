@@ -1,4 +1,5 @@
 import XCTest
+@testable import SkipSyntax
 
 final class TupleTests: XCTestCase {
     func testDeclarations() async throws {
@@ -325,6 +326,35 @@ final class TupleTests: XCTestCase {
         """, packageSupportKotlin: """
         internal val <E0, E1> Tuple2<E0, E1>.value: E1
             get() = element1
+        """)
+    }
+
+    func testKeyPathPackageSupport() async throws {
+        KotlinTupleLabelTransformer.gatherLabelsFromTypeSignatures = false
+        defer { KotlinTupleLabelTransformer.gatherLabelsFromTypeSignatures = true }
+        try await check(supportingSwift: """
+        struct Array<E>: Collection {
+            typealias Element = E
+        }
+        protocol Collection {
+            associatedtype Element
+            func enumerated() -> [(index: Int, element: Element)] {
+            }
+        }
+        """, swift: """
+        func f(a: [String]) {
+            g(elements: a.enumerated(), id: \\.index)
+        }
+        func g<E>(elements: [E], id: (E) -> Int) {
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        internal fun f(a: Array<String>): Unit = g(elements = a.enumerated(), id = { it.index })
+        internal fun <E> g(elements: Array<E>, id: (E) -> Int) = Unit
+        """, packageSupportKotlin: """
+        internal val <E0, E1> Tuple2<E0, E1>.index: E0
+            get() = element0
         """)
     }
 }

@@ -674,7 +674,7 @@ private final class TranslateVisitor {
     }
 
     private func updateEnvironmentFunctionCallParameters(for keyPath: KotlinKeyPathLiteral, in functionCall: KotlinFunctionCall) {
-        guard keyPath.components.count == 1, case .property(let property) = keyPath.components[0] else {
+        guard keyPath.components.count == 1, case .property(let property, _) = keyPath.components[0] else {
             return
         }
 

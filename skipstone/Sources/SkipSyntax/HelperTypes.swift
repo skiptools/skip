@@ -79,6 +79,7 @@ struct ArgumentValue: Hashable {
     var type: TypeSignature
     var isLiteral = false
     var isInterpolated = false
+    var isFirstTrailingClosure = false
 }
 
 /// A variable or function's async behavior.

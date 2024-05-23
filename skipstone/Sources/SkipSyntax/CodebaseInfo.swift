@@ -914,10 +914,10 @@ public final class CodebaseInfo {
                 } else {
                     // If there is no label, then either this parameter has to have no label, be a variadic continuation, or be a trailing closure.
                     // We don't give the extra point for a nil label on a function parameter to avoid advantaging trailing closures on nil-labeled
-                    // params other trailing closures
-                    if (isVariadicContinuation || (parameter.label == nil && !parameter.type.isFunction) || isSubscript), let score = argument.value.type.compatibilityScore(target: parameter.type, codebaseInfo: self, isLiteral: argument.value.isLiteral, isInterpolated: argument.value.isInterpolated) {
+                    // params over other trailing closures
+                    if (isVariadicContinuation || (parameter.label == nil && !argument.value.isFirstTrailingClosure) || isSubscript), let score = argument.value.type.compatibilityScore(target: parameter.type, codebaseInfo: self, isLiteral: argument.value.isLiteral, isInterpolated: argument.value.isInterpolated) {
                         return (startIndex + index, 1.0 + score)
-                    } else if parameter.type.isFunction, let score = argument.value.type.compatibilityScore(target: parameter.type, codebaseInfo: self, isLiteral: argument.value.isLiteral, isInterpolated: argument.value.isInterpolated) {
+                    } else if argument.value.isFirstTrailingClosure, let score = argument.value.type.compatibilityScore(target: parameter.type, codebaseInfo: self, isLiteral: argument.value.isLiteral, isInterpolated: argument.value.isInterpolated) {
                         if argumentIndex == arguments.count - 1 && startIndex + index < parameters.count - 1 && parameter.hasDefaultValue && parameters[(startIndex + index + 1)...].contains(where: { !$0.hasDefaultValue }) {
                             // If this trailing closure is the last supplied argument, save it for the next required parameter
                             // even if it matches this defaulted parameter. Handles the case of a defaulted closure parameter

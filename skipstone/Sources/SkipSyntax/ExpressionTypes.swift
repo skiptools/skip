@@ -814,11 +814,11 @@ final class FunctionCall: Expression, APICallExpression, MemberAccessExpression 
         let argumentTypes = arguments.map { $0.value.inferredType }
         let match: (TypeSignature, APIMatch)?
         let matchBaseType: TypeSignature?
-        if isUnchainedOptional, let name, let baseType, baseType.withModuleName(nil) != .none, let optionalMatch = context.function(name, in: .named("Optional", [baseType]), arguments: arguments, expectedReturn: expecting, messagesNode: nil) {
+        if isUnchainedOptional, let name, let baseType, baseType.withModuleName(nil) != .none, let optionalMatch = context.function(name, in: .named("Optional", [baseType]), arguments: arguments, trailingClosureCount: trailingClosureCount, expectedReturn: expecting, messagesNode: nil) {
             match = optionalMatch
             matchBaseType = .named("Optional", [baseType])
         } else {
-            match = context.function(name, in: baseType, arguments: arguments, expectedReturn: expecting, messagesNode: self)
+            match = context.function(name, in: baseType, arguments: arguments, trailingClosureCount: trailingClosureCount, expectedReturn: expecting, messagesNode: self)
             matchBaseType = baseType
         }
         if var match {
@@ -829,7 +829,7 @@ final class FunctionCall: Expression, APICallExpression, MemberAccessExpression 
             // If any argument types changed, it could affect the return type of a generic function
             let refinedArgumentTypes = arguments.map({ $0.value.inferredType })
             if argumentTypes != refinedArgumentTypes {
-                if let refinedMatch = context.function(name, in: matchBaseType, arguments: arguments, expectedReturn: expecting, messagesNode: nil) {
+                if let refinedMatch = context.function(name, in: matchBaseType, arguments: arguments, trailingClosureCount: trailingClosureCount, expectedReturn: expecting, messagesNode: nil) {
                     match = refinedMatch
                 }
             }
@@ -1067,10 +1067,10 @@ final class InOut: Expression {
 /// `\.x`
 final class KeyPathLiteral: Expression {
     private(set) var root: TypeSignature = .none
-    let components: [Component]
+    private(set) var components: [Component]
 
     enum Component {
-        case property(String)
+        case property(String, TypeSignature)
         case optional
         case unwrappedOptional
     }
@@ -1097,7 +1097,7 @@ final class KeyPathLiteral: Expression {
                     throw Message.keyPathUnsupported(syntax, source: syntaxTree.source)
                 }
                 let name = syntax.declName.baseName.text
-                components.append(.property(name))
+                components.append(.property(name, .none))
             case .subscript(let syntax):
                 throw Message.keyPathUnsupported(syntax, source: syntaxTree.source)
             case .optional(let syntax):
@@ -1117,6 +1117,7 @@ final class KeyPathLiteral: Expression {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         var root = root
+        var typedComponents: [Component] = []
         var expectingLeaf: TypeSignature = .none
         var isKeyPathExpected = false
         if expecting.isKeyPath {
@@ -1134,19 +1135,21 @@ final class KeyPathLiteral: Expression {
         var leaf = root
         for component in components {
             switch component {
-            case .property(let name):
+            case .property(let name, _):
                 if name != "self" {
                     if let match = context.member(name, in: leaf, messagesNode: self) {
                         leaf = match.0
                     } else {
                         leaf = .none
-                        break
                     }
                 }
+                typedComponents.append(.property(name, leaf))
             case .optional:
                 leaf = leaf.asOptional(true)
+                typedComponents.append(.optional)
             case .unwrappedOptional:
                 leaf = leaf.asUnwrappedOptional(true)
+                typedComponents.append(.unwrappedOptional)
             }
         }
         leaf = leaf.or(expectingLeaf)
@@ -1155,6 +1158,8 @@ final class KeyPathLiteral: Expression {
         } else {
             keyPathType = .function([.init(type: root)], leaf, [], nil).or(expecting)
         }
+        self.root = root
+        self.components = typedComponents
         return context
     }
 
@@ -1172,7 +1177,7 @@ final class KeyPathLiteral: Expression {
         for component in components {
             string.append(".")
             switch component {
-            case .property(let name):
+            case .property(let name, _):
                 string.append(name)
             case .optional:
                 string.append("?")

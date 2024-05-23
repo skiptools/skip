@@ -298,9 +298,11 @@ struct TypeInferenceContext {
     /// - Parameters:
     ///   - name: The function name, or `nil` if none, as in constructor calls.
     ///   - type: The function's owning type if this is a member function, or nil if not.
-    func function(_ name: String?, in type: TypeSignature?, arguments: [LabeledValue<Expression>], expectedReturn: TypeSignature, messagesNode: SyntaxNode?) -> (TypeSignature, APIMatch)? {
-        let argumentValues = arguments.map { LabeledValue(label: $0.label, value: argumentValue(for: $0.value)) }
-        let matches = function(name, in: type, arguments: argumentValues, messagesNode: messagesNode)
+    func function(_ name: String?, in type: TypeSignature?, arguments: [LabeledValue<Expression>], trailingClosureCount: Int = 0, expectedReturn: TypeSignature, messagesNode: SyntaxNode?) -> (TypeSignature, APIMatch)? {
+        let argumentValues = arguments.enumerated().map { index, argument in
+            LabeledValue(label: argument.label, value: argumentValue(for: argument.value, isFirstTrailingClosure: index == arguments.count - trailingClosureCount))
+        }
+        let matches = function(name, in: type, arguments: argumentValues, trailingClosureCount: trailingClosureCount, messagesNode: messagesNode)
         if matches.count > 1 {
             if let unqualifiedArgumentMatch = findUnqualifiedArgumentMatch(in: matches, arguments: arguments) {
                 return unqualifiedArgumentMatch
@@ -316,7 +318,7 @@ struct TypeInferenceContext {
     }
 
     // Exposed for testing
-    func function(_ name: String?, in type: TypeSignature?, arguments: [LabeledValue<ArgumentValue>], messagesNode: SyntaxNode?) -> [(TypeSignature, APIMatch)] {
+    func function(_ name: String?, in type: TypeSignature?, arguments: [LabeledValue<ArgumentValue>], trailingClosureCount: Int = 0, messagesNode: SyntaxNode?) -> [(TypeSignature, APIMatch)] {
         if let type, type.isOptional {
             return function(name, inNonOptional: type.asOptional(false), arguments: arguments, messagesNode: messagesNode).map { match in
                 let signature = resolveSignature(match: match)
@@ -615,14 +617,14 @@ struct TypeInferenceContext {
         return nil
     }
 
-    private func argumentValue(for expression: Expression) -> ArgumentValue {
+    private func argumentValue(for expression: Expression, isFirstTrailingClosure: Bool = false) -> ArgumentValue {
         let inferredType = expression.inferredType
         // TODO: Handle other Expressible types
         switch expression.type {
         case .stringLiteral:
             return ArgumentValue(type: inferredType, isLiteral: true, isInterpolated: (expression as! StringLiteral).isInterpolated)
         default:
-            return ArgumentValue(type: inferredType)
+            return ArgumentValue(type: inferredType, isFirstTrailingClosure: isFirstTrailingClosure)
         }
     }
 

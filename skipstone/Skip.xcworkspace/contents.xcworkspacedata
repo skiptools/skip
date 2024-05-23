@@ -47,6 +47,6 @@
       location = "group:../skipapp-fireside/Darwin/FireSide.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-scrumdinger/Darwin/ScrumDinger.xcodeproj">
+      location = "group:../skipapp-scrumdinger/Darwin/SkipScrumDinger.xcodeproj">
    </FileRef>
 </Workspace>

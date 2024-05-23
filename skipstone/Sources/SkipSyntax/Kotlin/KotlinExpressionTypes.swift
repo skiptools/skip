@@ -919,11 +919,15 @@ final class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APIC
     var mayBeSharedMutableStructType = false
     var hasTrailingClosures = false {
         didSet {
-            if !hasTrailingClosures && oldValue == true, !arguments.isEmpty && arguments.last?.label == nil, let apiMatch {
+            if !hasTrailingClosures && oldValue == true, !arguments.isEmpty, let apiMatch {
                 // Attempt to fill in the trailing closure argument label
                 let parameters = apiMatch.signature.parameters
                 if parameters.count == arguments.count {
-                    arguments[arguments.count - 1].label = parameters.last?.label
+                    for i in 0..<arguments.count {
+                        if arguments[i].label == nil {
+                            arguments[i].label = parameters[i].label
+                        }
+                    }
                 }
             }
         }
@@ -1685,12 +1689,14 @@ final class KotlinInOut: KotlinExpression {
 }
 
 final class KotlinKeyPathLiteral: KotlinExpression {
+    var root: TypeSignature = .none
     var components: [KeyPathLiteral.Component] = []
     var isWrite = false
     var keyPathType: TypeSignature = .none
 
     static func translate(expression: KeyPathLiteral, translator: KotlinTranslator) -> KotlinKeyPathLiteral {
         let kexpression = KotlinKeyPathLiteral(expression: expression)
+        kexpression.root = expression.root
         kexpression.components = expression.components
         kexpression.keyPathType = expression.inferredType
         return kexpression
@@ -1709,7 +1715,7 @@ final class KotlinKeyPathLiteral: KotlinExpression {
         var path = root
         for component in components {
             switch component {
-            case .property(let name):
+            case .property(let name, _):
                 if let tupleIndex = Int(name) {
                     path.append(".")
                     path.append(KotlinTupleLiteral.member(index: tupleIndex))
