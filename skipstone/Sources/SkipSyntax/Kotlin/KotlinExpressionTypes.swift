@@ -209,7 +209,7 @@ final class KotlinBinaryOperator: KotlinExpression, KotlinSingleStatementVetoing
         switch expression.op.symbol {
         case "<<=", ">>=", "&=", "|=", "^=", "~=":
             kexpression.messages.append(.kotlinOperatorUnsupportedAssignment(kexpression, source: translator.syntaxTree.source))
-        case ".==", ".!=", ".<", ".<=", ".>", ".>=", "&+", "&-", "&*":
+        case ".==", ".!=", ".<", ".<=", ".>", ".>=":
             kexpression.messages.append(.kotlinOperatorUnsupported(kexpression, source: translator.syntaxTree.source))
         default:
             break

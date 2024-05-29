@@ -397,6 +397,12 @@ extension Operator {
             return "shl"
         case ">>":
             return "shr"
+        case "&+":
+            return "+"
+        case "&-":
+            return "-"
+        case "&*":
+            return "*"
         default:
             // Note that we construct operators with non-Swift symbols like 'in'
             return symbol
