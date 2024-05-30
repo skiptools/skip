@@ -7,6 +7,45 @@ fileprivate extension String {
 
 /// A test case that verifies that transpilation are *not* working as hoped.
 final class FeatureSupportTests: XCTestCase {
+    func testExtendArrayShouldImportArray() async throws {
+        // https://github.com/skiptools/skip/issues/134
+        try await check(expectFailure: true, swift: """
+        extension Array {
+            func doSomething()
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        internal fun Array.doSomething()
+        """)
+    }
+
+    func testExtendSetShouldImportSet() async throws {
+        // https://github.com/skiptools/skip/issues/134
+        try await check(expectFailure: true, swift: """
+        extension Set {
+            func doSomething()
+        }
+        """, kotlin: """
+        import skip.lib.Set
+
+        internal fun Set.doSomething()
+        """)
+    }
+
+    func testExtendCollectionShouldImportCollection() async throws {
+        // https://github.com/skiptools/skip/issues/134
+        try await check(expectFailure: true, swift: """
+        extension Collection {
+            func doSomething()
+        }
+        """, kotlin: """
+        import skip.lib.Collection
+
+        internal fun Collection.doSomething()
+        """)
+    }
+
     func testJetpackCompose() async throws {
         try await check(compiler: nil, swiftCode: {
             func JetpackCompose() {
