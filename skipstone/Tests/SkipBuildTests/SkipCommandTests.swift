@@ -254,11 +254,11 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
-    func testLibInitAppCommand() async throws {
+    func testLibInitAppDefaults() async throws {
         let projectName = "cool-app"
         let moduleName = "APPNAME"
         let appid = "some.cool.app"
-        let (_, projectTree) = try await libInitComand(projectName: projectName, free: true, appid: appid, moduleNames: moduleName)
+        let (_, projectTree) = try await libInitComand(projectName: projectName, free: true, fastlane: false, appid: appid, moduleNames: moduleName)
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -288,6 +288,7 @@ final class SkipCommandTests: XCTestCase {
         │  │  │  └─ Contents.json
         │  │  └─ Contents.json
         │  ├─ Entitlements.plist
+        │  ├─ Info.plist
         │  └─ Sources
         │     └─ APPNAMEAppMain.swift
         ├─ LICENSE.GPL
@@ -300,7 +301,102 @@ final class SkipCommandTests: XCTestCase {
         │     ├─ APPNAMEApp.swift
         │     ├─ ContentView.swift
         │     ├─ Resources
-        │     │  └─ Localizable.xcstrings
+        │     │  ├─ Localizable.xcstrings
+        │     │  └─ Module.xcassets
+        │     │     └─ Contents.json
+        │     └─ Skip
+        │        └─ skip.yml
+        └─ Tests
+           └─ APPNAMETests
+              ├─ APPNAMETests.swift
+              ├─ Resources
+              │  └─ TestData.json
+              ├─ Skip
+              │  └─ skip.yml
+              └─ XCSkipTests.swift
+
+        """)
+
+    }
+
+    func testLibInitAppFastlane() async throws {
+        let projectName = "cool-app"
+        let moduleName = "APPNAME"
+        let appid = "some.cool.app"
+        let (_, projectTree) = try await libInitComand(projectName: projectName, free: true, fastlane: true, appid: appid, moduleNames: moduleName)
+        XCTAssertEqual(projectTree ?? "", """
+        .
+        ├─ Android
+        │  ├─ app
+        │  │  ├─ build.gradle.kts
+        │  │  ├─ proguard-rules.pro
+        │  │  └─ src
+        │  │     └─ main
+        │  │        ├─ AndroidManifest.xml
+        │  │        └─ kotlin
+        │  │           └─ appname
+        │  │              └─ module
+        │  │                 └─ Main.kt
+        │  ├─ fastlane
+        │  │  ├─ Appfile
+        │  │  ├─ Fastfile
+        │  │  ├─ README.md
+        │  │  └─ metadata
+        │  │     └─ android
+        │  │        └─ en-US
+        │  │           ├─ full_description.txt
+        │  │           ├─ short_description.txt
+        │  │           └─ title.txt
+        │  ├─ gradle
+        │  │  └─ wrapper
+        │  │     └─ gradle-wrapper.properties
+        │  ├─ gradle.properties
+        │  └─ settings.gradle.kts
+        ├─ Darwin
+        │  ├─ APPNAME.xcconfig
+        │  ├─ APPNAME.xcodeproj
+        │  │  └─ project.pbxproj
+        │  ├─ Assets.xcassets
+        │  │  ├─ AccentColor.colorset
+        │  │  │  └─ Contents.json
+        │  │  ├─ AppIcon.appiconset
+        │  │  │  └─ Contents.json
+        │  │  └─ Contents.json
+        │  ├─ Entitlements.plist
+        │  ├─ Info.plist
+        │  ├─ Sources
+        │  │  └─ APPNAMEAppMain.swift
+        │  └─ fastlane
+        │     ├─ AppStore.xcconfig
+        │     ├─ Appfile
+        │     ├─ Deliverfile
+        │     ├─ Fastfile
+        │     ├─ README.md
+        │     └─ metadata
+        │        ├─ en-US
+        │        │  ├─ description.txt
+        │        │  ├─ keywords.txt
+        │        │  ├─ privacy_url.txt
+        │        │  ├─ release_notes.txt
+        │        │  ├─ software_url.txt
+        │        │  ├─ subtitle.txt
+        │        │  ├─ support_url.txt
+        │        │  ├─ title.txt
+        │        │  └─ version_whats_new.txt
+        │        └─ rating.json
+        ├─ LICENSE.GPL
+        ├─ Package.swift
+        ├─ README.md
+        ├─ Skip.env
+        ├─ Sources
+        │  └─ APPNAME
+        │     ├─ APPNAME.swift
+        │     ├─ APPNAMEApp.swift
+        │     ├─ ContentView.swift
+        │     ├─ Resources
+        │     │  ├─ Localizable.xcstrings
+        │     │  └─ Module.xcassets
+        │     │     └─ Contents.json
         │     └─ Skip
         │        └─ skip.yml
         └─ Tests
@@ -320,7 +416,7 @@ final class SkipCommandTests: XCTestCase {
         let projectName = "cool-app"
         let moduleName = "APPNAME"
         let appid = "some.cool.app"
-        let (projectURL, projectTree) = try await libInitComand(projectName: projectName, free: true, appid: appid, iconColor: "4994EC", moduleNames: moduleName)
+        let (projectURL, projectTree) = try await libInitComand(projectName: projectName, free: true, fastlane: false, appid: appid, iconColor: "4994EC", moduleNames: moduleName)
         #if os(macOS) // icons are not generated on Linux
         XCTAssertEqual(projectTree ?? "", """
         .
@@ -381,6 +477,7 @@ final class SkipCommandTests: XCTestCase {
         │  │  │  └─ Contents.json
         │  │  └─ Contents.json
         │  ├─ Entitlements.plist
+        │  ├─ Info.plist
         │  └─ Sources
         │     └─ APPNAMEAppMain.swift
         ├─ LICENSE.GPL
@@ -393,7 +490,9 @@ final class SkipCommandTests: XCTestCase {
         │     ├─ APPNAMEApp.swift
         │     ├─ ContentView.swift
         │     ├─ Resources
-        │     │  └─ Localizable.xcstrings
+        │     │  ├─ Localizable.xcstrings
+        │     │  └─ Module.xcassets
+        │     │     └─ Contents.json
         │     └─ Skip
         │        └─ skip.yml
         └─ Tests
@@ -422,85 +521,8 @@ final class SkipCommandTests: XCTestCase {
         #endif
     }
 
-    func OLDtestLibInitAppCommand() async throws {
-        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", appid: "some.cool.app", moduleNames: "APPNAME")
-        XCTAssertEqual(projectTree ?? "", """
-        .
-        ├─ APPNAME.xcconfig
-        ├─ APPNAME.xcodeproj
-        │  └─ project.pbxproj
-        ├─ Package.swift
-        ├─ README.md
-        ├─ Sources
-        │  ├─ APPNAME
-        │  │  ├─ APPNAME.swift
-        │  │  ├─ APPNAMEApp.swift
-        │  │  ├─ ContentView.swift
-        │  │  ├─ Resources
-        │  │  │  └─ Localizable.xcstrings
-        │  │  └─ Skip
-        │  │     ├─ AndroidManifest.xml
-        │  │     ├─ Assets.xcassets
-        │  │     │  ├─ AccentColor.colorset
-        │  │     │  │  └─ Contents.json
-        │  │     │  ├─ AppIcon.appiconset
-        │  │     │  │  └─ Contents.json
-        │  │     │  └─ Contents.json
-        │  │     ├─ Capabilities.entitlements
-        │  │     └─ skip.yml
-        │  └─ APPNAMEApp
-        │     └─ APPNAMEAppMain.swift
-        └─ Tests
-           └─ APPNAMETests
-              ├─ APPNAMETests.swift
-              ├─ Resources
-              │  └─ TestData.json
-              ├─ Skip
-              │  └─ skip.yml
-              └─ XCSkipTests.swift
-
-        """)
-
-        let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
-        let AndroidManifest = try load("Sources/APPNAME/Skip/AndroidManifest.xml")
-        XCTAssertTrue(AndroidManifest.contains("android.intent.category.LAUNCHER"))
-        let PackageSwift = try load("Package.swift")
-        XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 5.9
-        // This is a Skip (https://skip.tools) package,
-        // containing a Swift Package Manager project
-        // that will use the Skip build plugin to transpile the
-        // Swift Package, Sources, and Tests into an
-        // Android Gradle Project with Kotlin sources and JUnit tests.
-        import PackageDescription
-        import Foundation
-
-        // Set SKIP_ZERO=1 to build without Skip libraries
-        let zero = ProcessInfo.processInfo.environment["SKIP_ZERO"] != nil
-        let skipstone = !zero ? [Target.PluginUsage.plugin(name: "skipstone", package: "skip")] : []
-
-        let package = Package(
-            name: "cool-app",
-            defaultLocalization: "en",
-            platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
-            products: [
-                .library(name: "APPNAME", type: .dynamic, targets: ["APPNAME"]),
-            ],
-            dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
-                .package(url: "https://source.skip.tools/skip-ui.git", from: "0.0.0")
-            ],
-            targets: [
-                .target(name: "APPNAME", dependencies: (zero ? [] : [.product(name: "SkipUI", package: "skip-ui")]), resources: [.process("Resources")], plugins: skipstone),
-                .testTarget(name: "APPNAMETests", dependencies: ["APPNAME"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
-            ]
-        )
-
-        """)
-    }
-
     func testLibInitApp3ModuleCommand() async throws {
-        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: true, tests: true, appid: "some.cool.app", moduleNames: "TOP_MODULE", "MIDDLE_MODULE", "BOTTOM_MODULE")
+        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: true, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "TOP_MODULE", "MIDDLE_MODULE", "BOTTOM_MODULE")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -527,6 +549,7 @@ final class SkipCommandTests: XCTestCase {
         │  │  │  └─ Contents.json
         │  │  └─ Contents.json
         │  ├─ Entitlements.plist
+        │  ├─ Info.plist
         │  ├─ Sources
         │  │  └─ TOP_MODULEAppMain.swift
         │  ├─ TOP_MODULE.xcconfig
@@ -551,7 +574,9 @@ final class SkipCommandTests: XCTestCase {
         │  └─ TOP_MODULE
         │     ├─ ContentView.swift
         │     ├─ Resources
-        │     │  └─ Localizable.xcstrings
+        │     │  ├─ Localizable.xcstrings
+        │     │  └─ Module.xcassets
+        │     │     └─ Contents.json
         │     ├─ Skip
         │     │  └─ skip.yml
         │     ├─ TOP_MODULE.swift
@@ -628,7 +653,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitApp5ModuleNoZeroCommand() async throws {
-        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: false, tests: false, appid: "some.cool.app", moduleNames: "M1", "M2", "M3", "M4", "M5")
+        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: false, tests: false, fastlane: false, appid: "some.cool.app", moduleNames: "M1", "M2", "M3", "M4", "M5")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -655,6 +680,7 @@ final class SkipCommandTests: XCTestCase {
         │  │  │  └─ Contents.json
         │  │  └─ Contents.json
         │  ├─ Entitlements.plist
+        │  ├─ Info.plist
         │  ├─ M1.xcconfig
         │  ├─ M1.xcodeproj
         │  │  └─ project.pbxproj
@@ -669,7 +695,9 @@ final class SkipCommandTests: XCTestCase {
            │  ├─ M1.swift
            │  ├─ M1App.swift
            │  ├─ Resources
-           │  │  └─ Localizable.xcstrings
+           │  │  ├─ Localizable.xcstrings
+           │  │  └─ Module.xcassets
+           │  │     └─ Contents.json
            │  └─ Skip
            │     └─ skip.yml
            ├─ M2
@@ -741,7 +769,7 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
-    func libInitComand(projectName: String, free: Bool? = nil, zero: Bool? = nil, tests moduleTests: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, resourcePath: String? = "Resources", iconColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
+    func libInitComand(projectName: String, free: Bool? = nil, zero: Bool? = nil, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, resourcePath: String? = "Resources", iconColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["lib", "init", "-jA", "--no-build", "--no-test", "--show-tree"]
@@ -761,6 +789,12 @@ final class SkipCommandTests: XCTestCase {
             cmd += ["--module-tests"]
         } else if moduleTests == false {
             cmd += ["--no-module-tests"]
+        }
+
+        if fastlane == true {
+            cmd += ["--fastlane"]
+        } else if fastlane == false {
+            cmd += ["--no-fastlane"]
         }
 
         if validatePackage == true {

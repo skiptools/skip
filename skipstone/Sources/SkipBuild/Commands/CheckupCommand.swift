@@ -40,7 +40,7 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
             let checkupModules = try [PackageModule(parse: "HelloSkip")]
             
             // create a project differently based on the index, but the ultimate binary output should be identical
-            return try await initSkipProject(projectName: "hello-skip", modules: checkupModules, resourceFolder: "Resources", dir: URL(fileURLWithPath: tmpdir, isDirectory: true), verify: true, configuration: self.configuration, build: primary, test: primary, returnHashes: doubleCheck, messagePrefix: !primary ? "Re-" : "", showTree: false, chain: true, gitRepo: false, free: true, zero: true, appid: "skip.hello.App", iconColor: nil, version: "1.0.0", moduleTests: primary, validatePackage: true, packageResolved: packageResolvedURL, apk: true, ipa: true, with: out)
+            return try await initSkipProject(projectName: "hello-skip", modules: checkupModules, resourceFolder: "Resources", dir: URL(fileURLWithPath: tmpdir, isDirectory: true), verify: true, configuration: self.configuration, build: primary, test: primary, returnHashes: doubleCheck, messagePrefix: !primary ? "Re-" : "", showTree: false, chain: true, gitRepo: false, free: true, zero: true, appid: "skip.hello.App", iconColor: nil, version: "1.0.0", moduleTests: primary, fastlane: true, validatePackage: true, packageResolved: packageResolvedURL, apk: true, ipa: true, with: out)
         }
 
         // build a sample project (twice when performing a double-check)

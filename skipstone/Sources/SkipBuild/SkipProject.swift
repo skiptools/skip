@@ -141,14 +141,14 @@ class FrameworkProjectLayout {
 
             """
 
-            try (isAppModule ? skipYamlApp : skipYamlGeneric).write(to: sourceSkipYamlFile, atomically: true, encoding: .utf8)
+            try (isAppModule ? skipYamlApp : skipYamlGeneric).write(to: sourceSkipYamlFile, atomically: false, encoding: .utf8)
 
             let sourceSwiftFile = sourceDir.appending(path: "\(moduleName).swift")
             try """
             \(sourceHeader)public class \(moduleName)Module {
             }
 
-            """.write(to: sourceSwiftFile, atomically: true, encoding: .utf8)
+            """.write(to: sourceSwiftFile, atomically: false, encoding: .utf8)
 
             var resourcesAttribute: String = ""
             if let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
@@ -497,7 +497,7 @@ class FrameworkProjectLayout {
   },
   "version" : "1.0"
 }
-""".write(to: sourceResourcesFile, atomically: true, encoding: .utf8)
+""".write(to: sourceResourcesFile, atomically: false, encoding: .utf8)
             }
 
 
@@ -538,7 +538,7 @@ class FrameworkProjectLayout {
                     var testModuleName: String
                 }
                 """ } ?? "")
-                """.write(to: testSwiftFile, atomically: true, encoding: .utf8)
+                """.write(to: testSwiftFile, atomically: false, encoding: .utf8)
 
                 let testSkipModuleFile = testDir.appending(path: "XCSkipTests.swift")
                 try """
@@ -571,7 +571,7 @@ class FrameworkProjectLayout {
                 /// True if the system's `Int` type is 32-bit.
                 let is32BitInteger = Int64(Int.max) == Int64(Int32.max)
 
-                """.write(to: testSkipModuleFile, atomically: true, encoding: .utf8)
+                """.write(to: testSkipModuleFile, atomically: false, encoding: .utf8)
 
                 let skipYamlAppTests = """
                 # Configuration file for https://skip.tools project
@@ -579,7 +579,7 @@ class FrameworkProjectLayout {
                 #  contents:
                 """
                 let testSkipYamlFile = testSkipDir.appending(path: "skip.yml")
-                try (isAppModule ? skipYamlAppTests : skipYamlGeneric).write(to: testSkipYamlFile, atomically: true, encoding: .utf8)
+                try (isAppModule ? skipYamlAppTests : skipYamlGeneric).write(to: testSkipYamlFile, atomically: false, encoding: .utf8)
 
                 if let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
                     let testResourcesDir = try testDir.append(path: resourceFolder, create: true)
@@ -588,7 +588,7 @@ class FrameworkProjectLayout {
                     {
                       "testModuleName": "\(moduleName)"
                     }
-                    """.write(to: testResourcesFile, atomically: true, encoding: .utf8)
+                    """.write(to: testResourcesFile, atomically: false, encoding: .utf8)
 
                     resourcesAttribute = ", resources: [.process(\"\(resourceFolder)\")]"
                 }
@@ -697,7 +697,7 @@ class FrameworkProjectLayout {
         """
 
         let packageSwiftURL = projectFolderURL.appending(path: "Package.swift")
-        try packageSource.write(to: packageSwiftURL, atomically: true, encoding: .utf8)
+        try packageSource.write(to: packageSwiftURL, atomically: false, encoding: .utf8)
 
         // now snapshot the file tree for inclusion in the README
         // let fileTree = try localFileSystem.treeASCIIRepresentation(at: projectFolderURL.absolutePath, hideHiddenFiles: true)
@@ -786,13 +786,13 @@ class FrameworkProjectLayout {
 
         """
 
-        try (app ? appREADME : libREADME).write(to: readmeURL, atomically: true, encoding: .utf8)
+        try (app ? appREADME : libREADME).write(to: readmeURL, atomically: false, encoding: .utf8)
 
         if free == true {
             if app {
-                try licenseGPL.write(to: projectFolderURL.appending(path: "LICENSE.GPL"), atomically: true, encoding: .utf8)
+                try licenseGPL.write(to: projectFolderURL.appending(path: "LICENSE.GPL"), atomically: false, encoding: .utf8)
             } else {
-                try licenseLGPL.write(to: projectFolderURL.appending(path: "LICENSE.LGPL"), atomically: true, encoding: .utf8)
+                try licenseLGPL.write(to: projectFolderURL.appending(path: "LICENSE.LGPL"), atomically: false, encoding: .utf8)
             }
         }
 
@@ -811,6 +811,7 @@ class AppProjectLayout : FrameworkProjectLayout {
     let moduleSourcesSkipConfig: URL
     let testsFolder: URL
     let moduleTestsFolder: URL
+    let moduleResourcesFolder: URL
 
     let darwinFolder: URL
     let darwinREADME: URL
@@ -820,12 +821,18 @@ class AppProjectLayout : FrameworkProjectLayout {
     let darwinAccentColorContents: URL
     let darwinAppIconFolder: URL
     let darwinAppIconContents: URL
+
+    let darwinModuleAssetsFolder: URL
+    let darwinModuleAssetsFolderContents: URL
+
     let darwinEntitlementsPlist: URL
+    let darwinInfoPlist: URL
     let darwinProjectConfig: URL
     let darwinProjectFolder: URL
     let darwinProjectContents: URL
     let darwinSourcesFolder: URL
     let darwinMainAppSwift: URL
+    let darwinFastlaneFolder: URL
 
     let androidFolder: URL
     let androidREADME: URL
@@ -841,6 +848,7 @@ class AppProjectLayout : FrameworkProjectLayout {
     let androidManifest: URL
     let androidAppSrcMainRes: URL
     let androidAppSrcMainKotlin: URL
+    let androidFastlaneFolder: URL
 
 
     init(moduleName: String, root: URL, check: (URL, Bool) throws -> () = checkURLExists) rethrows {
@@ -852,6 +860,7 @@ class AppProjectLayout : FrameworkProjectLayout {
 
         self.sourcesFolder = try root.resolve("Sources/", check: check)
         self.moduleSourcesFolder = try sourcesFolder.resolve(moduleName + "/", check: check)
+        self.moduleResourcesFolder = try moduleSourcesFolder.resolve("Resources/", check: check)
         self.moduleSourcesSkipFolder = try moduleSourcesFolder.resolve("Skip/", check: check)
         self.moduleSourcesSkipConfig = try moduleSourcesSkipFolder.resolve("skip.yml", check: check)
 
@@ -866,12 +875,20 @@ class AppProjectLayout : FrameworkProjectLayout {
         self.darwinProjectFolder = try darwinFolder.resolve(moduleName + ".xcodeproj/", check: check)
         self.darwinProjectContents = try darwinProjectFolder.resolve("project.pbxproj", check: check)
         self.darwinEntitlementsPlist = try darwinFolder.resolve("Entitlements.plist", check: check)
+        self.darwinInfoPlist = try darwinFolder.resolve("Info.plist", check: check)
+
         self.darwinAssetsFolder = try darwinFolder.resolve("Assets.xcassets/", check: check)
         self.darwinAssetsContents = try darwinAssetsFolder.resolve("Contents.json", check: check)
         self.darwinAccentColorFolder = try darwinAssetsFolder.resolve("AccentColor.colorset/", check: check)
         self.darwinAccentColorContents = try darwinAccentColorFolder.resolve("Contents.json", check: check)
         self.darwinAppIconFolder = try darwinAssetsFolder.resolve("AppIcon.appiconset/", check: check)
         self.darwinAppIconContents = try darwinAppIconFolder.resolve("Contents.json", check: check)
+
+        self.darwinModuleAssetsFolder = try moduleResourcesFolder.resolve("Module.xcassets/", check: check)
+        self.darwinModuleAssetsFolderContents = try darwinModuleAssetsFolder.resolve("Contents.json", check: check)
+        // TODO: add logoPDF
+
+        self.darwinFastlaneFolder = darwinFolder.resolve("fastlane/", check: optional)
 
         self.androidFolder = try root.resolve("Android/", check: check)
         self.androidREADME = androidFolder.resolve("README.md", check: optional)
@@ -887,6 +904,7 @@ class AppProjectLayout : FrameworkProjectLayout {
         self.androidAppSrcMainRes = androidAppSrcMain.resolve("res/", check: optional)
         //self.androidAppSrcIconMDPI = try androidAppSrcRes.resolve("mipmap-mdpi/", check: check)
         self.androidAppSrcMainKotlin = try androidAppSrcMain.resolve("kotlin/", check: check)
+        self.androidFastlaneFolder = androidFolder.resolve("fastlane/", check: optional)
 
         //self.androidAppSrcMainKotlinModule = try androidAppSrcMainKotlin.resolve("src/", check: check)
 
@@ -894,7 +912,7 @@ class AppProjectLayout : FrameworkProjectLayout {
     }
 
 
-    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, iconColor: String?, version: String?, moduleTests: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool) throws -> (baseURL: URL, project: AppProjectLayout) {
+    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, iconColor: String?, version: String?, moduleTests: Bool, fastlane: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool) throws -> (baseURL: URL, project: AppProjectLayout) {
 
         let sourceHeader = free ? freeLicenseHeader(type: nil) : ""
 
@@ -952,17 +970,32 @@ class AppProjectLayout : FrameworkProjectLayout {
 
 """
 
-        try appEntitlementsContents.write(to: appProject.darwinEntitlementsPlist.createParentDirectory(), atomically: true, encoding: .utf8)
+        try appEntitlementsContents.write(to: appProject.darwinEntitlementsPlist.createParentDirectory(), atomically: false, encoding: .utf8)
+
+        // Sources/PlaygroundApp/Info.plist
+        let infoPlistContents = """
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+</dict>
+</plist>
+
+"""
+
+        try infoPlistContents.write(to: appProject.darwinInfoPlist.createParentDirectory(), atomically: false, encoding: .utf8)
 
         // create the top-level Skip.env which is the source or truth for Xcode and Gradle
         let skipEnvContents = """
-// The configuration file for your Skip App (https://skip.tools)
-// Properties specified here are shared between Darwin/\(appModuleName).xcconfig and Android/settings.gradle.kts
+// The configuration file for your Skip App (https://skip.tools).
+// Properties specified here are shared between
+// Darwin/\(appModuleName).xcconfig and Android/settings.gradle.kts
+// and will be included in the app's metadata files
+// Info.plist and AndroidManifest.xml
 
-// The name of the project, which must match the SPM project name in Package.swift
-SKIP_PROJECT_NAME = \(projectName)
-
-// PRODUCT_NAME is the default title of the app
+// PRODUCT_NAME is the default title of the app, which must match the app's Swift module name
 PRODUCT_NAME = \(appModuleName)
 
 // PRODUCT_BUNDLE_IDENTIFIER is the unique id for both the iOS and Android app
@@ -979,7 +1012,7 @@ ANDROID_PACKAGE_NAME = \(appModulePackage)
 
 """
 
-        try skipEnvContents.write(to: appProject.skipEnv, atomically: true, encoding: .utf8)
+        try skipEnvContents.write(to: appProject.skipEnv, atomically: false, encoding: .utf8)
         //let skipEnvFileName = appProject.skipEnv.lastPathComponent
 
         let skipEnvBaseName = "Skip.env"
@@ -998,6 +1031,7 @@ SKIP_ACTION = launch
 ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor
 
+INFOPLIST_FILE = Info.plist
 GENERATE_INFOPLIST_FILE = YES
 
 // The user-visible name of the app (localizable)
@@ -1013,12 +1047,26 @@ INFOPLIST_KEY_UISupportedInterfaceOrientations[sdk=iphone*] = UIInterfaceOrienta
 
 IPHONEOS_DEPLOYMENT_TARGET = 16.0
 MACOSX_DEPLOYMENT_TARGET = 13.0
+SUPPORTS_MACCATALYST = NO
+
+// iPhone + iPad
+TARGETED_DEVICE_FAMILY = 1,2
+
+// iPhone only
+// TARGETED_DEVICE_FAMILY = 1
+
+SWIFT_EMIT_LOC_STRINGS = YES
 
 // the name of the product module; this can be anything, but cannot conflict with any Swift module names
 PRODUCT_MODULE_NAME = $(PRODUCT_NAME:c99extidentifier)App
 
 // On-device testing may need to override the bundle ID
 // PRODUCT_BUNDLE_IDENTIFIER[config=Debug][sdk=iphoneos*] = cool.beans.BundleIdentifer
+
+SDKROOT = auto
+SUPPORTED_PLATFORMS = iphoneos iphonesimulator macosx
+SWIFT_EMIT_LOC_STRINGS = YES
+SWIFT_VERSION = 5.0
 
 // Development team ID for on-device testing
 CODE_SIGNING_REQUIRED = NO
@@ -1029,9 +1077,321 @@ CODE_SIGN_ENTITLEMENTS = Entitlements.plist
 
 """
 
-        try configContents.write(to: appProject.darwinProjectConfig, atomically: true, encoding: .utf8)
+        try configContents.write(to: appProject.darwinProjectConfig, atomically: false, encoding: .utf8)
         let xcconfigFileName = appProject.darwinProjectConfig.lastPathComponent
         let _ = xcconfigFileName
+
+        if fastlane {
+            try createFastlaneMetadata()
+        }
+
+        func createFastlaneMetadata() throws {
+            try createFastlaneAndroidMetadata()
+            try createFastlaneDarwinMetadata()
+        }
+
+        func createFastlaneAndroidMetadata() throws {
+            // README.md
+            try """
+This is a stock fastlane configuration file for your Skip project.
+To use fastlane to distribute your app:
+
+1. Update the metadata text files in metadata/android/en-US/
+2. Add screenshots to screenshots/en-US
+3. Download your Android API JSON file to apikey.json (see https://docs.fastlane.tools/actions/upload_to_play_store/)
+4. Run `fastlane assemble` to build the app
+5. Run `fastlane release` to submit a new release to the App Store
+
+For the bundle name and version numbers, the ../Skip.env file will be used.
+
+More information about _fastlane_ can be found on [fastlane.tools](https://fastlane.tools).
+
+The documentation of _fastlane_ can be found on [docs.fastlane.tools](https://docs.fastlane.tools).
+
+""".write(to: appProject.androidFastlaneFolder.appendingPathComponent("README.md").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // Appfile
+            try """
+# This file contains the app distribution configuration
+# for the Android half of the Skip app.
+# You can find the documentation at https://docs.fastlane.tools
+
+# Load the shared Skip.env properties with the app info
+require('dotenv')
+Dotenv.load '../../Skip.env'
+package_name(ENV['PRODUCT_BUNDLE_IDENTIFIER'])
+
+# Path to the json secret file - Follow https://docs.fastlane.tools/actions/supply/#setup to get one
+json_key_file("fastlane/apikey.json")
+
+""".write(to: appProject.androidFastlaneFolder.appendingPathComponent("Appfile").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // Fastfile
+            try """
+# This file contains the fastlane.tools configuration
+# for the Android half of the Skip app.
+# You can find the documentation at https://docs.fastlane.tools
+
+# Load the shared Skip.env properties with the app info
+require('dotenv')
+Dotenv.load '../../Skip.env'
+
+default_platform(:android)
+
+# use the Homebrew gradle rather than expecting a local gradlew
+gradle_bin = (ENV['HOMEBREW_PREFIX'] ? ENV['HOMEBREW_PREFIX'] : "/opt/homebrew") + "/bin/gradle"
+
+default_platform(:android)
+
+desc "Build Skip Android App"
+lane :build do |options|
+  build_config = (options[:release] ? "Release" : "Debug")
+  gradle(
+    task: "build${build_config}",
+    gradle_path: gradle_bin,
+    flags: "--warning-mode none -x lint"
+  )
+end
+
+desc "Test Skip Android App"
+lane :test do
+  gradle(
+    task: "test",
+    gradle_path: gradle_bin
+  )
+end
+
+desc "Assemble Skip Android App"
+lane :assemble do
+  gradle(
+    gradle_path: gradle_bin,
+    task: "bundleRelease"
+  )
+  # sh "your_script.sh"
+end
+
+desc "Deploy Skip Android App to Google Play"
+lane :release do
+  assemble
+  upload_to_play_store(
+    aab: '../.build/Android/app/outputs/bundle/release/app-release.aab'
+  )
+end
+
+""".write(to: appProject.androidFastlaneFolder.appendingPathComponent("Fastfile").createParentDirectory(), atomically: false, encoding: .utf8)
+
+
+            // metadata/android/en-US/full_description.txt
+            try """
+A great new app built with Skip!
+
+""".write(to: appProject.androidFastlaneFolder.appendingPathComponent("metadata/android/en-US/full_description.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // metadata/android/en-US/title.txt
+            try """
+\(appModuleName)
+
+""".write(to: appProject.androidFastlaneFolder.appendingPathComponent("metadata/android/en-US/title.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // metadata/android/en-US/short_description.txt
+            try """
+A great new app built with Skip!
+
+""".write(to: appProject.androidFastlaneFolder.appendingPathComponent("metadata/android/en-US/short_description.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+
+
+        }
+
+        func createFastlaneDarwinMetadata() throws {
+            // README.md
+            try """
+This is a stock fastlane configuration file for your Skip project.
+To use fastlane to distribute your app:
+
+1. Update the metadata text files in metadata/en-US/
+2. Add screenshots to screenshots/en-US
+3. Download your App Store Connect API JSON file to apikey.json
+4. Run `fastlane assemble` to build the app
+5. Run `fastlane release` to submit a new release to the App Store
+
+For the bundle name and version numbers, the ../Skip.env file will be used.
+
+More information about _fastlane_ can be found on [fastlane.tools](https://fastlane.tools).
+
+The documentation of _fastlane_ can be found on [docs.fastlane.tools](https://docs.fastlane.tools).
+
+""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("README.md").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // Fastfile
+            try """
+# This file contains the fastlane.tools configuration
+# for the iOS half of the Skip app.
+# You can find the documentation at https://docs.fastlane.tools
+
+default_platform(:ios)
+
+lane :assemble do |options|
+  # only build the iOS side of the app
+  ENV["SKIP_ZERO"] = "true"
+  build_app(
+    sdk: "iphoneos",
+    xcconfig: "fastlane/AppStore.xcconfig",
+    xcargs: "-skipPackagePluginValidation -skipMacroValidation",
+    derived_data_path: "../.build/Darwin/DerivedData",
+    output_directory: "../.build/fastlane/Darwin",
+    skip_archive: ENV["FASTLANE_SKIP_ARCHIVE"] == "YES",
+    skip_codesigning: ENV["FASTLANE_SKIP_CODESIGNING"] == "YES"
+  )
+end
+
+lane :release do |options|
+  desc "Build and release app"
+
+  assemble
+
+  upload_to_app_store(
+    api_key_path: "fastlane/apikey.json",
+    app_rating_config_path: "fastlane/metadata/rating.json",
+    release_notes: { default: "Fixes and improvements." }
+  )
+end
+
+
+""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("Fastfile").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // Appfile
+            try """
+# For more information about the Appfile, see:
+#     https://docs.fastlane.tools/advanced/#appfile
+
+require('dotenv')
+Dotenv.load '../../Skip.env'
+#app_identifier(ENV['PRODUCT_BUNDLE_IDENTIFIER'])
+
+# apple_id("my@email")
+
+""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("Appfile").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // Deliverfile
+            try """
+
+copyright "#{Time.now.year}"
+default_language("en-US")
+
+force(true) # Skip HTML report verification
+automatic_release(true)
+skip_screenshots(false)
+precheck_include_in_app_purchases(false)
+
+#skip_binary_upload(true)
+submit_for_review(true)
+
+submission_information({
+    add_id_info_serves_ads: false,
+    add_id_info_uses_idfa: false,
+    add_id_info_tracks_install: false,
+    add_id_info_tracks_action: false,
+    add_id_info_limits_tracking: false,
+    content_rights_has_rights: false,
+    content_rights_contains_third_party_content: false,
+    export_compliance_contains_third_party_cryptography: false,
+    export_compliance_encryption_updated: false,
+    export_compliance_platform: 'ios',
+    export_compliance_compliance_required: false,
+    export_compliance_uses_encryption: false,
+    export_compliance_is_exempt: false,
+    export_compliance_contains_proprietary_cryptography: false
+})
+
+""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("Deliverfile").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // AppStore.xcconfig
+            try """
+// Additional properties included by the Fastfile build_app
+
+// This file can be used to override various properties from Skip.env
+//PRODUCT_BUNDLE_IDENTIFIER =
+//DEVELOPMENT_TEAM =
+
+""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("AppStore.xcconfig").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // rating.json
+            try """
+{
+  "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+  "contests": "NONE",
+  "gamblingSimulated": "NONE",
+  "horrorOrFearThemes": "NONE",
+  "matureOrSuggestiveThemes": "NONE",
+  "medicalOrTreatmentInformation": "NONE",
+  "profanityOrCrudeHumor": "NONE",
+  "sexualContentGraphicAndNudity": "NONE",
+  "sexualContentOrNudity": "NONE",
+  "violenceCartoonOrFantasy": "NONE",
+  "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+  "violenceRealistic": "NONE",
+  "gambling": false,
+  "seventeenPlus": false,
+  "unrestrictedWebAccess": false
+}
+
+""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/rating.json").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // description.txt
+            try """
+A great new app built with Skip!
+
+""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/description.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // keywords.txt
+            try """
+app,key,words
+
+""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/keywords.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // privacy_url.txt
+            try """
+https://example.org/privacy/
+
+""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/privacy_url.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // release_notes.txt
+            try """
+Bug fixes and performance improvements.
+
+""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/release_notes.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // software_url.txt
+            try """
+https://example.org/app/
+
+""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/software_url.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // subtitle.txt
+            try """
+A new Skip app
+
+""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/subtitle.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // support_url.txt
+            try """
+https://example.org/support/
+
+""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/support_url.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // title.txt
+            try """
+\(appModuleName)
+
+""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/title.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+
+            // version_whats_new.txt
+            try """
+New features and better performance.
+
+""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/version_whats_new.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+
+        }
 
         // Darwin/Sources/MODULEAppMain.swift
         let appMainContents = """
@@ -1043,7 +1403,7 @@ CODE_SIGN_ENTITLEMENTS = Entitlements.plist
         }
 
         """
-        try appMainContents.write(to: primaryModuleAppMainURL.createParentDirectory(), atomically: true, encoding: .utf8)
+        try appMainContents.write(to: primaryModuleAppMainURL.createParentDirectory(), atomically: false, encoding: .utf8)
 
         // Sources/Playground/PlaygroundApp.swift
         let appExtContents = """
@@ -1094,7 +1454,7 @@ public extension \(primaryModuleAppTarget) {
 
         let appModuleApplicationStubFileURL = projectURL.appending(path: appModuleApplicationStubFilePath)
         try FileManager.default.createDirectory(at: appModuleApplicationStubFileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try appExtContents.write(to: appModuleApplicationStubFileURL, atomically: true, encoding: .utf8)
+        try appExtContents.write(to: appModuleApplicationStubFileURL, atomically: false, encoding: .utf8)
 
 
         // Sources/Playground/PlaygroundApp.swift
@@ -1185,7 +1545,7 @@ enum Tab : String, Hashable {
 
         let contentViewURL = projectURL.appending(path: contentViewRelativePath)
         try FileManager.default.createDirectory(at: contentViewURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try contentViewContents.write(to: contentViewURL, atomically: true, encoding: .utf8)
+        try contentViewContents.write(to: contentViewURL, atomically: false, encoding: .utf8)
 
 
         let Assets_xcassets_URL = try appProject.darwinAssetsFolder.createDirectory()
@@ -1201,8 +1561,9 @@ enum Tab : String, Hashable {
     "version" : 1
   }
 }
+
 """
-        try Assets_xcassets_Contents.write(to: Assets_xcassets_Contents_URL, atomically: true, encoding: .utf8)
+        try Assets_xcassets_Contents.write(to: Assets_xcassets_Contents_URL, atomically: false, encoding: .utf8)
 
         let Assets_xcassets_AccentColor = try Assets_xcassets_URL.append(path: "AccentColor.colorset", create: true)
         let Assets_xcassets_AccentColor_Contents = """
@@ -1217,11 +1578,12 @@ enum Tab : String, Hashable {
     "version" : 1
   }
 }
+
 """
 
 
         let Assets_xcassets_AccentColor_ContentsURL = Assets_xcassets_AccentColor.appending(path: "Contents.json")
-        try Assets_xcassets_AccentColor_Contents.write(to: Assets_xcassets_AccentColor_ContentsURL, atomically: true, encoding: .utf8)
+        try Assets_xcassets_AccentColor_Contents.write(to: Assets_xcassets_AccentColor_ContentsURL, atomically: false, encoding: .utf8)
 
         let Assets_xcassets_AppIcon_Contents: String
         if hasIcon {
@@ -1413,7 +1775,18 @@ enum Tab : String, Hashable {
 """
         }
 
-        try Assets_xcassets_AppIcon_Contents.write(to: appProject.darwinAppIconContents.createParentDirectory(), atomically: true, encoding: .utf8)
+        try Assets_xcassets_AppIcon_Contents.write(to: appProject.darwinAppIconContents.createParentDirectory(), atomically: false, encoding: .utf8)
+
+        // Sources/ModuleName/Resources/Module.xcassets/Contents.json
+        try """
+{
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
+
+""".write(to: appProject.darwinModuleAssetsFolderContents.createParentDirectory(), atomically: false, encoding: .utf8)
 
         func createXcodeProj() -> String {
             // the .xcodeproj file is located in the Darwin/ folder
@@ -1476,6 +1849,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 /* Begin PBXFileReference section */
         493609562A6B7EAE00C401E2 /* \(APP) */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = \(APP); path = ..; sourceTree = "<group>"; };
         496BDBEB2B89A47800C09264 /* \(APP).app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = \(APP).app; sourceTree = BUILT_PRODUCTS_DIR; };
+        4900101C2BACEA710000DE33 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info.plist"; sourceTree = "<group>"; };
         496BDBED2B8A7E9C00C09264 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = Localizable.xcstrings; path = ../Sources/\(APP)/Resources/Localizable.xcstrings; sourceTree = "<group>"; };
         496EB72F2A6AE4DE00C1253A /* Skip.env */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Skip.env; path = ../Skip.env; sourceTree = "<group>"; };
         496EB72F2A6AE4DE00C1253B /* \(APP).xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = \(APP).xcconfig; sourceTree = "<group>"; };
@@ -1534,6 +1908,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
                 49F90C2B2A52156200F06D93 /* \(APP)AppMain.swift */,
                 49F90C2F2A52156300F06D93 /* Assets.xcassets */,
                 49F90C312A52156300F06D93 /* Entitlements.plist */,
+                4900101C2BACEA710000DE33 /* Info.plist */,
             );
             name = App;
             sourceTree = "<group>";
@@ -1571,7 +1946,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
             attributes = {
                 BuildIndependentTargetsInParallel = 1;
                 LastSwiftUpdateCheck = 1430;
-                LastUpgradeCheck = 1500;
+                LastUpgradeCheck = 1540;
             };
             buildConfigurationList = 49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(APP)" */;
             compatibilityVersion = "Xcode 14.0";
@@ -1642,50 +2017,12 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-        491FCC8E2AD18D38002FB1E1 /* Skippy */ = {
-            isa = XCBuildConfiguration;
-            baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(APP).xcconfig */;
-            buildSettings = {
-                ALWAYS_SEARCH_USER_PATHS = NO;
-                ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-                COPY_PHASE_STRIP = NO;
-                DEBUG_INFORMATION_FORMAT = dwarf;
-                ENABLE_BITCODE = NO;
-                ENABLE_NS_ASSERTIONS = NO;
-                ENABLE_STRICT_OBJC_MSGSEND = YES;
-                ENABLE_USER_SCRIPT_SANDBOXING = NO;
-                LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-                MTL_ENABLE_DEBUG_INFO = NO;
-                MTL_FAST_MATH = YES;
-                SWIFT_COMPILATION_MODE = wholemodule;
-            };
-            name = Skippy;
-        };
-        491FCC8F2AD18D38002FB1E1 /* Skippy */ = {
-            isa = XCBuildConfiguration;
-            buildSettings = {
-                ENABLE_PREVIEWS = YES;
-                LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-                "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-                SDKROOT = auto;
-                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
-                SWIFT_EMIT_LOC_STRINGS = YES;
-                SWIFT_VERSION = 5.0;
-                TARGETED_DEVICE_FAMILY = "1,2";
-            };
-            name = Skippy;
-        };
         499CD4422AC5B799001AE8D8 /* Debug */ = {
             isa = XCBuildConfiguration;
             buildSettings = {
                 ENABLE_PREVIEWS = YES;
                 LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
                 "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-                SDKROOT = auto;
-                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
-                SWIFT_EMIT_LOC_STRINGS = YES;
-                SWIFT_VERSION = 5.0;
-                TARGETED_DEVICE_FAMILY = "1,2";
             };
             name = Debug;
         };
@@ -1695,11 +2032,6 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
                 ENABLE_PREVIEWS = YES;
                 LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
                 "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-                SDKROOT = auto;
-                SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
-                SWIFT_EMIT_LOC_STRINGS = YES;
-                SWIFT_VERSION = 5.0;
-                TARGETED_DEVICE_FAMILY = "1,2";
             };
             name = Release;
         };
@@ -1711,7 +2043,6 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
                 ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
                 COPY_PHASE_STRIP = NO;
                 DEBUG_INFORMATION_FORMAT = dwarf;
-                ENABLE_BITCODE = NO;
                 ENABLE_STRICT_OBJC_MSGSEND = YES;
                 ENABLE_TESTABILITY = YES;
                 ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1732,7 +2063,6 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
                 ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
                 COPY_PHASE_STRIP = NO;
                 DEBUG_INFORMATION_FORMAT = dwarf;
-                ENABLE_BITCODE = NO;
                 ENABLE_NS_ASSERTIONS = NO;
                 ENABLE_STRICT_OBJC_MSGSEND = YES;
                 ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1751,7 +2081,6 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
             buildConfigurations = (
                 499CD4422AC5B799001AE8D8 /* Debug */,
                 499CD4432AC5B799001AE8D8 /* Release */,
-                491FCC8F2AD18D38002FB1E1 /* Skippy */,
             );
             defaultConfigurationIsVisible = 0;
             defaultConfigurationName = Release;
@@ -1761,7 +2090,6 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
             buildConfigurations = (
                 49F90C4B2A52156300F06D93 /* Debug */,
                 49F90C4C2A52156300F06D93 /* Release */,
-                491FCC8E2AD18D38002FB1E1 /* Skippy */,
             );
             defaultConfigurationIsVisible = 0;
             defaultConfigurationName = Release;
@@ -1784,20 +2112,20 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
         let xcodeProjectContents = createXcodeProj()
         let xcodeProjectPbxprojURL = appProject.darwinProjectContents
         // change spaces to tabs in the pbxproj, since that is what Xcode will do when it saves it
-        try xcodeProjectContents.replacingOccurrences(of: "    ", with: "\t").write(to: xcodeProjectPbxprojURL, atomically: true, encoding: .utf8)
+        try xcodeProjectContents.replacingOccurrences(of: "    ", with: "\t").write(to: xcodeProjectPbxprojURL, atomically: false, encoding: .utf8)
 
         let androidIconName: String? = hasIcon ? "mipmap/ic_launcher" : nil
-        try createAndroidManifest(androidIconName: androidIconName).write(to: appProject.androidManifest.createParentDirectory(), atomically: true, encoding: .utf8)
-        try createSettingsGradle().write(to: appProject.androidGradleSettings, atomically: true, encoding: .utf8)
-        try createAppBuildGradle(appModulePackage: appModulePackage, appModuleName: appModuleName).write(to: appProject.androidAppBuildGradle, atomically: true, encoding: .utf8)
-        try defaultProguardContents(appModulePackage).write(to: appProject.androidAppProguardRules, atomically: true, encoding: .utf8)
-        try defaultGradleProperties().write(to: appProject.androidGradleProperties, atomically: true, encoding: .utf8)
-        try defaultGradleWrapperProperties().write(to: appProject.androidGradleWrapperProperties.createParentDirectory(), atomically: true, encoding: .utf8)
+        try createAndroidManifest(androidIconName: androidIconName).write(to: appProject.androidManifest.createParentDirectory(), atomically: false, encoding: .utf8)
+        try createSettingsGradle().write(to: appProject.androidGradleSettings, atomically: false, encoding: .utf8)
+        try createAppBuildGradle(appModulePackage: appModulePackage, appModuleName: appModuleName).write(to: appProject.androidAppBuildGradle, atomically: false, encoding: .utf8)
+        try defaultProguardContents(appModulePackage).write(to: appProject.androidAppProguardRules, atomically: false, encoding: .utf8)
+        try defaultGradleProperties().write(to: appProject.androidGradleProperties, atomically: false, encoding: .utf8)
+        try defaultGradleWrapperProperties().write(to: appProject.androidGradleWrapperProperties.createParentDirectory(), atomically: false, encoding: .utf8)
 
 
         let sourceMainKotlinPackage = appProject.androidAppSrcMainKotlin.appendingPathComponent(appModulePackage.split(separator: ".").joined(separator: "/"), isDirectory: true)
         let sourceMainKotlinSourceFile = sourceMainKotlinPackage.appendingPathComponent("Main.kt")
-        try createKotlinMain(appModulePackage: appModulePackage, appModuleName: appModuleName).write(to: sourceMainKotlinSourceFile.createParentDirectory(), atomically: true, encoding: .utf8)
+        try createKotlinMain(appModulePackage: appModulePackage, appModuleName: appModuleName).write(to: sourceMainKotlinSourceFile.createParentDirectory(), atomically: false, encoding: .utf8)
 
         if gitRepo == true {
             // create the .gitignore file
@@ -1815,7 +2143,7 @@ DerivedData/
 
 """
 
-            try gitignore.write(to: projectURL.appending(path: ".gitignore"), atomically: true, encoding: .utf8)
+            try gitignore.write(to: projectURL.appending(path: ".gitignore"), atomically: false, encoding: .utf8)
         }
 
         return (projectURL, appProject)
@@ -1935,6 +2263,7 @@ extension FrameworkProjectLayout {
 
             defaultConfig {
                 minSdk = libs.versions.android.sdk.min.get().toInt()
+                targetSdk = libs.versions.android.sdk.compile.get().toInt()
                 // skip.tools.skip-build-plugin will automatically use Skip.env properties for:
                 // applicationId = PRODUCT_BUNDLE_IDENTIFIER
                 // versionCode = CURRENT_PROJECT_VERSION
@@ -2994,3 +3323,89 @@ func freeLicenseHeader(type: String?) -> String {
 
 """
 }
+
+// cat SkipLogo.pdf | base64 -b 80 -i - | pbcopy
+// not currently used, but we might populate the Module.xcassets catalog with it,
+// and use it as the basis for 
+fileprivate let logoPDF = """
+JVBERi0xLjMKJcTl8uXrp/Og0MTGCjMgMCBvYmoKPDwgL0ZpbHRlciAvRmxhdGVEZWNvZGUgL0xlbmd0
+aCAxMTQ5ID4+CnN0cmVhbQp4AXWVW2pmNxCE388qtAKlb2q1nrOCPGUBJmECdmDi/UO+lj0mkIRh4Lh+
+Xbqrq0rfxy/j+9Al05buYbZnpa/xNkxzmngN3TaP6BqvYDVXHAWT6SeDDTq1ZA3NmrqXP2YxZZ0NktMj
+a7wMc5mauzGbsZKLfE8r56TkajdOipg7lPtARCsf9sWep5LT15nHUgdVTjv73FW6WW4rZmp9IHVO9H07
+58d1a7JGHzsyM92G1p6rOKcWjVKRyZnbVXtXY3bWB6bl3THYkXOhBh49OXdu6q2Y6vDzChsxow9zMQ6z
+5kenb7pyzyklIHVmHZj1VTP20W5PuHDBou89Ny00w0ENClQ1M8zvSCJPDj9ruvfNoTMiHYQ2wy5Ta81Q
+mPIDZatX5ZlytFf53MLNtm8JytlQdjTp2WF9bSkKFUqw/byC5Sw/Z7jVdIoGOdOpwJBE9uJlU3XxA8OO
+YticRF/WSnCTuZzdSUln5+OohrvZv31KBttApOL0NkZlexsYhZ/icMpcQZW97X6UzUJbFzlZB+pC4GkJ
+24zuKmIgnV7VxS5GLA6CEvfixIReiVZiY0j1QgVf3S5dhawcEQJ1tRmDC3qJZSNasL4gD30L9Y3ADisK
+gh3BGqZhOojauiwT5p7rgCF+RzGtBKzEKjxGaygBMkuRWUDekssCQmolsApJ8BtloZdE8k22zr3VBpNl
+dZuOEjAeR/3Lty/j2/h1/DmEf4s9/H/++u0Dmjn+GD/9/I7W3weuy1VmxtcKjIvmZJZUcvJ4fxmtv3t/
+MLXb8NsT2qXD8Rf2CqOfmCKA61Fq/7H3H9i38fvNGl975tp4Eiuicu+swZ7on2k65nB8+uE83IMTAsIP
+cgTbSMKSdQSDCqpple/VIoNVJNAIUyzpfdTjyIaxUNqu1isY3Hdq5MR5WBaEahgwOeLLNyf1pFE5+1w5
+i3F6OFNsV6HSskY6+AxRQ+FMRGOHOxI5sA1o2zJipzHihtJ7WfY9YFnVcerqGNnb4xQvDBSMwFjaiaOM
+vTjYP2QZj9J9tsWRvC9YUEyP1btDl45f2ldfHM+PXHmQUCrJ2C49MNGUW2U+ShsuWNoYLs4ldRW3Ooub
+LaqBdTAmv4g4u5ZiPr2PNwKWEX+g2keNiG07vBDJeEvv69DtZFKDpiOK1YnYrr5TVLg3BqRkK1lMfQQO
+WaaPIpySTktY0N0PBgivh/fxeAQD8hiA6U18xlPCNDvViySkU1rW2JxEg90MKiFF4BhtNLHYiBAqYuc+
+IYEQ2lgnhctQn6zLJ0MSYqUr6a9zcKSiUq49o+MklfyEY8WKZNLAiSRlP2yMnNTA3UiR8Gf+/Q2tJMHW
+0Kd/IfDJc3LC7juBBIqyNnGN0jTsytZ5gl3QGGpPMZrobCvl2YTq3f59nDuUaDu8Cd7PJ1ooQsjutPgg
+q6mTl4SjmlnWh9x0RJCHvO7h+pbz/HDmlcl15n+kyfifNOGFFp41MiQxEXJ8pDWARE+nybFP0h2irk/f
+qAnHdU1fWNf5iUH969cugoe/boL8DRQHuCQKZW5kc3RyZWFtCmVuZG9iagoxIDAgb2JqCjw8IC9UeXBl
+IC9QYWdlIC9QYXJlbnQgMiAwIFIgL1Jlc291cmNlcyA0IDAgUiAvQ29udGVudHMgMyAwIFIgPj4KZW5k
+b2JqCjQgMCBvYmoKPDwgL1Byb2NTZXQgWyAvUERGIF0gL0NvbG9yU3BhY2UgPDwgL0NzMSA1IDAgUiA+
+PiA+PgplbmRvYmoKNiAwIG9iago8PCAvTiAzIC9BbHRlcm5hdGUgL0RldmljZVJHQiAvTGVuZ3RoIDI2
+MTIgL0ZpbHRlciAvRmxhdGVEZWNvZGUgPj4Kc3RyZWFtCngBnZZ3VFPZFofPvTe90BIiICX0GnoJINI7
+SBUEUYlJgFAChoQmdkQFRhQRKVZkVMABR4ciY0UUC4OCYtcJ8hBQxsFRREXl3YxrCe+tNfPemv3HWd/Z
+57fX2Wfvfde6AFD8ggTCdFgBgDShWBTu68FcEhPLxPcCGBABDlgBwOFmZgRH+EQC1Py9PZmZqEjGs/bu
+LoBku9ssv1Amc9b/f5EiN0MkBgAKRdU2PH4mF+UClFOzxRky/wTK9JUpMoYxMhahCaKsIuPEr2z2p+Yr
+u8mYlybkoRpZzhm8NJ6Mu1DemiXho4wEoVyYJeBno3wHZb1USZoA5fco09P4nEwAMBSZX8znJqFsiTJF
+FBnuifICAAiUxDm8cg6L+TlongB4pmfkigSJSWKmEdeYaeXoyGb68bNT+WIxK5TDTeGIeEzP9LQMjjAX
+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
+3N3puvNYmWJZXtnQruBdreXM8qLyt7tX7L5WYVtxYA9pj2SPtDKosr1Kr2pH1afqpOqBGo+a5r3qe7ft
+ndrH29e/321/0wGNA8UHPh4UHLx/yPdQa61BbcVh3OGsw8/rouq6v2d/X39E7Ujxkc9HhUelx8KPddU7
+1Nc3qDeUNsKNksax43HHb/3g9UN7E6vpUDOjufgEOCE58eLH+B/vngw82XmKfarpJ/2f9rbQWopaodbc
+1om2pDZpe0x73+mA050dzh0tP5v/fPSM9pmas8pnS8+RzhWcmzmfd37yQsaF8YuJF4c6V3Q+urTk0p2u
+sK7ey4GXr17xuXKp2737/FWXq2euOV07fZ19ve2G/Y3WHruell/sfmnpte9tvelws/2W462OvgV95/pd
++y/e9rp95Y7/nRsDiwb67i6+e/9e3D3pfd790QepD14/zHo4/Wj9Y+zjoicKTyqeqj+t/dX412apvfTs
+oNdgz7OIZ4+GuEMv/5X5r0/DBc+pzytGtEbqR61Hz4z5jN16sfTF8MuMl9Pjhb8p/rb3ldGrn353+71n
+YsnE8GvR65k/St6ovjn61vZt52To5NN3ae+mp4req74/9oH9oftj9MeR6exP+E+Vn40/d3wJ/PJ4Jm1m
+5t/3hPP7CmVuZHN0cmVhbQplbmRvYmoKNSAwIG9iagpbIC9JQ0NCYXNlZCA2IDAgUiBdCmVuZG9iagoy
+IDAgb2JqCjw8IC9UeXBlIC9QYWdlcyAvTWVkaWFCb3ggWzAgMCA1MTIgNTEyXSAvQ291bnQgMSAvS2lk
+cyBbIDEgMCBSIF0gPj4KZW5kb2JqCjcgMCBvYmoKPDwgL1R5cGUgL0NhdGFsb2cgL1BhZ2VzIDIgMCBS
+ID4+CmVuZG9iago4IDAgb2JqCjw8IC9Qcm9kdWNlciAobWFjT1MgVmVyc2lvbiAxNC41IFwoQnVpbGQg
+MjNGNzlcKSBRdWFydHogUERGQ29udGV4dCkgL0NyZWF0aW9uRGF0ZQooRDoyMDI0MDYwNTIyMzczOFow
+MCcwMCcpIC9Nb2REYXRlIChEOjIwMjQwNjA1MjIzNzM4WjAwJzAwJykgPj4KZW5kb2JqCnhyZWYKMCA5
+CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMTI0NCAwMDAwMCBuIAowMDAwMDA0MTM5IDAwMDAwIG4g
+CjAwMDAwMDAwMjIgMDAwMDAgbiAKMDAwMDAwMTMyNCAwMDAwMCBuIAowMDAwMDA0MTA0IDAwMDAwIG4g
+CjAwMDAwMDEzOTIgMDAwMDAgbiAKMDAwMDAwNDIyMiAwMDAwMCBuIAowMDAwMDA0MjcxIDAwMDAwIG4g
+CnRyYWlsZXIKPDwgL1NpemUgOSAvUm9vdCA3IDAgUiAvSW5mbyA4IDAgUiAvSUQgWyA8MWFlODJkYjBm
+ODg2YzVkZmI5OTQyZDZjNmE2MjQxODU+CjwxYWU4MmRiMGY4ODZjNWRmYjk5NDJkNmM2YTYyNDE4NT4g
+XSA+PgpzdGFydHhyZWYKNDQzMgolJUVPRgo=
+"""

@@ -161,8 +161,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         /// Load the given source file, tracking its last modified date for the timestamp on the `.sourcehash` marker file
         func inputSource(_ path: AbsolutePath) throws -> ByteString {
-            _ = addInputFile(path)
-            return try fs.readFileContents(path)
+            try fs.readFileContents(addInputFile(path))
         }
 
 

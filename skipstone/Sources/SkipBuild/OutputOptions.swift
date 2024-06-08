@@ -496,18 +496,37 @@ extension OutputOptions {
     @discardableResult static func checkFirstRun() -> Bool {
         let cfg = home(".skiptools")
 
-        defer {
-            try? FileManager.default.createDirectory(atPath: cfg, withIntermediateDirectories: true)
-            let env = cfg + "/skipkey.env"
-            if !FileManager.default.fileExists(atPath: env) {
-                try? """
-                # Obtain a Skip key from https://skip.tools for the SKIPKEY property
-                #SKIPKEY:
-                """.write(toFile: env, atomically: true, encoding: .utf8)
-            }
+        let firstRun = FileManager.default.fileExists(atPath: cfg) == false
+
+        try? FileManager.default.createDirectory(atPath: cfg, withIntermediateDirectories: true)
+        let env = cfg + "/skipkey.env"
+        if !FileManager.default.fileExists(atPath: env) {
+            try? """
+            # Obtain a Skip key from https://skip.tools for the SKIPKEY property
+            # Be sure that the key is on a single line, and that
+            # there is a space between the colon and the key string
+            #SKIPKEY:
+            """.write(toFile: env, atomically: false, encoding: .utf8)
         }
 
-        return FileManager.default.fileExists(atPath: cfg) == false
+        let yml = cfg + "/skip.yml"
+        if !FileManager.default.fileExists(atPath: yml) {
+            try? """
+# This file contains the configuration properties for Skip in the YAML format
+# See https://skip.tools/docs for the structure of the configuration file
+
+# The environment that will be set when Skip launches other tools
+environment:
+    # set ANDROID_SERIAL to override the default Android launch device/emulator
+    # use `adb devices` to list the available device identifiers
+    #ANDROID_SERIAL: emulator-5554
+    #ANDROID_SERIAL: 19091FDF600BAY
+
+"""
+                .write(toFile: yml, atomically: false, encoding: .utf8)
+        }
+
+        return firstRun
     }
 }
 

@@ -80,6 +80,9 @@ struct CreateOptions : ParsableArguments {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create test modules", valueName: "tests"))
     var moduleTests: Bool = true
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create fastlane metadata", valueName: "enable"))
+    var fastlane: Bool = true
+
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Validate generated Package.swift files", valueName: "validate"))
     var validatePackage: Bool = true
 
