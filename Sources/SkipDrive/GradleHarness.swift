@@ -117,7 +117,9 @@ extension GradleHarness {
     }
 
     /// Uses the system `adb` process to install and launch the given APK, following the
-    public func launchAPK(device: String?, appid: String, log: [String] = [], apk: String, relativeTo sourcePath: StaticString = #file) async throws {
+    /// Note that is currently unused; launching the APK is handled by a custom "launchDebug"/"launchRelease" task in SkipGradlePlugin.kt
+    @available(*, deprecated, message: "unused")
+    private func launchAPK(device: String?, appid: String, log: [String] = [], apk: String, relativeTo sourcePath: StaticString = #file) async throws {
         let env: [String: String] = [:]
 
         let apkPath = URL(fileURLWithPath: apk, isDirectory: false, relativeTo: packageBaseFolder(forSourceFile: sourcePath))
@@ -263,10 +265,19 @@ extension GradleHarness {
 
     private func parseGradleErrorOutput(line1: String, line2: String) -> GradleIssue? {
         // general task failure
-        if line1 == "* What went wrong:" && line2.hasPrefix("Execution failed for task ") {
+        if line1 == "* What went wrong:" {
             return GradleIssue(kind: .error, message: line2)
         }
 
+        if line1.hasPrefix("> Failed to apply plugin") {
+            // e.g.:
+            // * What went wrong:
+            // An exception occurred applying plugin request [id: 'skip-plugin']
+            // > Failed to apply plugin 'skip-plugin'.
+            //    > Could not read script '~/Library/Developer/Xcode/DerivedData/Skip-Everything-aqywrhrzhkbvfseiqgxuufbdwdft/SourcePackages/plugins/skipapp-packname.output/PackName/skipstone/settings.gradle.kts' as it does not exist.
+            return GradleIssue(kind: .error, message: line2.trimmingCharacters(in: CharacterSet(charactersIn: " >")))
+        }
+        
         guard let matchResult = gradleFailurePattern.firstMatch(in: line1, range: NSRange(line1.startIndex..., in: line1)) else {
             return nil
         }
