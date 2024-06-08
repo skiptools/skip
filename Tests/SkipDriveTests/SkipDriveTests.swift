@@ -92,6 +92,16 @@ class SkipCommandTests : XCTestCase {
         │  │           │  └─ ic_launcher.png
         │  │           └─ mipmap-xxxhdpi
         │  │              └─ ic_launcher.png
+        │  ├─ fastlane
+        │  │  ├─ Appfile
+        │  │  ├─ Fastfile
+        │  │  ├─ README.md
+        │  │  └─ metadata
+        │  │     └─ android
+        │  │        └─ en-US
+        │  │           ├─ full_description.txt
+        │  │           ├─ short_description.txt
+        │  │           └─ title.txt
         │  ├─ gradle
         │  │  └─ wrapper
         │  │     └─ gradle-wrapper.properties
@@ -127,8 +137,27 @@ class SkipCommandTests : XCTestCase {
         │  ├─ HelloSkip.xcconfig
         │  ├─ HelloSkip.xcodeproj
         │  │  └─ project.pbxproj
-        │  └─ Sources
-        │     └─ HelloSkipAppMain.swift
+        │  ├─ Info.plist
+        │  ├─ Sources
+        │  │  └─ HelloSkipAppMain.swift
+        │  └─ fastlane
+        │     ├─ AppStore.xcconfig
+        │     ├─ Appfile
+        │     ├─ Deliverfile
+        │     ├─ Fastfile
+        │     ├─ README.md
+        │     └─ metadata
+        │        ├─ en-US
+        │        │  ├─ description.txt
+        │        │  ├─ keywords.txt
+        │        │  ├─ privacy_url.txt
+        │        │  ├─ release_notes.txt
+        │        │  ├─ software_url.txt
+        │        │  ├─ subtitle.txt
+        │        │  ├─ support_url.txt
+        │        │  ├─ title.txt
+        │        │  └─ version_whats_new.txt
+        │        └─ rating.json
         ├─ Package.resolved
         ├─ Package.swift
         ├─ README.md
@@ -139,7 +168,9 @@ class SkipCommandTests : XCTestCase {
         │     ├─ HelloSkip.swift
         │     ├─ HelloSkipApp.swift
         │     ├─ Resources
-        │     │  └─ Localizable.xcstrings
+        │     │  ├─ Localizable.xcstrings
+        │     │  └─ Module.xcassets
+        │     │     └─ Contents.json
         │     └─ Skip
         │        └─ skip.yml
         └─ Tests
