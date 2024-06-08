@@ -875,7 +875,7 @@ class AppProjectLayout : FrameworkProjectLayout {
         self.darwinProjectFolder = try darwinFolder.resolve(moduleName + ".xcodeproj/", check: check)
         self.darwinProjectContents = try darwinProjectFolder.resolve("project.pbxproj", check: check)
         self.darwinEntitlementsPlist = try darwinFolder.resolve("Entitlements.plist", check: check)
-        self.darwinInfoPlist = try darwinFolder.resolve("Info.plist", check: check)
+        self.darwinInfoPlist = darwinFolder.resolve("Info.plist", check: optional)
 
         self.darwinAssetsFolder = try darwinFolder.resolve("Assets.xcassets/", check: check)
         self.darwinAssetsContents = try darwinAssetsFolder.resolve("Contents.json", check: check)
