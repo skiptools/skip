@@ -884,8 +884,8 @@ class AppProjectLayout : FrameworkProjectLayout {
         self.darwinAppIconFolder = try darwinAssetsFolder.resolve("AppIcon.appiconset/", check: check)
         self.darwinAppIconContents = try darwinAppIconFolder.resolve("Contents.json", check: check)
 
-        self.darwinModuleAssetsFolder = try moduleResourcesFolder.resolve("Module.xcassets/", check: check)
-        self.darwinModuleAssetsFolderContents = try darwinModuleAssetsFolder.resolve("Contents.json", check: check)
+        self.darwinModuleAssetsFolder = moduleResourcesFolder.resolve("Module.xcassets/", check: optional)
+        self.darwinModuleAssetsFolderContents = darwinModuleAssetsFolder.resolve("Contents.json", check: optional)
         // TODO: add logoPDF
 
         self.darwinFastlaneFolder = darwinFolder.resolve("fastlane/", check: optional)
