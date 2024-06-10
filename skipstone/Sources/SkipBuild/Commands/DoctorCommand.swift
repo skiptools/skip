@@ -110,7 +110,7 @@ extension ToolOptionsCommand {
         await checkVersion(title: "Homebrew version", cmd: ["brew", "--version"], min: Version("4.1.0"), pattern: "Homebrew ([0-9.]+)", hint: " (install from: https://brew.sh)")
         // await checkForRosetta() // disabled because this fails on CI
         await checkVersion(title: "Gradle version", cmd: ["gradle", "-version"], min: Version("8.6.0"), pattern: "Gradle ([0-9.]+)", hint: " (install with: brew install gradle)")
-        await checkVersion(title: "Java version", cmd: ["java", "-version"], min: Version("21.0.0"), pattern: "version \"([0-9._]+)\"", hint: ProcessInfo.processInfo.environment["JAVA_HOME"] == nil ? nil : " (check JAVA_HOME envrionment: \(ProcessInfo.processInfo.environment["JAVA_HOME"] ?? "unset"))") // we don't necessarily need java in the path (which it doesn't seem to be by default with Homebrew)
+        await checkVersion(title: "Java version", cmd: ["java", "-version"], min: Version("21.0.0"), pattern: "version \"([0-9._]+)\"", hint: ProcessInfo.processInfo.environment["JAVA_HOME"] == nil ? nil : " (check JAVA_HOME environment: \(ProcessInfo.processInfo.environment["JAVA_HOME"] ?? "unset"))") // we don't necessarily need java in the path (which it doesn't seem to be by default with Homebrew)
         await checkVersion(title: "Android Debug Bridge version", cmd: ["adb", "version"], min: Version("1.0.40"), pattern: "version ([0-9.]+)")
         await checkAndroidStudioVersion(with: out)
 
