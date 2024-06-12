@@ -1031,7 +1031,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         return mappingTypes {
             if $0 == .named("Self", []) {
                 if owningType == nil, let owningTypeDeclaration = node?.owningTypeDeclaration {
-                    if owningTypeDeclaration.signature.generics.isEmpty {
+                    if let selfType = owningTypeDeclaration.generics.selfType {
+                        owningType = selfType
+                    } else if owningTypeDeclaration.signature.generics.isEmpty {
                         owningType = owningTypeDeclaration.signature.withGenerics(owningTypeDeclaration.generics.entries.map { $0.constrainedType(ifEqual: true) })
                     } else {
                         owningType = owningTypeDeclaration.signature

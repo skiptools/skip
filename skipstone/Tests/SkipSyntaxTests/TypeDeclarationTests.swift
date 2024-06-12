@@ -491,6 +491,29 @@ final class TypeDeclarationTests: XCTestCase {
             val b = S.value == Int.max
         }
         """)
+
+        try await check(swift: """
+        struct S: P {
+        }
+        protocol P {
+        }
+        extension P where Self == S {
+            static var s: Self { return Self() }
+        }
+        """, kotlin: """
+        internal class S: P {
+
+            companion object: PCompanion {
+
+                val s: S
+                    get() = S()
+            }
+        }
+        internal interface P {
+        }
+        internal interface PCompanion {
+        }
+        """)
     }
 
     func testGenericProtocolConformance() async throws {

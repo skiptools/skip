@@ -1276,7 +1276,12 @@ final class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, Kotlin
         if name == "self" {
             output.append("this")
         } else if name == "Self" {
-            output.append("Companion")
+            //~~~
+            if isCalledAsFunction, let signature = apiMatch?.signature, signature.isMetaType {
+                output.append(signature.asMetaType(false).kotlin)
+            } else {
+                output.append("Companion")
+            }
         } else if isModuleNameFor != .none {
             if isModuleNameFor.kotlinIsNative() {
                 output.append("kotlin") // Kotlin package
