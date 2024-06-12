@@ -2752,9 +2752,17 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
             if kstatement.propertyType.isUnwrappedOptional && kstatement.propertyType.kotlinIsNative(primitive: true) {
                 kstatement.messages.append(.kotlinLateinitPrimitive(kstatement, source: translator.syntaxTree.source))
             }
-        } else if let functionDeclaration = statement.parent?.parent as? FunctionDeclaration {
-            if functionDeclaration.parameters.contains(where: { kstatement.names.contains($0.internalLabel) && $0.internalLabel != $0.externalLabel && $0.externalLabel != nil }) {
-                kstatement.messages.append(.kotlinVariableShadowInternalParameter(kstatement, source: translator.syntaxTree.source))
+        } else {
+            if let functionDeclaration = statement.parent?.parent as? FunctionDeclaration {
+                if functionDeclaration.parameters.contains(where: { kstatement.names.contains($0.internalLabel) && $0.internalLabel != $0.externalLabel && $0.externalLabel != nil }) {
+                    kstatement.messages.append(.kotlinVariableShadowInternalParameter(kstatement, source: translator.syntaxTree.source))
+                }
+            }
+            if kstatement.modifiers.isLazy {
+                kstatement.messages.append(.kotlinLocalVariableLazy(kstatement, source: translator.syntaxTree.source))
+            }
+            if kstatement.getter?.body != nil || kstatement.setter?.body != nil || kstatement.didSet?.body != nil || kstatement.willSet?.body != nil {
+                kstatement.messages.append(.kotlinLocalVariableCustomLogic(kstatement, source: translator.syntaxTree.source))
             }
         }
         return kstatement

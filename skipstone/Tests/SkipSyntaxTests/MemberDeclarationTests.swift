@@ -68,6 +68,28 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
+    func testLocalVariableGetSet() async throws {
+        try await checkProducesMessage(swift: """
+        func f() {
+            var x: Int {
+                return 100
+            }
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        func f() {
+            var x: Int {
+                get {
+                    return 100
+                }
+                set {
+                }
+            }
+        }
+        """)
+    }
+
     func testOverrideComputedProperty() async throws {
         try await check(swift: """
         class C {
@@ -247,6 +269,21 @@ final class MemberDeclarationTests: XCTestCase {
             override fun scopy(): MutableStruct = A(i, j)
 
             private var suppresssideeffects = false
+        }
+        """)
+    }
+
+    func testLocalVariableWillDidSet() async throws {
+        try await checkProducesMessage(swift: """
+        func f() {
+            var x = 1 {
+                willSet {
+                    print("will set")
+                }
+                didSet {
+                    print("did set")
+                }
+            }
         }
         """)
     }
@@ -621,6 +658,14 @@ final class MemberDeclarationTests: XCTestCase {
             private var fstorage = Int(0)
             private var finitialized = false
             private fun factorial(i: Int): Int = 0
+        }
+        """)
+    }
+
+    func testLazyLocalVariable() async throws {
+        try await checkProducesMessage(swift: """
+        func f() {
+            lazy var x: SomeType
         }
         """)
     }

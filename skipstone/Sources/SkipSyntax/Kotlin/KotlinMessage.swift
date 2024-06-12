@@ -245,6 +245,14 @@ extension Message {
         return Message(kind: .error, message: "Kotlin does not support late initialization of properties with primitive types", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinLocalVariableCustomLogic(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin does not support custom get and set logic for local variables", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinLocalVariableLazy(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin does not support lazy local variables. Consider using a closure to delay the variable value's creation", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinMemberAccessUnknownBaseType(_ sourceDerived: SourceDerived, source: Source, member: String) -> Message {
         return Message(kind: .error, message: "Skip is unable to determine the owning type for member '\(member)'. This often occurs when other issues prevent Skip from matching the surrounding API call, and it may resolve when those issues are fixed. Or add the owning type explicitly (e.g. MyType.\(member))", sourceDerived: sourceDerived, source: source)
     }
