@@ -1932,6 +1932,10 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
         if parameters.contains(where: { $0.isVariadic }) {
             dependencies.insertSkipLibType("Array")
         }
+        if let extends {
+            extends.0.insertDependencies(into: &dependencies)
+            extends.1.insertDependencies(into: &dependencies)
+        }
     }
 
     override var children: [KotlinSyntaxNode] {
@@ -2773,6 +2777,10 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         // Include implicit property types in case a transformer uses it as a declared type
         if declaredType == .none && role == .property && propertyType != .none {
             propertyType.insertDependencies(into: &dependencies)
+        }
+        if let extends {
+            extends.0.insertDependencies(into: &dependencies)
+            extends.1.insertDependencies(into: &dependencies)
         }
     }
 

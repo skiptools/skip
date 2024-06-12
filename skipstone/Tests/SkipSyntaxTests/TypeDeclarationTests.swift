@@ -269,6 +269,21 @@ final class TypeDeclarationTests: XCTestCase {
         """)
     }
 
+    func testArrayTypeExtensionImportsArray() async throws {
+        try await check(swift: """
+        extension Array {
+            public static func countElements() -> Int {
+                return count
+            }
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+
+        fun Array.Companion.countElements(): Int = count
+        """)
+    }
+
     func testProtocol() async throws {
         try await check(swift: """
         protocol P {
