@@ -1315,7 +1315,7 @@ final class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, Kotlin
                     if let generics, !generics.isEmpty {
                         output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
                     }
-                    if let apiMatch, apiMatch.declarationType == .variableDeclaration, (apiMatch.apiFlags.contains(.viewBuilder) && !apiMatch.signature.isFunction) || (apiMatch.apiFlags.contains(.async) && !apiMatch.apiFlags.contains(.writeable)) {
+                    if let apiMatch, apiMatch.declarationType == .variableDeclaration, (apiMatch.apiFlags.contains(.viewBuilder) && apiMatch.apiFlags.contains(.computed) && !apiMatch.signature.isFunction) || (apiMatch.apiFlags.contains(.async) && !apiMatch.apiFlags.contains(.writeable)) {
                         // View builder and async properties are converted to Kotlin functions. Any writeable async API must
                         // be a private actor variable, which we do not treat as async
                         output.append("()")
@@ -2159,7 +2159,7 @@ final class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, Kotl
         } else if castTargetType != .none, let apiMatch, apiMatch.declarationType != .enumCaseDeclaration && !apiMatch.signature.generics.isEmpty {
             output.append("<\(Array(repeating: "*", count: apiMatch.signature.generics.count).joined(separator: ", "))>")
         }
-        if let apiMatch, apiMatch.declarationType == .variableDeclaration, (apiMatch.apiFlags.contains(.viewBuilder) && !apiMatch.signature.isFunction) || (apiMatch.apiFlags.contains(.async) && !apiMatch.apiFlags.contains(.writeable)) {
+        if let apiMatch, apiMatch.declarationType == .variableDeclaration, (apiMatch.apiFlags.contains(.viewBuilder) && apiMatch.apiFlags.contains(.computed) && !apiMatch.signature.isFunction) || (apiMatch.apiFlags.contains(.async) && !apiMatch.apiFlags.contains(.writeable)) {
             // View builder and async properties are converted to Kotlin functions. Any writeable async API must
             // be a private actor variable, which we do not treat as async
             output.append("()")

@@ -1330,6 +1330,9 @@ public final class CodebaseInfo {
             var parameterType = variable.signature
             if variable.attributes.contains(.binding) {
                 parameterType = parameterType.asBinding()
+            } else if variable.attributes.contains(.viewBuilder), !variable.signature.isFunction, variable.apiFlags?.contains(.computed) == false {
+                // Swift generates a closure parameter that returns a view for stored @ViewBuilder variables
+                parameterType = .function([], variable.signature, [], nil)
             }
             // Transfer attributes if variable is a closure, e.g. @ViewBuilder
             parameterType = variable.attributes.apply(toFunction: parameterType)

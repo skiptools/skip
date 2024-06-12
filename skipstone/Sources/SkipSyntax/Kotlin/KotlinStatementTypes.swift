@@ -3138,7 +3138,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
     }
 
     private var isAppendAsFunction: Bool {
-        return (apiFlags.contains(.viewBuilder) && !propertyType.isFunction) || (apiFlags.contains(.async) && !isAsyncLet)
+        return (apiFlags.contains(.viewBuilder) && apiFlags.contains(.computed) && !propertyType.isFunction) || (apiFlags.contains(.async) && !isAsyncLet)
     }
 
     private func initializeStorage() -> KotlinVariableStorage? {

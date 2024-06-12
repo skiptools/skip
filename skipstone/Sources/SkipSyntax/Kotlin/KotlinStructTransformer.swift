@@ -37,6 +37,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         var hasConstructors = false
         var isMutable = false
         var hasMutableStructCopyConstructor = false
+        var transformsConstructorParameters = false
         var initializableVariableDeclarations: [KotlinVariableDeclaration] = []
         var copyableVariableDeclarations: [KotlinVariableDeclaration] = []
         for member in classDeclaration.members {
@@ -53,6 +54,7 @@ final class KotlinStructTransformer: KotlinTransformer {
                     copyableVariableDeclarations.append(variableDeclaration)
                     if !variableDeclaration.isLet || variableDeclaration.value == nil {
                         initializableVariableDeclarations.append(variableDeclaration)
+                        transformsConstructorParameters = transformsConstructorParameters || variableDeclaration.isTransformedToViewBuilderClosureParameter
                     }
                 }
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
@@ -78,7 +80,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         if needsMemberwiseConstructor {
             addMemberwiseConstructor(to: classDeclaration, variableDeclarations: initializableVariableDeclarations, translator: translator)
         }
-        let needsMutableStructCopyConstructor = isMutable && ((!needsMemberwiseConstructor && !copyableVariableDeclarations.isEmpty) || (needsMemberwiseConstructor && copyableVariableDeclarations.count > initializableVariableDeclarations.count))
+        let needsMutableStructCopyConstructor = isMutable && (transformsConstructorParameters || (!needsMemberwiseConstructor && !copyableVariableDeclarations.isEmpty) || (needsMemberwiseConstructor && copyableVariableDeclarations.count > initializableVariableDeclarations.count))
         if needsMutableStructCopyConstructor && !hasMutableStructCopyConstructor {
             addMutableStructCopyConstructor(to: classDeclaration, isOptionSet: isOptionSet, variableDeclarations: copyableVariableDeclarations)
         }
@@ -207,6 +209,8 @@ final class KotlinStructTransformer: KotlinTransformer {
             } else {
                 if variableDeclaration.modifiers.isLazy {
                     assignment = "if (\(variableDeclaration.propertyName) != null) { this.\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
+                } else if variableDeclaration.isTransformedToViewBuilderClosureParameter {
+                    assignment = "this.\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)()"
                 } else {
                     assignment = "this.\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
                 }
@@ -268,6 +272,9 @@ final class KotlinStructTransformer: KotlinTransformer {
                 type = type.asBinding()
             } else if variableDeclaration.modifiers.isLazy {
                 type = type.asOptional(true)
+            } else if variableDeclaration.isTransformedToViewBuilderClosureParameter {
+                type = .function([], variableDeclaration.propertyType, [], nil)
+                type = variableDeclaration.attributes.apply(toFunction: type)
             }
             let defaultValue: KotlinExpression?
             if let value = variableDeclaration.value {
@@ -454,5 +461,12 @@ final class KotlinStructTransformer: KotlinTransformer {
                 return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.propertyName) = \(copy).\(variableDeclaration.propertyName)")
             }
         }
+    }
+}
+
+extension KotlinVariableDeclaration {
+    /// Whether this variable is transformed into a closure when made into a default constructor parameter.
+    var isTransformedToViewBuilderClosureParameter: Bool {
+        return !propertyType.isFunction && attributes.contains(.viewBuilder) && !apiFlags.contains(.computed)
     }
 }
