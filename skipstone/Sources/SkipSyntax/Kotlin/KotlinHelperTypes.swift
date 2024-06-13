@@ -176,12 +176,14 @@ struct KotlinVariableStorage {
         self.isSingleStatementAppendable = { !$0.modifiers.isLazy || $0.value == nil }
         self.appendGet = { variable, sref, isSingleStatement, output, indentation in
             if variable.modifiers.isLazy && variable.value != nil {
-                output.append(indentation).append("if (!\(Self.lazyInitializedName(variable))) {\n")
+                output.append(indentation).append("if (!\(Self.isLazyInitialized(variable))) {\n")
                 let initializeIndentation = indentation.inc()
                 output.append(initializeIndentation).append(access)
                 variable.appendInitialValue(to: output, indentation: initializeIndentation)
                 output.append("\n")
-                output.append(initializeIndentation).append("\(Self.lazyInitializedName(variable)) = true\n")
+                if !variable.isLateInit {
+                    output.append(initializeIndentation).append("\(Self.isLazyInitialized(variable)) = true\n")
+                }
                 output.append(indentation).append("}\n")
             }
             if isSingleStatement {
@@ -199,16 +201,35 @@ struct KotlinVariableStorage {
             output.append(indentation).append(access).append(" = ")
             value()
             output.append("\n")
-            if variable.modifiers.isLazy {
-                output.append(indentation).append("\(Self.lazyInitializedName(variable)) = true\n")
+            if variable.modifiers.isLazy && !variable.isLateInit {
+                output.append(indentation).append("\(Self.isLazyInitialized(variable)) = true\n")
             }
         }
         self.appendStorage = appendStorage
     }
 
-    /// Lazy variables must set this property to `true` when initalized.
-    static func lazyInitializedName(_ variable: KotlinVariableDeclaration) -> String {
-        return variable.propertyName + "initialized"
+    /// The name to use for lazy storage of the given variable.
+    static func lazyStorageName(_ variable: KotlinVariableDeclaration) -> String {
+        return variable.propertyName + "storage"
+    }
+
+    /// Code to check whether the given lazy variable is initialized.
+    static func isLazyInitialized(_ variable: KotlinVariableDeclaration, instance: String? = nil) -> String {
+        if variable.isLateInit {
+            let name = "::" + lazyStorageName(variable) + ".isInitialized"
+            if let instance {
+                return instance + name
+            } else {
+                return name
+            }
+        } else {
+            let name = variable.propertyName + "initialized"
+            if let instance {
+                return instance + "." + name
+            } else {
+                return name
+            }
+        }
     }
 }
 
@@ -383,8 +404,6 @@ extension Operator {
             return "?:"
         case "as!":
             return "as"
-        case "..<":
-            return "until"
         case "...":
             return ".."
         case "|":

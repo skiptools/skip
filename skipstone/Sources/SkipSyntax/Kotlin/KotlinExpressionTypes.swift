@@ -354,7 +354,7 @@ final class KotlinBinaryOperator: KotlinExpression, KotlinSingleStatementVetoing
         } else {
             let kotlinSymbol = op.kotlinSymbol
             output.append(lhs, indentation: indentation)
-            if kotlinSymbol == ".." {
+            if kotlinSymbol == ".." || kotlinSymbol == "..<" {
                 output.append(kotlinSymbol)
             } else {
                 output.append(" \(kotlinSymbol) ")
@@ -2478,7 +2478,7 @@ final class KotlinPrefixOperator: KotlinExpression {
             output.append(operatorSymbol).append(" ")
             output.append(target, indentation: indentation)
         case "..<":
-            output.append(targetType.kotlin).append(".min until ")
+            output.append(targetType.kotlin).append(".min..<")
             output.append(target, indentation: indentation)
         case "...":
             output.append(targetType.kotlin).append(".min..")

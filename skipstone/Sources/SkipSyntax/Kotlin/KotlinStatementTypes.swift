@@ -2569,6 +2569,9 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
     var annotations: [String] = []
     var getterAnnotations: [String] = []
     var modifiers = Modifiers()
+    var isLateInit: Bool {
+        return modifiers.isLazy && !propertyType.kotlinIsNative(primitive: true)
+    }
     var attributes = Attributes()
     var apiFlags: APIFlags = []
     var isAsyncLet: Bool {
@@ -2834,8 +2837,8 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
             appendPropertyDefinition(to: output, indentation: indentation, storage: storage)
         }
         storage?.appendStorage(self, output, indentation)
-        if modifiers.isLazy {
-            output.append(indentation).append("private var \(KotlinVariableStorage.lazyInitializedName(self)) = false\n")
+        if modifiers.isLazy && !isLateInit {
+            output.append(indentation).append("private var \(KotlinVariableStorage.isLazyInitialized(self)) = false\n")
         }
 
         // Create property wrapper-like access for local @Bindable variables. We use a Binding rather than Observable
@@ -2973,7 +2976,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
                 output.append(" {\n")
                 if let mutationFunctionNames, modifiers.isLazy {
                     // Lazy getters are considered mutable
-                    output.append(getterBodyIndentation).append("val isinitialized = \(KotlinVariableStorage.lazyInitializedName(self))\n")
+                    output.append(getterBodyIndentation).append("val isinitialized = \(KotlinVariableStorage.isLazyInitialized(self))\n")
                     output.append(getterBodyIndentation).append("if (!isinitialized) \(mutationFunctionNames.willMutate)()\n")
                     output.append(getterBodyIndentation).append("try {\n")
                     getIndentation = getterBodyIndentation.inc()
@@ -3160,6 +3163,18 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
             return nil
         }
 
+        // Lazy?
+        if modifiers.isLazy {
+            let name = KotlinVariableStorage.lazyStorageName(self)
+            return KotlinVariableStorage(access: name) { variable, output, indentation in
+                if variable.isLateInit {
+                    output.append(indentation).append("private lateinit var \(name): \(variable.propertyType.kotlin)\n")
+                } else {
+                    output.append(indentation).append("private var \(name) = \(variable.propertyType.kotlinDefaultValue ?? "")\n")
+                }
+            }
+        }
+
         var storagePrefix = ""
         if let extends {
             storagePrefix = extends.0.name.replacingOccurrences(of: ".", with: "_")
@@ -3167,18 +3182,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
                 storagePrefix += "Companion"
             }
         }
-        let name = "\(storagePrefix)\(propertyName)storage"
-
-        // Lazy?
-        if modifiers.isLazy {
-            return KotlinVariableStorage(access: name) { variable, output, indentation in
-                if variable.propertyType.kotlinIsNative(primitive: true) {
-                    output.append(indentation).append("private var \(name) = \(variable.propertyType.kotlinDefaultValue ?? "")\n")
-                } else {
-                    output.append(indentation).append("private lateinit var \(name): \(variable.propertyType.kotlin)\n")
-                }
-            }
-        }
+        let name = storagePrefix + propertyName + "storage"
 
         // Unwrapped optional with custom get and set logic?
         if declaredType.isUnwrappedOptional, (mayBeSharedMutableStruct && apiFlags.contains(.writeable)) || mutationFunctionNames != nil || getter?.body != nil || setter?.body != nil || willSet?.body != nil || didSet?.body != nil {

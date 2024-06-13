@@ -59,7 +59,7 @@ final class OperatorTests: XCTestCase {
             print(b)
         }
         """, kotlin: """
-        for (i in 0 until 10) {
+        for (i in 0..<10) {
             val b = i == Int.myZero
             print(b)
         }
@@ -71,7 +71,7 @@ final class OperatorTests: XCTestCase {
             print(b)
         }
         """, kotlin: """
-        for (i in Int.min until 10) {
+        for (i in Int.min..<10) {
             val b = i == Int.myZero
             print(b)
         }
@@ -406,10 +406,10 @@ final class OperatorTests: XCTestCase {
         internal fun slice() {
             val a = arrayOf(0, 1, 2, 3, 4)
             val s1 = a[1..3]
-            val s2 = a[1 until 3]
+            val s2 = a[1..<3]
             val s3 = a[1..Int.max]
             val s4 = a[Int.min..3]
-            val s5 = a[Int.min until 3]
+            val s5 = a[Int.min..<3]
         }
         """)
     }

@@ -243,8 +243,8 @@ final class SwitchTests: XCTestCase {
         """, kotlin: """
         internal val i = 100
         when (i) {
-            in Int.min until 0 -> print(-1)
-            in 0 until 10 -> print(0)
+            in Int.min..<0 -> print(-1)
+            in 0..<10 -> print(0)
             in 10..20 -> print(1)
             in 21..Int.max -> print(21)
             else -> print("default")

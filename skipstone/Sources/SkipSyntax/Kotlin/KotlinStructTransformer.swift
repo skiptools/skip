@@ -137,7 +137,7 @@ final class KotlinStructTransformer: KotlinTransformer {
                 let argumentValue: KotlinExpression
                 if variableDeclaration.modifiers.isLazy {
                     // if (varinitialized) { var } else { null }
-                    let isInitialized = KotlinIdentifier(name: KotlinVariableStorage.lazyInitializedName(variableDeclaration))
+                    let isInitialized = KotlinIdentifier(name: KotlinVariableStorage.isLazyInitialized(variableDeclaration))
                     let ifCondition = KotlinIf.ConditionSet(conditions: [isInitialized])
                     let ifBody = KotlinCodeBlock(statements: [KotlinExpressionStatement(expression: identifier)])
                     let ifInitialized = KotlinIf(conditionSets: [ifCondition], body: ifBody)
@@ -332,7 +332,7 @@ final class KotlinStructTransformer: KotlinTransformer {
                     }
                     var assignment = ""
                     if variableDeclaration.modifiers.isLazy {
-                        assignment += "if (copy.\(KotlinVariableStorage.lazyInitializedName(variableDeclaration))) { "
+                        assignment += "if (\(KotlinVariableStorage.isLazyInitialized(variableDeclaration, instance: "copy"))) { "
                     }
                     assignment += "this.\(variableDeclaration.propertyName) = copy.\(variableDeclaration.propertyName)"
                     if variableDeclaration.modifiers.isLazy {

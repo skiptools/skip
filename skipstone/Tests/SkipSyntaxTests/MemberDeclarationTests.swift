@@ -462,18 +462,15 @@ final class MemberDeclarationTests: XCTestCase {
         internal open class C {
             internal open var v: V
                 get() {
-                    if (!vinitialized) {
+                    if (!::vstorage.isInitialized) {
                         vstorage = V()
-                        vinitialized = true
                     }
                     return vstorage
                 }
                 set(newValue) {
                     vstorage = newValue
-                    vinitialized = true
                 }
             private lateinit var vstorage: V
-            private var vinitialized = false
         }
         """)
 
@@ -489,18 +486,15 @@ final class MemberDeclarationTests: XCTestCase {
         internal open class C {
             internal open var s: S
                 get() {
-                    if (!sinitialized) {
+                    if (!::sstorage.isInitialized) {
                         sstorage = S()
-                        sinitialized = true
                     }
                     return sstorage.sref({ this.s = it })
                 }
                 set(newValue) {
                     sstorage = newValue.sref()
-                    sinitialized = true
                 }
             private lateinit var sstorage: S
-            private var sinitialized = false
         }
         """)
 
@@ -521,22 +515,19 @@ final class MemberDeclarationTests: XCTestCase {
         internal open class C {
             internal open var v: V
                 get() {
-                    if (!vinitialized) {
+                    if (!::vstorage.isInitialized) {
                         vstorage = V()
-                        vinitialized = true
                     }
                     return vstorage
                 }
                 set(newValue) {
                     val oldValue = this.v
                     vstorage = newValue
-                    vinitialized = true
                     if (v != oldValue) {
                         print("did set")
                     }
                 }
             private lateinit var vstorage: V
-            private var vinitialized = false
         }
         """)
 
@@ -551,7 +542,7 @@ final class MemberDeclarationTests: XCTestCase {
         internal class S: MutableStruct {
             internal var v: V
                 get() {
-                    val isinitialized = vinitialized
+                    val isinitialized = ::vstorage.isInitialized
                     if (!isinitialized) willmutate()
                     try {
                         return vstorage
@@ -562,11 +553,9 @@ final class MemberDeclarationTests: XCTestCase {
                 set(newValue) {
                     willmutate()
                     vstorage = newValue
-                    vinitialized = true
                     didmutate()
                 }
             private lateinit var vstorage: V
-            private var vinitialized = false
 
             constructor(v: V? = V()) {
                 if (v != null) { this.v = v }
@@ -575,7 +564,7 @@ final class MemberDeclarationTests: XCTestCase {
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
             override fun scopy(): MutableStruct {
-                return S(if (vinitialized) {
+                return S(if (::vstorage.isInitialized) {
                     v
                 } else {
                     null
@@ -597,7 +586,7 @@ final class MemberDeclarationTests: XCTestCase {
             internal val x: Int
             internal var v: V
                 get() {
-                    val isinitialized = vinitialized
+                    val isinitialized = ::vstorage.isInitialized
                     if (!isinitialized) willmutate()
                     try {
                         return vstorage
@@ -608,11 +597,9 @@ final class MemberDeclarationTests: XCTestCase {
                 set(newValue) {
                     willmutate()
                     vstorage = newValue
-                    vinitialized = true
                     didmutate()
                 }
             private lateinit var vstorage: V
-            private var vinitialized = false
 
             constructor(v: V? = V()) {
                 this.x = 1
@@ -622,7 +609,7 @@ final class MemberDeclarationTests: XCTestCase {
             private constructor(copy: MutableStruct) {
                 @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as S
                 this.x = copy.x
-                if (copy.vinitialized) { this.v = copy.v }
+                if (copy::vstorage.isInitialized) { this.v = copy.v }
             }
 
             override var supdate: ((Any) -> Unit)? = null
