@@ -1066,7 +1066,9 @@ PRODUCT_MODULE_NAME = $(PRODUCT_NAME:c99extidentifier)App
 SDKROOT = auto
 SUPPORTED_PLATFORMS = iphoneos iphonesimulator macosx
 SWIFT_EMIT_LOC_STRINGS = YES
+
 SWIFT_VERSION = 5.0
+//SWIFT_VERSION = 6.0
 
 // Development team ID for on-device testing
 CODE_SIGNING_REQUIRED = NO
@@ -1794,13 +1796,12 @@ enum Tab : String, Hashable {
 if [ "${SKIP_ZERO}" != "" ]; then
     echo "note: skipping skip due to SKIP_ZERO"
     exit 0
-fi
-if [ "${ENABLE_PREVIEWS}" == "YES" ]; then
+elif [ "${ENABLE_PREVIEWS}" == "YES" ]; then
     echo "note: skipping skip due to ENABLE_PREVIEWS"
     exit 0
-fi
-if [ "${ACTION}" = "install" ]; then
-    SKIP_ACTION="build"
+elif [ "${ACTION}" == "install" ]; then
+    echo "note: skipping skip due to archive install"
+    exit 0
 else
     SKIP_ACTION="${SKIP_ACTION:-launch}"
 fi
@@ -2259,6 +2260,9 @@ extension FrameworkProjectLayout {
             compileOptions {
                 sourceCompatibility = JavaVersion.toVersion(libs.versions.jvm.get())
                 targetCompatibility = JavaVersion.toVersion(libs.versions.jvm.get())
+            }
+            kotlinOptions {
+                jvmTarget = libs.versions.jvm.get().toString()
             }
 
             defaultConfig {
