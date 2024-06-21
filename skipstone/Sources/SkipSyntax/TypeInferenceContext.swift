@@ -34,7 +34,7 @@ struct TypeInferenceContext {
     /// Return a context for evaluating members of the given type.
     func pushing(_ typeDeclaration: TypeDeclaration) -> TypeInferenceContext {
         var context = self
-        var typeSignature = typeDeclaration.generics.selfType ?? typeDeclaration.signature
+        let typeSignature = typeDeclaration.generics.selfType ?? typeDeclaration.signature
         context.path.append(PathEntry(typeSignature: typeSignature, superSignature: typeDeclaration.type == .classDeclaration ? typeDeclaration.inherits.first : nil))
         context.generics = context.generics.merge(overrides: typeDeclaration.generics, addNew: true)
         return context

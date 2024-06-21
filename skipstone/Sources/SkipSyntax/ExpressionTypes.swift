@@ -779,6 +779,10 @@ final class FunctionCall: Expression, APICallExpression, MemberAccessExpression 
                 // constructor params to resolve generics
                 baseType = identifier.inferredType.asMetaType(false)
                 name = nil
+            } else if identifier.inferredType.isFunction, let apiMatch = identifier.apiMatch, apiMatch.declarationType == .variableDeclaration {
+                // We can get everything we need from the closure var
+                inferTypesFromFunction(context: context, apiMatch: apiMatch, expecting: expecting)
+                return context
             } else {
                 baseType = nil
                 name = identifier.name
@@ -789,6 +793,10 @@ final class FunctionCall: Expression, APICallExpression, MemberAccessExpression 
             if memberAccess.inferredType.isMetaType {
                 baseType = memberAccess.inferredType.asMetaType(false)
                 name = nil
+            } else if memberAccess.inferredType.isFunction, let apiMatch = memberAccess.apiMatch, apiMatch.declarationType == .variableDeclaration {
+                // We can get everything we need from the closure var
+                inferTypesFromFunction(context: context, apiMatch: apiMatch, expecting: expecting)
+                return context
             } else {
                 baseType = memberAccess.baseType // Note: our type inference differentiates between .none and nil
                 name = memberAccess.member
@@ -796,16 +804,7 @@ final class FunctionCall: Expression, APICallExpression, MemberAccessExpression 
             }
         default:
             function.inferTypes(context: context, expecting: .none)
-            let functionType = function.inferredType.asTypealiased(nil).asOptional(false).withoutOptionality()
-            if case .function(_, var returnType, let apiFlags, _) = functionType {
-                if function.inferredType.isOptional {
-                    returnType = returnType.asOptional(true)
-                }
-                self.returnType = returnType.or(expecting)
-                apiMatch = APIMatch(signature: functionType, apiFlags: apiFlags)
-            } else {
-                returnType = expecting
-            }
+            inferTypesFromFunction(context: context, apiMatch: nil, expecting: expecting)
             return context
         }
 
@@ -846,6 +845,24 @@ final class FunctionCall: Expression, APICallExpression, MemberAccessExpression 
             returnType = expecting
         }
         return context
+    }
+
+    private func inferTypesFromFunction(context: TypeInferenceContext, apiMatch: APIMatch?, expecting: TypeSignature) {
+        let functionType = function.inferredType.asTypealiased(nil).asOptional(false).withoutOptionality()
+        if case .function(let parameterTypes, var returnType, let apiFlags, _) = functionType {
+            if parameterTypes.count == arguments.count {
+                for i in 0..<parameterTypes.count {
+                    arguments[i].value.inferTypes(context: context, expecting: parameterTypes[i].type)
+                }
+            }
+            if function.inferredType.isOptional {
+                returnType = returnType.asOptional(true)
+            }
+            self.returnType = returnType.or(expecting)
+            self.apiMatch = apiMatch ?? APIMatch(signature: functionType, apiFlags: apiFlags)
+        } else {
+            returnType = expecting
+        }
     }
 
     private static func isUnchainedOptional(expression: Expression?) -> Bool {

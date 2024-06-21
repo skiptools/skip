@@ -2349,6 +2349,7 @@ final class SwiftUITests: XCTestCase {
             var body: some View {
                 VStack {
                     content
+                    self.content
                 }
             }
         }
@@ -2386,6 +2387,7 @@ final class SwiftUITests: XCTestCase {
                     VStack { ->
                         ComposeBuilder { composectx: ComposeContext ->
                             content.Compose(composectx)
+                            this.content.Compose(composectx)
                             ComposeResult.ok
                         }
                     }.Compose(composectx)
@@ -2429,6 +2431,7 @@ final class SwiftUITests: XCTestCase {
             var body: some View {
                 VStack {
                     content()
+                    self.content()
                 }
             }
         }
@@ -2465,6 +2468,7 @@ final class SwiftUITests: XCTestCase {
                     VStack { ->
                         ComposeBuilder { composectx: ComposeContext ->
                             content().Compose(composectx)
+                            this.content().Compose(composectx)
                             ComposeResult.ok
                         }
                     }.Compose(composectx)
