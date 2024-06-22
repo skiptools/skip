@@ -849,7 +849,7 @@ final class FunctionCall: Expression, APICallExpression, MemberAccessExpression 
 
     private func inferTypesFromFunction(context: TypeInferenceContext, apiMatch: APIMatch?, expecting: TypeSignature) {
         let functionType = function.inferredType.asTypealiased(nil).asOptional(false).withoutOptionality()
-        if case .function(let parameterTypes, var returnType, let apiFlags, _) = functionType {
+        if case .function(let parameterTypes, var returnType, let apiFlags, let attributes) = functionType {
             if parameterTypes.count == arguments.count {
                 for i in 0..<parameterTypes.count {
                     arguments[i].value.inferTypes(context: context, expecting: parameterTypes[i].type)
@@ -859,7 +859,7 @@ final class FunctionCall: Expression, APICallExpression, MemberAccessExpression 
                 returnType = returnType.asOptional(true)
             }
             self.returnType = returnType.or(expecting)
-            self.apiMatch = apiMatch ?? APIMatch(signature: functionType, apiFlags: apiFlags)
+            self.apiMatch = apiMatch ?? APIMatch(signature: functionType, apiFlags: apiFlags, attributes: attributes)
         } else {
             returnType = expecting
         }

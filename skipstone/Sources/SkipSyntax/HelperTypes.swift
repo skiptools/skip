@@ -25,6 +25,7 @@ struct APIMatch {
     /// May be `nil` for bultins like tuple members.
     var declarationType: StatementType?
     var memberOf: (declaringType: TypeSignature, selfType: TypeSignature?)?
+    var attributes: Attributes?
     var availability: Availability = .available
 }
 

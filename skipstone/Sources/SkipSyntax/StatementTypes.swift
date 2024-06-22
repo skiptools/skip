@@ -1593,7 +1593,7 @@ final class VariableDeclaration: Statement {
             return context
         } else {
             // Local variable in code block
-            return context.addingIdentifiers(names, types: variableTypes, apiFlags: apiFlags)
+            return context.addingIdentifiers(names, types: variableTypes, apiFlags: apiFlags, attributes: attributes)
         }
     }
 

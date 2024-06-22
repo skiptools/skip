@@ -1982,7 +1982,7 @@ extension TypeSignature {
 
     /// Return this type as a binding.
     func asBinding() -> TypeSignature {
-        return asPropertyWrapper("Binding")
+        return .named("Binding", [self])
     }
 
     /// Return this as a self-generic-typed property wrapper of the given type.

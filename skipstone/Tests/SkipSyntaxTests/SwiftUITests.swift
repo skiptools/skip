@@ -2498,4 +2498,65 @@ final class SwiftUITests: XCTestCase {
         }
         """)
     }
+
+    func testOnReceivePropertyPublisher() async throws {
+        try await check(supportingSwift: baseSupportingSwift + """
+        extension View {
+            func onReceive<P>(_ publisher: P, perform action: @escaping (P.Output) -> Void) -> some View where P : Publisher {
+            }
+        }
+        public protocol Publisher<Output, Failure> {
+            associatedtype Output
+            associatedtype Failure
+        }
+        class O: ObservableObject {
+            @Published var i = 0
+        }
+        """, swift: """
+        import SwiftUI
+        struct V: View {
+            @ObservedObject var o: O
+            var body: some View {
+                Text("")
+                    .onReceive(o.$i) { print("Received \\($0)") }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
+        internal class V: View {
+            internal var o: O
+                get() = _o.wrappedValue
+                set(newValue) {
+                    _o.wrappedValue = newValue
+                }
+            internal var _o: skip.ui.Bindable<O>
+            override fun body(): View {
+                return ComposeBuilder { composectx: ComposeContext ->
+                    Text("")
+                        .onReceive(o._i.projectedValue) { it -> print("Received ${it}") }.Compose(composectx)
+                }
+            }
+
+            @Composable
+            override fun ComposeContent(composectx: ComposeContext) {
+
+                super.ComposeContent(composectx)
+            }
+
+            constructor(o: O) {
+                this._o = skip.ui.Bindable(o)
+            }
+        }
+        """)
+    }
 }

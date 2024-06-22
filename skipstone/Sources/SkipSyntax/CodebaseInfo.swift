@@ -892,7 +892,7 @@ public final class CodebaseInfo {
             } else {
                 memberOf = nil
             }
-            let match = APIMatch(signature: .function(matchingParameters, mappedSignature.returnType, apiFlags, attributes), apiFlags: apiFlags, declarationType: declarationType, memberOf: memberOf, availability: availability)
+            let match = APIMatch(signature: .function(matchingParameters, mappedSignature.returnType, apiFlags, attributes), apiFlags: apiFlags, declarationType: declarationType, memberOf: memberOf, attributes: attributes, availability: availability)
             return FunctionCandidate(match: match, score: totalScore, level: level)
         }
 
@@ -2169,7 +2169,7 @@ extension CodebaseInfoItem {
         } else {
             memberOf = nil
         }
-        return APIMatch(signature: signature, apiFlags: apiFlags ?? [], declarationType: declarationType, memberOf: memberOf, availability: availability)
+        return APIMatch(signature: signature, apiFlags: apiFlags ?? [], declarationType: declarationType, memberOf: memberOf, attributes: attributes, availability: availability)
     }
 }
 
