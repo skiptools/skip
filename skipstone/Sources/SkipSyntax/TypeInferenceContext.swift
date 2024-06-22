@@ -167,7 +167,7 @@ struct TypeInferenceContext {
         if let (identifierType, apiFlags, attributes) = localIdentifierTypes[name] {
             let signature = identifierType.constrainedTypeWithGenerics(generics)
             let apiMatch = APIMatch(signature: signature, apiFlags: apiFlags, attributes: attributes)
-            return update((signature, apiMatch), isProjectedValue: isProjectedValue)
+            return update((signature, apiMatch), isBindingPath: false, isProjectedValue: isProjectedValue)
         }
         if name == "self" || name == "Self" || name == "super" {
             guard let pathEntry = path.last(where: { $0.typeSignature != nil }), let typeSignature = pathEntry.typeSignature else {
@@ -198,11 +198,11 @@ struct TypeInferenceContext {
             if let codebaseInfo {
                 if let match = codebaseInfo.matchIdentifier(name: name, inConstrained: signature.constrainedTypeWithGenerics(generics)) {
                     addUnavailableMessages(to: messagesNode, for: [match.availability])
-                    return update((resolveSignature(match: match), match), isProjectedValue: isProjectedValue)
+                    return update((resolveSignature(match: match), match), isBindingPath: false, isProjectedValue: isProjectedValue)
                 }
             } else if let match = unavailableAPI?.knownUnavailableMember(name, in: signature) {
                 addUnavailableMessages(to: messagesNode, for: [match.availability])
-                return update((resolveSignature(match: match), match), isProjectedValue: isProjectedValue)
+                return update((resolveSignature(match: match), match), isBindingPath: false, isProjectedValue: isProjectedValue)
             }
         }
         let genericType = generics.constrainedType(of: name)
@@ -212,13 +212,13 @@ struct TypeInferenceContext {
         if let codebaseInfo {
             if let match = codebaseInfo.matchIdentifier(name: name) {
                 addUnavailableMessages(to: messagesNode, for: [match.availability])
-                return update((resolveSignature(match: match), match), isProjectedValue: isProjectedValue)
+                return update((resolveSignature(match: match), match), isBindingPath: false, isProjectedValue: isProjectedValue)
             } else {
                 return nil
             }
         } else if let match = unavailableAPI?.knownUnavailableIdentifier(name) {
             addUnavailableMessages(to: messagesNode, for: [match.availability])
-            return update((resolveSignature(match: match), match), isProjectedValue: isProjectedValue)
+            return update((resolveSignature(match: match), match), isBindingPath: false, isProjectedValue: isProjectedValue)
         } else if !isProjectedValue {
             let signature = TypeSignature.for(name: name, genericTypes: [], allowNamed: false).asMetaType(true)
             return signature == .none ? nil : (signature, APIMatch(signature: signature))
@@ -244,10 +244,11 @@ struct TypeInferenceContext {
     func member(_ name: String, in type: TypeSignature, messagesNode: SyntaxNode?) -> (TypeSignature, APIMatch)? {
         var type = type
         var name = name
+        var isBindingPath = false
         var isProjectedValue = false
-        if case .named("Binding", let generics) = type, generics.count == 1 {
-            isProjectedValue = true
-            type = generics[0]
+        if type.isNamed("Binding"), type.generics.count == 1 {
+            isBindingPath = true
+            type = type.generics[0]
         } else if name.hasPrefix("$") {
             isProjectedValue = true
             name = String(name.dropFirst())
@@ -255,13 +256,13 @@ struct TypeInferenceContext {
 
         if type.isOptional {
             if let match = member(name, inNonOptional: type.asOptional(false), messagesNode: messagesNode) {
-                return update((resolveSignature(match: match).asOptional(true), match), isProjectedValue: isProjectedValue)
+                return update((resolveSignature(match: match).asOptional(true), match), isBindingPath: isBindingPath, isProjectedValue: isProjectedValue)
             } else {
                 return nil
             }
         } else {
             if let match = member(name, inNonOptional: type, messagesNode: messagesNode) {
-                return update((resolveSignature(match: match), match), isProjectedValue: isProjectedValue)
+                return update((resolveSignature(match: match), match), isBindingPath: isBindingPath, isProjectedValue: isProjectedValue)
             } else {
                 return nil
             }
@@ -631,20 +632,18 @@ struct TypeInferenceContext {
         return codebaseInfo?.resolveTypealias(for: match.signature) ?? match.signature
     }
 
-    private func update(_ match: (TypeSignature, APIMatch), isProjectedValue: Bool) -> (TypeSignature, APIMatch) {
-        guard isProjectedValue else {
+    private func update(_ match: (TypeSignature, APIMatch), isBindingPath: Bool, isProjectedValue: Bool) -> (TypeSignature, APIMatch) {
+        guard isBindingPath || isProjectedValue else {
             return match
         }
         var signature = match.0
         var apiMatch = match.1
-        let isBinding = apiMatch.attributes?.contains(.state) == true || apiMatch.attributes?.contains(.stateObject) == true
-        if isBinding {
+        if !isBindingPath && apiMatch.attributes?.contains(.published) == true {
+            signature = signature.asPublisher()
+            apiMatch.signature = apiMatch.signature.asPublisher()
+        } else {
             signature = signature.asBinding()
             apiMatch.signature = apiMatch.signature.asBinding()
-        } else {
-            // We'd have to figure out the property wrapper's projected value type
-            signature = .none
-            apiMatch.signature = .none
         }
         return (signature, apiMatch)
     }

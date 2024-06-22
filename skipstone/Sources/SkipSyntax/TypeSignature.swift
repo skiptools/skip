@@ -1226,6 +1226,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// Whether this is a named type with the given name, optionally matching a module and generics.
     func isNamed(_ name: String, moduleName: String? = nil, generics: [TypeSignature]? = nil) -> Bool {
         switch self {
+        case .member(let base, let member):
+            guard let dotIdx = name.lastIndex(of: ".") else {
+                return false
+            }
+            let baseName = name.prefix(upTo: dotIdx)
+            let memberName = name.suffix(from: name.index(after: dotIdx))
+            return member.isNamed(String(memberName), generics: generics) && base.isNamed(String(baseName), moduleName: moduleName)
         case .module(let module2, let type):
             guard type.isNamed(name, generics: generics) else {
                 return false
@@ -1983,6 +1990,11 @@ extension TypeSignature {
     /// Return this type as a binding.
     func asBinding() -> TypeSignature {
         return .named("Binding", [self])
+    }
+
+    /// Return this type as a publisher.
+    func asPublisher() -> TypeSignature {
+        return .named("Publisher", [self, .none])
     }
 
     /// Return this as a self-generic-typed property wrapper of the given type.
