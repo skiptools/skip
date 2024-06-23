@@ -1039,6 +1039,7 @@ public struct PackageManifest : Hashable, Decodable {
             case regular
             case test
             case system
+            case binary
         }
 
         public var packageAccess: Bool?
