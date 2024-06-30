@@ -308,11 +308,24 @@ extension TypeSignature {
         if isOptional {
             return "null"
         } else if kotlinIsNative(primitive: true) {
-            if self == .bool {
+            switch self {
+            case .bool:
                 return "false"
-            } else if self == .character {
+            case .character:
                 return "' '"
-            } else {
+            case .double:
+                return "0.0"
+            case .float:
+                return "0f"
+            case .int:
+                return "0"
+            case .int64:
+                return "0L"
+            case .uint:
+                return "0U"
+            case .uint64:
+                return "0UL"
+            default:
                 return "\(self.kotlin)(0)"
             }
         } else if self == .string {

@@ -1191,8 +1191,9 @@ final class KotlinClassDeclaration: KotlinStatement {
                 enumCases.forEach { output.append($0, indentation: memberIndentation) }
             }
         }
-        nonstaticMembers.forEach { output.append($0, indentation: memberIndentation) }
-
+        for member in nonstaticMembers {
+            output.append(member, indentation: memberIndentation)
+        }
         if let suppressSideEffectsPropertyName {
             output.append("\n")
             output.append(memberIndentation).append("private var \(suppressSideEffectsPropertyName) = false\n")
@@ -2041,6 +2042,25 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
         }
         appendExtends(to: output, indentation: indentation)
         output.append(name).append("(")
+        appendFunctionParameters(to: output, indentation: indentation, forceOverride: forceOverride)
+        output.append(")")
+
+        var hasExplicitReturnType = false
+        if type != .constructorDeclaration {
+            // Kotlin requires an explicit return type for single statement bodies (as we use for async) that return Never, as in:
+            //   suspending fun f(): Unit = MainActor.run { throw Error() }
+            if returnType != .void || apiFlags.contains(.async) {
+                output.append(": ").append(returnType.kotlin)
+                hasExplicitReturnType = true
+            }
+        } else if let delegatingConstructorCall {
+            output.append(": ").append(delegatingConstructorCall, indentation: indentation)
+        }
+        functionGenerics.appendWhere(to: output, indentation: indentation)
+        return hasExplicitReturnType
+    }
+
+    private func appendFunctionParameters(to output: OutputGenerator, indentation: Indentation, forceOverride: Bool = false) {
         for (index, parameter) in parameters.enumerated() {
             if parameter.isVariadic {
                 output.append("vararg ")
@@ -2072,21 +2092,6 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
                 output.append(", ")
             }
         }
-        output.append(")")
-
-        var hasExplicitReturnType = false
-        if type != .constructorDeclaration {
-            // Kotlin requires an explicit return type for single statement bodies (as we use for async) that return Never, as in:
-            //   suspending fun f(): Unit = MainActor.run { throw Error() }
-            if returnType != .void || apiFlags.contains(.async) {
-                output.append(": ").append(returnType.kotlin)
-                hasExplicitReturnType = true
-            }
-        } else if let delegatingConstructorCall {
-            output.append(": ").append(delegatingConstructorCall, indentation: indentation)
-        }
-        functionGenerics.appendWhere(to: output, indentation: indentation)
-        return hasExplicitReturnType
     }
 
     private func appendFunctionBody(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation, hasExplicitReturnType: Bool) {
@@ -2596,6 +2601,9 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
     var isDescriptionImplementation: Bool {
         return role.isProperty && propertyName == "description" && propertyType == .string
     }
+    var isAppendAsFunction: Bool {
+        return (apiFlags.contains(.viewBuilder) && apiFlags.contains(.computed) && !propertyType.isFunction) || (apiFlags.contains(.async) && !isAsyncLet)
+    }
 
     enum Role {
         case local
@@ -2834,7 +2842,9 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         if isAppendAsFunction, let getterBody = getter?.body {
             appendAsFunctionDefinition(getterBody, to: output, indentation: indentation)
         } else {
-            appendPropertyDefinition(to: output, indentation: indentation, storage: storage)
+            output.append("\n")
+            appendPropertyGetter(to: output, indentation: indentation, storage: storage)
+            appendPropertySetter(to: output, indentation: indentation, storage: storage)
         }
         storage?.appendStorage(self, output, indentation)
         if modifiers.isLazy && !isLateInit {
@@ -2876,6 +2886,9 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
     private func appendDeclaration(to output: OutputGenerator, indentation: Indentation, storage: KotlinVariableStorage? = nil, isDelegatingToCompanion: Bool) {
         attributes.append(to: output, indentation: indentation)
         annotations.appendLines(to: output, indentation: indentation)
+        if !isDelegatingToCompanion {
+            appendSuppressKotlin2Uninitalized(to: output, indentation: indentation, storage: storage)
+        }
         output.append(indentation)
         if role.isProperty || role == .global {
             if !isDelegatingToCompanion && isStatic && visibility != .private && companion?.1.isClass == true && !attributes.contains(.unavailable) {
@@ -2917,8 +2930,9 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         } else if storage != nil && propertyType != .none {
             output.append(": ").append(propertyType.kotlin)
         }
-        if !isDelegatingToCompanion && (!apiFlags.contains(.async) || isAsyncLet) && storage == nil {
-            appendInitialValue(to: output, indentation: indentation)
+        if !isDelegatingToCompanion && canDeclareInitialValue(with: storage) {
+            // Avoid need to suppress Kotlin 2 uninitialized errors by defaulting primitives if we're open or have a custom setter
+            appendInitialValue(to: output, indentation: indentation, initializeToDefaultValue: !isStatic && (isOpen || appendPropertySetter(to: nil, indentation: nil, storage: storage)))
         }
         extends?.1.appendWhere(to: output, indentation: indentation)
     }
@@ -2941,8 +2955,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         output.append(indentation).append("}\n")
     }
 
-    private func appendPropertyDefinition(to output: OutputGenerator, indentation: Indentation, storage: KotlinVariableStorage?) {
-        output.append("\n")
+    private func appendPropertyGetter(to output: OutputGenerator, indentation: Indentation, storage: KotlinVariableStorage?) {
         if !getterAnnotations.isEmpty {
             getterAnnotations.appendLines(to: output, indentation: indentation.inc())
         }
@@ -2990,13 +3003,23 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
                 output.append(getterIndentation).append("}\n")
             }
         }
+    }
 
-        let setVisibilityString = modifiers.kotlinSetVisibilityString(isGlobal: role == .global, suffix: " ")
+    /// Append the property's custom setter.
+    /// 
+    /// - Parameters:
+    ///   - output: Pass `nil` to determine whether a custom setter will be appended, without taking action
+    /// - Returns: Whether a custom setter **with a body** is appended
+    @discardableResult private func appendPropertySetter(to output: OutputGenerator?, indentation: Indentation?, storage: KotlinVariableStorage?) -> Bool {
         let hasCustomSet = setter?.body != nil || willSet?.body != nil || didSet?.body != nil
         if hasCustomSet || mutationFunctionNames != nil {
+            guard let output else {
+                return true
+            }
             let isStoredOverride = getter?.body == nil && role == .superclassOverrideProperty
-            let setterIndentation = indentation.inc()
+            let setterIndentation = indentation!.inc()
             let setterBodyIndentation = setterIndentation.inc()
+            let setVisibilityString = modifiers.kotlinSetVisibilityString(isGlobal: role == .global, suffix: " ")
             output.append(setterIndentation).append(setVisibilityString).append("set(newValue) {\n")
             if mayBeSharedMutableStruct && !isStoredOverride {
                 output.append(setterBodyIndentation).append("@Suppress(\"NAME_SHADOWING\") val newValue = newValue.sref()\n")
@@ -3069,38 +3092,57 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
                 }
             }
             output.append(setterIndentation).append("}\n")
+            return true
         } else if (role.isProperty && role != .protocolProperty) || role == .global, apiFlags.contains(.writeable) || isAssignFromWriteable {
             if storage != nil || (mayBeSharedMutableStruct && apiFlags.contains(.writeable)) {
-                let setterIndentation = indentation.inc()
+                guard let output else {
+                    return true
+                }
+                let setterIndentation = indentation!.inc()
+                let setVisibilityString = modifiers.kotlinSetVisibilityString(isGlobal: role == .global, suffix: " ")
                 output.append(setterIndentation).append(setVisibilityString).append("set(newValue) {\n")
                 appendSetField(to: output, indentation: setterIndentation.inc(), storage: storage, isCopy: false)
                 output.append(setterIndentation).append("}\n")
-            } else if !setVisibilityString.isEmpty {
-                output.append(indentation.inc()).append(setVisibilityString).append("set\n")
+                return true
+            } else {
+                guard let output else {
+                    return false
+                }
+                let setVisibilityString = modifiers.kotlinSetVisibilityString(isGlobal: role == .global, suffix: " ")
+                if !setVisibilityString.isEmpty {
+                    output.append(indentation!.inc()).append(setVisibilityString).append("set\n")
+                }
+                return false
             }
         }
+        return false
     }
 
     /// Appends any initial value, starting with ` = ...`.
-    @discardableResult func appendInitialValue(to output: OutputGenerator, indentation: Indentation) -> Bool {
+    ///
+    /// - Parameters:
+    ///   - output: Pass `nil` to determine whether an initial value will be appended, without taking action
+    /// - Returns: Whether an initial value is appended
+    @discardableResult func appendInitialValue(to output: OutputGenerator?, indentation: Indentation?, initializeToDefaultValue: Bool = false) -> Bool {
         if let value {
+            guard let output else {
+                return true
+            }
             output.append(" = ")
             if isAsyncLet {
                 output.append("Task { ")
             }
-            output.append(value, indentation: indentation)
+            output.append(value, indentation: indentation!)
             if isAsyncLet {
                 output.append(" }")
             }
             return true
+        } else if !isLet && getter == nil && role != .protocolProperty && role != .superclassOverrideProperty && (declaredType.isOptional || initializeToDefaultValue), let defaultValue = declaredType.kotlinDefaultValue {
+            // Kotlin doesn't auto-initialize optionals to nil like Swift
+            output?.append(" = ").append(defaultValue)
+            return true
         } else {
-            // In Swift an optional var defaults to nil, but not so in Kotlin
-            if role != .protocolProperty, declaredType.isOptional, !isLet, getter == nil {
-                output.append(" = null")
-                return true
-            } else {
-                return false
-            }
+            return false
         }
     }
 
@@ -3148,8 +3190,29 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         }
     }
 
-    private var isAppendAsFunction: Bool {
-        return (apiFlags.contains(.viewBuilder) && apiFlags.contains(.computed) && !propertyType.isFunction) || (apiFlags.contains(.async) && !isAsyncLet)
+    /// Starting in Kotlin 2.0 you get an uninitialized error for any open property or property with a custom setter
+    /// that is not set in the inline constructor (which we don't use) and does not have an initial value.
+    private func appendSuppressKotlin2Uninitalized(to output: OutputGenerator, indentation: Indentation, storage: KotlinVariableStorage?) {
+        guard role == .property, !isStatic else {
+            return
+        }
+        // No errors for computed properties
+        guard getter?.body == nil, storage == nil, !isAppendAsFunction else {
+            return
+        }
+        // No errors if not open and doesn't have a custom setter
+        guard isOpen || appendPropertySetter(to: nil, indentation: nil, storage: storage) else {
+            return
+        }
+        // No errors if we declare an initial value
+        guard !canDeclareInitialValue(with: storage) || !appendInitialValue(to: nil, indentation: nil, initializeToDefaultValue: true) else {
+            return
+        }
+        // No errors if we'll turn it into a lateinit
+        guard !declaredType.isUnwrappedOptional else {
+            return
+        }
+        output.append(indentation).append("@Suppress(\"MUST_BE_INITIALIZED\")\n")
     }
 
     private func initializeStorage() -> KotlinVariableStorage? {
@@ -3217,6 +3280,10 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         }
 
         return nil
+    }
+
+    private func canDeclareInitialValue(with storage: KotlinVariableStorage?) -> Bool {
+        return (!apiFlags.contains(.async) || isAsyncLet) && storage == nil
     }
 
     private var didSetUsesOldValue: Bool {

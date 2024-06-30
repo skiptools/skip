@@ -697,7 +697,7 @@ final class SwiftUITests: XCTestCase {
         import skip.foundation.*
         import skip.model.*
         internal class S: MutableStruct {
-            internal var x: Int
+            internal var x: Int = 0
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -840,7 +840,7 @@ final class SwiftUITests: XCTestCase {
         import skip.foundation.*
         import skip.model.*
         internal class V: View {
-            internal var envvalue: Int = Int(0)
+            internal var envvalue: Int = 0
             override fun body(): View {
                 return ComposeBuilder { composectx: ComposeContext -> Text("Value: ${envvalue}").Compose(composectx) }
             }
@@ -1509,7 +1509,7 @@ final class SwiftUITests: XCTestCase {
         import skip.foundation.*
         import skip.model.*
         internal class V: View, MutableStruct {
-            internal var envvalue: Int = Int(0)
+            internal var envvalue: Int = 0
             internal var count: Int
                 get() = _count.wrappedValue
                 set(newValue) {
@@ -1528,7 +1528,7 @@ final class SwiftUITests: XCTestCase {
                     _o.wrappedValue = newValue.sref()
                 }
             internal var _o: skip.ui.Bindable<O>
-            internal var i: Int
+            internal var i: Int = 0
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -1596,7 +1596,7 @@ final class SwiftUITests: XCTestCase {
         import skip.foundation.*
         import skip.model.*
         internal class V: View, MutableStruct {
-            internal var envvalue: Int = Int(0)
+            internal var envvalue: Int = 0
             internal var count: Int
                 get() = _count.wrappedValue
                 set(newValue) {
@@ -2373,6 +2373,7 @@ final class SwiftUITests: XCTestCase {
         import skip.foundation.*
         import skip.model.*
         internal class Stack<Content>: View, MutableStruct where Content: View {
+            @Suppress("MUST_BE_INITIALIZED")
             internal var content: Content
                 get() = field.sref({ this.content = it })
                 set(newValue) {
@@ -2456,6 +2457,7 @@ final class SwiftUITests: XCTestCase {
         import skip.foundation.*
         import skip.model.*
         internal class Stack<Content>: View, MutableStruct where Content: View {
+            @Suppress("MUST_BE_INITIALIZED")
             internal var content: () -> Content
                 set(newValue) {
                     willmutate()

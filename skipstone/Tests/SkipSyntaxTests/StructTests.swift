@@ -59,7 +59,7 @@ final class StructTests: XCTestCase {
         }
         """, kotlin: """
         internal class A: MutableStruct {
-            internal var i: Int
+            internal var i: Int = 0
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -92,7 +92,7 @@ final class StructTests: XCTestCase {
         }
         """, kotlin: """
         internal class S: MutableStruct {
-            internal var i: Int
+            internal var i: Int = 0
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -184,7 +184,7 @@ final class StructTests: XCTestCase {
         }
         """, kotlin: """
         internal class S: MutableStruct {
-            internal var i: Int
+            internal var i: Int = 0
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -275,7 +275,7 @@ final class StructTests: XCTestCase {
         }
         """, kotlin: """
         internal class Gen<T, U, V>: MutableStruct {
-            internal var name: String
+            internal var name: String = ""
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -353,6 +353,7 @@ final class StructTests: XCTestCase {
         internal class S: MutableStruct {
             internal val letms: MS
             internal val letis: IS
+            @Suppress("MUST_BE_INITIALIZED")
             internal var varms: MS
                 get() = field.sref({ this.varms = it })
                 set(newValue) {
@@ -361,6 +362,7 @@ final class StructTests: XCTestCase {
                     field = newValue
                     didmutate()
                 }
+            @Suppress("MUST_BE_INITIALIZED")
             internal var varis: IS
                 set(newValue) {
                     willmutate()
@@ -429,6 +431,7 @@ final class StructTests: XCTestCase {
         
         internal class S: MutableStruct {
             internal val letms: MS
+            @Suppress("MUST_BE_INITIALIZED")
             internal var varms: MS
                 get() = field.sref({ this.varms = it })
                 set(newValue) {
@@ -438,6 +441,7 @@ final class StructTests: XCTestCase {
                     didmutate()
                 }
             internal val letarr: Array<MS>
+            @Suppress("MUST_BE_INITIALIZED")
             internal var vararr: Array<MS>
                 get() = field.sref({ this.vararr = it })
                 set(newValue) {
@@ -515,6 +519,7 @@ final class StructTests: XCTestCase {
             }
         }
         internal class A: MutableStruct {
+            @Suppress("MUST_BE_INITIALIZED")
             internal var s: S
                 set(newValue) {
                     willmutate()
@@ -564,13 +569,13 @@ final class StructTests: XCTestCase {
         }
         """, kotlin: """
         internal class S: MutableStruct {
-            private var i: Int
+            private var i: Int = 0
                 set(newValue) {
                     willmutate()
                     field = newValue
                     didmutate()
                 }
-            internal var s: String
+            internal var s: String = ""
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -600,13 +605,13 @@ final class StructTests: XCTestCase {
         }
         """, kotlin: """
         class S: MutableStruct {
-            var i: Int
+            var i: Int = 0
                 set(newValue) {
                     willmutate()
                     field = newValue
                     didmutate()
                 }
-            internal var s: String
+            internal var s: String = ""
                 set(newValue) {
                     willmutate()
                     field = newValue

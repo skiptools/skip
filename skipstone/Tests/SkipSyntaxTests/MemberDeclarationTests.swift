@@ -229,7 +229,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal class A: MutableStruct {
-            internal var i: Int
+            internal var i: Int = 0
                 set(newValue) {
                     willmutate()
                     try {
@@ -241,7 +241,7 @@ final class MemberDeclarationTests: XCTestCase {
                         didmutate()
                     }
                 }
-            internal var j: Int
+            internal var j: Int = 0
                 set(newValue) {
                     willmutate()
                     try {
@@ -450,6 +450,32 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
+    func testOpenUninitializedProperty() async throws {
+        try await check(swift: """
+        open class C {
+            open var i: Int
+            open var s: String
+            open var c: C
+            open var x = 0
+            open var s = C()
+        }
+        """, kotlin: """
+        open class C {
+            open var i: Int = 0
+            open var s: String = ""
+            @Suppress("MUST_BE_INITIALIZED")
+            open var c: C
+            open var x = 0
+            open var s = C()
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
+        }
+        """)
+    }
+
     func testLazyProperty() async throws {
         try await check(supportingSwift: """
         class V {
@@ -642,7 +668,7 @@ final class MemberDeclarationTests: XCTestCase {
                     fstorage = newValue
                     finitialized = true
                 }
-            private var fstorage = Int(0)
+            private var fstorage = 0
             private var finitialized = false
             private fun factorial(i: Int): Int = 0
         }
@@ -1562,6 +1588,7 @@ final class MemberDeclarationTests: XCTestCase {
         import skip.lib.Array
 
         internal open class C<T> {
+            @Suppress("MUST_BE_INITIALIZED")
             internal open var v: C<T>
             internal open fun f(p: Array<C<T>>): C<T>? = null
         }
@@ -1655,6 +1682,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C<T> where T: Any {
+            @Suppress("MUST_BE_INITIALIZED")
             internal open var t: T
             internal constructor(t: T) {
                 this.t = t
@@ -1689,6 +1717,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C<T> where T: Any {
+            @Suppress("MUST_BE_INITIALIZED")
             internal open var t: T
             internal constructor(t: T) {
                 this.t = t
@@ -1724,6 +1753,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C<T>: Comparable<C<T>> where T: Any, T: Comparable<T> {
+            @Suppress("MUST_BE_INITIALIZED")
             internal open var t: T
             internal constructor(t: T) {
                 this.t = t
@@ -1852,7 +1882,7 @@ final class MemberDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class C {
-            internal open var i: Int
+            internal open var i: Int = 0
 
             internal open fun f(s: String) {
                 fun doSomething(with: String): String = String.myValue

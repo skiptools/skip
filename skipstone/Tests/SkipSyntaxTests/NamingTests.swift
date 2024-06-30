@@ -72,6 +72,7 @@ final class NamingTests: XCTestCase {
             var object: S
         """, kotlin: """
         internal class S: MutableStruct {
+            @Suppress("MUST_BE_INITIALIZED")
             internal var object_: S
                 get() = field.sref({ this.object_ = it })
                 set(newValue) {

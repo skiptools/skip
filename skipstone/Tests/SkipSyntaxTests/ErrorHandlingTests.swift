@@ -320,7 +320,7 @@ final class ErrorHandlingTests: XCTestCase {
         }
         """, kotlin: """
         internal class S: MutableStruct {
-            internal var i: Int
+            internal var i: Int = 0
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -416,7 +416,7 @@ final class ErrorHandlingTests: XCTestCase {
         }
         """, kotlin: """
         internal class S: Exception, Error, MutableStruct {
-            override var message: String
+            override var message: String = ""
                 set(newValue) {
                     willmutate()
                     field = newValue

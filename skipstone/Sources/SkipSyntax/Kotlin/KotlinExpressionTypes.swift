@@ -1276,7 +1276,6 @@ final class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, Kotlin
         if name == "self" {
             output.append("this")
         } else if name == "Self" {
-            //~~~
             if isCalledAsFunction, let signature = apiMatch?.signature, signature.isMetaType {
                 output.append(signature.asMetaType(false).kotlin)
             } else {

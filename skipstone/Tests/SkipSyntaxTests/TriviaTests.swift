@@ -29,9 +29,9 @@ final class TriviaTests: XCTestCase {
         // Class comment
         // Spanning two lines
         internal open class S {
-            internal open var s: String // EOL comment
+            internal open var s: String = "" // EOL comment
 
-            internal open var i: Int
+            internal open var i: Int = 0
             internal open fun f(): S {
                 // Copy
                 var copy = this
@@ -98,9 +98,9 @@ final class TriviaTests: XCTestCase {
         Spanning two lines
         */
         internal open class S {
-            internal open var s: String /* EOL comment */
+            internal open var s: String = "" /* EOL comment */
 
-            internal open var i: Int
+            internal open var i: Int = 0
             internal open fun f(): S {
                 /*
                 Copy */

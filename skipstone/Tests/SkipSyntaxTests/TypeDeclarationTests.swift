@@ -24,11 +24,13 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, kotlin: """
         internal open class A {
+            @Suppress("MUST_BE_INITIALIZED")
             internal open var b1: A.B
 
             internal open class B {
             }
 
+            @Suppress("MUST_BE_INITIALIZED")
             internal open var b2: A.B
         }
         """)
