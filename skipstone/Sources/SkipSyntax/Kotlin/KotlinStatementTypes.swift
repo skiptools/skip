@@ -1107,6 +1107,7 @@ final class KotlinClassDeclaration: KotlinStatement {
         } else {
             attributes.append(to: output, indentation: indentation)
             annotations.appendLines(to: output, indentation: indentation)
+            appendSuppressKotlin2Uninitialized(to: output, indentation: indentation)
             output.append(indentation)
             switch modifiers.visibility {
             case .default, .internal:
@@ -1288,6 +1289,17 @@ final class KotlinClassDeclaration: KotlinStatement {
             companionInit.appendParameters(to: output, isFunctionCall: true)
             output.append(")\n")
             output.append(indentation).append("}\n")
+        }
+    }
+
+    private func appendSuppressKotlin2Uninitialized(to output: OutputGenerator, indentation: Indentation) {
+        let types: Kotlin2UninitializedTypes = members.reduce(into: []) { result, member in
+            if let variableDeclaration = member as? KotlinVariableDeclaration {
+                result.formUnion(variableDeclaration.kotlin2UninitializedTypes)
+            }
+        }
+        if let annotation = types.suppressAnnotation {
+            output.append(indentation).append(annotation).append("\n")
         }
     }
 }
@@ -2886,9 +2898,6 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
     private func appendDeclaration(to output: OutputGenerator, indentation: Indentation, storage: KotlinVariableStorage? = nil, isDelegatingToCompanion: Bool) {
         attributes.append(to: output, indentation: indentation)
         annotations.appendLines(to: output, indentation: indentation)
-        if !isDelegatingToCompanion {
-            appendSuppressKotlin2Uninitalized(to: output, indentation: indentation, storage: storage)
-        }
         output.append(indentation)
         if role.isProperty || role == .global {
             if !isDelegatingToCompanion && isStatic && visibility != .private && companion?.1.isClass == true && !attributes.contains(.unavailable) {
@@ -2931,8 +2940,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
             output.append(": ").append(propertyType.kotlin)
         }
         if !isDelegatingToCompanion && canDeclareInitialValue(with: storage) {
-            // Avoid need to suppress Kotlin 2 uninitialized errors by defaulting primitives if we're open or have a custom setter
-            appendInitialValue(to: output, indentation: indentation, initializeToDefaultValue: !isStatic && (isOpen || appendPropertySetter(to: nil, indentation: nil, storage: storage)))
+            appendInitialValue(to: output, indentation: indentation)
         }
         extends?.1.appendWhere(to: output, indentation: indentation)
     }
@@ -3123,7 +3131,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
     /// - Parameters:
     ///   - output: Pass `nil` to determine whether an initial value will be appended, without taking action
     /// - Returns: Whether an initial value is appended
-    @discardableResult func appendInitialValue(to output: OutputGenerator?, indentation: Indentation?, initializeToDefaultValue: Bool = false) -> Bool {
+    @discardableResult func appendInitialValue(to output: OutputGenerator?, indentation: Indentation?) -> Bool {
         if let value {
             guard let output else {
                 return true
@@ -3137,9 +3145,9 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
                 output.append(" }")
             }
             return true
-        } else if !isLet && getter == nil && role != .protocolProperty && role != .superclassOverrideProperty && (declaredType.isOptional || initializeToDefaultValue), let defaultValue = declaredType.kotlinDefaultValue {
+        } else if !isLet, getter == nil, role != .protocolProperty && role != .superclassOverrideProperty, declaredType.isOptional {
             // Kotlin doesn't auto-initialize optionals to nil like Swift
-            output?.append(" = ").append(defaultValue)
+            output?.append(" = null")
             return true
         } else {
             return false
@@ -3188,31 +3196,6 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
             appendValue()
             output.append("\n")
         }
-    }
-
-    /// Starting in Kotlin 2.0 you get an uninitialized error for any open property or property with a custom setter
-    /// that is not set in the inline constructor (which we don't use) and does not have an initial value.
-    private func appendSuppressKotlin2Uninitalized(to output: OutputGenerator, indentation: Indentation, storage: KotlinVariableStorage?) {
-        guard role == .property, !isStatic else {
-            return
-        }
-        // No errors for computed properties
-        guard getter?.body == nil, storage == nil, !isAppendAsFunction else {
-            return
-        }
-        // No errors if not open and doesn't have a custom setter
-        guard isOpen || appendPropertySetter(to: nil, indentation: nil, storage: storage) else {
-            return
-        }
-        // No errors if we declare an initial value
-        guard !canDeclareInitialValue(with: storage) || !appendInitialValue(to: nil, indentation: nil, initializeToDefaultValue: true) else {
-            return
-        }
-        // No errors if we'll turn it into a lateinit
-        guard !declaredType.isUnwrappedOptional else {
-            return
-        }
-        output.append(indentation).append("@Suppress(\"MUST_BE_INITIALIZED\")\n")
     }
 
     private func initializeStorage() -> KotlinVariableStorage? {
@@ -3298,5 +3281,39 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
             return usesOldValue ? .skip : .recurse(nil)
         }
         return usesOldValue
+    }
+
+    /// Starting in Kotlin 2.0 you get an uninitialized error for any open property or property with a custom setter
+    /// that is not set in the inline constructor (which we don't use) and does not have an initial value.
+    var kotlin2UninitializedTypes: Kotlin2UninitializedTypes {
+        guard role == .property, !isStatic else {
+            return []
+        }
+        // No errors for computed properties
+        let storage = initializeStorage()
+        guard getter?.body == nil, storage == nil, !isAppendAsFunction else {
+            return []
+        }
+        // No errors if not open and doesn't have a custom setter
+        let hasCustomSetter = appendPropertySetter(to: nil, indentation: nil, storage: storage)
+        guard isOpen || hasCustomSetter else {
+            return []
+        }
+        // No errors if we declare an initial value
+        guard !canDeclareInitialValue(with: storage) || !appendInitialValue(to: nil, indentation: nil) else {
+            return []
+        }
+        // No errors if we'll turn it into a lateinit
+        guard !declaredType.isUnwrappedOptional else {
+            return []
+        }
+        var types: Kotlin2UninitializedTypes = []
+        if hasCustomSetter {
+            types.insert(.mustBeInitialized)
+        }
+        if isOpen {
+            types.insert(.mustBeInitializedOrFinalOrAbstract)
+        }
+        return types
     }
 }

@@ -696,8 +696,9 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         import skip.foundation.*
         import skip.model.*
+        @Suppress("MUST_BE_INITIALIZED")
         internal class S: MutableStruct {
-            internal var x: Int = 0
+            internal var x: Int
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -1508,6 +1509,7 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         import skip.foundation.*
         import skip.model.*
+        @Suppress("MUST_BE_INITIALIZED")
         internal class V: View, MutableStruct {
             internal var envvalue: Int = 0
             internal var count: Int
@@ -1528,7 +1530,7 @@ final class SwiftUITests: XCTestCase {
                     _o.wrappedValue = newValue.sref()
                 }
             internal var _o: skip.ui.Bindable<O>
-            internal var i: Int = 0
+            internal var i: Int
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -2372,8 +2374,8 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         import skip.foundation.*
         import skip.model.*
+        @Suppress("MUST_BE_INITIALIZED")
         internal class Stack<Content>: View, MutableStruct where Content: View {
-            @Suppress("MUST_BE_INITIALIZED")
             internal var content: Content
                 get() = field.sref({ this.content = it })
                 set(newValue) {
@@ -2456,8 +2458,8 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         import skip.foundation.*
         import skip.model.*
+        @Suppress("MUST_BE_INITIALIZED")
         internal class Stack<Content>: View, MutableStruct where Content: View {
-            @Suppress("MUST_BE_INITIALIZED")
             internal var content: () -> Content
                 set(newValue) {
                     willmutate()

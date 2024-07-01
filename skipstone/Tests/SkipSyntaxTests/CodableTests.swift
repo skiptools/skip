@@ -62,14 +62,15 @@ final class CodableTests: XCTestCase {
             var s = ""
         }
         """, kotlin: """
+        @Suppress("MUST_BE_INITIALIZED")
         internal class S: Codable, MutableStruct {
-            internal var i: Int = 0
+            internal var i: Int
                 set(newValue) {
                     willmutate()
                     field = newValue
                     didmutate()
                 }
-            internal var s: String = ""
+            internal var s: String
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -743,16 +744,17 @@ final class CodableTests: XCTestCase {
             }
         }
         """, kotlin: """
+        @Suppress("MUST_BE_INITIALIZED")
         internal class S: Codable, MutableStruct {
             internal val i: Int
-            internal var s: String = ""
+            internal var s: String
                 set(newValue) {
                     willmutate()
                     field = newValue
                     didmutate()
                 }
             internal val j: Int
-            internal var t: String = ""
+            internal var t: String
                 set(newValue) {
                     willmutate()
                     field = newValue

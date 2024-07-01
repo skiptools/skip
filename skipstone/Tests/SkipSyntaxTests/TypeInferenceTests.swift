@@ -307,8 +307,8 @@ final class TypeInferenceTests: XCTestCase {
             }
         }
         """, kotlin: """
+        @Suppress("MUST_BE_INITIALIZED_OR_FINAL_OR_ABSTRACT")
         internal open class C<T> where T: P {
-            @Suppress("MUST_BE_INITIALIZED")
             internal open var v: T
             internal open fun f(): Boolean = v.pfunc() == Int.myZero
         }

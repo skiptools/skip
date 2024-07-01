@@ -319,8 +319,9 @@ final class ErrorHandlingTests: XCTestCase {
             }
         }
         """, kotlin: """
+        @Suppress("MUST_BE_INITIALIZED")
         internal class S: MutableStruct {
-            internal var i: Int = 0
+            internal var i: Int
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -415,8 +416,9 @@ final class ErrorHandlingTests: XCTestCase {
             var message = ""
         }
         """, kotlin: """
+        @Suppress("MUST_BE_INITIALIZED")
         internal class S: Exception, Error, MutableStruct {
-            override var message: String = ""
+            override var message: String
                 set(newValue) {
                     willmutate()
                     field = newValue

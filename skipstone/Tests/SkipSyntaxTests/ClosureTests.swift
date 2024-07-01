@@ -445,8 +445,8 @@ final class ClosureTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
+        @Suppress("MUST_BE_INITIALIZED")
         internal class V {
-            @Suppress("MUST_BE_INITIALIZED")
             internal var items: Array<Item>
                 get() = field.sref({ this.items = it })
                 set(newValue) {
@@ -477,8 +477,8 @@ final class ClosureTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
+        @Suppress("MUST_BE_INITIALIZED")
         internal class V {
-            @Suppress("MUST_BE_INITIALIZED")
             internal var items: Array<Item>
                 get() = field.sref({ this.items = it })
                 set(newValue) {

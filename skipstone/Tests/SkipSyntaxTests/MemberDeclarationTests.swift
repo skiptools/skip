@@ -228,8 +228,9 @@ final class MemberDeclarationTests: XCTestCase {
               }
         }
         """, kotlin: """
+        @Suppress("MUST_BE_INITIALIZED")
         internal class A: MutableStruct {
-            internal var i: Int = 0
+            internal var i: Int
                 set(newValue) {
                     willmutate()
                     try {
@@ -241,7 +242,7 @@ final class MemberDeclarationTests: XCTestCase {
                         didmutate()
                     }
                 }
-            internal var j: Int = 0
+            internal var j: Int
                 set(newValue) {
                     willmutate()
                     try {
@@ -452,26 +453,31 @@ final class MemberDeclarationTests: XCTestCase {
 
     func testOpenUninitializedProperty() async throws {
         try await check(swift: """
-        open class C {
-            open var i: Int
-            open var s: String
-            open var c: C
-            open var x = 0
-            open var s = C()
+        class C {
+            var i: Int
+            var s: String
+            var c: C
+            var x = 0
+            var s = C()
+            var nonopen: Int {
+                didSet {
+                    print("didSet")
+                }
+            }
         }
         """, kotlin: """
-        open class C {
-            open var i: Int = 0
-            open var s: String = ""
-            @Suppress("MUST_BE_INITIALIZED")
-            open var c: C
-            open var x = 0
-            open var s = C()
-
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
-            }
+        @Suppress("MUST_BE_INITIALIZED", "MUST_BE_INITIALIZED_OR_FINAL_OR_ABSTRACT")
+        internal open class C {
+            internal open var i: Int
+            internal open var s: String
+            internal open var c: C
+            internal open var x = 0
+            internal open var s = C()
+            internal open var nonopen: Int
+                set(newValue) {
+                    field = newValue
+                    print("didSet")
+                }
         }
         """)
     }
@@ -1587,8 +1593,8 @@ final class MemberDeclarationTests: XCTestCase {
         """, kotlin: """
         import skip.lib.Array
 
+        @Suppress("MUST_BE_INITIALIZED_OR_FINAL_OR_ABSTRACT")
         internal open class C<T> {
-            @Suppress("MUST_BE_INITIALIZED")
             internal open var v: C<T>
             internal open fun f(p: Array<C<T>>): C<T>? = null
         }
@@ -1681,8 +1687,8 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
+        @Suppress("MUST_BE_INITIALIZED_OR_FINAL_OR_ABSTRACT")
         internal open class C<T> where T: Any {
-            @Suppress("MUST_BE_INITIALIZED")
             internal open var t: T
             internal constructor(t: T) {
                 this.t = t
@@ -1716,8 +1722,8 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
+        @Suppress("MUST_BE_INITIALIZED_OR_FINAL_OR_ABSTRACT")
         internal open class C<T> where T: Any {
-            @Suppress("MUST_BE_INITIALIZED")
             internal open var t: T
             internal constructor(t: T) {
                 this.t = t
@@ -1752,8 +1758,8 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
+        @Suppress("MUST_BE_INITIALIZED_OR_FINAL_OR_ABSTRACT")
         internal open class C<T>: Comparable<C<T>> where T: Any, T: Comparable<T> {
-            @Suppress("MUST_BE_INITIALIZED")
             internal open var t: T
             internal constructor(t: T) {
                 this.t = t
@@ -1881,8 +1887,9 @@ final class MemberDeclarationTests: XCTestCase {
             }
         }
         """, kotlin: """
+        @Suppress("MUST_BE_INITIALIZED_OR_FINAL_OR_ABSTRACT")
         internal open class C {
-            internal open var i: Int = 0
+            internal open var i: Int
 
             internal open fun f(s: String) {
                 fun doSomething(with: String): String = String.myValue

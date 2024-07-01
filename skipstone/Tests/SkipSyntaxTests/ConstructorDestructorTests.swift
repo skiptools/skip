@@ -148,7 +148,7 @@ final class ConstructorDestructorTests: XCTestCase {
         }
         """)
     }
-    
+
     func testStructMemberwiseConstructors() async throws {
         try await check(swift: """
         struct A {
@@ -181,8 +181,9 @@ final class ConstructorDestructorTests: XCTestCase {
         internal class A {
         }
 
+        @Suppress("MUST_BE_INITIALIZED")
         internal class B: MutableStruct {
-            internal var i: Int = 0
+            internal var i: Int
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -209,17 +210,18 @@ final class ConstructorDestructorTests: XCTestCase {
                 get() = "100"
         }
 
+        @Suppress("MUST_BE_INITIALIZED")
         internal class D: MutableStruct {
             internal val letVar: Int
             internal val computedVar: Int
                 get() = 100
-            internal var i: Int = 0
+            internal var i: Int
                 set(newValue) {
                     willmutate()
                     field = newValue
                     didmutate()
                 }
-            internal var s: String = ""
+            internal var s: String
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -259,8 +261,9 @@ final class ConstructorDestructorTests: XCTestCase {
             private var s: String
         }
         """, kotlin: """
+        @Suppress("MUST_BE_INITIALIZED")
         internal class A: MutableStruct {
-            private var s: String = ""
+            private var s: String
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -278,14 +281,15 @@ final class ConstructorDestructorTests: XCTestCase {
             override var smutatingcount = 0
             override fun scopy(): MutableStruct = A(s)
         }
+        @Suppress("MUST_BE_INITIALIZED")
         internal class B: MutableStruct {
-            internal var i: Int = 0
+            internal var i: Int
                 set(newValue) {
                     willmutate()
                     field = newValue
                     didmutate()
                 }
-            private var s: String = ""
+            private var s: String
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -304,8 +308,9 @@ final class ConstructorDestructorTests: XCTestCase {
             override var smutatingcount = 0
             override fun scopy(): MutableStruct = B(i, s)
         }
+        @Suppress("MUST_BE_INITIALIZED")
         private class C: MutableStruct {
-            private var s: String = ""
+            private var s: String
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -344,10 +349,10 @@ final class ConstructorDestructorTests: XCTestCase {
             var i = 100
         }
         """, kotlin: """
+        @Suppress("MUST_BE_INITIALIZED")
         internal class S1: MutableStruct {
             internal val a: Int
             private val b: Int
-            @Suppress("MUST_BE_INITIALIZED")
             internal var c: S3
                 get() = field.sref({ this.c = it })
                 set(newValue) {
@@ -356,7 +361,7 @@ final class ConstructorDestructorTests: XCTestCase {
                     field = newValue
                     didmutate()
                 }
-            private var d: Int = 0
+            private var d: Int
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -385,10 +390,10 @@ final class ConstructorDestructorTests: XCTestCase {
             override var smutatingcount = 0
             override fun scopy(): MutableStruct = S1(this as MutableStruct)
         }
+        @Suppress("MUST_BE_INITIALIZED")
         internal class S2: MutableStruct {
             internal val a: Int
             private val b: Int
-            @Suppress("MUST_BE_INITIALIZED")
             internal var c: S3
                 get() = field.sref({ this.c = it })
                 set(newValue) {
@@ -422,8 +427,9 @@ final class ConstructorDestructorTests: XCTestCase {
             override var smutatingcount = 0
             override fun scopy(): MutableStruct = S2(this as MutableStruct)
         }
+        @Suppress("MUST_BE_INITIALIZED")
         internal class S3: MutableStruct {
-            internal var i: Int = 0
+            internal var i: Int
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -453,8 +459,8 @@ final class ConstructorDestructorTests: XCTestCase {
         """, kotlin: """
         internal class A {
         }
+        @Suppress("MUST_BE_INITIALIZED")
         internal class B: MutableStruct {
-            @Suppress("MUST_BE_INITIALIZED")
             internal var a1: A
                 set(newValue) {
                     willmutate()
@@ -763,6 +769,7 @@ final class ConstructorDestructorTests: XCTestCase {
             }
         }
         """, kotlin: """
+        @Suppress("MUST_BE_INITIALIZED")
         internal class S: MutableStruct {
             internal val x: Int
             internal var s = ""
@@ -771,7 +778,7 @@ final class ConstructorDestructorTests: XCTestCase {
                     field = newValue
                     didmutate()
                 }
-            internal var i: Int = 0
+            internal var i: Int
                 set(newValue) {
                     willmutate()
                     field = newValue
@@ -868,8 +875,9 @@ final class ConstructorDestructorTests: XCTestCase {
             private var suppresssideeffects = false
         }
 
+        @Suppress("MUST_BE_INITIALIZED")
         internal class S: MutableStruct {
-            internal var i: Int = 0
+            internal var i: Int
                 set(newValue) {
                     willmutate()
                     try {
@@ -1111,8 +1119,9 @@ final class ConstructorDestructorTests: XCTestCase {
             }
         }
         """, kotlin: """
+        @Suppress("MUST_BE_INITIALIZED_OR_FINAL_OR_ABSTRACT")
         internal open class C {
-            internal open var x: Int = 0
+            internal open var x: Int
             internal constructor(x: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null) {
                 this.x = x
             }

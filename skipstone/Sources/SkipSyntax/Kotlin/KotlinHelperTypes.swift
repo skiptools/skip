@@ -1,3 +1,31 @@
+/// Kotlin 2 uninitialized variable error types.
+struct Kotlin2UninitializedTypes: OptionSet {
+    static let mustBeInitialized = Kotlin2UninitializedTypes(rawValue: 1)
+    static let mustBeInitializedOrFinalOrAbstract = Kotlin2UninitializedTypes(rawValue: 2)
+
+    let rawValue: Int
+
+    /// The annotation to add to suppress these uninitialized types.
+    var suppressAnnotation: String? {
+        var values: String?
+        if self.contains(.mustBeInitialized) {
+            values = "\"MUST_BE_INITIALIZED\""
+        }
+        if self.contains(.mustBeInitializedOrFinalOrAbstract) {
+            let value = "\"MUST_BE_INITIALIZED_OR_FINAL_OR_ABSTRACT\""
+            if values == nil {
+                values = value
+            } else {
+                values! += ", " + value
+            }
+        }
+        guard let values else {
+            return nil
+        }
+        return "@Suppress(\(values))"
+    }
+}
+
 /// A variable we declare to mirror a Swift binding pattern.
 struct KotlinBindingVariable {
     var names: [String?]
