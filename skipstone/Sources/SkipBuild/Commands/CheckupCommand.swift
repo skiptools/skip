@@ -67,6 +67,11 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
                 await out.write(status: .fail, "Double-check APK failed due to missing artifacts")
             }
         }
+
+        let latestVersion = await checkSkipUpdates(with: out)
+        if let latestVersion = latestVersion, latestVersion != skipVersion {
+            await out.yield(MessageBlock(status: .warn, "A new version is Skip (\(latestVersion)) is available to update with: skip upgrade"))
+        }
     }
 }
 

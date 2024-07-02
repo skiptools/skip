@@ -2452,7 +2452,7 @@ extension FrameworkProjectLayout {
 
     static func defaultGradleProperties() -> String {
         """
-        org.gradle.jvmargs=-Xmx2048m
+        org.gradle.jvmargs=-Xmx4g
         android.useAndroidX=true
         kotlin.code.style=official
 
@@ -2469,6 +2469,30 @@ extension FrameworkProjectLayout {
         """
     }
 }
+
+let useLGPLException = false
+
+enum SourceLicense: Equatable, CaseIterable {
+    case lgpl
+    case lgplLinkingException
+    case gpl
+
+    var sourceHeader: String {
+        return "// SPDX-License-Identifier: \(self.spdx.identifier)"
+    }
+
+    var spdx: (name: String, identifier: String) {
+        switch self {
+        case .lgpl:
+            return ("GNU Lesser General Public License v3.0 only", "LGPL-3.0-only") // https://spdx.org/licenses/LGPL-3.0-only.html
+        case .lgplLinkingException:
+            return ("LGPL-3.0 Linking Exception", "LGPL-3.0-only WITH LGPL-3.0-linking-exception") // https://spdx.org/licenses/LGPL-3.0-linking-exception.html
+        case .gpl:
+            return ("GNU General Public License v3.0 only", "GPL-3.0-only") // https://spdx.org/licenses/GPL-3.0-only.html
+        }
+    }
+}
+
 
 fileprivate let licenseLGPL = """
                    GNU LESSER GENERAL PUBLIC LICENSE
