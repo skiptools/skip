@@ -577,6 +577,7 @@ private final class TranslateVisitor {
                     if let apiMatch = apiCall.apiMatch {
                         if isSwiftUIType(named: "View", type: apiMatch.signature, codebaseInfo: translator.codebaseInfo) || isSwiftUIType(named: "View", type: apiMatch.signature.returnType, codebaseInfo: translator.codebaseInfo) {
                             addComposeTailCall(to: node as! KotlinExpression, statement: expressionStatement)
+                            updateTableColumnFunctionCallParameters(in: node)
                         }
                     } else {
                         node.messages.append(.kotlinSwiftUITypeInference(node, source: translator.syntaxTree.source))
@@ -694,5 +695,25 @@ private final class TranslateVisitor {
         if let match = codebaseInfo.matchIdentifier(name: property, inConstrained: .named("EnvironmentValues", [])) {
             memberAccess.baseType = match.signature
         }
+    }
+
+    private func updateTableColumnFunctionCallParameters(in node: KotlinSyntaxNode) {
+        guard let functionCall = node as? KotlinFunctionCall, (functionCall.function as? KotlinIdentifier)?.name == "TableColumn", isInTableFunctionCall(node: node) else {
+            return
+        }
+        // The SkipUI framework adds a leading argument to TableColumn that must always be set to the
+        // enclosing Table's content closure argument. See SkipUI.Table
+        functionCall.arguments.insert(LabeledValue(value: KotlinRawExpression(sourceCode: "it")), at: 0)
+    }
+
+    private func isInTableFunctionCall(node: KotlinSyntaxNode) -> Bool {
+        var parent = node.parent
+        while parent != nil {
+            if let functionCall = parent as? KotlinFunctionCall, (functionCall.function as? KotlinIdentifier)?.name == "Table" {
+                return true
+            }
+            parent = parent?.parent
+        }
+        return false
     }
 }
