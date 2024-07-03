@@ -643,13 +643,14 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """, swift: """
         class A: Identifiable {
-            var id: String
+            let id: String
         }
         class B: Identifiable {
         }
         """, kotlin: """
+        @Suppress("MUST_BE_INITIALIZED_OR_FINAL_OR_ABSTRACT")
         internal open class A: Identifiable<String> {
-            override var id: String
+            override val id: String
         }
         internal open class B: Identifiable<ObjectIdentifier> {
         }

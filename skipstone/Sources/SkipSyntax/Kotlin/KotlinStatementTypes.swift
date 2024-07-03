@@ -3294,7 +3294,8 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         guard getter?.body == nil, storage == nil, !isAppendAsFunction else {
             return []
         }
-        // No errors if not open and doesn't have a custom setter
+        // No errors if not effectively open (could be marked override if implementing an interface) and doesn't have a custom setter
+        let isOpen = self.isOpen || (modifiers.isOverride && !modifiers.isFinal && (parent as? KotlinClassDeclaration)?.modifiers.isFinal != true && (parent as? KotlinClassDeclaration)?.declarationType != .structDeclaration)
         let hasCustomSetter = appendPropertySetter(to: nil, indentation: nil, storage: storage)
         guard isOpen || hasCustomSetter else {
             return []
