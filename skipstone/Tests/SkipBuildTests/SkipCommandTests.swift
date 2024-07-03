@@ -66,7 +66,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
             products: [
-                .library(name: "SomeModule", targets: ["SomeModule"]),
+                .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
@@ -114,7 +114,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
             products: [
-                .library(name: "TeenyModule", targets: ["TeenyModule"]),
+                .library(name: "TeenyModule", type: .dynamic, targets: ["TeenyModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
@@ -172,7 +172,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
             products: [
-                .library(name: "SomeModule", targets: ["SomeModule"]),
+                .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
@@ -239,7 +239,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
             products: [
-                .library(name: "FreeModule", targets: ["FreeModule"]),
+                .library(name: "FreeModule", type: .dynamic, targets: ["FreeModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
@@ -630,8 +630,8 @@ final class SkipCommandTests: XCTestCase {
             platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
             products: [
                 .library(name: "TOP_MODULEApp", type: .dynamic, targets: ["TOP_MODULE"]),
-                .library(name: "MIDDLE_MODULE", targets: ["MIDDLE_MODULE"]),
-                .library(name: "BOTTOM_MODULE", targets: ["BOTTOM_MODULE"]),
+                .library(name: "MIDDLE_MODULE", type: .dynamic, targets: ["MIDDLE_MODULE"]),
+                .library(name: "BOTTOM_MODULE", type: .dynamic, targets: ["BOTTOM_MODULE"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
@@ -746,10 +746,10 @@ final class SkipCommandTests: XCTestCase {
             platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
             products: [
                 .library(name: "M1App", type: .dynamic, targets: ["M1"]),
-                .library(name: "M2", targets: ["M2"]),
-                .library(name: "M3", targets: ["M3"]),
-                .library(name: "M4", targets: ["M4"]),
-                .library(name: "M5", targets: ["M5"]),
+                .library(name: "M2", type: .dynamic, targets: ["M2"]),
+                .library(name: "M3", type: .dynamic, targets: ["M3"]),
+                .library(name: "M4", type: .dynamic, targets: ["M4"]),
+                .library(name: "M5", type: .dynamic, targets: ["M5"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
