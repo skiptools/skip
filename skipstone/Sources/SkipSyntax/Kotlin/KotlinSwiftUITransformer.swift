@@ -698,7 +698,15 @@ private final class TranslateVisitor {
     }
 
     private func updateTableColumnFunctionCallParameters(in node: KotlinSyntaxNode) {
-        guard let functionCall = node as? KotlinFunctionCall, (functionCall.function as? KotlinIdentifier)?.name == "TableColumn", isInTableFunctionCall(node: node) else {
+        guard let functionCall = node as? KotlinFunctionCall else {
+            return
+        }
+        // Handle TableColumn(...).width(...) case
+        if let memberAccess = functionCall.function as? KotlinMemberAccess, memberAccess.member == "width", let base = memberAccess.base {
+            updateTableColumnFunctionCallParameters(in: base)
+            return
+        }
+        guard (functionCall.function as? KotlinIdentifier)?.name == "TableColumn", isInTableFunctionCall(node: node) else {
             return
         }
         // The SkipUI framework adds a leading argument to TableColumn that must always be set to the
