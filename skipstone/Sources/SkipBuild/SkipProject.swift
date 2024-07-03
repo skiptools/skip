@@ -602,7 +602,7 @@ class FrameworkProjectLayout {
                 """
             } else {
                 products += """
-                        .library(name: "\(moduleName)", targets: ["\(moduleName)"]),
+                        .library(name: "\(moduleName)", type: .dynamic, targets: ["\(moduleName)"]),
 
                 """
             }
@@ -2243,15 +2243,12 @@ extension FrameworkProjectLayout {
 
         plugins {
             alias(libs.plugins.kotlin.android)
+            alias(libs.plugins.kotlin.compose)
             alias(libs.plugins.android.application)
             id("skip-build-plugin")
         }
 
         skip {
-        }
-
-        kotlin {
-            //jvmToolchain(libs.versions.jvm.get().toInt())
         }
 
         android {
@@ -2276,11 +2273,6 @@ extension FrameworkProjectLayout {
 
             buildFeatures {
                 buildConfig = true
-                compose = true
-            }
-
-            composeOptions {
-                kotlinCompilerExtensionVersion = libs.versions.kotlin.compose.compiler.extension.get()
             }
 
             // default signing configuration tries to load from keystore.properties
