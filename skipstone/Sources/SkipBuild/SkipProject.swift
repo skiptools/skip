@@ -46,6 +46,13 @@ class FrameworkProjectLayout {
             throw InitError(errorDescription: "Specified project path already exists: \(projectFolderURL.path)")
         }
 
+        let validModuleCharacters = CharacterSet.alphanumerics
+        for module in modules {
+            if module.moduleName.rangeOfCharacter(from: validModuleCharacters.inverted) != nil {
+                throw InitError(errorDescription: "Module name contains an invalid character (must be alphanumeric): \(module.moduleName)")
+            }
+        }
+
         try FileManager.default.createDirectory(at: projectFolderURL, withIntermediateDirectories: true)
 
         let sourcesURL = try projectFolderURL.append(path: "Sources", create: true)
