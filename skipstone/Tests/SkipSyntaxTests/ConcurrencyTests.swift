@@ -145,47 +145,6 @@ final class ConcurrencyTests: XCTestCase {
         XCTAssertTrue(f1?.apiFlags?.contains(.mainActor) == true)
     }
 
-    func testMainActorObservationInference() async throws {
-        let context = try await setUpContext(swift: """
-        @Observable
-        class M {
-        }
-        @ObservableObject
-        class O {
-        }
-        struct A {
-            @State var i = 0
-        }
-        struct B {
-            @State var m = M()
-        }
-        struct C {
-            var m = M()
-        }
-        struct D {
-            @ObservedObject var o = O()
-        }
-        struct E {
-            var o: O
-        }
-        struct F {
-            @StateObject var o = O()
-        }
-        """)
-        let a = context.primaryTypeInfo(forNamed: .named("A", []))
-        XCTAssertTrue(a?.apiFlags?.contains(.mainActor) == false)
-        let b = context.primaryTypeInfo(forNamed: .named("B", []))
-        XCTAssertTrue(b?.apiFlags?.contains(.mainActor) == true)
-        let c = context.primaryTypeInfo(forNamed: .named("C", []))
-        XCTAssertTrue(c?.apiFlags?.contains(.mainActor) == true)
-        let d = context.primaryTypeInfo(forNamed: .named("D", []))
-        XCTAssertTrue(d?.apiFlags?.contains(.mainActor) == true)
-        let e = context.primaryTypeInfo(forNamed: .named("E", []))
-        XCTAssertTrue(e?.apiFlags?.contains(.mainActor) == false)
-        let f = context.primaryTypeInfo(forNamed: .named("F", []))
-        XCTAssertTrue(f?.apiFlags?.contains(.mainActor) == true)
-    }
-
     func testMainActorRun() async throws {
         let supportingSwift = """
         class MainActor {

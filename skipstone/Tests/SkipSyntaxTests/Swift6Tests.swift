@@ -57,6 +57,24 @@ final class Swift6Tests: XCTestCase {
         }
         """)
     }
+
+    func testImportAccessModifiersIgnored() async throws {
+        try await check(swift: """
+        private import MyPackage1
+        internal import MyPackage2
+        import MyPackage3
+
+        struct S {
+        }
+        """, kotlin: """
+        import my.package1.*
+        import my.package2.*
+        import my.package3.*
+
+        internal class S {
+        }
+        """)
+    }
 }
 
 

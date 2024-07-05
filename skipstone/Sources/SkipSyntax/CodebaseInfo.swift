@@ -1709,18 +1709,8 @@ public final class CodebaseInfo {
                 return codebaseInfo.primaryTypeInfo(forNamed: signature)?.isMainActorType(codebaseInfo: codebaseInfo) == true
             } else {
                 // Do we extend a class or conform to a protocol that is @MainActor?
-                if inherits.contains(where: { codebaseInfo.primaryTypeInfo(forNamed: $0)?.isMainActorType(codebaseInfo: codebaseInfo) == true }) {
-                    return true
-                }
-                return variables.contains(where: { forcesMainActorType(member: $0, codebaseInfo: codebaseInfo) })
+                return inherits.contains { codebaseInfo.primaryTypeInfo(forNamed: $0)?.isMainActorType(codebaseInfo: codebaseInfo) == true }
             }
-        }
-
-        private func forcesMainActorType(member: VariableInfo, codebaseInfo: CodebaseInfo) -> Bool {
-            if member.attributes.contains(.observedObject) || member.attributes.contains(.stateObject) {
-                return true
-            }
-            return codebaseInfo.primaryTypeInfo(forNamed: member.signature)?.attributes.contains(.observable) == true
         }
 
         private static func isMainActorInferred(_ item: CodebaseInfoItem, in typeInfos: [TypeInfo]) -> Bool {
