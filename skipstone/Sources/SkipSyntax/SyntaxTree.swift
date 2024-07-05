@@ -1,4 +1,4 @@
-import SwiftParser
+@_spi(ExperimentalLanguageFeatures) import SwiftParser
 import SwiftSyntax
 
 /// Representation of the Swift syntax tree.
@@ -12,7 +12,8 @@ public final class SyntaxTree: PrettyPrintable {
     public init(source: Source, preprocessorSymbols: Set<String> = [], codebaseInfo: CodebaseInfo? = nil, unavailableAPI: UnavailableAPI? = nil) {
         self.source = source
         self.preprocessorSymbols = preprocessorSymbols
-        self.syntax = Parser.parse(source: source.content)
+        var parser = Parser(source.content, experimentalFeatures: [.sendingArgsAndResults])
+        self.syntax = SourceFileSyntax.parse(from: &parser)
         self.root.statements = StatementDecoder.decode(syntaxListContainer: syntax, in: self)
 
         let importedModuleNames = root.statements.importedModulePaths.compactMap(\.moduleName)

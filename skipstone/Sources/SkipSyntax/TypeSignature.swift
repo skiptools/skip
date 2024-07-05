@@ -1467,7 +1467,14 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             guard let attributedType = syntax.as(AttributedTypeSyntax.self) else {
                 return false
             }
-            return attributedType.specifier?.text == "inout"
+            return attributedType.specifiers.contains {
+                switch $0 {
+                case .simpleTypeSpecifier(let syntax):
+                    return syntax.specifier.text == "inout"
+                default:
+                    return false
+                }
+            }
         default:
             return false
         }
@@ -1489,7 +1496,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             let signature = self.for(syntax: attributedType.baseType, in: syntaxTree)
             let attributes = Attributes.for(syntax: attributedType.attributes, in: syntaxTree)
             return attributes.apply(toFunction: signature)
-        case .simpleTypeIdentifier:
+        case .identifierType:
             guard let simpleType = syntax.as(IdentifierTypeSyntax.self) else {
                 return .none
             }
@@ -1521,7 +1528,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 return .none
             }
             return .dictionary(keyType, valueType)
-        case .constrainedSugarType:
+        case .someOrAnyType:
             guard let someOrAnyType = syntax.as(SomeOrAnyTypeSyntax.self) else {
                 return .none
             }
@@ -1544,7 +1551,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
             let apiFlags = functionType.effectSpecifiers?.apiFlags ?? []
             return .function(parameters, returnType, apiFlags, nil)
-        case .memberTypeIdentifier:
+        case .memberType:
             guard let memberType = syntax.as(MemberTypeSyntax.self) else {
                 return .none
             }
@@ -1619,7 +1626,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             fallthrough
         case .packExpansionType:
             fallthrough
-        case .packReferenceType:
+        case .packElementType:
             fallthrough
         default:
             return .none
