@@ -394,7 +394,7 @@ final class Binding: Expression, BindingExpression {
 
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         var identifierPatterns: [IdentifierPattern]? = nil
-        if syntax.kind == .discardAssignmentExpr || syntax.kind == .unresolvedPatternExpr, let expr = syntax.as(ExprSyntax.self) {
+        if syntax.kind == .discardAssignmentExpr || syntax.kind == .patternExpr, let expr = syntax.as(ExprSyntax.self) {
             identifierPatterns = expr.identifierPatterns(in: syntaxTree)
         } else if let patternSyntax = syntax.as(PatternSyntax.self) {
             identifierPatterns = patternSyntax.identifierPatterns(in: syntaxTree)
@@ -553,7 +553,7 @@ final class Closure: Expression {
         let (returnType, parameters, messages) = closureExpr.signature?.typeSignatures(in: syntaxTree) ?? (.none, [], [])
         let attributes = Attributes.for(syntax: closureExpr.signature?.attributes, in: syntaxTree)
         let isAsync = closureExpr.signature?.effectSpecifiers?.asyncSpecifier != nil
-        let isThrows = closureExpr.signature?.effectSpecifiers?.throwsSpecifier != nil
+        let isThrows = closureExpr.signature?.effectSpecifiers?.throwsClause?.throwsSpecifier != nil
         var statements = StatementDecoder.decode(syntaxList: closureExpr.statements, in: syntaxTree)
         if let extras = StatementExtras.decode(syntax: closureExpr.rightBrace) {
             let (extraStatements, _) = extras.statements(syntax: closureExpr.rightBrace, in: syntaxTree)
@@ -925,11 +925,11 @@ final class Identifier: Expression, APICallExpression {
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         let name: String
         var generics: [TypeSignature]? = nil
-        if syntax.kind == .identifierExpr, let identifierExpr = syntax.as(DeclReferenceExprSyntax.self) {
+        if syntax.kind == .declReferenceExpr, let identifierExpr = syntax.as(DeclReferenceExprSyntax.self) {
             name = identifierExpr.baseName.text
-        } else if syntax.kind == .superRefExpr {
+        } else if syntax.kind == .superExpr {
             name = "super"
-        } else if syntax.kind == .specializeExpr, let specializeExpr = syntax.as(GenericSpecializationExprSyntax.self), specializeExpr.expression.kind == .identifierExpr, let identifierExpr = specializeExpr.expression.as(DeclReferenceExprSyntax.self) {
+        } else if syntax.kind == .genericSpecializationExpr, let specializeExpr = syntax.as(GenericSpecializationExprSyntax.self), specializeExpr.expression.kind == .declReferenceExpr, let identifierExpr = specializeExpr.expression.as(DeclReferenceExprSyntax.self) {
             name = identifierExpr.baseName.text
             generics = specializeExpr.genericArgumentClause.arguments.map { TypeSignature.for(syntax: $0.argument, in: syntaxTree) }
         } else {
@@ -1298,7 +1298,7 @@ final class MemberAccess: Expression, APICallExpression, MemberAccessExpression 
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         var syntax = syntax
         var generics: [TypeSignature]? = nil
-        if syntax.kind == .specializeExpr, let specializeExpr = syntax.as(GenericSpecializationExprSyntax.self), specializeExpr.expression.kind == .memberAccessExpr {
+        if syntax.kind == .genericSpecializationExpr, let specializeExpr = syntax.as(GenericSpecializationExprSyntax.self), specializeExpr.expression.kind == .memberAccessExpr {
             syntax = specializeExpr.expression
             generics = specializeExpr.genericArgumentClause.arguments.map { TypeSignature.for(syntax: $0.argument, in: syntaxTree) }
         }
@@ -1619,13 +1619,13 @@ final class PostfixOperator: Expression {
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
         let operatorSymbol: String
         let target: Expression
-        if syntax.kind == .forcedValueExpr, let forceUnwrapExpr = syntax.as(ForceUnwrapExprSyntax.self) {
+        if syntax.kind == .forceUnwrapExpr, let forceUnwrapExpr = syntax.as(ForceUnwrapExprSyntax.self) {
             operatorSymbol = "!"
             target = ExpressionDecoder.decode(syntax: forceUnwrapExpr.expression, in: syntaxTree)
         } else if syntax.kind == .optionalChainingExpr, let optionalChainingExpr = syntax.as(OptionalChainingExprSyntax.self) {
             operatorSymbol = "?"
             target = ExpressionDecoder.decode(syntax: optionalChainingExpr.expression, in: syntaxTree)
-        } else if syntax.kind == .postfixUnaryExpr, let postfixExpr = syntax.as(PostfixOperatorExprSyntax.self) {
+        } else if syntax.kind == .postfixOperatorExpr, let postfixExpr = syntax.as(PostfixOperatorExprSyntax.self) {
             operatorSymbol = postfixExpr.operator.text
             target = ExpressionDecoder.decode(syntax: postfixExpr.expression, in: syntaxTree)
         } else {
@@ -1813,7 +1813,7 @@ final class Subscript: Expression, APICallExpression {
     }
 
     override class func decode(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) throws -> Expression? {
-        guard syntax.kind == .subscriptExpr, let subscriptExpr = syntax.as(SubscriptCallExprSyntax.self) else {
+        guard syntax.kind == .subscriptCallExpr, let subscriptExpr = syntax.as(SubscriptCallExprSyntax.self) else {
             return nil
         }
         let base = ExpressionDecoder.decode(syntax: subscriptExpr.calledExpression, in: syntaxTree)

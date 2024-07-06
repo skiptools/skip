@@ -54,6 +54,8 @@ extension TypeSignature {
             return "Int"
         case .int64:
             return "Long"
+        case .int128:
+            return "BigInteger"
         case .member(let baseType, let type):
             // Erase generics of outer type because Kotlin inner types do not inherit them
             return "\(baseType.withGenerics([]).kotlin).\(type.kotlin)"
@@ -117,6 +119,8 @@ extension TypeSignature {
             return "UInt"
         case .uint64:
             return "ULong"
+        case .uint128:
+            return "BigInteger"
         case .unwrappedOptional(let type):
             return type.kotlin
         case .void:
@@ -188,6 +192,8 @@ extension TypeSignature {
             return false
         case .int64:
             return false
+        case .int128:
+            return false
         case .member, .module, .named:
             guard let codebaseInfo else {
                 return true
@@ -223,6 +229,8 @@ extension TypeSignature {
         case .uint32:
             return false
         case .uint64:
+            return false
+        case .uint128:
             return false
         case .unwrappedOptional(let type):
             return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
@@ -264,6 +272,8 @@ extension TypeSignature {
             return true
         case .int64:
             return true
+        case .int128:
+            return !primitive
         case .named:
             return false
         case .none:
@@ -296,6 +306,8 @@ extension TypeSignature {
             return true
         case .uint64:
             return true
+        case .uint128:
+            return !primitive
         case .unwrappedOptional(let type):
             return type.kotlinIsNative(primitive: primitive)
         case .void:
@@ -330,6 +342,8 @@ extension TypeSignature {
             }
         } else if self == .string {
             return "\"\""
+        } else if self == .int128 || self == .uint128 {
+            return "\(self.kotlin)(0)"
         } else {
             return nil
         }

@@ -23,6 +23,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     case int16
     case int32
     case int64
+    case int128
     case member(TypeSignature, TypeSignature) // A.B
     case metaType(TypeSignature) // A.Type
     case module(String, TypeSignature) // Module.Type
@@ -39,6 +40,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     case uint16
     case uint32
     case uint64
+    case uint128
     case unwrappedOptional(TypeSignature)
     case void
 
@@ -1146,9 +1148,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         switch self {
         case .double, .float:
             return true
-        case .int, .int8, .int16, .int32, .int64:
+        case .int, .int8, .int16, .int32, .int64, .int128:
             return true
-        case .uint, .uint8, .uint16, .uint32, .uint64:
+        case .uint, .uint8, .uint16, .uint32, .uint64, .uint128:
             return true
         case .module(_, let type):
             return type.isNumeric
@@ -1166,7 +1168,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// Whether this is an unsigned number type.
     var isUnsigned: Bool {
         switch self {
-        case .uint, .uint8, .uint16, .uint32, .uint64:
+        case .uint, .uint8, .uint16, .uint32, .uint64, .uint128:
             return true
         case .module(_, let type):
             return type.isUnsigned
@@ -1327,7 +1329,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             if strippedTarget.isNumeric {
                 return 1.0
             }
-        case .int, .int8, .int16, .int32, .int64, .uint, .uint8, .uint16, .uint64:
+        case .int, .int8, .int16, .int32, .int64, .int128, .uint, .uint8, .uint16, .uint64, .uint128:
             if strippedTarget.isFloatingPoint {
                 return 1.0
             }
@@ -1671,6 +1673,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return genericTypes.isEmpty ? .int32 : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Int64", "Swift.Int64":
             return genericTypes.isEmpty ? .int64 : allowNamed ? swiftNamed(name, genericTypes) : .none
+        case "Int128", "Swift.Int128":
+            return genericTypes.isEmpty ? .int128 : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Range", "Swift.Range":
             return genericTypes.isEmpty ? .range(nil) : genericTypes.count == 1 ? .range(genericTypes[0]) : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Set", "Swift.Set":
@@ -1687,6 +1691,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return genericTypes.isEmpty ? .uint32 : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "UInt64", "Swift.UInt64":
             return genericTypes.isEmpty ? .uint64 : allowNamed ? swiftNamed(name, genericTypes) : .none
+        case "UInt128", "Swift.UInt128":
+            return genericTypes.isEmpty ? .uint128 : allowNamed ? swiftNamed(name, genericTypes) : .none
         case "Void", "Swift.Void":
             return genericTypes.isEmpty ? .void : allowNamed ? swiftNamed(name, genericTypes) : .none
         default:
@@ -1811,6 +1817,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return "Int32"
         case .int64:
             return "Int64"
+        case .int128:
+            return "Int128"
         case .member(let baseType, let type):
             return "\(baseType[keyPath: keyPath]).\(type[keyPath: keyPath])"
         case .metaType(let baseType):
@@ -1873,6 +1881,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return "UInt32"
         case .uint64:
             return "UInt64"
+        case .uint128:
+            return "UInt128"
         case .unwrappedOptional(let type):
             switch type {
             case .function:

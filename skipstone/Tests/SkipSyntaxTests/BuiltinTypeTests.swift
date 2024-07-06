@@ -15,12 +15,14 @@ final class BuiltinTypeTests: XCTestCase {
             var i16: Int16
             var i32: Int32
             var i64: Int64
+            var i128: Int128
             var s: String
             var ui: UInt
             var ui8: UInt8
             var ui16: UInt16
             var ui32: UInt32
             var ui64: UInt64
+            var ui128: UInt128
             var v: Void
         }
         """, kotlin: """
@@ -36,12 +38,14 @@ final class BuiltinTypeTests: XCTestCase {
             var i16: Short
             var i32: Int
             var i64: Long
+            var i128: BigInteger
             var s: String
             var ui: UInt
             var ui8: UByte
             var ui16: UShort
             var ui32: UInt
             var ui64: ULong
+            var ui128: BigInteger
             var v: Unit
         }
         """)
@@ -52,6 +56,7 @@ final class BuiltinTypeTests: XCTestCase {
         {
             var a: [Any]
             var ai: [Int]
+            var abi: [Int128]
             var ai2: Array<Int>
             var ai3 = Array<Int>()
             var m: [Any: Any]
@@ -73,6 +78,7 @@ final class BuiltinTypeTests: XCTestCase {
         { ->
             var a: Array<Any>
             var ai: Array<Int>
+            var abi: Array<BigInteger>
             var ai2: Array<Int>
             var ai3 = Array<Int>()
             var m: Dictionary<Any, Any>
@@ -191,9 +197,11 @@ final class BuiltinTypeTests: XCTestCase {
         try await check(swift: """
         let x: UInt = UInt(1)
         let y: UInt64 = UInt64(1)
+        let bi: UInt128 = UInt128(1)
         """, kotlin: """
         internal val x: UInt = 1U
         internal val y: ULong = 1UL
+        internal val bi: BigInteger = BigIntegerInit(1)
         """)
 
         try await checkProducesMessage(swift: """
@@ -202,12 +210,18 @@ final class BuiltinTypeTests: XCTestCase {
 
         try await check(swift: """
         let i: Int = Int(1)
-        let x: Long = Long(1)
-        let y: Long = Long(1.0)
+        let x: Int64 = Int64(1)
+        let y: Int64 = Int64(1.0)
+        let bi: Int128 = Int128(1)
         """, kotlin: """
         internal val i: Int = Int(1)
         internal val x: Long = 1L
         internal val y: Long = Long(1.0)
+        internal val bi: BigInteger = BigIntegerInit(1)
+        """)
+
+        try await checkProducesMessage(swift: """
+        let x: Int128 = 1
         """)
     }
 

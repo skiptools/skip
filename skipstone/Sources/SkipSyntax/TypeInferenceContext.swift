@@ -564,6 +564,8 @@ struct TypeInferenceContext {
             return type2.isFloatingPoint ? type2 : type1
         case .int64:
             return type2.isFloatingPoint ? type2 : type1
+        case .int128:
+            return type2.isFloatingPoint ? type2 : type1
         case .set(let elementType1):
             if let elementType1 {
                 if case .array(let elementType2) = type2, let elementType2 {
@@ -585,6 +587,8 @@ struct TypeInferenceContext {
         case .uint32:
             return type2.isFloatingPoint ? type2 : type1
         case .uint64:
+            return type2.isFloatingPoint ? type2 : type1
+        case .uint128:
             return type2.isFloatingPoint ? type2 : type1
         default:
             return type1

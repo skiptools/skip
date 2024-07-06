@@ -949,6 +949,9 @@ final class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APIC
         if let numberLiteral = numberConstructorToLiteral(expression: expression, arguments: karguments) {
             return numberLiteral
         }
+        if let number128Init = number128InitFunction(expression: expression, arguments: karguments) {
+            return number128Init
+        }
 
         let kfunction = translator.translateExpression(expression.function)
         // E.g. [Int](), [String: Int]()
@@ -998,7 +1001,7 @@ final class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APIC
             return nil
         }
 
-        if isFunction(expression: expression, named: "Long", moduleName: "Swift") {
+        if isFunction(expression: expression, named: "Int64", moduleName: "Swift") {
             numberLiteral.suffix = "L"
             return numberLiteral
         } else if isFunction(expression: expression, named: "UInt", moduleName: "Swift") {
@@ -1010,6 +1013,21 @@ final class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APIC
         } else {
             return nil
         }
+    }
+
+    private static func number128InitFunction(expression: FunctionCall, arguments: [LabeledValue<KotlinExpression>]) -> KotlinExpression? {
+        guard arguments.count == 1, arguments[0].label == nil else {
+            return nil
+        }
+        guard isFunction(expression: expression, named: "Int128", moduleName: "Swift") || isFunction(expression: expression, named: "UInt128", moduleName: "Swift") else {
+            return nil
+        }
+        let identifier = KotlinIdentifier(name: "BigIntegerInit", sourceFile: expression.function.sourceFile, sourceRange: expression.function.sourceRange)
+        let kexpression = KotlinFunctionCall(expression: expression, function: identifier)
+        kexpression.arguments = arguments
+        kexpression.inferredType = expression.inferredType.resolvingSelf(in: expression)
+        kexpression.apiMatch = expression.apiMatch
+        return kexpression
     }
 
     private static func isFunction(expression: FunctionCall, named: String, moduleName: String) -> Bool {

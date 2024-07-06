@@ -258,7 +258,7 @@ extension Message {
     }
 
     static func kotlinNumericCast(_ sourceDerived: SourceDerived, source: Source, type: String) -> Message {
-        return Message(kind: .error, message: "Cast required, e.g. \(type)(<value>). Kotlin requires specific type matching when dealing with Floats and unsigned types. We generally recommend avoiding them in favor of Double and signed types", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "Cast required, e.g. \(type)(<value>). Kotlin requires specific type matching when dealing with Floats, Int128, and unsigned types. We generally recommend avoiding Float in favor of Double and unsigned types in favor of signed types", sourceDerived: sourceDerived, source: source)
     }
 
     // Idea: read/mutate synthetic mutableState values
