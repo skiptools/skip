@@ -28,6 +28,9 @@ extension InheritedTypeListSyntax {
             let typeSignature = TypeSignature.for(syntax: typeSyntax.type, in: syntaxTree)
             if typeSignature != .none {
                 return typeSignature
+            } else if typeSyntax.type.kind == .suppressedType {
+                // Ignore suppressed types (e.g. ~Copyable)
+                return nil
             } else {
                 messages.append(.unsupportedTypeSignature(typeSyntax.type, source: syntaxTree.source))
                 return nil
@@ -106,7 +109,7 @@ extension AccessorDeclListSyntax {
             if accessorSyntax.effectSpecifiers?.asyncSpecifier != nil {
                 accessors.isAsync = true
             }
-            if accessorSyntax.effectSpecifiers?.throwsSpecifier != nil {
+            if accessorSyntax.effectSpecifiers?.throwsClause?.throwsSpecifier != nil {
                 accessors.isThrows = true
             }
             var body: CodeBlock? = nil
@@ -260,7 +263,7 @@ extension ExprSyntaxProtocol {
         switch kind {
         case .discardAssignmentExpr:
             return [IdentifierPattern(name: nil)]
-        case .identifierExpr:
+        case .declReferenceExpr:
             guard let identifierExpr = self.as(DeclReferenceExprSyntax.self) else {
                 return nil
             }
@@ -277,7 +280,7 @@ extension ExprSyntaxProtocol {
                 identifierPatterns += elementPatterns
             }
             return identifierPatterns
-        case .unresolvedPatternExpr:
+        case .patternExpr:
             // We've seen this pattern in e.g. 'if let (a, b) = optionalTuple'
             guard let patternExpr = self.as(PatternExprSyntax.self) else {
                 return nil
@@ -292,7 +295,7 @@ extension ExprSyntaxProtocol {
 extension TypeEffectSpecifiersSyntax {
     /// Return the API flags in these specifiers.
     var apiFlags: APIFlags {
-        return APIFlags(isAsync: asyncSpecifier?.text != nil, isThrows: throwsSpecifier?.text != nil)
+        return APIFlags(isAsync: asyncSpecifier?.text != nil, isThrows: throwsClause?.throwsSpecifier.text != nil)
     }
 }
 

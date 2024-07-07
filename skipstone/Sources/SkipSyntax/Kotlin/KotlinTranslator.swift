@@ -106,6 +106,8 @@ public final class KotlinTranslator {
                 return [KotlinContinue(statement: statement as! Continue)]
             case .defer:
                 return [KotlinDefer.translate(statement: statement as! Defer, translator: self)]
+            case .discard:
+                throw Message.kotlinDiscard(statement, source: syntaxTree.source)
             case .doCatch:
                 return [KotlinTryCatch.translate(statement: statement as! DoCatch, translator: self)]
             case .empty:

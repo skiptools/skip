@@ -1234,4 +1234,18 @@ final class TypeDeclarationTests: XCTestCase {
         }
         """)
     }
+
+    func testSuppressedProtocol() async throws {
+        try await check(swift: """
+        class C: Copyable {
+        }
+        class B: ~BitwiseCopyable {
+        }
+        """, kotlin: """
+        internal open class C: Copyable {
+        }
+        internal open class B {
+        }
+        """)
+    }
 }

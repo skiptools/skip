@@ -75,29 +75,32 @@ final class Swift6Tests: XCTestCase {
         }
         """)
     }
-}
 
+    func testNoncopyableTypes() async throws {
+        try await check(swift: """
+        struct NonCopyable: ~Copyable {
+            consuming func terminate() {
+                print("Terminating")
+            }
+        }
 
-struct XWing {
-    @MainActor
-    static var sFoilsAttackPosition = true
-}
+        func borrow(_ user: borrowing NonCopyable) {
+            print("\\(user)")
+        }
+        """, kotlin: """
+        internal class NonCopyable {
+            internal fun terminate(): Unit = print("Terminating")
+        }
 
-struct WarpDrive {
-    static let maximumSpeed = 9.975
-}
+        internal fun borrow(user: NonCopyable): Unit = print("${user}")
+        """)
 
-@MainActor
-var idNumber = 24601
-
-@MainActor
-func f() {
-    let s = XWing.sFoilsAttackPosition
-    XWing.sFoilsAttackPosition = false
-    idNumber = 100
-}
-
-func g() async {
-    let s = await XWing.sFoilsAttackPosition
-    let i = await idNumber
+        try await checkProducesMessage(swift: """
+        struct NonCopyable: ~Copyable {
+            consuming func terminate() {
+                discard self
+            }
+        }
+        """)
+    }
 }

@@ -108,6 +108,10 @@ extension Message {
         return Message(kind: .error, message: "Kotlin cannot satisfy a protocol init requirement with a generic constructor", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinDiscard(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Kotlin does not support discarding non-copyable types", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinEnumNameProperty(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "The Kotlin enum base type has a 'name' property which cannot be overridden. Consider changing the name of this property", sourceDerived: sourceDerived, source: source)
     }

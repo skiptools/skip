@@ -6,6 +6,7 @@ import SwiftSyntax
 enum StatementType: CaseIterable, Codable {
     case `break`
     case `continue`
+    case `discard`
     case `defer`
     case doCatch
     case empty
@@ -48,6 +49,8 @@ enum StatementType: CaseIterable, Codable {
             return CodeBlock.self
         case .continue:
             return Continue.self
+        case .discard:
+            return Discard.self
         case .defer:
             return Defer.self
         case .doCatch:
@@ -229,6 +232,27 @@ final class Defer: Statement {
     }
 }
 
+/// `discard self`
+final class Discard: ExpressionStatement {
+    init(expression: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        super.init(type: .discard, expression: expression, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .discardStmt, let discardStmnt = syntax.as(DiscardStmtSyntax.self) else {
+            return nil
+        }
+
+        let expression = ExpressionDecoder.decode(syntax: discardStmnt.expression, in: syntaxTree)
+        let statement = Discard(expression: expression, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        return [statement]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return ["discard"] + super.prettyPrintAttributes
+    }
+}
+
 /// `do { ... } [catch...]`
 final class DoCatch: Statement {
     let body: CodeBlock
@@ -289,7 +313,7 @@ final class Fallthrough: Statement {
     }
 
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
-        guard syntax.kind == .fallthroughStmt else {
+        guard syntax.kind == .fallThroughStmt else {
             return nil
         }
         return [Fallthrough(syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
@@ -320,7 +344,7 @@ final class ForLoop: Statement {
     }
 
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
-        guard syntax.kind == .forInStmt, let forStmnt = syntax.as(ForStmtSyntax.self) else {
+        guard syntax.kind == .forStmt, let forStmnt = syntax.as(ForStmtSyntax.self) else {
             return nil
         }
 
@@ -719,7 +743,7 @@ final class WhileLoop: Statement {
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         if syntax.kind == .whileStmt, let whileStmnt = syntax.as(WhileStmtSyntax.self) {
             return try [decodeWhile(statement: whileStmnt, extras: extras, in: syntaxTree)]
-        } else if syntax.kind == .repeatWhileStmt, let repeatStmnt = syntax.as(RepeatStmtSyntax.self) {
+        } else if syntax.kind == .repeatStmt, let repeatStmnt = syntax.as(RepeatStmtSyntax.self) {
             return [decodeRepeat(statement: repeatStmnt, extras: extras, in: syntaxTree)]
         } else {
             return nil
@@ -951,7 +975,7 @@ final class FunctionDeclaration: Statement {
         let name = functionDecl.name.text.removingBacktickEscaping
         let (returnType, parameters, signatureMessges) = functionDecl.signature.typeSignatures(in: syntaxTree)
         let isAsync = functionDecl.signature.effectSpecifiers?.asyncSpecifier != nil
-        let isThrows = functionDecl.signature.effectSpecifiers?.throwsSpecifier != nil
+        let isThrows = functionDecl.signature.effectSpecifiers?.throwsClause?.throwsSpecifier != nil
         var attributes = Attributes.for(syntax: functionDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: functionDecl.modifiers)
@@ -969,7 +993,7 @@ final class FunctionDeclaration: Statement {
         let isOptionalInit = initializerDecl.optionalMark != nil
         let (_, parameters, signatureMessages) = initializerDecl.signature.typeSignatures(in: syntaxTree)
         let isAsync = initializerDecl.signature.effectSpecifiers?.asyncSpecifier != nil
-        let isThrows = initializerDecl.signature.effectSpecifiers?.throwsSpecifier != nil
+        let isThrows = initializerDecl.signature.effectSpecifiers?.throwsClause?.throwsSpecifier != nil
         var attributes = Attributes.for(syntax: initializerDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: initializerDecl.modifiers)
@@ -1234,7 +1258,7 @@ final class TypealiasDeclaration: Statement {
     }
 
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> [Statement]? {
-        guard syntax.kind == .typealiasDecl, let typealiasDecl = syntax.as(TypeAliasDeclSyntax.self) else {
+        guard syntax.kind == .typeAliasDecl, let typealiasDecl = syntax.as(TypeAliasDeclSyntax.self) else {
             return nil
         }
         let name = typealiasDecl.name.text.removingBacktickEscaping
@@ -1351,8 +1375,8 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: protocolDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
-        let associatedTypeDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind == .associatedtypeDecl ? $0.decl.as(AssociatedTypeDeclSyntax.self) : nil }
-        let memberDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind != .associatedtypeDecl ? $0.decl : nil }
+        let associatedTypeDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind == .associatedTypeDecl ? $0.decl.as(AssociatedTypeDeclSyntax.self) : nil }
+        let memberDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind != .associatedTypeDecl ? $0.decl : nil }
         let (generics, genericsMessages) = Generics.for(syntax: nil, associatedTypeSyntax: associatedTypeDecls, where: protocolDecl.genericWhereClause, in: syntaxTree)
         let members = memberDecls.flatMap { StatementDecoder.decode(syntax: $0, in: syntaxTree) }
         let statement = TypeDeclaration(type: .protocolDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: protocolDecl, sourceFile: syntaxTree.source.file, sourceRange: protocolDecl.range(in: syntaxTree.source), extras: extras)
