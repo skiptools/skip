@@ -38,6 +38,7 @@ public final class CodebaseInfo {
         "OSLog": ["SkipFoundation"],
         "Swift": ["SkipLib"],
         "SwiftUI": ["SkipUI", "SkipFoundation", "SkipModel"],
+        "UIKit": ["SkipUI", "SkipFoundation", "SkipModel"],
         "XCTest": ["SkipUnit"],
     ]
 
