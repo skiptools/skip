@@ -13,7 +13,7 @@ struct Accessors {
     var willSet: Accessor<CodeBlock>?
     var didSet: Accessor<CodeBlock>?
     var isAsync = false
-    var isThrows = false
+    var throwsType: TypeSignature = .none
     var attributes: Attributes?
     var messages: [Message] = []
 }
@@ -21,7 +21,7 @@ struct Accessors {
 /// Match when querying identifiers, functions, and other API.
 struct APIMatch {
     var signature: TypeSignature
-    var apiFlags: APIFlags = []
+    var apiFlags = APIFlags()
     /// May be `nil` for bultins like tuple members.
     var declarationType: StatementType?
     var memberOf: (declaringType: TypeSignature, selfType: TypeSignature?)?
@@ -32,46 +32,63 @@ struct APIMatch {
 /// Flags that affect API calls.
 ///
 /// - Note: `Codable` for use in `CodebaseInfo`.
-struct APIFlags: OptionSet, Hashable, Codable {
-    let rawValue: Int
+struct APIFlags: Hashable, Codable {
+    var options: Options = []
+    var throwsType: TypeSignature = .none
 
-    static let async = APIFlags(rawValue: 1 << 0)
-    static let autoclosure = APIFlags(rawValue: 1 << 1)
-    static let mainActor = APIFlags(rawValue: 1 << 2)
-    static let `throws` = APIFlags(rawValue: 1 << 3)
-    static let viewBuilder = APIFlags(rawValue: 1 << 4)
-    static let writeable = APIFlags(rawValue: 1 << 5)
-    static let swiftUIBindable = APIFlags(rawValue: 1 << 6)
-    static let computed = APIFlags(rawValue: 1 << 7)
+    struct Options: OptionSet, Hashable, Codable {
+        let rawValue: Int
 
-    init(rawValue: Int) {
-        self.rawValue = rawValue
+        static let async = Options(rawValue: 1 << 0)
+        static let autoclosure = Options(rawValue: 1 << 1)
+        static let mainActor = Options(rawValue: 1 << 2)
+        static let `throws` = Options(rawValue: 1 << 3) /// Legacy value: see `APIFlags.throwsType`
+        static let viewBuilder = Options(rawValue: 1 << 4)
+        static let writeable = Options(rawValue: 1 << 5)
+        static let swiftUIBindable = Options(rawValue: 1 << 6)
+        static let computed = Options(rawValue: 1 << 7)
+
+        init(rawValue: Int) {
+            self.rawValue = rawValue
+        }
     }
 
-    init(isAsync: Bool = false, isThrows: Bool = false, isMainActor: Bool = false, isSwiftUIBindable: Bool = false, isViewBuilder: Bool = false, isComputed: Bool = false, isWriteable: Bool = false) {
-        var apiFlags: APIFlags = []
+    init(isAsync: Bool = false, isMainActor: Bool = false, isSwiftUIBindable: Bool = false, isViewBuilder: Bool = false, isComputed: Bool = false, isWriteable: Bool = false, throwsType: TypeSignature = .none) {
         if isAsync {
-            apiFlags.insert(.async)
-        }
-        if isThrows {
-            apiFlags.insert(.throws)
+            options.insert(.async)
         }
         if isMainActor {
-            apiFlags.insert(.mainActor)
+            options.insert(.mainActor)
         }
         if isSwiftUIBindable {
-            apiFlags.insert(.swiftUIBindable)
+            options.insert(.swiftUIBindable)
         }
         if isViewBuilder {
-            apiFlags.insert(.viewBuilder)
+            options.insert(.viewBuilder)
         }
         if isComputed {
-            apiFlags.insert(.computed)
+            options.insert(.computed)
         }
         if isWriteable {
-            apiFlags.insert(.writeable)
+            options.insert(.writeable)
         }
-        self = apiFlags
+        if throwsType != .none {
+            self.throwsType = throwsType
+            options.insert(.throws)
+        }
+    }
+
+    init(options: Options, throwsType: TypeSignature = .none) {
+        self.options = options
+        self.throwsType = throwsType
+    }
+
+    func union(_ apiFlags: APIFlags) -> APIFlags {
+        return APIFlags(options: options.union(apiFlags.options), throwsType: throwsType.or(apiFlags.throwsType))
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case options = "o", throwsType = "t"
     }
 }
 
@@ -140,18 +157,18 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
         guard case .function(let parameters, let returnType, let initialAPIFlags, let initialAttributes) = signature else {
             return signature
         }
-        var apiFlags: APIFlags = []
+        var apiFlags = APIFlags()
         var attributes: [Attribute] = []
         for attribute in self.attributes {
             switch attribute.kind {
             case .autoclosure:
-                apiFlags.insert(.autoclosure)
+                apiFlags.options.insert(.autoclosure)
             case .directive:
                 attributes.append(attribute)
             case .mainActor:
-                apiFlags.insert(.mainActor)
+                apiFlags.options.insert(.mainActor)
             case .viewBuilder, .toolbarContentBuilder:
-                apiFlags.insert(.viewBuilder)
+                apiFlags.options.insert(.viewBuilder)
             case .unknown:
                 attributes.append(attribute)
             default:

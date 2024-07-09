@@ -226,7 +226,7 @@ final class KotlinBinaryOperator: KotlinExpression, KotlinSingleStatementVetoing
             // Within a constructor, look for assignments to an identifier or 'self.identifier'
             if (identifier != nil && identifier?.name != "self") || (memberAccess?.base as? Identifier)?.name == "self" {
                 // If the assignment target is a 'let' member, sref() it
-                if (expression.lhs as? APICallExpression)?.apiMatch?.apiFlags.contains(.writeable) != true {
+                if (expression.lhs as? APICallExpression)?.apiMatch?.apiFlags.options.contains(.writeable) != true {
                     return true
                 }
             }
@@ -589,7 +589,7 @@ final class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
     var isDestructuredParameters = false
     var implicitParameterCount = 0
     var attributes = Attributes()
-    var apiFlags: APIFlags? = []
+    var apiFlags: APIFlags? = APIFlags()
     var inferredReturnType: TypeSignature = .none
     var isAnonymousFunction = false
     var body: KotlinCodeBlock
@@ -627,7 +627,7 @@ final class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
         // If there is an explicit return type we'll use an anonymous function rather than a closure, as Kotlin
         // closures cannot declare a return type. Kotlin does not support anonymous suspend functions, though
         let kbody = KotlinCodeBlock.translate(statement: expression.body, translator: translator)
-        let isAnonymousFunction = expression.returnType != .none && !expression.isDestructuredParameters && !expression.apiFlags.contains(.async) && !expression.apiFlags.contains(.mainActor)
+        let isAnonymousFunction = expression.returnType != .none && !expression.isDestructuredParameters && !expression.apiFlags.options.contains(.async) && !expression.apiFlags.options.contains(.mainActor)
         var hasReturnLabel = false
         if isAnonymousFunction {
             if expression.returnType != .void {
@@ -753,8 +753,8 @@ final class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
 
     private func appendClosure(to output: OutputGenerator, indentation: Indentation) {
         // Output with the correct context if we're async or if we need to jump to the main actor
-        let isAsync = !isNoDispatch && (apiFlags?.contains(.async) == true || mainActorMode.output != .none)
-        let isMainActor = isAsync && apiFlags?.contains(.mainActor) == true
+        let isAsync = !isNoDispatch && (apiFlags?.options.contains(.async) == true || mainActorMode.output != .none)
+        let isMainActor = isAsync && apiFlags?.options.contains(.mainActor) == true
         let returnLabel = hasReturnLabel ? "\(Self.returnLabel)@" : ""
         if !isAsync {
             output.append(returnLabel)
@@ -1230,7 +1230,7 @@ final class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, Kotlin
     }
 
     var isSwiftUIBinding: Bool {
-        return isSwiftUIBindingParameter || (name.isProjectedValue && apiFlags?.contains(.swiftUIBindable) == true)
+        return isSwiftUIBindingParameter || (name.isProjectedValue && apiFlags?.options.contains(.swiftUIBindable) == true)
     }
 
     func appendSwiftUIBindingPath(to output: OutputGenerator, indentation: Indentation, appendPath: @escaping (OutputGenerator, Indentation, KotlinBindableBase) -> Void) {
@@ -1337,7 +1337,7 @@ final class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, Kotlin
                     if let generics, !generics.isEmpty {
                         output.append("<\(generics.map(\.kotlin).joined(separator: ", "))>")
                     }
-                    if let apiMatch, apiMatch.declarationType == .variableDeclaration, (apiMatch.apiFlags.contains(.viewBuilder) && apiMatch.apiFlags.contains(.computed) && !apiMatch.signature.isFunction) || (apiMatch.apiFlags.contains(.async) && !apiMatch.apiFlags.contains(.writeable)) {
+                    if let apiMatch, apiMatch.declarationType == .variableDeclaration, (apiMatch.apiFlags.options.contains(.viewBuilder) && apiMatch.apiFlags.options.contains(.computed) && !apiMatch.signature.isFunction) || (apiMatch.apiFlags.options.contains(.async) && !apiMatch.apiFlags.options.contains(.writeable)) {
                         // View builder and async properties are converted to Kotlin functions. Any writeable async API must
                         // be a private actor variable, which we do not treat as async
                         output.append("()")
@@ -2010,7 +2010,7 @@ final class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, Kotl
     }
 
     var isSwiftUIBinding: Bool {
-        return (base as? KotlinSwiftUIBindable)?.isSwiftUIBinding == true || (member.isProjectedValue && apiFlags?.contains(.swiftUIBindable) == true)
+        return (base as? KotlinSwiftUIBindable)?.isSwiftUIBinding == true || (member.isProjectedValue && apiFlags?.options.contains(.swiftUIBindable) == true)
     }
 
     func appendSwiftUIBindingPath(to output: OutputGenerator, indentation: Indentation, appendPath: @escaping (OutputGenerator, Indentation, KotlinBindableBase) -> Void) {
@@ -2181,7 +2181,7 @@ final class KotlinMemberAccess: KotlinExpression, KotlinMainActorTargeting, Kotl
         } else if castTargetType != .none, let apiMatch, apiMatch.declarationType != .enumCaseDeclaration && !apiMatch.signature.generics.isEmpty {
             output.append("<\(Array(repeating: "*", count: apiMatch.signature.generics.count).joined(separator: ", "))>")
         }
-        if let apiMatch, apiMatch.declarationType == .variableDeclaration, (apiMatch.apiFlags.contains(.viewBuilder) && apiMatch.apiFlags.contains(.computed) && !apiMatch.signature.isFunction) || (apiMatch.apiFlags.contains(.async) && !apiMatch.apiFlags.contains(.writeable)) {
+        if let apiMatch, apiMatch.declarationType == .variableDeclaration, (apiMatch.apiFlags.options.contains(.viewBuilder) && apiMatch.apiFlags.options.contains(.computed) && !apiMatch.signature.isFunction) || (apiMatch.apiFlags.options.contains(.async) && !apiMatch.apiFlags.options.contains(.writeable)) {
             // View builder and async properties are converted to Kotlin functions. Any writeable async API must
             // be a private actor variable, which we do not treat as async
             output.append("()")

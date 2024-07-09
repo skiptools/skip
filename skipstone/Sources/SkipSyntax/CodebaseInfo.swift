@@ -521,11 +521,11 @@ public final class CodebaseInfo {
                 if case .range = arguments[0].value.type {
                     // Slice - fall through to symbols
                 } else {
-                    let signature: TypeSignature = .function([TypeSignature.Parameter(type: .int)], elementType.mappingSelf(to: type), [], nil)
+                    let signature: TypeSignature = .function([TypeSignature.Parameter(type: .int)], elementType.mappingSelf(to: type), APIFlags(), nil)
                     return [APIMatch(signature: signature, memberOf: (type, nil))]
                 }
             } else if case .dictionary(let keyType, let valueType) = type, let keyType, let valueType, arguments.count == 1 {
-                let signature: TypeSignature = .function([TypeSignature.Parameter(type: keyType)], valueType.mappingSelf(to: type).asOptional(true), [], nil)
+                let signature: TypeSignature = .function([TypeSignature.Parameter(type: keyType)], valueType.mappingSelf(to: type).asOptional(true), APIFlags(), nil)
                 return [APIMatch(signature: signature, memberOf: (type, nil))]
             }
             let isStatic = type.isMetaType
@@ -747,12 +747,12 @@ public final class CodebaseInfo {
             // If we don't have any matches and this appears to be a constructor, treat it as one. We take advantage of this
             // while inferring the types of variable values in prepareForUse(), before we've called generateConstructors()
             if initSignatures.isEmpty {
-                initSignatures.append(syntheticInitCandidate(for: primaryTypeInfo.signature, arguments: arguments, apiFlags: primaryTypeInfo.apiFlags ?? [], availability: primaryTypeInfo.availability))
+                initSignatures.append(syntheticInitCandidate(for: primaryTypeInfo.signature, arguments: arguments, apiFlags: primaryTypeInfo.apiFlags ?? APIFlags(), availability: primaryTypeInfo.availability))
             }
             return initSignatures
         }
 
-        private func syntheticInitCandidate(for type: TypeSignature, arguments: [LabeledValue<ArgumentValue>], apiFlags: APIFlags = [], availability: Availability = .available) -> FunctionCandidate {
+        private func syntheticInitCandidate(for type: TypeSignature, arguments: [LabeledValue<ArgumentValue>], apiFlags: APIFlags = APIFlags(), availability: Availability = .available) -> FunctionCandidate {
             let initParameters = arguments.map { TypeSignature.Parameter(label: $0.label, type: $0.value.type) }
             let match = APIMatch(signature: .function(initParameters, type, apiFlags, nil), apiFlags: apiFlags, declarationType: .initDeclaration, memberOf: (type, nil), availability: availability)
             return FunctionCandidate(match: match, score: 0.0, level: 0)
@@ -770,7 +770,7 @@ public final class CodebaseInfo {
             default:
                 // Is this a cast?
                 if type.isNumeric && arguments.count == 1 && arguments[0].label == nil && arguments[0].value.type.isNumeric {
-                    return [FunctionCandidate(match: APIMatch(signature: .function([.init(type: arguments[0].value.type)], type, [], nil), apiFlags: [], declarationType: .initDeclaration, memberOf: (type, nil), availability: .available), score: 1.0, level: 0)]
+                    return [FunctionCandidate(match: APIMatch(signature: .function([.init(type: arguments[0].value.type)], type, APIFlags(), nil), apiFlags: APIFlags(), declarationType: .initDeclaration, memberOf: (type, nil), availability: .available), score: 1.0, level: 0)]
                 }
                 return functionCandidates(name: type.name, moduleName: moduleName, constrainedGenerics: constrainedGenerics, arguments: arguments, includeTypes: false)
             }
@@ -1330,15 +1330,15 @@ public final class CodebaseInfo {
             var parameterType = variable.signature
             if variable.attributes.contains(.binding) {
                 parameterType = parameterType.asBinding()
-            } else if variable.attributes.contains(.viewBuilder), !variable.signature.isFunction, variable.apiFlags?.contains(.computed) == false {
+            } else if variable.attributes.contains(.viewBuilder), !variable.signature.isFunction, variable.apiFlags?.options.contains(.computed) == false {
                 // Swift generates a closure parameter that returns a view for stored @ViewBuilder variables
-                parameterType = .function([], variable.signature, [], nil)
+                parameterType = .function([], variable.signature, APIFlags(), nil)
             }
             // Transfer attributes if variable is a closure, e.g. @ViewBuilder
             parameterType = variable.attributes.apply(toFunction: parameterType)
             return TypeSignature.Parameter(label: variable.name, type: parameterType, hasDefaultValue: variable.hasValue)
         }
-        let initSignature: TypeSignature = .function(parameters, typeInfo.signature, typeInfo.apiFlags ?? [], nil)
+        let initSignature: TypeSignature = .function(parameters, typeInfo.signature, typeInfo.apiFlags ?? APIFlags(), nil)
         var initInfo = FunctionInfo(name: "init", declarationType: .initDeclaration, signature: initSignature, moduleName: typeInfo.moduleName, sourceFile: typeInfo.sourceFile, declaringType: typeInfo.signature, modifiers: typeInfo.modifiers, attributes: Attributes(), availability: .available)
         initInfo.isGenerated = true
         typeInfo.functions.append(initInfo)
@@ -1561,7 +1561,7 @@ public final class CodebaseInfo {
             self.modifiers = statement.modifiers
             self.attributes = statement.attributes
             self.availability = Availability(attributes: statement.attributes)
-            self.apiFlags = statement.attributes.contains(.mainActor) ? .mainActor : []
+            self.apiFlags = APIFlags(isMainActor: statement.attributes.contains(.mainActor))
             self.generics = statement.generics
             self.inherits = statement.inherits
             addMembers(statement.members, codebaseInfo: codebaseInfo, syntaxTree: syntaxTree)
@@ -1582,7 +1582,7 @@ public final class CodebaseInfo {
             self.modifiers = statement.modifiers
             self.attributes = statement.attributes
             self.availability = Availability(attributes: statement.attributes)
-            self.apiFlags = statement.attributes.contains(.mainActor) ? .mainActor : []
+            self.apiFlags = APIFlags(isMainActor: statement.attributes.contains(.mainActor))
             self.generics = statement.generics
             self.inherits = statement.inherits
             addMembers(statement.members, codebaseInfo: codebaseInfo, syntaxTree: syntaxTree)
@@ -1658,7 +1658,7 @@ public final class CodebaseInfo {
             guard isMainActorType(codebaseInfo: codebaseInfo) else {
                 return
             }
-            apiFlags?.insert(.mainActor)
+            apiFlags?.options.insert(.mainActor)
             for i in 0..<variables.count { variables[i].addMainActorFlag() }
             for i in 0..<functions.count { functions[i].addMainActorFlag() }
             for i in 0..<subscripts.count { subscripts[i].addMainActorFlag() }
@@ -1666,7 +1666,7 @@ public final class CodebaseInfo {
 
         fileprivate func addMainActorMemberFlags(codebaseInfo: CodebaseInfo) {
             for i in 0..<types.count { types[i].addMainActorMemberFlags(codebaseInfo: codebaseInfo) }
-            guard apiFlags?.contains(.mainActor) != true else {
+            guard apiFlags?.options.contains(.mainActor) != true else {
                 return
             }
             guard !inherits.isEmpty else {
@@ -1701,7 +1701,7 @@ public final class CodebaseInfo {
             guard !modifiers.isNonisolated else {
                 return false
             }
-            guard apiFlags?.contains(.mainActor) != true else {
+            guard apiFlags?.options.contains(.mainActor) != true else {
                 return true
             }
             if declarationType == .extensionDeclaration {
@@ -1714,7 +1714,7 @@ public final class CodebaseInfo {
         }
 
         private static func isMainActorInferred(_ item: CodebaseInfoItem, in typeInfos: [TypeInfo]) -> Bool {
-            guard !item.modifiers.isNonisolated, item.apiFlags?.contains(.mainActor) != true, item.modifiers.visibility != .private else {
+            guard !item.modifiers.isNonisolated, item.apiFlags?.options.contains(.mainActor) != true, item.modifiers.visibility != .private else {
                 return false
             }
             for typeInfo in typeInfos {
@@ -1724,15 +1724,15 @@ public final class CodebaseInfo {
                 }
                 switch item.declarationType {
                 case .variableDeclaration:
-                    if typeInfo.variables.contains(where: { $0.apiFlags?.contains(.mainActor) == true && $0.modifiers.visibility != .private && $0.isStatic == item.isStatic && $0.name == item.name }) {
+                    if typeInfo.variables.contains(where: { $0.apiFlags?.options.contains(.mainActor) == true && $0.modifiers.visibility != .private && $0.isStatic == item.isStatic && $0.name == item.name }) {
                         return true
                     }
                 case .functionDeclaration, .initDeclaration:
-                    if typeInfo.functions.contains(where: { $0.apiFlags?.contains(.mainActor) == true && $0.modifiers.visibility != .private && $0.isStatic == item.isStatic && $0.name == item.name && $0.signature.parameters.map(\.label) == item.signature.parameters.map(\.label) }) {
+                    if typeInfo.functions.contains(where: { $0.apiFlags?.options.contains(.mainActor) == true && $0.modifiers.visibility != .private && $0.isStatic == item.isStatic && $0.name == item.name && $0.signature.parameters.map(\.label) == item.signature.parameters.map(\.label) }) {
                         return true
                     }
                 case .subscriptDeclaration:
-                    if typeInfo.subscripts.contains(where: { $0.apiFlags?.contains(.mainActor) == true && $0.modifiers.visibility != .private && $0.isStatic == item.isStatic && $0.signature.parameters.map(\.label) == item.signature.parameters.map(\.label) }) {
+                    if typeInfo.subscripts.contains(where: { $0.apiFlags?.options.contains(.mainActor) == true && $0.modifiers.visibility != .private && $0.isStatic == item.isStatic && $0.signature.parameters.map(\.label) == item.signature.parameters.map(\.label) }) {
                         return true
                     }
                 default:
@@ -1828,7 +1828,7 @@ public final class CodebaseInfo {
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
         }
 
-        fileprivate init(name: String, signature: TypeSignature, moduleName: String?, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, modifiers: Modifiers, attributes: Attributes, availability: Availability, apiFlags: APIFlags = [], isInitializable: Bool = false, hasValue: Bool = false) {
+        fileprivate init(name: String, signature: TypeSignature, moduleName: String?, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, modifiers: Modifiers, attributes: Attributes, availability: Availability, apiFlags: APIFlags = APIFlags(), isInitializable: Bool = false, hasValue: Bool = false) {
             self.name = name
             self.signature = signature
             self.moduleName = moduleName
@@ -1892,7 +1892,7 @@ public final class CodebaseInfo {
 
         fileprivate mutating func addMainActorFlag() {
             if !modifiers.isNonisolated {
-                apiFlags?.insert(.mainActor)
+                apiFlags?.options.insert(.mainActor)
             }
         }
     }
@@ -1942,7 +1942,7 @@ public final class CodebaseInfo {
             (codebaseInfo.languageAdditions as? CodebaseInfoLanguageAdditionsGatherDelegate)?.codebaseInfo(codebaseInfo, didGather: &self, from: statement, syntaxTree: syntaxTree)
         }
 
-        fileprivate init(name: String, declarationType: StatementType, signature: TypeSignature, moduleName: String?, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, modifiers: Modifiers, attributes: Attributes, availability: Availability, generics: Generics = Generics(), apiFlags: APIFlags = [], isMutating: Bool = false) {
+        fileprivate init(name: String, declarationType: StatementType, signature: TypeSignature, moduleName: String?, sourceFile: Source.FilePath? = nil, declaringType: TypeSignature? = nil, modifiers: Modifiers, attributes: Attributes, availability: Availability, generics: Generics = Generics(), apiFlags: APIFlags = APIFlags(), isMutating: Bool = false) {
             self.name = name
             self.declarationType = declarationType
             self.signature = signature
@@ -1965,7 +1965,7 @@ public final class CodebaseInfo {
         fileprivate mutating func addMainActorFlag() {
             if !modifiers.isNonisolated {
                 var apiFlags = signature.apiFlags
-                apiFlags.insert(.mainActor)
+                apiFlags.options.insert(.mainActor)
                 signature = signature.withAPIFlags(apiFlags)
             }
         }
@@ -2026,7 +2026,7 @@ public final class CodebaseInfo {
         fileprivate mutating func addMainActorFlag() {
             if !modifiers.isNonisolated {
                 var apiFlags = signature.apiFlags
-                apiFlags.insert(.mainActor)
+                apiFlags.options.insert(.mainActor)
                 signature = signature.withAPIFlags(apiFlags)
             }
         }
@@ -2159,7 +2159,7 @@ extension CodebaseInfoItem {
         } else {
             memberOf = nil
         }
-        return APIMatch(signature: signature, apiFlags: apiFlags ?? [], declarationType: declarationType, memberOf: memberOf, attributes: attributes, availability: availability)
+        return APIMatch(signature: signature, apiFlags: apiFlags ?? APIFlags(), declarationType: declarationType, memberOf: memberOf, attributes: attributes, availability: availability)
     }
 }
 

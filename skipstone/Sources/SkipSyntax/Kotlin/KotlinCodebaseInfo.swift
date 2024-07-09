@@ -212,7 +212,7 @@ extension CodebaseInfo.Context {
             guard !structInfo.attributes.kotlinHasDirective(.nocopy) else {
                 return false
             }
-            if structInfo.variables.contains(where: { $0.apiFlags?.contains(.writeable) == true && !$0.attributes.isNonMutating }) || structInfo.functions.contains(where: \.isMutating) {
+            if structInfo.variables.contains(where: { $0.apiFlags?.options.contains(.writeable) == true && !$0.attributes.isNonMutating }) || structInfo.functions.contains(where: \.isMutating) {
                 return true
             }
             // Special case for OptionSets, where the transpiler adds mutability

@@ -469,6 +469,13 @@ final class CasePattern: Expression, BindingExpression {
         }
     }
 
+    init(value: Expression, isVar: Bool = false, isNonNilMatch: Bool = false) {
+        self.value = value
+        self.isVar = isVar
+        self.isNonNilMatch = isNonNilMatch
+        super.init(type: .casePattern)
+    }
+
     init(syntax: PatternSyntax, in syntaxTree: SyntaxTree) {
         let (value, isVar) = syntax.expression(in: syntaxTree)
         if let postfixOperator = value as? PostfixOperator, postfixOperator.operatorSymbol == "?" {
@@ -514,21 +521,21 @@ final class Closure: Expression {
     private(set) var captureList: [(CaptureType, LabeledValue<Expression>)]
     private(set) var returnType: TypeSignature
     private(set) var parameters: [Parameter<Void>]
-    let attributes: Attributes
+    private(set) var throwsType: TypeSignature
+    private(set) var attributes: Attributes
     let isAsync: Bool
-    let isThrows: Bool
     let body: CodeBlock
     var apiFlags: APIFlags {
-        return APIFlags(isAsync: isAsync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor), isViewBuilder: attributes.contains(.viewBuilder))
+        return APIFlags(isAsync: isAsync, isMainActor: attributes.contains(.mainActor), isViewBuilder: attributes.contains(.viewBuilder), throwsType: throwsType)
     }
 
-    init(captureList: [(CaptureType, LabeledValue<Expression>)] = [], returnType: TypeSignature = .none, parameters: [Parameter<Void>], attributes: Attributes = Attributes(), isAsync: Bool = false, isThrows: Bool = false, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+    init(captureList: [(CaptureType, LabeledValue<Expression>)] = [], returnType: TypeSignature = .none, parameters: [Parameter<Void>], attributes: Attributes = Attributes(), isAsync: Bool = false, throwsType: TypeSignature = .none, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.captureList = captureList
         self.returnType = returnType
         self.parameters = parameters
         self.attributes = attributes
         self.isAsync = isAsync
-        self.isThrows = isThrows
+        self.throwsType = throwsType
         self.body = body
         super.init(type: .closure, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange)
     }
@@ -553,7 +560,7 @@ final class Closure: Expression {
         let (returnType, parameters, messages) = closureExpr.signature?.typeSignatures(in: syntaxTree) ?? (.none, [], [])
         let attributes = Attributes.for(syntax: closureExpr.signature?.attributes, in: syntaxTree)
         let isAsync = closureExpr.signature?.effectSpecifiers?.asyncSpecifier != nil
-        let isThrows = closureExpr.signature?.effectSpecifiers?.throwsClause?.throwsSpecifier != nil
+        let throwsType =  closureExpr.signature?.effectSpecifiers?.throwsClause?.typeSignature(in: syntaxTree) ?? .none
         var statements = StatementDecoder.decode(syntaxList: closureExpr.statements, in: syntaxTree)
         if let extras = StatementExtras.decode(syntax: closureExpr.rightBrace) {
             let (extraStatements, _) = extras.statements(syntax: closureExpr.rightBrace, in: syntaxTree)
@@ -561,9 +568,16 @@ final class Closure: Expression {
             statements.append(Empty(syntax: closureExpr.rightBrace, extras: extras, in: syntaxTree))
         }
         let body = CodeBlock(statements: statements)
-        let expression = Closure(captureList: captureList, returnType: returnType, parameters: parameters, attributes: attributes, isAsync: isAsync, isThrows: isThrows, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
+        let expression = Closure(captureList: captureList, returnType: returnType, parameters: parameters, attributes: attributes, isAsync: isAsync, throwsType: throwsType, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
         expression.messages = messages
         return expression
+    }
+
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        returnType = returnType.resolved(in: self, context: context)
+        parameters = parameters.map { $0.resolvedType(in: self, context: context) }
+        throwsType = throwsType.resolved(in: self, context: context)
+        attributes = attributes.resolved(in: self, context: context)
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
@@ -609,7 +623,7 @@ final class Closure: Expression {
         return highestParameter + 1
     }
 
-    var functionType: TypeSignature = .function([], .none, [], nil)
+    var functionType: TypeSignature = .function([], .none, APIFlags(), nil)
     var isDestructuredParameters = false
 
     override var inferredType: TypeSignature {
@@ -631,8 +645,8 @@ final class Closure: Expression {
         if isAsync {
             attrs.append("async")
         }
-        if isThrows {
-            attrs.append("throws")
+        if throwsType != .none {
+            attrs.append(PrettyPrintTree(root: "throws", children: [PrettyPrintTree(root: throwsType.description)]))
         }
         return attrs
     }
@@ -1173,7 +1187,7 @@ final class KeyPathLiteral: Expression {
         if isKeyPathExpected {
             keyPathType = .named("KeyPath", [root, leaf])
         } else {
-            keyPathType = .function([.init(type: root)], leaf, [], nil).or(expecting)
+            keyPathType = .function([.init(type: root)], leaf, APIFlags(), nil).or(expecting)
         }
         self.root = root
         self.components = typedComponents
@@ -1528,7 +1542,7 @@ final class OptionalBinding: Expression, BindingExpression {
         if names.count == 1, let name = names[0], !context.isLocalOrSelfIdentifier(name), value == nil || (value as? Identifier)?.name == name {
             if let (signature, match) = context.identifier(name, messagesNode: nil) {
                 // For some reason Kotlin considers all closure members unstable
-                nameShadowsUnstableValue = match.memberOf != nil && (match.apiFlags.contains(.writeable) || match.apiFlags.contains(.computed) || signature.isFunction)
+                nameShadowsUnstableValue = match.memberOf != nil && (match.apiFlags.options.contains(.writeable) || match.apiFlags.options.contains(.computed) || signature.isFunction)
             } else {
                 nameShadowsUnstableValue = true // Better safe than sorry
             }
@@ -1928,7 +1942,7 @@ final class Switch: Expression {
 
 /// `case x:` or `default:`, and also used for `catch` matching.
 final class SwitchCase: Expression, BindingExpression {
-    let patterns: [(pattern: CasePattern, whereGuard: Expression?)] // Empty = default
+    private(set) var patterns: [(pattern: CasePattern, whereGuard: Expression?)] // Empty = default
     let body: CodeBlock
 
     // BindingExpression
@@ -1989,15 +2003,39 @@ final class SwitchCase: Expression, BindingExpression {
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         let patternsExpecting: TypeSignature
+        var bindings: [String: TypeSignature] = [:]
         if let switchStatement = parent as? Switch {
             patternsExpecting = switchStatement.on.inferredType
-        } else if parent is DoCatch {
-            patternsExpecting = .named("Error", [])
+        } else if let doCatch = parent as? DoCatch {
+            let throwsType = doCatch.body.throwsType
+            if throwsType != .none && throwsType != .any {
+                patternsExpecting = throwsType
+                let asThrowsType: (Binding) -> BinaryOperator = {
+                    BinaryOperator(op: .with(symbol: "as"), lhs: $0, rhs: TypeLiteral(literal: throwsType))
+                }
+                // If this is a general catch, turn it into a specific catch type
+                if patterns.isEmpty {
+                    let value = asThrowsType(Binding(identifierPatterns: [IdentifierPattern(name: "error")]))
+                    patterns.append((CasePattern(value: value), nil))
+                } else {
+                    for (index, pattern) in patterns.enumerated() {
+                        // e.g. 'catch let e'
+                        if let binding = pattern.pattern.value as? Binding {
+                            let value = asThrowsType(binding)
+                            patterns[index] = (CasePattern(value: value, isVar: pattern.pattern.isVar, isNonNilMatch: pattern.pattern.isNonNilMatch), pattern.whereGuard)
+                        }
+                    }
+                }
+            } else {
+                patternsExpecting = .named("Error", [])
+                if patterns.isEmpty {
+                    bindings["error"] = patternsExpecting
+                }
+            }
         } else {
             patternsExpecting = .none
         }
         var patternsContext = context
-        var bindings: [String: TypeSignature] = [:]
         for pattern in patterns {
             patternsContext = pattern.pattern.inferTypes(context: patternsContext, expecting: patternsExpecting)
             pattern.whereGuard?.inferTypes(context: patternsContext, expecting: .bool)

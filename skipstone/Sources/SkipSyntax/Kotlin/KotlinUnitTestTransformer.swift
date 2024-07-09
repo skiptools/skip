@@ -13,7 +13,7 @@ final class KotlinUnitTestTransformer: KotlinTransformer {
 
     private func visit(_ node: KotlinSyntaxNode, codebaseInfo: CodebaseInfo.Context, importPackages: inout Set<String>) -> VisitResult<KotlinSyntaxNode> {
         if let functionDeclaration = node as? KotlinFunctionDeclaration, let owningClass = functionDeclaration.parent as? KotlinClassDeclaration, Self.isTestFunction(functionDeclaration, owningClass: owningClass, codebaseInfo: codebaseInfo) {
-            if functionDeclaration.apiFlags.contains(.async) {
+            if functionDeclaration.apiFlags.options.contains(.async) {
                 transformAsyncTest(functionDeclaration: functionDeclaration, owningClass: owningClass, importPackages: &importPackages)
             } else {
                 functionDeclaration.annotations += ["@Test"]

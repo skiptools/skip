@@ -217,10 +217,10 @@ private final class TranslateVisitor {
 
     private func translateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration) {
         if let viewModifierDeclaration = KotlinSwiftUITransformer.viewModifierForBody(functionDeclaration, codebaseInfo: translator.codebaseInfo) {
-            functionDeclaration.apiFlags.insert(.viewBuilder)
+            functionDeclaration.apiFlags.options.insert(.viewBuilder)
             // We perform our ViewModifier transformations when we find the body
             transform(classDeclaration: viewModifierDeclaration, isModifier: true, body: functionDeclaration)
-        } else if !functionDeclaration.apiFlags.contains(.viewBuilder) {
+        } else if !functionDeclaration.apiFlags.options.contains(.viewBuilder) {
             return
         }
         if let body = functionDeclaration.body {
@@ -230,7 +230,7 @@ private final class TranslateVisitor {
     }
     
     private func translateClosure(_ closure: KotlinClosure) {
-        guard closure.apiFlags?.contains(.viewBuilder) == true else {
+        guard closure.apiFlags?.options.contains(.viewBuilder) == true else {
             return
         }
         closure.body = translateViewBuilder(codeBlock: closure.body, fromClosure: closure)
@@ -250,11 +250,11 @@ private final class TranslateVisitor {
             return
         }
         for i in 0..<parameterTypes.count {
-            guard case .function(_, _, let apiFlags, _) = parameterTypes[i].type, apiFlags.contains(.viewBuilder), let closure = functionCall.arguments[i].value as? KotlinClosure else {
+            guard case .function(_, _, let apiFlags, _) = parameterTypes[i].type, apiFlags.options.contains(.viewBuilder), let closure = functionCall.arguments[i].value as? KotlinClosure else {
                 continue
             }
             // If the closure is marked as a ViewBuilder, we'll already process it
-            guard closure.apiFlags?.contains(.viewBuilder) != true else {
+            guard closure.apiFlags?.options.contains(.viewBuilder) != true else {
                 continue
             }
             closure.body = translateViewBuilder(codeBlock: closure.body, fromClosure: closure)
@@ -265,7 +265,7 @@ private final class TranslateVisitor {
     private func translateVariableDeclaration(_ statement: KotlinVariableDeclaration) {
         var viewBuilder: KotlinCodeBlock? = nil
         if let viewDeclaration = KotlinSwiftUITransformer.viewForBody(statement, codebaseInfo: translator.codebaseInfo) {
-            statement.apiFlags.insert(.viewBuilder)
+            statement.apiFlags.options.insert(.viewBuilder)
             // Re-map e.g. ToolbarContent to base View type, because we always return a ComposeBuiler
             if !statement.declaredType.isNamed("View", moduleName: "SwiftUI") {
                 statement.declaredType = .named("View", [])
@@ -273,7 +273,7 @@ private final class TranslateVisitor {
             // We perform our View transformations when we find the body
             transform(classDeclaration: viewDeclaration, body: statement)
             viewBuilder = statement.getter?.body
-        } else if statement.apiFlags.contains(.viewBuilder) {
+        } else if statement.apiFlags.options.contains(.viewBuilder) {
             viewBuilder = statement.getter?.body
         } else if let classDeclaration = statement.parent as? KotlinClassDeclaration, classDeclaration.signature.isNamed("EnvironmentValues", moduleName: "SwiftUI", generics: []), statement.getter != nil {
             translateEnvironmentValue(statement)
@@ -663,7 +663,7 @@ private final class TranslateVisitor {
             return
         }
         statement.setter = nil
-        statement.apiFlags.remove(.writeable)
+        statement.apiFlags.options.remove(.writeable)
 
         let setFunction = KotlinFunctionDeclaration(name: "set" + statement.propertyName)
         setFunction.extends = statement.extends

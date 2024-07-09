@@ -54,7 +54,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         guard withoutOptionality || (isOptional == other.isOptional && isUnwrappedOptional == other.isUnwrappedOptional) else {
             return false
         }
-        return asTypealiased(nil).withoutOptionality().withModuleName(nil).withAPIFlags([]) == other.asTypealiased(nil).withoutOptionality().withModuleName(nil).withAPIFlags([])
+        return asTypealiased(nil).withoutOptionality().withModuleName(nil).withAPIFlags(APIFlags()) == other.asTypealiased(nil).withoutOptionality().withModuleName(nil).withAPIFlags(APIFlags())
     }
 
     /// What type this was typealiased from, if any.
@@ -455,7 +455,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .unwrappedOptional(let type):
             return type.apiFlags
         default:
-            return []
+            return APIFlags()
         }
     }
 
@@ -681,7 +681,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .dictionary(let key, let value):
             return .dictionary(key?.constrainedTypeWithGenerics(generics), value?.constrainedTypeWithGenerics(generics))
         case .function(let parameters, let returnType, let apiFlags, let attributes):
-            return .function(parameters.map { $0.constrainedTypeWithGenerics(generics) }, returnType.constrainedTypeWithGenerics(generics), apiFlags, attributes)
+            return .function(parameters.map { $0.constrainedTypeWithGenerics(generics) }, returnType.constrainedTypeWithGenerics(generics), APIFlags(options: apiFlags.options, throwsType: apiFlags.throwsType.constrainedTypeWithGenerics(generics)), attributes)
         case .member(let base, let type):
             return .member(base.constrainedTypeWithGenerics(generics), type.constrainedTypeWithGenerics(generics))
         case .metaType(let type):
@@ -755,10 +755,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                     value.addGenericMappings(to: value2, into: &generics)
                 }
             }
-        case .function(let parameters, let returnType, _, _):
-            if case .function(let parameters2, let returnType2, _, _) = to, parameters.count == parameters2.count {
+        case .function(let parameters, let returnType, let apiFlags, _):
+            if case .function(let parameters2, let returnType2, let apiFlags2, _) = to, parameters.count == parameters2.count {
                 zip(parameters, parameters2).forEach { $0.0.type.addGenericMappings(to: $0.1.type, into: &generics) }
                 returnType.addGenericMappings(to: returnType2, into: &generics)
+                apiFlags.throwsType.addGenericMappings(to: apiFlags2.throwsType, into: &generics)
             }
         case .member(let base, let type):
             if case .member(let base2, let type2) = to {
@@ -855,9 +856,10 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .dictionary(let key, let value):
             key?.visit(visitor)
             value?.visit(visitor)
-        case .function(let parameters, let returnType, _, _):
+        case .function(let parameters, let returnType, let apiFlags, _):
             parameters.forEach { $0.type.visit(visitor) }
             returnType.visit(visitor)
+            apiFlags.throwsType.visit(visitor)
         case .member(let base, let type):
             base.visit(visitor)
             type.visit(visitor)
@@ -927,7 +929,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .dictionary(let key, let value):
             return .dictionary(key?.mappingTypes(with: map), value?.mappingTypes(with: map))
         case .function(let parameters, let returnType, let apiFlags, let attributes):
-            return .function(parameters.map { $0.mappingTypes(with: map) }, returnType.mappingTypes(with: map), apiFlags, attributes)
+            return .function(parameters.map { $0.mappingTypes(with: map) }, returnType.mappingTypes(with: map), APIFlags(options: apiFlags.options, throwsType: apiFlags.throwsType.mappingTypes(with: map)), attributes)
         case .member(let base, let type):
             let base = base.mappingTypes(with: map)
             // Do not map 'type' alone because it will be confused for any non-member type with the same name.
@@ -975,7 +977,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return .dictionary(keyType?.resolved(in: node, declaringType: declaringType, context: context), valueType?.resolved(in: node, declaringType: declaringType, context: context))
         case .function(let parameters, let returnType, let apiFlags, let attributes):
             let resolvedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.resolved(in: node, declaringType: declaringType, context: context), isInOut: $0.isInOut, isVariadic: $0.isVariadic, isVariadicContinuation: $0.isVariadicContinuation, hasDefaultValue: $0.hasDefaultValue) }
-            return .function(resolvedParameters, returnType.resolved(in: node, declaringType: declaringType, context: context), apiFlags, attributes)
+            return .function(resolvedParameters, returnType.resolved(in: node, declaringType: declaringType, context: context), APIFlags(options: apiFlags.options, throwsType: apiFlags.throwsType.resolved(in: node, declaringType: declaringType, context: context)), attributes)
         case .member(let baseType, let type):
             let resolvedBase = baseType.resolved(in: node, declaringType: declaringType, moduleName: moduleName, context: context)
             if case .named(let name, let generics) = type {
@@ -1452,13 +1454,26 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// Whether this type signature does not have any `.none` values.
     var isFullySpecified: Bool {
         var isSpecified = true
-        visit {
-            if !isSpecified || $0 == .none {
-                isSpecified = false
+        func visitor(_ typeSignature: TypeSignature) -> VisitResult<TypeSignature> {
+            if !isSpecified {
                 return .skip
             }
-            return .recurse(nil)
+            switch typeSignature {
+            case .function(let parameters, let returnType, _, _):
+                // Don't include the throwsType
+                parameters.forEach { $0.type.visit(visitor) }
+                returnType.visit(visitor)
+                return .skip
+            default:
+                if typeSignature == .none {
+                    isSpecified = false
+                    return .skip
+                } else {
+                    return .recurse(nil)
+                }
+            }
         }
+        visit(visitor)
         return isSpecified
     }
 
@@ -1551,7 +1566,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             guard !parameters.contains(where: { $0.type == .none }) && returnType != .none else {
                 return .none
             }
-            let apiFlags = functionType.effectSpecifiers?.apiFlags ?? []
+            let apiFlags = functionType.effectSpecifiers?.apiFlags(in: syntaxTree) ?? APIFlags()
             return .function(parameters, returnType, apiFlags, nil)
         case .memberType:
             guard let memberType = syntax.as(MemberTypeSyntax.self) else {
@@ -1800,11 +1815,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return "Float"
         case .function(let parameters, let returnType, let apiFlags, _):
             var apiFlagsString = ""
-            if apiFlags.contains(.async) {
+            if apiFlags.options.contains(.async) {
                 apiFlagsString += "async "
             }
-            if apiFlags.contains(.throws) {
-                apiFlagsString += "throws "
+            if apiFlags.throwsType != .none {
+                apiFlagsString += "throws(\(apiFlags.throwsType.descriptionUsing(keyPath))) "
             }
             return "(\(parameters.map { $0.descriptionUsing(keyPath) }.joined(separator: ", ")))\(apiFlagsString) -> \(returnType[keyPath: keyPath])"
         case .int:

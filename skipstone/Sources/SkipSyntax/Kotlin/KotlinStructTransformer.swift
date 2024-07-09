@@ -14,7 +14,7 @@ final class KotlinStructTransformer: KotlinTransformer {
                 updateStructDeclaration(classDeclaration, translator: translator)
             }
         } else if let variableDeclaration = node as? KotlinVariableDeclaration {
-            if !variableDeclaration.isStatic, variableDeclaration.apiFlags.contains(.writeable) && !variableDeclaration.attributes.isNonMutating, let extends = variableDeclaration.extends, translator.codebaseInfo?.mayBeMutableStruct(type: extends.0) == true {
+            if !variableDeclaration.isStatic, variableDeclaration.apiFlags.options.contains(.writeable) && !variableDeclaration.attributes.isNonMutating, let extends = variableDeclaration.extends, translator.codebaseInfo?.mayBeMutableStruct(type: extends.0) == true {
                 variableDeclaration.mutationFunctionNames = Self.mutationFunctionNames
             }
             return .skip
@@ -42,7 +42,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         var copyableVariableDeclarations: [KotlinVariableDeclaration] = []
         for member in classDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
-                if !isNoCopy && !variableDeclaration.isStatic && ((variableDeclaration.apiFlags.contains(.writeable) && !variableDeclaration.attributes.isNonMutating && variableDeclaration.getter == nil) || variableDeclaration.modifiers.isLazy) && !variableDeclaration.isGenerated {
+                if !isNoCopy && !variableDeclaration.isStatic && ((variableDeclaration.apiFlags.options.contains(.writeable) && !variableDeclaration.attributes.isNonMutating && variableDeclaration.getter == nil) || variableDeclaration.modifiers.isLazy) && !variableDeclaration.isGenerated {
                     variableDeclaration.mutationFunctionNames = Self.mutationFunctionNames
                     isMutable = true
                 }
@@ -97,13 +97,13 @@ final class KotlinStructTransformer: KotlinTransformer {
     }
 
     private func addMutableStructAPI(to classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], useMutableStructCopyConstructor: Bool) {
-        let supdateType: TypeSignature = .function([TypeSignature.Parameter(type: .any)], .void, [], nil).asOptional(true)
+        let supdateType: TypeSignature = .function([TypeSignature.Parameter(type: .any)], .void, APIFlags(), nil).asOptional(true)
         let supdate = KotlinVariableDeclaration(names: ["supdate"], variableTypes: [supdateType])
         supdate.declaredType = supdateType
         supdate.role = .property
         supdate.isGenerated = true
         supdate.modifiers = Modifiers(visibility: .public, isOverride: true)
-        supdate.apiFlags = [.writeable]
+        supdate.apiFlags = APIFlags(isWriteable: true)
         supdate.extras = .singleNewline
         supdate.parent = classDeclaration
         supdate.assignParentReferences()
@@ -114,7 +114,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         scount.role = .property
         scount.isGenerated = true
         scount.modifiers = Modifiers(visibility: .public, isOverride: true)
-        scount.apiFlags = [.writeable]
+        scount.apiFlags = APIFlags(isWriteable: true)
         scount.parent = classDeclaration
         scount.assignParentReferences()
         classDeclaration.members.append(scount)
@@ -214,7 +214,7 @@ final class KotlinStructTransformer: KotlinTransformer {
                 } else {
                     assignment = "this.\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
                 }
-                if !variableDeclaration.apiFlags.contains(.writeable) && variableDeclaration.mayBeSharedMutableStruct {
+                if !variableDeclaration.apiFlags.options.contains(.writeable) && variableDeclaration.mayBeSharedMutableStruct {
                     assignment += ".sref()"
                 }
                 if variableDeclaration.modifiers.isLazy {
@@ -273,7 +273,7 @@ final class KotlinStructTransformer: KotlinTransformer {
             } else if variableDeclaration.modifiers.isLazy {
                 type = type.asOptional(true)
             } else if variableDeclaration.isTransformedToViewBuilderClosureParameter {
-                type = .function([], variableDeclaration.propertyType, [], nil)
+                type = .function([], variableDeclaration.propertyType, APIFlags(), nil)
                 type = variableDeclaration.attributes.apply(toFunction: type)
             }
             let defaultValue: KotlinExpression?
@@ -467,6 +467,6 @@ final class KotlinStructTransformer: KotlinTransformer {
 extension KotlinVariableDeclaration {
     /// Whether this variable is transformed into a closure when made into a default constructor parameter.
     var isTransformedToViewBuilderClosureParameter: Bool {
-        return !propertyType.isFunction && attributes.contains(.viewBuilder) && !apiFlags.contains(.computed)
+        return !propertyType.isFunction && attributes.contains(.viewBuilder) && !apiFlags.options.contains(.computed)
     }
 }

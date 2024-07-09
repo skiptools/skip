@@ -42,7 +42,7 @@ extension TypeSignature {
             return "Float"
         case .function(let parameters, let returnType, let apiFlags, let attributes):
             let composableString = attributes?.attributes.contains(where: { $0.signature == .named("Composable", []) }) == true ? "@Composable " : ""
-            let suspendString = apiFlags.contains(.async) ? "suspend " : ""
+            let suspendString = apiFlags.options.contains(.async) ? "suspend " : ""
             return "\(composableString)\(suspendString)(\(parameters.map { $0.kotlin }.joined(separator: ", "))) -> \(returnType.kotlin)"
         case .int:
             return "Int"
@@ -144,7 +144,7 @@ extension TypeSignature {
                     messages.append(.kotlinKeyPath(node, source: source))
                 }
             case .function(_, _, let apiFlags, _):
-                if apiFlags.contains(.autoclosure) {
+                if apiFlags.options.contains(.autoclosure) {
                     messages.append(.kotlinAutoclosure(node, source: source))
                 }
             case .tuple(let labels, _):

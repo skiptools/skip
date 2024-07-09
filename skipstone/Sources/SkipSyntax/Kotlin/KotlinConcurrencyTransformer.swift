@@ -5,17 +5,17 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
         var taskClosureIdentifiers: Set<ObjectIdentifier> = []
         syntaxTree.root.visit { node in
             if let functionDeclaration = node as? KotlinFunctionDeclaration {
-                if functionDeclaration.apiFlags.contains(.async) {
+                if functionDeclaration.apiFlags.options.contains(.async) {
                     if let body = functionDeclaration.body {
                         updateNestingClosures(in: body)
                     }
                     // Async implementations change for main actor
                     if codebaseInfo?.isMainActor(declaration: functionDeclaration) == true {
-                        functionDeclaration.apiFlags.insert(.mainActor)
+                        functionDeclaration.apiFlags.options.insert(.mainActor)
                     }
                 }
             } else if let variableDeclaration = node as? KotlinVariableDeclaration {
-                if variableDeclaration.apiFlags.contains(.async) {
+                if variableDeclaration.apiFlags.options.contains(.async) {
                     if variableDeclaration.isAsyncLet {
                         if let codeBlock = variableDeclaration.parent as? KotlinCodeBlock {
                             codeBlock.updateWithAsyncLet(declaration: variableDeclaration, source: translator.syntaxTree.source)
@@ -26,7 +26,7 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
                         }
                         // Async implementations change for main actor
                         if codebaseInfo?.isMainActor(declaration: variableDeclaration) == true {
-                            variableDeclaration.apiFlags.insert(.mainActor)
+                            variableDeclaration.apiFlags.options.insert(.mainActor)
                         }
                     }
                 }
@@ -34,7 +34,7 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
                 if !taskClosureIdentifiers.contains(ObjectIdentifier(closure)) {
                     updateClosure(closure, codebaseInfo: codebaseInfo)
                 }
-                if closure.isNoDispatch || closure.apiFlags?.contains(.async) == true {
+                if closure.isNoDispatch || closure.apiFlags?.options.contains(.async) == true {
                     updateNestingClosures(in: closure.body)
                 }
             } else if let functionCall = node as? KotlinFunctionCall {
@@ -65,7 +65,7 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
             } else if memberAccess.member == "detached" && memberAccess.isBaseType(named: "Task", moduleName: "Swift") {
                 if let closure = taskClosure(in: functionCall, source: source) {
                     // Task.detached always launches with the default dispatcher. Only a closure with a specified actor needs to dispatch itself
-                    if closure.apiFlags?.contains(.mainActor) != true {
+                    if closure.apiFlags?.options.contains(.mainActor) != true {
                         closure.isNoDispatch = true
                     }
                     return closure
@@ -84,15 +84,15 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
             functionCall.messages.append(.kotlinAsyncTaskClosureInline(functionCall, source: source))
             return nil
         }
-        closure.apiFlags?.insert(.async)
+        closure.apiFlags?.options.insert(.async)
         return closure
     }
 
     private func updateTaskConstructor(functionCall: KotlinFunctionCall, closure: KotlinClosure, codebaseInfo: CodebaseInfo.Context?) {
         // The Task will launch a coroutine with the correct dispatcher based on the main actor argument we insert
-        let isMainActorClosure = closure.apiFlags?.contains(.mainActor) == true || (codebaseInfo != nil && isInMainActorContext(node: functionCall, codebaseInfo: codebaseInfo!))
+        let isMainActorClosure = closure.apiFlags?.options.contains(.mainActor) == true || (codebaseInfo != nil && isInMainActorContext(node: functionCall, codebaseInfo: codebaseInfo!))
         if isMainActorClosure {
-            closure.apiFlags?.insert(.mainActor)
+            closure.apiFlags?.options.insert(.mainActor)
             functionCall.arguments.insert(LabeledValue(label: "isMainActor", value: KotlinBooleanLiteral(literal: true)), at: 0)
         }
         // The closure itself does not need to specify a dispatch
@@ -103,13 +103,13 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
         guard let codebaseInfo else {
             return
         }
-        guard closure.apiFlags?.contains(.async) == true && closure.apiFlags?.contains(.mainActor) != true else {
+        guard closure.apiFlags?.options.contains(.async) == true && closure.apiFlags?.options.contains(.mainActor) != true else {
             return
         }
 
         // Async closures inherit actor isolation when they're created. See if this one should be isolated
         if isInMainActorContext(node: closure, codebaseInfo: codebaseInfo) {
-            closure.apiFlags?.insert(.mainActor)
+            closure.apiFlags?.options.insert(.mainActor)
         }
     }
 
@@ -163,11 +163,11 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
                 break
             }
             if let functionDeclaration = contextNode as? KotlinFunctionDeclaration {
-                return functionDeclaration.apiFlags.contains(.mainActor) || KotlinSwiftUITransformer.viewModifierForBody(functionDeclaration, codebaseInfo: codebaseInfo) != nil
+                return functionDeclaration.apiFlags.options.contains(.mainActor) || KotlinSwiftUITransformer.viewModifierForBody(functionDeclaration, codebaseInfo: codebaseInfo) != nil
             } else if let variableDeclaration = contextNode as? KotlinVariableDeclaration {
-                return variableDeclaration.apiFlags.contains(.mainActor) || KotlinSwiftUITransformer.viewForBody(variableDeclaration, codebaseInfo: codebaseInfo) != nil
-            } else if let closure = contextNode as? KotlinClosure, closure.apiFlags?.contains(.async) == true {
-                return closure.apiFlags?.contains(.mainActor) == true
+                return variableDeclaration.apiFlags.options.contains(.mainActor) || KotlinSwiftUITransformer.viewForBody(variableDeclaration, codebaseInfo: codebaseInfo) != nil
+            } else if let closure = contextNode as? KotlinClosure, closure.apiFlags?.options.contains(.async) == true {
+                return closure.apiFlags?.options.contains(.mainActor) == true
             }
         } while true
         return false
@@ -188,7 +188,7 @@ extension KotlinConcurrencyTransformer: KotlinTypeSignatureOutputTransformer {
 
 extension CodebaseInfo.Context {
     fileprivate func isMainActor(declaration: KotlinFunctionDeclaration) -> Bool {
-        if declaration.apiFlags.contains(.mainActor) {
+        if declaration.apiFlags.options.contains(.mainActor) {
             return true
         }
         let arguments = declaration.parameters.map { LabeledValue(label: $0.externalLabel, value: ArgumentValue(type: $0.declaredType)) }
@@ -198,11 +198,11 @@ extension CodebaseInfo.Context {
         } else {
             matches = matchFunction(name: declaration.name, arguments: arguments)
         }
-        return matches.first?.apiFlags.contains(.mainActor) == true
+        return matches.first?.apiFlags.options.contains(.mainActor) == true
     }
 
     fileprivate func isMainActor(declaration: KotlinVariableDeclaration) -> Bool {
-        if declaration.apiFlags.contains(.mainActor) {
+        if declaration.apiFlags.options.contains(.mainActor) {
             return true
         }
         let match: APIMatch?
@@ -213,7 +213,7 @@ extension CodebaseInfo.Context {
         } else {
             match = nil
         }
-        return match?.apiFlags.contains(.mainActor) == true
+        return match?.apiFlags.options.contains(.mainActor) == true
     }
 
     private func owningType(of declaration: KotlinStatement) -> TypeSignature? {

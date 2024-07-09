@@ -41,15 +41,15 @@ final class ConcurrencyTests: XCTestCase {
         }
         """)
         let a = context.primaryTypeInfo(forNamed: .named("A", []))
-        XCTAssertTrue(a?.apiFlags?.contains(.mainActor) == false)
+        XCTAssertTrue(a?.apiFlags?.options.contains(.mainActor) == false)
         let b = context.primaryTypeInfo(forNamed: .named("B", []))
-        XCTAssertTrue(b?.apiFlags?.contains(.mainActor) == true)
+        XCTAssertTrue(b?.apiFlags?.options.contains(.mainActor) == true)
         let c = context.primaryTypeInfo(forNamed: .named("C", []))
-        XCTAssertTrue(c?.apiFlags?.contains(.mainActor) == true)
+        XCTAssertTrue(c?.apiFlags?.options.contains(.mainActor) == true)
         let d = context.primaryTypeInfo(forNamed: .named("D", []))
-        XCTAssertTrue(d?.apiFlags?.contains(.mainActor) == true)
+        XCTAssertTrue(d?.apiFlags?.options.contains(.mainActor) == true)
         let e = context.primaryTypeInfo(forNamed: .named("E", []))
-        XCTAssertTrue(e?.apiFlags?.contains(.mainActor) == false)
+        XCTAssertTrue(e?.apiFlags?.options.contains(.mainActor) == false)
     }
 
     func testMainActorProtocolInference() async throws {
@@ -68,15 +68,15 @@ final class ConcurrencyTests: XCTestCase {
         }
         """)
         let pa = context.primaryTypeInfo(forNamed: .named("PA", []))
-        XCTAssertTrue(pa?.apiFlags?.contains(.mainActor) == true)
+        XCTAssertTrue(pa?.apiFlags?.options.contains(.mainActor) == true)
         let pb = context.primaryTypeInfo(forNamed: .named("PB", []))
-        XCTAssertTrue(pb?.apiFlags?.contains(.mainActor) == true)
+        XCTAssertTrue(pb?.apiFlags?.options.contains(.mainActor) == true)
         let a = context.primaryTypeInfo(forNamed: .named("A", []))
-        XCTAssertTrue(a?.apiFlags?.contains(.mainActor) == true)
+        XCTAssertTrue(a?.apiFlags?.options.contains(.mainActor) == true)
         let b = context.primaryTypeInfo(forNamed: .named("B", []))
-        XCTAssertTrue(b?.apiFlags?.contains(.mainActor) == true)
+        XCTAssertTrue(b?.apiFlags?.options.contains(.mainActor) == true)
         let c = context.primaryTypeInfo(forNamed: .named("C", []))
-        XCTAssertTrue(c?.apiFlags?.contains(.mainActor) == false)
+        XCTAssertTrue(c?.apiFlags?.options.contains(.mainActor) == false)
     }
 
     func testMainActorOverrideMemberInference() async throws {
@@ -97,18 +97,18 @@ final class ConcurrencyTests: XCTestCase {
         }
         """)
         let a = context.primaryTypeInfo(forNamed: .named("A", []))
-        XCTAssertTrue(a?.apiFlags?.contains(.mainActor) == false)
+        XCTAssertTrue(a?.apiFlags?.options.contains(.mainActor) == false)
         let v = a?.variables.first
-        XCTAssertTrue(v?.apiFlags?.contains(.mainActor) == true)
+        XCTAssertTrue(v?.apiFlags?.options.contains(.mainActor) == true)
         let f = a?.functions.first
-        XCTAssertTrue(f?.apiFlags?.contains(.mainActor) == true)
+        XCTAssertTrue(f?.apiFlags?.options.contains(.mainActor) == true)
 
         let c = context.primaryTypeInfo(forNamed: .named("C", []))
-        XCTAssertTrue(c?.apiFlags?.contains(.mainActor) == false)
+        XCTAssertTrue(c?.apiFlags?.options.contains(.mainActor) == false)
         let v1 = c?.variables.first
-        XCTAssertTrue(v1?.apiFlags?.contains(.mainActor) == true)
+        XCTAssertTrue(v1?.apiFlags?.options.contains(.mainActor) == true)
         let f1 = c?.functions.first
-        XCTAssertTrue(f1?.apiFlags?.contains(.mainActor) == true)
+        XCTAssertTrue(f1?.apiFlags?.options.contains(.mainActor) == true)
     }
 
     func testMainActorProtocolMemberInference() async throws {
@@ -131,18 +131,18 @@ final class ConcurrencyTests: XCTestCase {
         }
         """)
         let a = context.primaryTypeInfo(forNamed: .named("A", []))
-        XCTAssertTrue(a?.apiFlags?.contains(.mainActor) == false)
+        XCTAssertTrue(a?.apiFlags?.options.contains(.mainActor) == false)
         let v = a?.variables.first
-        XCTAssertTrue(v?.apiFlags?.contains(.mainActor) == true)
+        XCTAssertTrue(v?.apiFlags?.options.contains(.mainActor) == true)
         let f = a?.functions.first
-        XCTAssertTrue(f?.apiFlags?.contains(.mainActor) == true)
+        XCTAssertTrue(f?.apiFlags?.options.contains(.mainActor) == true)
 
         let b = context.typeInfos(forNamed: .named("B", [])).first { $0.declarationType == .extensionDeclaration }
-        XCTAssertTrue(b?.apiFlags?.contains(.mainActor) == false)
+        XCTAssertTrue(b?.apiFlags?.options.contains(.mainActor) == false)
         let v1 = b?.variables.first
-        XCTAssertTrue(v1?.apiFlags?.contains(.mainActor) == true)
+        XCTAssertTrue(v1?.apiFlags?.options.contains(.mainActor) == true)
         let f1 = b?.functions.first
-        XCTAssertTrue(f1?.apiFlags?.contains(.mainActor) == true)
+        XCTAssertTrue(f1?.apiFlags?.options.contains(.mainActor) == true)
     }
 
     func testMainActorRun() async throws {

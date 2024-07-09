@@ -109,8 +109,8 @@ extension AccessorDeclListSyntax {
             if accessorSyntax.effectSpecifiers?.asyncSpecifier != nil {
                 accessors.isAsync = true
             }
-            if accessorSyntax.effectSpecifiers?.throwsClause?.throwsSpecifier != nil {
-                accessors.isThrows = true
+            if let throwsSyntax = accessorSyntax.effectSpecifiers?.throwsClause {
+                accessors.throwsType = throwsSyntax.typeSignature(in: syntaxTree)
             }
             var body: CodeBlock? = nil
             if let bodySyntax = accessorSyntax.body {
@@ -294,8 +294,26 @@ extension ExprSyntaxProtocol {
 
 extension TypeEffectSpecifiersSyntax {
     /// Return the API flags in these specifiers.
-    var apiFlags: APIFlags {
-        return APIFlags(isAsync: asyncSpecifier?.text != nil, isThrows: throwsClause?.throwsSpecifier.text != nil)
+    func apiFlags(in syntaxTree: SyntaxTree) -> APIFlags {
+        return APIFlags(isAsync: asyncSpecifier?.text != nil, throwsType: throwsClause?.typeSignature(in: syntaxTree) ?? .none)
+    }
+}
+
+extension ThrowsClauseSyntax {
+    /// The declared throws type, or .any for an untyped throws.
+    func typeSignature(in syntaxTree: SyntaxTree) -> TypeSignature {
+        guard let typeSyntax = type else {
+            return .any
+        }
+        let type = TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
+        if type.isNamed("Error", moduleName: "Swift") {
+            return .any
+        } else if type.isNamed("Never", moduleName: "Swift") {
+            return .none
+        } else {
+            // For unparseable types, fallback to an untyped throws
+            return type == .none ? .any : type
+        }
     }
 }
 

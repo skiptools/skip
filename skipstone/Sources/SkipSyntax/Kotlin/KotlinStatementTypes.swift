@@ -468,7 +468,7 @@ final class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
                     // We should have already messaged about this. Output the incorrect code to break compilation
                     output.append(pattern, indentation: indentation)
                 }
-                output.append(indentation).append(") {\n")
+                output.append(") {\n")
                 appendCatchBody(kcatch, to: output, indentation: bodyIndentation)
             }
         }
@@ -1672,7 +1672,7 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
     var annotations: [String] = []
     var modifiers = Modifiers()
     var attributes = Attributes()
-    var apiFlags: APIFlags = []
+    var apiFlags = APIFlags()
     var isActorIsolated = false
     var generics = Generics()
     var convertedGenerics: Generics? = nil
@@ -1775,6 +1775,7 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
         if kstatement.type == .constructorDeclaration, !kstatement.generics.isEmpty {
             kstatement.messages.append(.kotlinConstructorGenerics(statement, source: translator.syntaxTree.source))
         }
+        kstatement.removeUnusedGenericThrowsTypes()
         return kstatement
     }
 
@@ -2030,7 +2031,7 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
                 output.append(modifiers.kotlinMemberString(isGlobal: role == .global, isOpen: isOpen || isDelegatingToCompanion, suffix: " "))
             }
         }
-        if apiFlags.contains(.async) {
+        if apiFlags.options.contains(.async) {
             output.append("suspend ")
         }
 
@@ -2061,7 +2062,7 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
         if type != .constructorDeclaration {
             // Kotlin requires an explicit return type for single statement bodies (as we use for async) that return Never, as in:
             //   suspending fun f(): Unit = MainActor.run { throw Error() }
-            if returnType != .void || apiFlags.contains(.async) {
+            if returnType != .void || apiFlags.options.contains(.async) {
                 output.append(": ").append(returnType.kotlin)
                 hasExplicitReturnType = true
             }
@@ -2131,7 +2132,7 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
         }
 
         // Append Kotlin single statement format if possible
-        guard isConstructor || apiFlags.contains(.async) || callSuperFinalize || !parameterVals.isEmpty || suppressSideEffects || mutationFunctionNames != nil || !body.isSingleStatementAppendable(mode: .function) else {
+        guard isConstructor || apiFlags.options.contains(.async) || callSuperFinalize || !parameterVals.isEmpty || suppressSideEffects || mutationFunctionNames != nil || !body.isSingleStatementAppendable(mode: .function) else {
             // There are scenarios in which single statement functions without an explicit return type result in a compiler error, such as a function
             // whose body just calls the same function on another object. So be explicit
             if !hasExplicitReturnType {
@@ -2143,8 +2144,8 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
             return
         }
 
-        if apiFlags.contains(.async) && !isNoDispatch {
-            if apiFlags.contains(.mainActor) {
+        if apiFlags.options.contains(.async) && !isNoDispatch {
+            if apiFlags.options.contains(.mainActor) {
                 output.append(" = MainActor.run ")
             } else if isActorIsolated {
                 output.append(" = Actor.run(this) ")
@@ -2247,6 +2248,41 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
         }
         convertedGenerics.entries = convertedGenerics.entries.filter { genericsUsedInParameters.contains($0.namedType) }
         self.convertedGenerics = convertedGenerics.merge(overrides: generics, addNew: true)
+    }
+
+    private func removeUnusedGenericThrowsTypes() {
+        guard !generics.isEmpty else {
+            return
+        }
+        let genericTypes = generics.entries.reduce(into: Set<TypeSignature>()) { result, entry in
+            result.insert(entry.namedType)
+        }
+        
+        // Find all generic throws types
+        var usedGenericTypes: Set<TypeSignature> = []
+        var genericThrowsTypes: Set<TypeSignature> = []
+        func visitor(_ typeSignature: TypeSignature) -> VisitResult<TypeSignature> {
+            if genericTypes.contains(typeSignature) {
+                usedGenericTypes.insert(typeSignature)
+                return .recurse(nil)
+            } else if case .function(let parameters, let returnType, let apiFlags, _) = typeSignature, genericTypes.contains(apiFlags.throwsType) {
+                genericThrowsTypes.insert(apiFlags.throwsType)
+
+                parameters.forEach { $0.type.visit(visitor) }
+                returnType.visit(visitor)
+                return .skip
+            } else {
+                return .recurse(nil)
+            }
+        }
+        functionType.visit(visitor)
+
+        // Remove function generics that only match throws types
+        let genericOnlyThrowsTypes = genericThrowsTypes.subtracting(usedGenericTypes)
+        generics.entries.removeAll { genericOnlyThrowsTypes.contains($0.namedType) }
+        if genericOnlyThrowsTypes.contains(apiFlags.throwsType) {
+            apiFlags.throwsType = .none // Mimic what we do for 'rethrows', which is to ignore
+        }
     }
 }
 
@@ -2590,9 +2626,9 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         return modifiers.isLazy && !propertyType.kotlinIsNative(primitive: true)
     }
     var attributes = Attributes()
-    var apiFlags: APIFlags = []
+    var apiFlags = APIFlags()
     var isAsyncLet: Bool {
-        return isLet && apiFlags.contains(.async)
+        return isLet && apiFlags.options.contains(.async)
     }
     var isActorIsolated = false
     var value: KotlinExpression?
@@ -2614,7 +2650,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         return role.isProperty && propertyName == "description" && propertyType == .string
     }
     var isAppendAsFunction: Bool {
-        return (apiFlags.contains(.viewBuilder) && apiFlags.contains(.computed) && !propertyType.isFunction) || (apiFlags.contains(.async) && !isAsyncLet)
+        return (apiFlags.options.contains(.viewBuilder) && apiFlags.options.contains(.computed) && !propertyType.isFunction) || (apiFlags.options.contains(.async) && !isAsyncLet)
     }
 
     enum Role {
@@ -2723,7 +2759,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         } else {
             kstatement.mayBeSharedMutableStruct = true
         }
-        if statement.apiFlags.contains(.writeable) && kstatement.mayBeSharedMutableStruct && !kstatement.attributes.contains(.unavailable) {
+        if statement.apiFlags.options.contains(.writeable) && kstatement.mayBeSharedMutableStruct && !kstatement.attributes.contains(.unavailable) {
             // Use a closure to build onUpdate code on-demand in case our property name is changed
             kstatement.onUpdate = { [weak kstatement] in
                 guard let kstatement else {
@@ -2740,7 +2776,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         kstatement.willSet = statement.willSet?.translate(translator: translator, expectedReturn: .no)
         kstatement.didSet = statement.didSet?.translate(translator: translator, expectedReturn: .no)
 
-        if kstatement.apiFlags.contains(.async) {
+        if kstatement.apiFlags.options.contains(.async) {
             if kstatement.isAsyncLet {
                 if let value = kstatement.value {
                     KotlinAwait.setIsAsync(value, source: translator.syntaxTree.source)
@@ -2750,17 +2786,17 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
                     // Allow synchronous access to private actor mutable variables, and disallow non-private ones. This still
                     // leaves us with potential bugs if a non-isolated actor function accesses its private state, but we have to
                     // allow this because we don't yet support mutable isolated variables
-                    if kstatement.apiFlags.contains(.writeable) {
+                    if kstatement.apiFlags.options.contains(.writeable) {
                         if kstatement.modifiers.visibility == .private {
                             kstatement.isActorIsolated = false
-                            kstatement.apiFlags.remove(.async)
+                            kstatement.apiFlags.options.remove(.async)
                         } else {
                             kstatement.messages.append(.kotlinActorMutableProperty(kstatement, source: translator.syntaxTree.source))
                         }
                     }
                 }
                 // Check the async flag again, because we may have just cleared it above
-                if kstatement.apiFlags.contains(.async) && kstatement.getter?.body?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) == true {
+                if kstatement.apiFlags.options.contains(.async) && kstatement.getter?.body?.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel)) == true {
                     kstatement.hasAsyncExplicitReturn = true
                 }
             }
@@ -2885,7 +2921,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
             let variableIndentation = indentation.inc()
             output.append("\n")
             output.append(variableIndentation).append("get() = ").append(companion.0.name).append(".").append(propertyName)
-            if apiFlags.contains(.writeable) && modifiers.setVisibility != .private {
+            if apiFlags.options.contains(.writeable) && modifiers.setVisibility != .private {
                 output.append("\n")
                 output.append(variableIndentation).append("set(newValue) {\n")
                 output.append(variableIndentation.inc()).append(companion.0.name).append(".").append(propertyName).append(" = newValue\n")
@@ -2905,7 +2941,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
             } else {
                 output.append(modifiers.kotlinMemberString(isGlobal: role == .global, isOpen: isOpen || isDelegatingToCompanion, suffix: " "))
             }
-            if apiFlags.contains(.async) {
+            if apiFlags.options.contains(.async) {
                 output.append("suspend ")
             } else if !isDelegatingToCompanion && storage == nil && role != .superclassOverrideProperty && declaredType.isUnwrappedOptional {
                 output.append("lateinit ")
@@ -2913,7 +2949,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         }
         if isAppendAsFunction {
             output.append("fun ")
-        } else if (!apiFlags.contains(.writeable) && !isAssignFromWriteable) || (isDelegatingToCompanion && modifiers.setVisibility == .private) {
+        } else if (!apiFlags.options.contains(.writeable) && !isAssignFromWriteable) || (isDelegatingToCompanion && modifiers.setVisibility == .private) {
             output.append("val ")
         } else {
             output.append("var ")
@@ -2946,11 +2982,11 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
     }
 
     private func appendAsFunctionDefinition(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
-        if apiFlags.contains(.mainActor) {
+        if apiFlags.options.contains(.mainActor) {
             output.append(" = MainActor.run ")
         } else if isActorIsolated {
             output.append(" = Actor.run(this) ")
-        } else if apiFlags.contains(.async) {
+        } else if apiFlags.options.contains(.async) {
             output.append(" = Async.run ")
         } else {
             output.append(" ")
@@ -2984,7 +3020,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
             }
         } else if role == .superclassOverrideProperty {
             output.append(indentation.inc()).append("get() = super.\(propertyName)\n")
-        } else if (role.isProperty && role != .protocolProperty) || role == .global, storage != nil || (mayBeSharedMutableStruct && apiFlags.contains(.writeable)) {
+        } else if (role.isProperty && role != .protocolProperty) || role == .global, storage != nil || (mayBeSharedMutableStruct && apiFlags.options.contains(.writeable)) {
             let getterIndentation = indentation.inc()
             output.append(getterIndentation).append("get()")
             let isSingleStatement = storage?.isSingleStatementAppendable(self) != false && (mutationFunctionNames == nil || !modifiers.isLazy)
@@ -3101,8 +3137,8 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
             }
             output.append(setterIndentation).append("}\n")
             return true
-        } else if (role.isProperty && role != .protocolProperty) || role == .global, apiFlags.contains(.writeable) || isAssignFromWriteable {
-            if storage != nil || (mayBeSharedMutableStruct && apiFlags.contains(.writeable)) {
+        } else if (role.isProperty && role != .protocolProperty) || role == .global, apiFlags.options.contains(.writeable) || isAssignFromWriteable {
+            if storage != nil || (mayBeSharedMutableStruct && apiFlags.options.contains(.writeable)) {
                 guard let output else {
                     return true
                 }
@@ -3168,7 +3204,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
     }
 
     private func appendGetField(to output: OutputGenerator, indentation: Indentation, storage: KotlinVariableStorage?, isSingleStatement: Bool) {
-        let sref: () -> Void = apiFlags.contains(.writeable) && mayBeSharedMutableStruct ? { output.append(".sref(\(self.onUpdate?() ?? ""))") } : { }
+        let sref: () -> Void = apiFlags.options.contains(.writeable) && mayBeSharedMutableStruct ? { output.append(".sref(\(self.onUpdate?() ?? ""))") } : { }
         if let storage {
             storage.appendGet(self, sref, isSingleStatement, output, indentation)
         } else {
@@ -3202,7 +3238,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         if let storage {
             return storage
         }
-        guard !apiFlags.contains(.async) else {
+        guard !apiFlags.options.contains(.async) else {
             return nil
         }
         guard role == .property || role == .global else {
@@ -3231,8 +3267,8 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         let name = storagePrefix + propertyName + "storage"
 
         // Unwrapped optional with custom get and set logic?
-        if declaredType.isUnwrappedOptional, (mayBeSharedMutableStruct && apiFlags.contains(.writeable)) || mutationFunctionNames != nil || getter?.body != nil || setter?.body != nil || willSet?.body != nil || didSet?.body != nil {
-            if !apiFlags.contains(.writeable), let getterBody = getter?.body {
+        if declaredType.isUnwrappedOptional, (mayBeSharedMutableStruct && apiFlags.options.contains(.writeable)) || mutationFunctionNames != nil || getter?.body != nil || setter?.body != nil || willSet?.body != nil || didSet?.body != nil {
+            if !apiFlags.options.contains(.writeable), let getterBody = getter?.body {
                 return KotlinVariableStorage(access: name, isUnwrappedOptional: !propertyType.isOptional) { variable, output, indentation in
                     output.append(indentation).append("private val \(name): \(variable.propertyType.asOptional(true).kotlin)\n")
                     variable.appendGetterBody(getterBody, to: output, indentation: indentation.inc())
@@ -3245,10 +3281,10 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         }
 
         // Stored static extension property that can't be moved into owning type?
-        if extends != nil, modifiers.isStatic, getter?.body == nil || (apiFlags.contains(.writeable) && setter?.body == nil) {
+        if extends != nil, modifiers.isStatic, getter?.body == nil || (apiFlags.options.contains(.writeable) && setter?.body == nil) {
             return KotlinVariableStorage(access: name, isUnwrappedOptional: propertyType.isUnwrappedOptional) { variable, output, indentation in
                 output.append(indentation).append("private ")
-                output.append(variable.apiFlags.contains(.writeable) ? "var " : "val ")
+                output.append(variable.apiFlags.options.contains(.writeable) ? "var " : "val ")
                 output.append(name)
                 if variable.declaredType != .none {
                     output.append(": ").append(variable.declaredType.kotlin)
@@ -3266,7 +3302,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
     }
 
     private func canDeclareInitialValue(with storage: KotlinVariableStorage?) -> Bool {
-        return (!apiFlags.contains(.async) || isAsyncLet) && storage == nil
+        return (!apiFlags.options.contains(.async) || isAsyncLet) && storage == nil
     }
 
     private var didSetUsesOldValue: Bool {

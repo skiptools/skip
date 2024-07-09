@@ -649,4 +649,123 @@ final class ErrorHandlingTests: XCTestCase {
         }
         """)
     }
+
+    func testDeclareTypedThrows() async throws {
+        try await check(supportingSwift: """
+        struct E: Error {
+        }
+        """, swift: """
+        func throwit() throws(E) {
+        }
+        """, kotlin: """
+        internal fun throwit() = Unit
+        """)
+
+        // Generics that are only used for the throws type are dropped
+        try await check(swift: """
+        func f<T, E>(p: T, c: () throws(E) -> Void) throws(E) {
+        }
+        """, kotlin: """
+        internal fun <T> f(p: T, c: () -> Unit) = Unit
+        """)
+
+        try await check(swift: """
+        func f<T, E>(p: T, c: () throws(E) -> E) throws(E) {
+        }
+        """, kotlin: """
+        internal fun <T, E> f(p: T, c: () -> E) = Unit
+        """)
+    }
+
+    func testImplicitTypedThrows() async throws {
+        try await check(supportingSwift: """
+        enum Errors {
+            case one, two
+        }
+        """, swift: """
+        func f(i: Int) throws(Errors) {
+            if i == 1 {
+                throw .one
+            } else if i == 2
+                throw .two
+            } else {
+                print("ok")
+            }
+        }
+        """, kotlin: """
+        internal fun f(i: Int) {
+            if (i == 1) {
+                throw Errors.one
+            } else if (i == 2) {
+                throw Errors.two
+            } else {
+                print("ok")
+            }
+        }
+        """)
+    }
+
+    func testImplicitTypedCatch() async throws {
+        let supportingSwift = """
+        enum Errors {
+            case one, two
+        }
+        func f() throws(Errors) {
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func g() {
+            do {
+                try f()
+            } catch {
+                let b = error == .one
+            }
+        }
+        """, kotlin: """
+        internal fun g() {
+            try {
+                f()
+            } catch (error: Errors) {
+                val b = error == Errors.one
+            }
+        }
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func g() {
+            do {
+                try f()
+            } catch let e {
+                let b = e == .one
+            }
+        }
+        """, kotlin: """
+        internal fun g() {
+            try {
+                f()
+            } catch (e: Errors) {
+                val b = e == Errors.one
+            }
+        }
+        """)
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        func g() {
+            do {
+                try f()
+            } catch .one {
+                print("one")
+            }
+        }
+        """, kotlin: """
+        internal fun g() {
+            try {
+                f()
+            } catch (error: Errors.OneCase) {
+                print("one")
+            }
+        }
+        """)
+    }
 }

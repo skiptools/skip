@@ -172,6 +172,45 @@ final class CodeBlock: Statement {
         return returnType.asOptional(isOptional || returnType.isOptional)
     }
 
+    /// Return the inferred type of the throwing statements in the block.
+    ///
+    /// Returns `.any` for an untyped throws.
+    var throwsType: TypeSignature {
+        guard !statements.isEmpty else {
+            return .none
+        }
+        var throwsType: TypeSignature = .none
+        var foundTry = false
+        visit { node in
+            if node is Closure || node is FunctionDeclaration {
+                return .skip
+            }
+            if let tryExpression = node as? Try {
+                if tryExpression.kind == .default {
+                    foundTry = true
+                    tryExpression.trying.visit {
+                        if let tryThrowsType = ($0 as? APICallExpression)?.apiMatch?.apiFlags.throwsType, tryThrowsType != .none {
+                            if throwsType == .none {
+                                throwsType = tryThrowsType
+                            } else if throwsType != tryThrowsType {
+                                throwsType = .any
+                            }
+                        }
+                        return .recurse(nil)
+                    }
+                }
+                return .skip
+            } else {
+                return .recurse(nil)
+            }
+        }
+        if throwsType == .none {
+            return foundTry ? .any : .none
+        } else {
+            return throwsType
+        }
+    }
+
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         var blockContext = context
         statements.forEach { blockContext = $0.inferTypes(context: blockContext, expecting: expecting) }
@@ -718,7 +757,7 @@ final class Throw: Statement {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        let _ = error.inferTypes(context: context, expecting: .none)
+        let _ = error.inferTypes(context: context, expecting: context.expectedThrows)
         return context
     }
 
@@ -813,7 +852,7 @@ final class EnumCaseDeclaration: Statement {
         let parameters = associatedValues.map {
             TypeSignature.Parameter(label: $0.externalLabel, type: $0.declaredType, isInOut: $0.isInOut, isVariadic: $0.isVariadic, hasDefaultValue: $0.defaultValue != nil)
         }
-        return .function(parameters, owningTypeDeclaration.signature, [], nil)
+        return .function(parameters, owningTypeDeclaration.signature, APIFlags(), nil)
     }
 
     init(name: String, associatedValues: [Parameter<Expression>], rawValue: Expression? = nil, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
@@ -934,24 +973,24 @@ final class FunctionDeclaration: Statement {
     private(set) var returnType: TypeSignature
     private(set) var parameters: [Parameter<Expression>]
     private(set) var asyncBehavior: AsyncBehavior
-    let isThrows: Bool
+    private(set) var throwsType: TypeSignature
     let attributes: Attributes
     private(set) var modifiers: Modifiers
     private(set) var generics: Generics
     let body: CodeBlock?
     var functionType: TypeSignature {
-        let apiFlags = APIFlags(isAsync: asyncBehavior != .sync, isThrows: isThrows)
+        let apiFlags = APIFlags(isAsync: asyncBehavior != .sync, throwsType: throwsType)
         let function: TypeSignature = .function(parameters.map(\.signature), returnType, apiFlags, nil)
         return attributes.apply(toFunction: function)
     }
 
-    init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>] = [], asyncBehavior: AsyncBehavior = .sync, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>] = [], asyncBehavior: AsyncBehavior = .sync, throwsType: TypeSignature = .none, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.isOptionalInit = isOptionalInit
         self.returnType = returnType.or(.void)
         self.parameters = parameters
         self.asyncBehavior = asyncBehavior
-        self.isThrows = isThrows
+        self.throwsType = throwsType
         self.attributes = attributes
         self.modifiers = modifiers
         self.generics = generics
@@ -975,7 +1014,7 @@ final class FunctionDeclaration: Statement {
         let name = functionDecl.name.text.removingBacktickEscaping
         let (returnType, parameters, signatureMessges) = functionDecl.signature.typeSignatures(in: syntaxTree)
         let isAsync = functionDecl.signature.effectSpecifiers?.asyncSpecifier != nil
-        let isThrows = functionDecl.signature.effectSpecifiers?.throwsClause?.throwsSpecifier != nil
+        let throwsType = functionDecl.signature.effectSpecifiers?.throwsClause?.typeSignature(in: syntaxTree) ?? .none
         var attributes = Attributes.for(syntax: functionDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: functionDecl.modifiers)
@@ -984,7 +1023,7 @@ final class FunctionDeclaration: Statement {
         if let bodySyntax = functionDecl.body {
             body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
         }
-        let statement = FunctionDeclaration(type: .functionDeclaration, name: name, returnType: returnType, parameters: parameters, asyncBehavior: isAsync ? .async : .sync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: functionDecl, sourceFile: syntaxTree.source.file, sourceRange: functionDecl.range(in: syntaxTree.source), extras: extras)
+        let statement = FunctionDeclaration(type: .functionDeclaration, name: name, returnType: returnType, parameters: parameters, asyncBehavior: isAsync ? .async : .sync, throwsType: throwsType, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: functionDecl, sourceFile: syntaxTree.source.file, sourceRange: functionDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = signatureMessges + genericsMessages
         return statement
     }
@@ -993,7 +1032,7 @@ final class FunctionDeclaration: Statement {
         let isOptionalInit = initializerDecl.optionalMark != nil
         let (_, parameters, signatureMessages) = initializerDecl.signature.typeSignatures(in: syntaxTree)
         let isAsync = initializerDecl.signature.effectSpecifiers?.asyncSpecifier != nil
-        let isThrows = initializerDecl.signature.effectSpecifiers?.throwsClause?.throwsSpecifier != nil
+        let throwsType = initializerDecl.signature.effectSpecifiers?.throwsClause?.typeSignature(in: syntaxTree) ?? .none
         var attributes = Attributes.for(syntax: initializerDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: initializerDecl.modifiers)
@@ -1002,7 +1041,7 @@ final class FunctionDeclaration: Statement {
         if let bodySyntax = initializerDecl.body {
             body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
         }
-        let statement = FunctionDeclaration(type: .initDeclaration, name: "init", isOptionalInit: isOptionalInit, returnType: .void, parameters: parameters, asyncBehavior: isAsync ? .async : .sync, isThrows: isThrows, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: initializerDecl, sourceFile: syntaxTree.source.file, sourceRange: initializerDecl.range(in: syntaxTree.source), extras: extras)
+        let statement = FunctionDeclaration(type: .initDeclaration, name: "init", isOptionalInit: isOptionalInit, returnType: .void, parameters: parameters, asyncBehavior: isAsync ? .async : .sync, throwsType: throwsType, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: initializerDecl, sourceFile: syntaxTree.source.file, sourceRange: initializerDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = signatureMessages + genericsMessages
         return statement
     }
@@ -1026,6 +1065,7 @@ final class FunctionDeclaration: Statement {
             returnType = returnType.resolved(in: self, context: context)
         }
         parameters = parameters.map { $0.resolvedType(in: self, context: context) }
+        throwsType = throwsType.resolved(in: self, context: context)
         // Functions in protocols or extensions inherit the visibility of the protocol or extension
         if modifiers.visibility == .default {
             if let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
@@ -1077,8 +1117,8 @@ final class FunctionDeclaration: Statement {
         if asyncBehavior != .sync {
             attrs.append("async")
         }
-        if isThrows {
-            attrs.append("throws")
+        if throwsType != .none {
+            attrs.append(PrettyPrintTree(root: "throws", children: [PrettyPrintTree(root: throwsType.description)]))
         }
         if !attributes.isEmpty {
             attrs.append(attributes.prettyPrintTree)
@@ -1121,14 +1161,14 @@ final class SubscriptDeclaration: Statement {
     private(set) var elementType: TypeSignature
     private(set) var parameters: [Parameter<Expression>]
     private(set) var asyncBehavior: AsyncBehavior
-    let isThrows: Bool
+    private(set) var throwsType: TypeSignature
     let attributes: Attributes
     private(set) var modifiers: Modifiers
     private(set) var generics: Generics
     let getter: Accessor<CodeBlock>?
     let setter: Accessor<CodeBlock>?
     var getterType: TypeSignature {
-        let apiFlags = APIFlags(isAsync: asyncBehavior != .sync, isThrows: isThrows)
+        let apiFlags = APIFlags(isAsync: asyncBehavior != .sync, throwsType: throwsType)
         let function: TypeSignature = .function(parameters.map(\.signature), elementType, apiFlags, nil)
         return attributes.apply(toFunction: function)
     }
@@ -1136,11 +1176,11 @@ final class SubscriptDeclaration: Statement {
         return .function(parameters.map(\.signature), .void, APIFlags(isMainActor: attributes.contains(.mainActor)), nil)
     }
 
-    init(elementType: TypeSignature, parameters: [Parameter<Expression>], asyncBehavior: AsyncBehavior = .sync, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(elementType: TypeSignature, parameters: [Parameter<Expression>], asyncBehavior: AsyncBehavior = .sync, throwsType: TypeSignature = .none, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.elementType = elementType
         self.parameters = parameters
         self.asyncBehavior = asyncBehavior
-        self.isThrows = isThrows
+        self.throwsType = throwsType
         self.attributes = attributes
         self.modifiers = modifiers
         self.generics = generics
@@ -1169,7 +1209,7 @@ final class SubscriptDeclaration: Statement {
                 accessors.getter = Accessor(body: CodeBlock(statements: statements))
             }
         }
-        let statement = SubscriptDeclaration(elementType: elementType, parameters: parameters, asyncBehavior: accessors.isAsync ? .async : .sync, isThrows: accessors.isThrows, attributes: attributes, modifiers: modifiers, generics: generics, getter: accessors.getter, setter: accessors.setter, sourceFile: syntaxTree.source.file, sourceRange: subscriptDecl.range(in: syntaxTree.source), extras: extras)
+        let statement = SubscriptDeclaration(elementType: elementType, parameters: parameters, asyncBehavior: accessors.isAsync ? .async : .sync, throwsType: accessors.throwsType, attributes: attributes, modifiers: modifiers, generics: generics, getter: accessors.getter, setter: accessors.setter, sourceFile: syntaxTree.source.file, sourceRange: subscriptDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = accessors.messages + parametersMessages + genericsMessages
         return [statement]
     }
@@ -1177,6 +1217,7 @@ final class SubscriptDeclaration: Statement {
     override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
         elementType = elementType.resolved(in: self, context: context)
         parameters = parameters.map { $0.resolvedType(in: self, context: context) }
+        throwsType = throwsType.resolved(in: self, context: context)
         // Functions in protocols or extensions inherit the visibility of the protocol or extension
         if modifiers.visibility == .default {
             if let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
@@ -1194,7 +1235,7 @@ final class SubscriptDeclaration: Statement {
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
         parameters.forEach { $0.defaultValue?.inferTypes(context: context, expecting: $0.declaredType) }
         if let body = getter?.body {
-            let bodyContext = context.expectingReturn(elementType)
+            let bodyContext = context.expectingReturn(elementType).expectingThrows(throwsType)
             let _ = body.inferTypes(context: bodyContext, expecting: .none)
         }
         if let body = setter?.body {
@@ -1223,8 +1264,8 @@ final class SubscriptDeclaration: Statement {
         if asyncBehavior != .sync {
             attrs.append("async")
         }
-        if isThrows {
-            attrs.append("throws")
+        if throwsType != .none {
+            attrs.append(PrettyPrintTree(root: "throws", children: [PrettyPrintTree(root: throwsType.description)]))
         }
         if !attributes.isEmpty {
             attrs.append(attributes.prettyPrintTree)
@@ -1477,7 +1518,7 @@ final class VariableDeclaration: Statement {
     private(set) var constrainedDeclaredType: TypeSignature
     let isLet: Bool // True for async let local OR async get property
     private(set) var asyncBehavior: AsyncBehavior
-    let isThrows: Bool
+    private(set) var throwsType: TypeSignature
     var attributes: Attributes
     private(set) var modifiers: Modifiers
     let value: Expression?
@@ -1491,19 +1532,19 @@ final class VariableDeclaration: Statement {
     var apiFlags: APIFlags {
         // Default to assuming that get-only protocol properties are computed
         let isComputed = getter?.body != nil || (getter != nil && setter == nil)
-        return APIFlags(isAsync: asyncBehavior != .sync, isThrows: isThrows, isMainActor: attributes.contains(.mainActor), isSwiftUIBindable: attributes.contains(.bindable) || attributes.contains(.observedObject) || attributes.contains(.state) || attributes.contains(.stateObject) || attributes.contains(.binding), isViewBuilder: attributes.contains(.viewBuilder), isComputed: isComputed, isWriteable: !isLet && (getter == nil || setter != nil))
+        return APIFlags(isAsync: asyncBehavior != .sync, isMainActor: attributes.contains(.mainActor), isSwiftUIBindable: attributes.contains(.bindable) || attributes.contains(.observedObject) || attributes.contains(.state) || attributes.contains(.stateObject) || attributes.contains(.binding), isViewBuilder: attributes.contains(.viewBuilder), isComputed: isComputed, isWriteable: !isLet && (getter == nil || setter != nil), throwsType: throwsType)
     }
     var isMutating: Bool {
         return !isLet && (getter == nil || setter != nil) && !attributes.isNonMutating
     }
 
-    init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = false, asyncBehavior: AsyncBehavior = .sync, isThrows: Bool = false, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = false, asyncBehavior: AsyncBehavior = .sync, throwsType: TypeSignature = .none, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.names = names
         self.declaredType = declaredType
         self.constrainedDeclaredType = declaredType
         self.isLet = isLet
         self.asyncBehavior = asyncBehavior
-        self.isThrows = isThrows
+        self.throwsType = throwsType
         self.attributes = attributes
         self.modifiers = modifiers
         self.value = value
@@ -1564,7 +1605,7 @@ final class VariableDeclaration: Statement {
             throw Message.unsupportedSyntax(syntax.pattern, source: syntaxTree.source)
         }
         let combinedAsyncBehavior = asyncBehavior != .sync ? asyncBehavior : accessors.isAsync ? .async : .sync
-        let declaration = VariableDeclaration(names: names, declaredType: declaredType, isLet: isLet, asyncBehavior: combinedAsyncBehavior, isThrows: accessors.isThrows, attributes: attributes, modifiers: modifiers, value: value, getter: accessors.getter, setter: accessors.setter, willSet: accessors.willSet, didSet: accessors.didSet, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        let declaration = VariableDeclaration(names: names, declaredType: declaredType, isLet: isLet, asyncBehavior: combinedAsyncBehavior, throwsType: accessors.throwsType, attributes: attributes, modifiers: modifiers, value: value, getter: accessors.getter, setter: accessors.setter, willSet: accessors.willSet, didSet: accessors.didSet, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
         declaration.messages = accessors.messages
         return declaration
     }
@@ -1584,6 +1625,7 @@ final class VariableDeclaration: Statement {
                 modifiers.visibility = .internal
             }
         }
+        throwsType = throwsType.resolved(in: self, context: context)
         if asyncBehavior == .sync, !modifiers.isNonisolated && !modifiers.isStatic, !isLet, (parent as? TypeDeclaration)?.nonExtensionDeclarationType == .actorDeclaration {
             asyncBehavior = .actor
         }
@@ -1649,8 +1691,8 @@ final class VariableDeclaration: Statement {
         if asyncBehavior != .sync {
             attrs.append("async")
         }
-        if isThrows {
-            attrs.append("throws")
+        if throwsType != .none {
+            attrs.append(PrettyPrintTree(root: "throws", children: [PrettyPrintTree(root: throwsType.description)]))
         }
         if !attributes.isEmpty {
             attrs.append(attributes.prettyPrintTree)

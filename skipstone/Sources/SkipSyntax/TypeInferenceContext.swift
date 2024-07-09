@@ -28,6 +28,9 @@ struct TypeInferenceContext {
     /// The type we're expecting to return from the current code block.
     private(set) var expectedReturn: TypeSignature = .none
 
+    /// The type we're expecting to throw from the current code block.
+    private(set) var expectedThrows: TypeSignature = .none
+
     /// The current generic constraints.
     private(set) var generics = Generics()
 
@@ -55,6 +58,7 @@ struct TypeInferenceContext {
         }
         var context = addingIdentifiers(parameterDictionary)
         context.expectedReturn = functionDeclaration.returnType
+        context.expectedThrows = functionDeclaration.throwsType
         if functionDeclaration.modifiers.isStatic, let lastTypePathIndex = context.path.lastIndex(where: { $0.typeSignature != nil }) {
             context.path[lastTypePathIndex].isStatic = true
         }
@@ -90,6 +94,7 @@ struct TypeInferenceContext {
         }
         var context = addingIdentifiers(parameterDictionary)
         context.expectedReturn = closure.returnType.or(closure.inferredType.returnType)
+        context.expectedThrows = closure.throwsType.or(closure.inferredType.apiFlags.throwsType)
         return context
     }
 
@@ -111,15 +116,22 @@ struct TypeInferenceContext {
         return context
     }
 
+    /// Return a context expecting the given type to be thrown from the current code block.
+    func expectingThrows(_ throwsType: TypeSignature) -> TypeInferenceContext {
+        var context = self
+        context.expectedThrows = throwsType
+        return context
+    }
+
     /// Return a context that includes the given identifier.
-    func addingIdentifier(_ name: String, type: TypeSignature, apiFlags: APIFlags = [], attributes: Attributes? = nil) -> TypeInferenceContext {
+    func addingIdentifier(_ name: String, type: TypeSignature, apiFlags: APIFlags = APIFlags(), attributes: Attributes? = nil) -> TypeInferenceContext {
         var context = self
         context.localIdentifierTypes[name] = (type, apiFlags, attributes)
         return context
     }
 
     /// Return a context that includes the given identifiers.
-    func addingIdentifiers(_ names: [String?], types: [TypeSignature], apiFlags: APIFlags = [], attributes: Attributes? = nil) -> TypeInferenceContext {
+    func addingIdentifiers(_ names: [String?], types: [TypeSignature], apiFlags: APIFlags = APIFlags(), attributes: Attributes? = nil) -> TypeInferenceContext {
         var context = self
         for nameAndType in zip(names, types) {
             if let name = nameAndType.0 {
@@ -136,7 +148,7 @@ struct TypeInferenceContext {
         }
         var context = self
         for (name, type) in identifiers {
-            context.localIdentifierTypes[name] = (type, [], nil)
+            context.localIdentifierTypes[name] = (type, APIFlags(), nil)
         }
         return context
     }

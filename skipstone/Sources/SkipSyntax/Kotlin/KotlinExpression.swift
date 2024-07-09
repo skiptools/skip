@@ -125,7 +125,7 @@ extension KotlinMainActorTargeting where Self: KotlinSyntaxNode {
         guard let apiFlags else {
             return nil
         }
-        return !apiFlags.contains(.async) && apiFlags.contains(.mainActor)
+        return !apiFlags.options.contains(.async) && apiFlags.options.contains(.mainActor)
     }
 }
 
