@@ -225,7 +225,11 @@ final class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
         if didFindReturn {
             return true
         }
-        guard returnRequired, statements.count == 1, statements[0].type == .expression, let expressionStatement = statements[0] as? KotlinExpressionStatement, var expression = expressionStatement.expression else {
+        guard returnRequired else {
+            return false
+        }
+        let filteredStatements = statements.filter { $0.type != .empty }
+        guard filteredStatements.count == 1, filteredStatements[0].type == .expression, let expressionStatement = filteredStatements[0] as? KotlinExpressionStatement, var expression = expressionStatement.expression else {
             return false
         }
         // No need to return if throwing a fatal error
@@ -238,7 +242,11 @@ final class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
         let returnStatement = KotlinReturn(expression: expression)
         returnStatement.extras = expressionStatement.extras
         expression.parent = returnStatement
-        statements = [returnStatement]
+        if let statementIndex = statements.firstIndex(where: { $0 === filteredStatements[0] }) {
+            statements[statementIndex] = returnStatement
+        } else {
+            statements = [returnStatement]
+        }
         returnStatement.parent = self
         return true
     }
@@ -951,6 +959,9 @@ final class KotlinClassDeclaration: KotlinStatement {
     var alwaysCreateNewSealedClassInstances = false
     var isGenerated = false
 
+    /// Names that conflict with built-in enum properties.
+    private static let disallowedEnumPropertyNames: Set<String> = ["name", "ordinal"]
+
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
         let kstatement = KotlinClassDeclaration(statement: statement)
         kstatement.inherits = statement.inherits
@@ -1016,7 +1027,7 @@ final class KotlinClassDeclaration: KotlinStatement {
         }
         kstatement.members = kmembers // Setting assigns companion information on members
         if statement.type == .enumDeclaration {
-            kstatement.processEnumCaseDeclarations()
+            kstatement.processEnumMemberDeclarations(translator: translator)
         }
 
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
@@ -1044,7 +1055,7 @@ final class KotlinClassDeclaration: KotlinStatement {
     }
 
     /// Assign raw values and other attributes to enum case members.
-    func processEnumCaseDeclarations() {
+    func processEnumMemberDeclarations(translator: KotlinTranslator) {
         guard declarationType == .enumDeclaration else {
             return
         }
@@ -1068,6 +1079,15 @@ final class KotlinClassDeclaration: KotlinStatement {
                 }
             }
             caseDeclaration.isLastDeclaration = index == caseDeclarations.count - 1
+        }
+
+        if !isSealedClassesEnum {
+            let variableDeclarations = members.compactMap { $0 as? KotlinVariableDeclaration }
+            for variableDeclaration in variableDeclarations where !variableDeclaration.isStatic {
+                if Self.disallowedEnumPropertyNames.contains(variableDeclaration.propertyName) {
+                    variableDeclaration.messages.append(.kotlinEnumReservedProperty(variableDeclaration, source: translator.syntaxTree.source))
+                }
+            }
         }
     }
 
@@ -2710,8 +2730,6 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
             } else {
                 if kstatement.modifiers.isOverride {
                     kstatement.role = .superclassOverrideProperty
-                } else if owningDeclarationType == .enumDeclaration && statement.propertyName == "name" && translator.codebaseInfo?.isSealedClassesEnum(type: owningSignature).0 == true {
-                    kstatement.messages.append(.kotlinEnumNameProperty(kstatement, source: translator.syntaxTree.source))
                 } else if translator.codebaseInfo?.isImplementingKotlinInterfaceMember(declaration: statement, in: owningSignature) == true {
                     kstatement.modifiers.isOverride = true
                 }

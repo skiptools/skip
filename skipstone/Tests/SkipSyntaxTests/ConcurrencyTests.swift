@@ -328,6 +328,18 @@ final class ConcurrencyTests: XCTestCase {
         }
         """)
 
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f() {
+            Task<Int, Error> {
+                print("task")
+            }
+        }
+        """, kotlin: """
+        internal fun f() {
+            Task<Int> { -> print("task") }
+        }
+        """)
+
         try await checkProducesMessage(swift: """
         func f() {
             let c = {}

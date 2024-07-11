@@ -636,4 +636,24 @@ final class BuiltinTypeTests: XCTestCase {
         }
         """)
     }
+
+    func testIntReturnedForFloatingPoint() async throws {
+        try await check(swift: """
+        func f() -> Double {
+            return 1
+        }
+        func g() -> Double { 2 }
+        var v1: Double {
+            return 3
+        }
+        var v2: Double { 4 }
+        """, kotlin: """
+        internal fun f(): Double = 1.0
+        internal fun g(): Double = 2.0
+        internal val v1: Double
+            get() = 3.0
+        internal val v2: Double
+            get() = 4.0
+        """)
+    }
 }

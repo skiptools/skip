@@ -38,7 +38,7 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
                     updateNestingClosures(in: closure.body)
                 }
             } else if let functionCall = node as? KotlinFunctionCall {
-                if let taskClosure = updateTaskClosure(in: functionCall, codebaseInfo: codebaseInfo, source: translator.syntaxTree.source) {
+                if let taskClosure = updateTaskCall(in: functionCall, codebaseInfo: codebaseInfo, source: translator.syntaxTree.source) {
                     taskClosureIdentifiers.insert(ObjectIdentifier(taskClosure))
                 }
             }
@@ -50,19 +50,26 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
         }
     }
 
-    private func updateTaskClosure(in functionCall: KotlinFunctionCall, codebaseInfo: CodebaseInfo.Context?, source: Source) -> KotlinClosure? {
+    private func updateTaskCall(in functionCall: KotlinFunctionCall, codebaseInfo: CodebaseInfo.Context?, source: Source) -> KotlinClosure? {
         if let identifier = functionCall.function as? KotlinIdentifier {
             if identifier.name == "Task", let closure = taskClosure(in: functionCall, source: source) {
+                identifier.generics = updateTaskGenerics(identifier.generics)
                 updateTaskConstructor(functionCall: functionCall, closure: closure, codebaseInfo: codebaseInfo)
                 return closure
             }
         } else if let memberAccess = functionCall.function as? KotlinMemberAccess {
             if memberAccess.member == "Task" && (memberAccess.base as? KotlinIdentifier)?.name == "Swift" {
+                memberAccess.generics = updateTaskGenerics(memberAccess.generics)
                 if let closure = taskClosure(in: functionCall, source: source) {
                     updateTaskConstructor(functionCall: functionCall, closure: closure, codebaseInfo: codebaseInfo)
                     return closure
                 }
             } else if memberAccess.member == "detached" && memberAccess.isBaseType(named: "Task", moduleName: "Swift") {
+                if let baseIdentifier = memberAccess.base as? KotlinIdentifier {
+                    baseIdentifier.generics = updateTaskGenerics(baseIdentifier.generics)
+                } else if let baseMemberAccess = memberAccess.base as? KotlinMemberAccess {
+                    baseMemberAccess.generics = updateTaskGenerics(baseMemberAccess.generics)
+                }
                 if let closure = taskClosure(in: functionCall, source: source) {
                     // Task.detached always launches with the default dispatcher. Only a closure with a specified actor needs to dispatch itself
                     if closure.apiFlags?.options.contains(.mainActor) != true {
@@ -131,6 +138,13 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
                 return .recurse(nil)
             }
         }
+    }
+
+    private func updateTaskGenerics(_ generics: [TypeSignature]?) -> [TypeSignature]? {
+        guard let generics else {
+            return nil
+        }
+        return generics.count == 2 ? [generics[0]] : generics
     }
 
     private func updateMainActorTargeting(_ mainActorTargeting: KotlinSyntaxNode & KotlinMainActorTargeting, codebaseInfo: CodebaseInfo.Context?, source: Source) {

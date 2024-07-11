@@ -4,7 +4,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
         syntaxTree.root.visit {
             if let classDeclaration = $0 as? KotlinClassDeclaration {
                 if classDeclaration.declarationType == .enumDeclaration && classDeclaration.inherits.contains(where: \.isCodingKey) {
-                    fixupCodingKey(enumDeclaration: classDeclaration)
+                    fixupCodingKey(enumDeclaration: classDeclaration, translator: translator)
                 } else {
                     synthesizeCodable(for: classDeclaration, translator: translator)
                 }
@@ -56,7 +56,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
             // The developer may use a bespoke name for their coding keys enum if they implement their own encode/decode,
             // so we only synthesize or look for coding keys after knowing we need to generate a coding function
             let rawValueType = classDeclaration.rawValueType
-            let codingKeys = synthesizeCodingKeys(for: classDeclaration, with: storedVariableDeclarations, rawValueType: rawValueType, isDecodable: isDecodable)
+            let codingKeys = synthesizeCodingKeys(for: classDeclaration, with: storedVariableDeclarations, rawValueType: rawValueType, isDecodable: isDecodable, translator: translator)
             let matchedCodingKeys = matchCodingKeys(codingKeys, to: storedVariableDeclarations, source: translator.syntaxTree.source)
             let matchedCodingKeysByName = matchedCodingKeys?.reduce(into: [String: (KotlinEnumCaseDeclaration, KotlinVariableDeclaration)]()) { result, entry in
                 result[entry.1.propertyName] = entry
@@ -74,7 +74,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
         }
     }
 
-    private func synthesizeCodingKeys(for classDeclaration: KotlinClassDeclaration, with storedVariableDeclarations: [KotlinVariableDeclaration], rawValueType: TypeSignature, isDecodable: Bool) -> [KotlinEnumCaseDeclaration]? {
+    private func synthesizeCodingKeys(for classDeclaration: KotlinClassDeclaration, with storedVariableDeclarations: [KotlinVariableDeclaration], rawValueType: TypeSignature, isDecodable: Bool, translator: KotlinTranslator) -> [KotlinEnumCaseDeclaration]? {
         // Does the user have a custom enum?
         if let existingKeys = classDeclaration.members.first(where: {
             guard let memberClassDeclaration = $0 as? KotlinClassDeclaration else {
@@ -102,7 +102,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
             return caseDeclaration
         }
         enumDeclaration.members = caseDeclarations
-        enumDeclaration.processEnumCaseDeclarations()
+        enumDeclaration.processEnumMemberDeclarations(translator: translator)
 
         classDeclaration.members.append(enumDeclaration)
         enumDeclaration.parent = classDeclaration
@@ -131,11 +131,11 @@ final class KotlinCodableTransformer: KotlinTransformer {
         return matchedCodingKeys
     }
 
-    private func fixupCodingKey(enumDeclaration: KotlinClassDeclaration) {
+    private func fixupCodingKey(enumDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
         // Coding keys are strings by default
         if enumDeclaration.enumInheritedRawValueType == .none {
             enumDeclaration.inherits.insert(.string, at: 0)
-            enumDeclaration.processEnumCaseDeclarations()
+            enumDeclaration.processEnumMemberDeclarations(translator: translator)
         }
     }
 

@@ -730,7 +730,10 @@ final class Return: ExpressionStatement {
     }
 
     override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
-        expression?.inferTypes(context: context, expecting: expecting.or(context.expectedReturn))
+        if let expression {
+            expression.inferTypes(context: context, expecting: expecting.or(context.expectedReturn))
+            context.assignLiteralExpressibleType(context.expectedReturn, to: expression)
+        }
         return context
     }
 
@@ -1090,6 +1093,9 @@ final class FunctionDeclaration: Statement {
         if let body {
             let bodyContext = context.pushing(self)
             let _ = body.inferTypes(context: bodyContext, expecting: body.statements.count == 1 && bodyContext.expectedReturn != .void ? bodyContext.expectedReturn : .none)
+            if body.statements.count == 1, body.statements[0].type != .return, let expression = (body.statements[0] as? ExpressionStatement)?.expression {
+                bodyContext.assignLiteralExpressibleType(bodyContext.expectedReturn, to: expression)
+            }
         }
         if parent?.owningFunctionDeclaration != nil {
             // Add identifier if local function
@@ -1642,6 +1648,9 @@ final class VariableDeclaration: Statement {
         if let body = getter?.body {
             let bodyContext = varContext.expectingReturn(type)
             let _ = body.inferTypes(context: bodyContext, expecting: body.statements.count == 1 ? bodyContext.expectedReturn : .none)
+            if body.statements.count == 1, body.statements[0].type != .return, let expression = (body.statements[0] as? ExpressionStatement)?.expression {
+                context.assignLiteralExpressibleType(bodyContext.expectedReturn, to: expression)
+            }
         }
         if let body = setter?.body {
             let bodyContext = varContext.addingIdentifier(setter?.parameterName ?? "newValue", type: type)

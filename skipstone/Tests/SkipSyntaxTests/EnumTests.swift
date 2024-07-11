@@ -752,4 +752,41 @@ final class EnumTests: XCTestCase {
         }
         """)
     }
+
+    func testDisallowedPropertyNames() async throws {
+        try await checkProducesMessage(swift: """
+        enum E {
+            case a, b
+        
+            var name: String {
+                "name"
+            }
+        }
+        """)
+
+        try await check(swift: """
+        enum E {
+            case a(Int), b
+        
+            var name: String {
+                "name"
+            }
+        }
+        """, kotlin: """
+        internal sealed class E {
+            class ACase(val associated0: Int): E() {
+            }
+            class BCase: E() {
+            }
+
+            internal val name: String
+                get() = "name"
+
+            companion object {
+                fun a(associated0: Int): E = ACase(associated0)
+                val b: E = BCase()
+            }
+        }
+        """)
+    }
 }

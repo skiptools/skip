@@ -2057,6 +2057,51 @@ final class MemberDeclarationTests: XCTestCase {
         """)
     }
 
+    func testImplicitReturn() async throws {
+        try await check(swift: """
+        class C {
+            var i: Int { 1 }
+            var j: Int { 
+                // Comment
+                2
+            }
+            var k: Int {
+                // Comment
+                #if !SKIP
+                3
+                #else
+                4
+                #endif
+            }
+            func f() -> Int { 1 }
+            func g() -> Int {
+                // Comment
+                2
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open val i: Int
+                get() = 1
+            internal open val j: Int
+                get() {
+                    // Comment
+                    return 2
+                }
+            internal open val k: Int
+                get() {
+                    // Comment
+                    return 4
+                }
+            internal open fun f(): Int = 1
+            internal open fun g(): Int {
+                // Comment
+                return 2
+            }
+        }
+        """)
+    }
+
     func testDoNotUseSingleStatementForIgnoredFunctionCallReturn() async throws {
         try await check(supportingSwift: """
         func intReturn() -> Int {
