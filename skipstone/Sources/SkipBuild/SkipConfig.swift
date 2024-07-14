@@ -10,6 +10,9 @@ struct SkipConfig : Codable {
 
     /// The rules to build up a `settings.gradle.kts` file
     var settings: GradleBlock?
+
+    /// The native toolchain info
+    var toolchain: SkipToolchain?
 }
 
 struct TranspilationConfig : Codable {
@@ -17,4 +20,12 @@ struct TranspilationConfig : Codable {
     var package: String?
 }
 
+
+struct SkipToolchain : Equatable, Codable {
+    var architectures: [SkipArchitecture]?
+}
+
+struct SkipArchitecture : Equatable, Codable {
+    var arch: String
+}
 

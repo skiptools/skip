@@ -120,12 +120,16 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
     struct KeyOutput : MessageEncodable {
         var id: String
         var expiration: Date
+        var hostid: String?
         var key: String
 
         func message(term: Term) -> String? {
+
             """
             id: \(id)
+            expiration: \(expiration)
             expiration: \(ISO8601DateFormatter.string(from: expiration, timeZone: TimeZone(secondsFromGMT: 0)!))
+            hostid: \(hostid ?? "")
             key: \(key)
             """
         }
@@ -146,7 +150,7 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
         func executeCommand() async throws -> Output {
             //info("create key")
             let licenseKey = try LicenseKey(licenseString: self.key)
-            return KeyOutput(id: licenseKey.id, expiration: licenseKey.expiration, key: key)
+            return KeyOutput(id: licenseKey.id, expiration: licenseKey.expiration, hostid: licenseKey.hostid, key: key)
         }
     }
 

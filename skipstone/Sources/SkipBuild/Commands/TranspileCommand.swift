@@ -265,12 +265,24 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         var dependentModuleExports: [CodebaseInfo.ModuleExport] = []
         let codebaseInfo = try await loadCodebaseInfo() // initialize the codebaseinfo and load DependentModuleName.skipcode.json
 
+        // load and merge each of the skip.yml files for the dependent modules
+        let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
+
+        let isNativeSwiftProject = baseSkipConfig.toolchain != nil
+
         // projects with a CMakeLists.txt file are built as a native Android library
         // these are only used for purely native code libraries, and so we short-circuit the build generation
         if isCMakeProject {
             // Link ext/ to the relative cmake target
             let extLink = moduleRootPath.appending(component: "ext")
             try addLink(extLink, pointingAt: projectFolderPath, relative: false)
+        }
+
+        if isNativeSwiftProject {
+            // Link src/main/swift/ to the relative cmake target
+            let swiftLinkFolder = try AbsolutePath(outputFolderPath, validating: "swift")
+            try fs.createDirectory(swiftLinkFolder.parentDirectory, recursive: true)
+            try addLink(swiftLinkFolder, pointingAt: rootPath, relative: false)
         }
 
         // the standard base name for Gradle Kotlin source files
@@ -299,8 +311,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         let packageName = KotlinTranslator.packageName(forModule: primaryModuleName)
 
-        // load and merge each of the skip.yml files for the dependent modules
-        let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
         let transformers: [KotlinTransformer] = try createTransformers(for: baseSkipConfig, with: configMap)
 
         let overridden = try linkSkipFolder(skipFolderPath, to: kotlinOutputFolder, topLevel: true)
