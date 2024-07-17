@@ -64,15 +64,18 @@ import PackagePlugin
 
         // we need to know the names of peer target folders in order to set up dependency links, so we need to determine the output folder structure
 
-        // output named vary dependeding on whether we are running from Xcode/xcodebuild and SPM:
-        // xcode: DERIVED/SourcePackages/plugins/skip-unit.output/SkipUnit/skipstone/SkipUnit.skipcode.json
-        // SPM:     PROJECT_HOME/.build/plugins/outputs/skip-unit/SkipUnit/skipstone/SkipUnit.skipcode.json
-        //Diagnostics.warning("OUTPUT: \(context.pluginWorkDirectory)")
-        let outputExt = context.pluginWorkDirectory.removingLastComponent().removingLastComponent().extension
+        // output named vary dependeding on whether we are running from Xcode/xcodebuild and SwiftPM, and also changed in Swift 6:
+        // xcode:     DERIVED/SourcePackages/plugins/skip-unit.output/SkipUnit/skipstone/SkipUnit.skipcode.json
+        // SwiftPM 5: PROJECT_HOME/.build/plugins/outputs/skip-unit/SkipUnit/skipstone/SkipUnit.skipcode.json
+        // SwiftPM 6: PROJECT_HOME/.build/plugins/outputs/skip-unit/SkipUnit/destination/skipstone/SkipUnit.skipcode.json
+        let outputFolder = context.pluginWorkDirectory
+
+        let outputExt = outputFolder.removingLastComponent().removingLastComponent().extension
         let pkgext = outputExt.flatMap({ "." + $0 }) ?? ""
+        // when run from Xcode, the plugin folder ends with ".output"; when run from CLI `swift build`, there is no output extension
+        let isXcodeBuild = !pkgext.isEmpty
 
         let skip = try context.tool(named: skipPluginCommandName)
-        let outputFolder = context.pluginWorkDirectory
 
         // look for ModuleKotlin/Sources/Skip/skip.yml
         let skipFolder = target.directory.appending(["Skip"])
@@ -152,10 +155,19 @@ import PackagePlugin
             // e.g. ../../../skiphub.output/SkipFoundationKotlin/skip/SkipFoundation
             // e.g. ../../SkipFoundationKotlin/skip/SkipFoundation
             let targetLink: String
+
+            // SwiftPM 6 (included with Xcode 16b3) changes the plugin output folder behavior from running from the command line:
+            // plugin output folders go to "plugins/outputs/package-name/TargetName/destination/skipstone" rather that "plugins/outputs/package-name/TargetName/skipstone", which affects how we set up symbolic links
+            // See: https://forums.swift.org/t/swiftpm-included-with-xcode-16b3-changes-plugin-output-folder-to-destination/73220
+            // So check to see if the output folder's parent directory is "destination", and if so, change our assumptions about where the plugins will be output
+            let hasDestinationFolder = !isXcodeBuild && outputFolder.removingLastComponent().lastComponent == "destination"
+            let destFolder = !hasDestinationFolder ? pluginFolderName : ("destination/" + pluginFolderName)
+            let parentLink = !hasDestinationFolder ? "" : "../" // the extra folder means we need to link one more level up
+
             if let packageID = packageID { // go further up to the external package name
-                targetLink = "../../../" + packageID + pkgext + "/" + target.name + "/" + pluginFolderName + "/" + targetName
+                targetLink = parentLink + "../../../" + packageID + pkgext + "/" + target.name + "/" + destFolder + "/" + targetName
             } else {
-                targetLink = "../../" + target.name + "/" + pluginFolderName + "/" + targetName
+                targetLink = parentLink + "../../" + target.name + "/" + destFolder + "/" + targetName
             }
             buildModuleArgs += ["--link", targetName + ":" + targetLink]
             return targetLink
@@ -223,6 +235,7 @@ import PackagePlugin
                 sourceHashFile = sourceHashFile.standardized
                     .deletingLastPathComponent()
                     .appendingPathComponent(sourceHashDot + sourceHashFile.lastPathComponent, isDirectory: false)
+                //Diagnostics.warning("sourceHashFile: outputFolder=\(outputFolder.string) moduleLinkTarget=\(moduleLinkTarget) -> \(sourceHashFile)")
 
                 // output a .sourcehash file contains all the input files, so the transpile will be re-run when any of the input sources have changed
                 let sourceHashFilePath = Path(sourceHashFile.path)
