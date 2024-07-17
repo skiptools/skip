@@ -2226,7 +2226,12 @@ extension FrameworkProjectLayout {
 
             // load the Skip plugin (part of the skip-unit project), which handles configuring the Android project
             // because this path is a symlink, we need to use the canonical path or gradle will mis-interpret it as a different build source
-            val pluginSource = skipOutputs.resolve("skip-unit${outputExt}/SkipUnit/skipstone/buildSrc/").canonicalFile
+            var pluginSource = skipOutputs.resolve("skip-unit${outputExt}/SkipUnit/skipstone/buildSrc/").canonicalFile
+            if (!pluginSource.isDirectory) {
+                // check new SwiftPM6 plugin "destination" folder for command-line builds
+                pluginSource = skipOutputs.resolve("skip-unit${outputExt}/SkipUnit/destination/skipstone/buildSrc/").canonicalFile
+            }
+
             if (!pluginSource.isDirectory) {
                 throw GradleException("Missing expected Skip output folder: ${pluginSource}. Run `swift build` in the root folder to create, or specify Xcode environment BUILT_PRODUCTS_DIR.")
             }
