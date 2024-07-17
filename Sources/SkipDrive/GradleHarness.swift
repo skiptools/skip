@@ -18,7 +18,7 @@ extension GradleHarness {
     ///   - moduleTranspilerFolder: the output folder for the transpiler plug-in
     ///   - linkFolder: when specified, the module's root folder will first be linked into the linkFolder, which enables the output of the project to be browsable from the containing project (e.g., Xcode)
     /// - Returns: the folder that contains the buildable gradle project, either in the DerivedData/ folder, or re-linked through the specified linkFolder
-    public func pluginOutputFolder(moduleTranspilerFolder: String, linkingInto linkFolder: URL?) throws -> URL {
+    public func pluginOutputFolder(moduleName: String, linkingInto linkFolder: URL?) throws -> URL {
         let env = ProcessInfo.processInfo.environment
 
         // if we are running tests from Xcode, this environment variable should be set; otherwise, assume the .build folder for an SPM build
@@ -51,9 +51,22 @@ extension GradleHarness {
                     continue // only check known path extensions (e.g., ".output" with running from Xcode, and no extension from SPM)
                 }
 
-                let pluginModuleOutputFolder = URL(fileURLWithPath: moduleTranspilerFolder, isDirectory: true, relativeTo: outputFolder)
+                func isDir(_ url: URL) -> Bool {
+                    (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+                }
+
+                // check for new "destination" output folder that Xcode16b3's SwiftPM started adding to the plugin output hierarchy
+                // See: https://forums.swift.org/t/swiftpm-included-with-xcode-16b3-changes-plugin-output-folder-to-destination/73220
+                // If it is not there, then check older SwiftPM 5's destination folder without the
+                var moduleTranspilerFolder = moduleName + "/destination/skipstone"
+                var pluginModuleOutputFolder = URL(fileURLWithPath: moduleTranspilerFolder, isDirectory: true, relativeTo: outputFolder)
+                if !isDir(pluginModuleOutputFolder) {
+                    moduleTranspilerFolder = moduleName + "/skipstone"
+                    pluginModuleOutputFolder = URL(fileURLWithPath: moduleTranspilerFolder, isDirectory: true, relativeTo: outputFolder)
+                }
+
                 //print("findModuleFolder: pluginModuleOutputFolder:", pluginModuleOutputFolder)
-                if (try? pluginModuleOutputFolder.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+                if isDir(pluginModuleOutputFolder) {
                     // found the folder; now make a link from its parent folder to the project source…
                     if let linkFolder = linkFolder {
                         let localModuleLink = URL(fileURLWithPath: outputFolder.lastPathComponent, isDirectory: false, relativeTo: linkFolder)

@@ -55,7 +55,7 @@ extension XCGradleHarness where Self : XCTestCase {
     ///   - moduleSuffix: the expected module name for automatic test determination
     ///   - sourcePath: the full path to the test case call site, which is used to determine the package root
     @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
-    func invokeGradle(actions: [String], arguments: [String] = [], info: Bool = false, pluginFolderName: String = "skipstone", outputPrefix: String? = "GRADLE>", deviceID: String? = nil, testFilter: String? = nil, moduleName: String? = nil, maxMemory: UInt64? = ProcessInfo.processInfo.physicalMemory, fromSourceFileRelativeToPackageRoot sourcePath: StaticString? = #file) async throws {
+    func invokeGradle(actions: [String], arguments: [String] = [], info: Bool = false, outputPrefix: String? = "GRADLE>", deviceID: String? = nil, testFilter: String? = nil, moduleName: String? = nil, maxMemory: UInt64? = ProcessInfo.processInfo.physicalMemory, fromSourceFileRelativeToPackageRoot sourcePath: StaticString? = #file) async throws {
 
         // the filters should be passed through to the --tests argument, but they don't seem to work for Android unit tests, neighter for Robolectric nor connected tests
         precondition(testFilter == nil, "test filtering does not yet work")
@@ -90,7 +90,7 @@ extension XCGradleHarness where Self : XCTestCase {
                 }
                 let driver = try await GradleDriver()
 
-                let dir = try pluginOutputFolder(moduleTranspilerFolder: moduleName + "/\(pluginFolderName)/", linkingInto: linkFolder(forSourceFile: sourcePath))
+                let dir = try pluginOutputFolder(moduleName: moduleName, linkingInto: linkFolder(forSourceFile: sourcePath))
 
                 // tests are run in the merged base module (e.g., "SkipLib") that corresponds to this test module name ("SkipLibTests")
                 let baseModuleName = moduleName.dropLast(testModuleSuffix.count).description
