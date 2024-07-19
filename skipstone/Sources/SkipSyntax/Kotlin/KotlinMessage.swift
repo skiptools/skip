@@ -138,7 +138,7 @@ extension Message {
     }
 
     static func kotlinErrorCannotExtendClass(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "An Error type cannot extend another class because it will be translated to extend Exception in Kotlin", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "An Error type cannot extend a non-Error base class in Kotlin", sourceDerived: sourceDerived, source: source)
     }
 
     // Idea: factory function with class name?

@@ -402,6 +402,48 @@ final class ErrorHandlingTests: XCTestCase {
         """)
     }
 
+    func testErrorSubclass() async throws {
+        try await checkProducesMessage(swift: """
+        class Base {
+        }
+        class Sub: Base, Error {
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        class Base {
+        }
+        protocol MyError: Error {
+        }
+        class Sub: Base, MyError {
+        }
+        """)
+
+        try await check(swift: """
+        class Base: Error {
+        }
+        class Sub: Base, Error {
+        }
+        """, kotlin: """
+        internal open class Base: Exception(), Error {
+        }
+        internal open class Sub: Base(), Error {
+        }
+        """)
+
+        try await check(swift: """
+        class Base: Error {
+        }
+        class Sub: Base {
+        }
+        """, kotlin: """
+        internal open class Base: Exception(), Error {
+        }
+        internal open class Sub: Base() {
+        }
+        """)
+    }
+
     func testErrorStruct() async throws {
         try await check(swift: """
         struct S: Error {

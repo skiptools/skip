@@ -25,6 +25,7 @@ public final class CodebaseInfo {
     /// When a Swift module transitively imports other modules - e.g.`SwiftUI` imports `Foundation` - put the corresponding Skip module first
     /// and any transitive modules after it - e.g. `[SkipUI, SkipFoundation]`.
     static let moduleNameMap: [String: [String]] = [
+        "AVFoundation": ["SkipAV"],
         "AVKit": ["SkipAV"],
         "Combine": ["SkipModel"],
         "CoreFoundation": ["SkipFoundation"],

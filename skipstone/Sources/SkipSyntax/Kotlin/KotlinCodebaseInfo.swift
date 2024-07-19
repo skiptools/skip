@@ -236,7 +236,7 @@ extension CodebaseInfo.Context {
         }
     }
 
-    /// Whether the given type conforms to `Error` through its protocols, **not** through inheritance.
+    /// Whether the given type conforms to `Error`.
     func conformsToError(type: TypeSignature) -> Bool {
         assert(global.kotlin != nil)
         return global.protocolSignatures(forNamed: type).contains { $0.isNamed("Error", moduleName: "Swift", generics: []) }

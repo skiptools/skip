@@ -23,6 +23,9 @@
       location = "group:../skip-ui">
    </FileRef>
    <FileRef
+      location = "group:../skip-av">
+   </FileRef>
+   <FileRef
       location = "group:../skip-ffi">
    </FileRef>
    <FileRef
@@ -45,8 +48,5 @@
    </FileRef>
    <FileRef
       location = "group:../skipapp-fireside/Darwin/FireSide.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "group:../skipapp-scrumdinger/Darwin/SkipScrumDinger.xcodeproj">
    </FileRef>
 </Workspace>

@@ -15,11 +15,19 @@ final class KotlinErrorToExceptionTransformer: KotlinTransformer {
     }
 
     private func processClassDeclaration(_ classDeclaration: KotlinClassDeclaration, codebaseInfo: CodebaseInfo.Context, source: Source) {
-        guard codebaseInfo.conformsToError(type: classDeclaration.signature) else {
+        let inherits = classDeclaration.inherits
+        guard !inherits.isEmpty else {
             return
         }
-        if let firstInherits = classDeclaration.inherits.first, codebaseInfo.declarationType(forNamed: firstInherits)?.type == .classDeclaration {
-            classDeclaration.messages.append(.kotlinErrorCannotExtendClass(classDeclaration, source: source))
+        let isSubclass = classDeclaration.declarationType == .classDeclaration && codebaseInfo.declarationType(forNamed: inherits[0])?.type == .classDeclaration
+        let protocols = isSubclass ? Array(inherits.suffix(from: 1)) : inherits
+        guard protocols.contains(where: { codebaseInfo.conformsToError(type: $0) }) else {
+            return
+        }
+        guard !isSubclass else {
+            if !codebaseInfo.conformsToError(type: inherits[0]) {
+                classDeclaration.messages.append(.kotlinErrorCannotExtendClass(classDeclaration, source: source))
+            }
             return
         }
 
