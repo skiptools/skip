@@ -885,14 +885,19 @@ final class SwiftUITests: XCTestCase {
         import skip.foundation.*
         import skip.model.*
         internal class V: View {
-            internal lateinit var envvalue: EnvValue<String>
+            internal var envvalue: EnvValue<String>
+                get() = _envvalue.wrappedValue
+                set(newValue) {
+                    _envvalue.wrappedValue = newValue
+                }
+            internal var _envvalue = skip.ui.Environment<EnvValue<String>>()
             override fun body(): View {
                 return ComposeBuilder { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
             }
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                envvalue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)!!
+                _envvalue.wrappedValue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)!!
 
                 super.ComposeContent(composectx)
             }
@@ -920,14 +925,19 @@ final class SwiftUITests: XCTestCase {
         import skip.foundation.*
         import skip.model.*
         internal class V: View {
-            internal lateinit var envvalue: EnvValue<String>
+            internal var envvalue: EnvValue<String>
+                get() = _envvalue.wrappedValue
+                set(newValue) {
+                    _envvalue.wrappedValue = newValue
+                }
+            internal var _envvalue = skip.ui.Environment<EnvValue<String>>()
             override fun body(): View {
                 return ComposeBuilder { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
             }
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                envvalue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)!!
+                _envvalue.wrappedValue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)!!
 
                 super.ComposeContent(composectx)
             }
@@ -959,14 +969,19 @@ final class SwiftUITests: XCTestCase {
         import skip.foundation.*
         import skip.model.*
         internal class V: View {
-            internal lateinit var envvalue: V.EnvValue
+            internal var envvalue: V.EnvValue
+                get() = _envvalue.wrappedValue
+                set(newValue) {
+                    _envvalue.wrappedValue = newValue
+                }
+            internal var _envvalue = skip.ui.Environment<V.EnvValue>()
             override fun body(): View {
                 return ComposeBuilder { composectx: ComposeContext -> Text("Value: ${envvalue.x}").Compose(composectx) }
             }
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                envvalue = EnvironmentValues.shared.environmentObject(type = V.EnvValue::class)!!
+                _envvalue.wrappedValue = EnvironmentValues.shared.environmentObject(type = V.EnvValue::class)!!
 
                 super.ComposeContent(composectx)
             }
@@ -1002,7 +1017,12 @@ final class SwiftUITests: XCTestCase {
         import skip.foundation.*
         import skip.model.*
         internal class V: View {
-            internal var envvalue: EnvValue? = null
+            internal var envvalue: EnvValue?
+                get() = _envvalue.wrappedValue
+                set(newValue) {
+                    _envvalue.wrappedValue = newValue
+                }
+            internal var _envvalue = skip.ui.Environment<EnvValue?>()
             override fun body(): View {
                 return ComposeBuilder { composectx: ComposeContext ->
                     Text("Value: ${envvalue?.x ?: 1}").Compose(composectx)
@@ -1011,9 +1031,80 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             override fun ComposeContent(composectx: ComposeContext) {
-                envvalue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)
+                _envvalue.wrappedValue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)
 
                 super.ComposeContent(composectx)
+            }
+        }
+        """)
+    }
+
+    func testEnvironmentVariableBinding() async throws {
+        let supportingSwift = baseSupportingSwift + """
+        class EnvValue {
+            var string = ""
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            @EnvironmentObject var envvalue1: EnvValue
+            @Environment(EnvValue.self) var envvalue2
+            @State var count = 0
+            var body: some View {
+                TextField($envvalue.string)
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
+        internal class V: View {
+            internal var envvalue1: EnvValue
+                get() = _envvalue1.wrappedValue
+                set(newValue) {
+                    _envvalue1.wrappedValue = newValue
+                }
+            internal var _envvalue1 = skip.ui.Environment<EnvValue>()
+            internal var envvalue2: EnvValue
+                get() = _envvalue2.wrappedValue
+                set(newValue) {
+                    _envvalue2.wrappedValue = newValue
+                }
+            internal var _envvalue2 = skip.ui.Environment<EnvValue>()
+            internal var count: Int
+                get() = _count.wrappedValue
+                set(newValue) {
+                    _count.wrappedValue = newValue
+                }
+            internal var _count: skip.ui.State<Int>
+            override fun body(): View {
+                return ComposeBuilder { composectx: ComposeContext -> TextField(_envvalue.projectedValue.string).Compose(composectx) }
+            }
+
+            @Composable
+            @Suppress("UNCHECKED_CAST")
+            override fun ComposeContent(composectx: ComposeContext) {
+                val rememberedcount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_count) }
+                _count = rememberedcount
+
+                _envvalue1.wrappedValue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)!!
+                _envvalue2.wrappedValue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)!!
+
+                super.ComposeContent(composectx)
+            }
+
+            constructor(count: Int = 0) {
+                this._count = skip.ui.State(count)
             }
         }
         """)

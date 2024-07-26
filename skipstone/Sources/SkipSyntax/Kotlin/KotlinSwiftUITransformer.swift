@@ -207,6 +207,8 @@ private final class TranslateVisitor {
                     return ("_" + variableName, "skip.ui.State")
                 } else if variable.attributes.contains(.bindable) || variable.attributes.contains(.observedObject) {
                     return ("_" + variableName, "skip.ui.Bindable")
+                } else if variable.attributes.contains(.environmentObject) || variable.attributes.environmentAttribute?.tokenTypeSignature != nil {
+                    return ("_" + variableName, "skip.ui.Environment")
                 } else {
                     return nil
                 }
@@ -300,6 +302,11 @@ private final class TranslateVisitor {
 
             for stateVariable in stateVariables {
                 synthesizeStateBacking(variable: stateVariable, propertyWrapperTypeName: "skip.ui.State")
+            }
+            for environmentVariable in environmentVariables {
+                if environmentVariable.attributes.contains(.environmentObject) || environmentVariable.attributes.environmentAttribute?.tokenTypeSignature != nil {
+                    synthesizeStateBacking(variable: environmentVariable, propertyWrapperTypeName: "skip.ui.Environment", create: true)
+                }
             }
         }
         for bindingVariable in bindingVariables {
@@ -416,18 +423,18 @@ private final class TranslateVisitor {
             }
         }
 
-        var valueSourceCode: String
+        var sourceCode: String
         if entry.key == "self" {
-            valueSourceCode = "EnvironmentValues.shared"
+            sourceCode = variable.propertyName + " = EnvironmentValues.shared"
         } else if entry.isObject {
-            valueSourceCode = "EnvironmentValues.shared.environmentObject(type = \(entry.key))"
+            sourceCode = "_" + variable.propertyName + ".wrappedValue = EnvironmentValues.shared.environmentObject(type = \(entry.key))"
             if variable.declaredType.isOptional == false {
-                valueSourceCode += "!!"
+                sourceCode += "!!"
             }
         } else {
-            valueSourceCode = "EnvironmentValues.shared.\(entry.key)"
+            sourceCode = variable.propertyName + " = EnvironmentValues.shared.\(entry.key)"
         }
-        return KotlinRawStatement(sourceCode: "\(variable.propertyName) = \(valueSourceCode)")
+        return KotlinRawStatement(sourceCode: sourceCode)
     }
 
     /// Given a Swift `@Environment` property wrapper key, return the Kotlin key and the expected value type.
@@ -445,7 +452,7 @@ private final class TranslateVisitor {
     }
 
     /// Create the additional property synthesized for `@State` and similar variables.
-    private func synthesizeStateBacking(variable: KotlinVariableDeclaration, propertyWrapperTypeName: String) {
+    private func synthesizeStateBacking(variable: KotlinVariableDeclaration, propertyWrapperTypeName: String, create: Bool = false) {
         // Tell the @State variable to get and set its value using _variable of type State
         let storageName = "_\(variable.propertyName)"
         var storage = KotlinVariableStorage()
@@ -465,13 +472,18 @@ private final class TranslateVisitor {
         }
         storage.appendStorage = { variable, output, indentation in
             let stateType = variable.propertyType.asPropertyWrapper(propertyWrapperTypeName).kotlin
-            output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName).append(": ").append(stateType)
-            if let value = variable.value {
-                output.append(" = \(propertyWrapperTypeName)(")
-                value.append(to: output, indentation: indentation)
-                output.append(")")
-            } else if variable.propertyType.isOptional {
-                output.append(" = \(propertyWrapperTypeName)(null)")
+            output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName)
+            if create {
+                output.append(" = ").append(stateType).append("()")
+            } else {
+                output.append(": ").append(stateType)
+                if let value = variable.value {
+                    output.append(" = \(propertyWrapperTypeName)(")
+                    value.append(to: output, indentation: indentation)
+                    output.append(")")
+                } else if variable.propertyType.isOptional {
+                    output.append(" = \(propertyWrapperTypeName)(null)")
+                }
             }
             output.append("\n")
         }
