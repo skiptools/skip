@@ -188,7 +188,8 @@ fileprivate extension AndroidOperationCommand {
 
     /// Create a temporary directory
     func createTempDir() throws -> URL {
-        let tempURL = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let tmpDir = FileManager.default.temporaryDirectory // or URL.temporaryDirectory, but unavailable on Linux
+        let tempURL = tmpDir.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: tempURL, withIntermediateDirectories: true)
         return tempURL
     }
@@ -226,6 +227,7 @@ fileprivate extension AndroidOperationCommand {
     /// Create the destination JSON for cross-compiling to Android
     /// - Returns: the path to the temporary destination file
     func createToolchainDestination(for arch: AndroidArch) throws -> (destination: SerializedDestinationV1, sdk: URL, ndk: URL, toolchain: URL) {
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser // or URL.homeDirectory, but unavailable on Linux
 
         var tc = SerializedDestinationV1()
 
@@ -237,7 +239,7 @@ fileprivate extension AndroidOperationCommand {
 
         let ndk = try toolchainOptions.ndk ?? ProcessInfo.processInfo.environment["ANDROID_NDK"] ?? {
             // GH Runner ANDROID_HOME=/Users/runner/Library/Android/sdk
-            let androidHome = ProcessInfo.processInfo.environment["ANDROID_HOME"] ?? URL.homeDirectory.appendingPathComponent("Library/Android/sdk").path
+            let androidHome = ProcessInfo.processInfo.environment["ANDROID_HOME"] ?? homeDir.appendingPathComponent("Library/Android/sdk").path
 
             let androidNDKHome = URL(fileURLWithPath: androidHome).appendingPathComponent("ndk")
             if !isDir(androidNDKHome) {
@@ -264,7 +266,7 @@ fileprivate extension AndroidOperationCommand {
         }
 
         let sdk = try toolchainOptions.sdk ?? {
-            let skipSDKHome = ProcessInfo.processInfo.environment["SKIP_SDK_HOME"] ?? URL.homeDirectory.appendingPathComponent("Library/Developer/Skip/SDKs").path
+            let skipSDKHome = ProcessInfo.processInfo.environment["SKIP_SDK_HOME"] ?? homeDir.appendingPathComponent("Library/Developer/Skip/SDKs").path
 
             if !FileManager.default.fileExists(atPath: skipSDKHome) {
                 throw CrossCompilerError(errorDescription: "The Skip SDKs folder does not exist: \(skipSDKHome)")
@@ -297,7 +299,7 @@ fileprivate extension AndroidOperationCommand {
             let toolchainOverride = ProcessInfo.processInfo.environment["SWIFT_TOOLCHAIN_DIR"].flatMap(URL.init(fileURLWithPath:))
 
             let toolchainsHomeGlobal = URL(fileURLWithPath: "/Library/Developer/Toolchains")
-            let toolchainsHomeLocal = URL.homeDirectory.appendingPathComponent("/Library/Developer/Toolchains")
+            let toolchainsHomeLocal = homeDir.appendingPathComponent("/Library/Developer/Toolchains")
 
             let toolchainDirs = toolchainOverride != nil ? [toolchainOverride!] : [toolchainsHomeGlobal, toolchainsHomeLocal]
 
@@ -558,6 +560,14 @@ private struct SerializedDestinationV1: Codable {
         case extraCCFlags = "extra-cc-flags"
         case extraSwiftCFlags = "extra-swiftc-flags"
         case extraCPPFlags = "extra-cpp-flags"
+    }
+}
+
+
+
+fileprivate extension URL {
+    var homeDir: URL {
+        FileManager.default.homeDirectoryForCurrentUser
     }
 }
 
