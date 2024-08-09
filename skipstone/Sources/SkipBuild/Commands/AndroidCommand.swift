@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import ArgumentParser
 import SkipSyntax
 #if canImport(SkipDriveExternal)
@@ -294,7 +297,7 @@ fileprivate extension AndroidOperationCommand {
             let toolchainOverride = ProcessInfo.processInfo.environment["SWIFT_TOOLCHAIN_DIR"].flatMap(URL.init(fileURLWithPath:))
 
             let toolchainsHomeGlobal = URL(fileURLWithPath: "/Library/Developer/Toolchains")
-            let toolchainsHomeLocal = URL.userDirectory.appendingPathComponent("/Library/Developer/Toolchains")
+            let toolchainsHomeLocal = URL.homeDirectory.appendingPathComponent("/Library/Developer/Toolchains")
 
             let toolchainDirs = toolchainOverride != nil ? [toolchainOverride!] : [toolchainsHomeGlobal, toolchainsHomeLocal]
 
