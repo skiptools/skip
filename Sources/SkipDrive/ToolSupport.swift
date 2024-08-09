@@ -83,7 +83,7 @@ extension Process {
                     case .success(let result):
                         if case .terminated = result.exitStatus {
                             do {
-                                try onExit(result) // check the exit handler, which may throw is the exit code is non-zero
+                                try onExit(result) // check the exit handler, which may throw if the exit code is non-zero
                                 continuation.finish()
                             } catch {
                                 continuation.finish(throwing: error)
