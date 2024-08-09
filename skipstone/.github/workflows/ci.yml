@@ -42,7 +42,11 @@ jobs:
         run: swift --version
 
       - name: Install dependencies
-        run: sudo apt-get install -y binutils git gnupg2 libc6-dev libcurl4 libcurl4-nss-dev libedit2 libgcc-9-dev libpython2.7 libsqlite3-0 libstdc++-9-dev libxml2 libz3-dev pkg-config tzdata uuid-dev zlib1g-dev
+        # need to update first or libcurl4-nss-dev isn't found
+        # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/customizing-github-hosted-runners#installing-software-on-ubuntu-runners
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binutils git gnupg2 libc6-dev libcurl4 libcurl4-nss-dev libedit2 libgcc-9-dev libpython2.7 libsqlite3-0 libstdc++-9-dev libxml2 libz3-dev pkg-config tzdata uuid-dev zlib1g-dev
 
       # checkout both skipstone.git and skip.git for the linked SkipDrive
       - name: Checkout skipstone.git
