@@ -42,7 +42,7 @@ jobs:
         run: swift --version
 
       - name: Install dependencies
-        run: sudo apt-get install -y binutils git gnupg2 libc6-dev libcurl4 libcurl4-openssl-dev libedit2 libgcc-9-dev libpython2.7 libsqlite3-0 libstdc++-9-dev libxml2 libz3-dev pkg-config tzdata uuid-dev zlib1g-dev
+        run: sudo apt-get install -y binutils git gnupg2 libc6-dev libcurl4 libcurl4-dev libedit2 libgcc-9-dev libpython2.7 libsqlite3-0 libstdc++-9-dev libxml2 libz3-dev pkg-config tzdata uuid-dev zlib1g-dev
 
       # checkout both skipstone.git and skip.git for the linked SkipDrive
       - name: Checkout skipstone.git
