@@ -2273,6 +2273,9 @@ extension FrameworkProjectLayout {
             kotlinOptions {
                 jvmTarget = libs.versions.jvm.get().toString()
             }
+            packaging {
+                jniLibs.keepDebugSymbols.add("**/*.so")
+            }
 
             defaultConfig {
                 minSdk = libs.versions.android.sdk.min.get().toInt()
@@ -2447,8 +2450,12 @@ extension FrameworkProjectLayout {
 
     /// See https://github.com/skiptools/skip/issues/95 for why we need to be so permissive
     static func defaultProguardContents(_ packageName: String) -> String {
+        // com.sun.jna.Pointer needed since the field pointer name is looked up by reflection
+        // keeppackagenames is needed because Bundle.module might not be found otherwise
         """
+        -keeppackagenames **
         -keep class skip.** { *; }
+        -keep class com.sun.jna.Pointer { *; }
         -keep class \(packageName).** { *; }
 
         """

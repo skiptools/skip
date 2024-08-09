@@ -77,6 +77,7 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
             // Conditional on SkipDrive being imported
             GradleCommand.self,
             ADBCommand.self,
+            AndroidCommand.self,
             ExportCommand.self,
             DevicesCommand.self,
             AssembleCommand.self,
@@ -1044,6 +1045,7 @@ public struct PackageManifest : Hashable, Decodable {
             case test
             case system
             case binary
+            case executable
         }
 
         public var packageAccess: Bool?
