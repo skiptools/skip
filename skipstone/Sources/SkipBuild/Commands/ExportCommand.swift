@@ -103,7 +103,7 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
         let isAppProject = fs.isFile(androidFolderAbsolute.appending(component: "settings.gradle.kts")) && self.module.isEmpty
 
         // if modules is not specified, use all the modules for targets listed in the Package.swift that have a plugin set (although we should probably make sure the plugin is skipstone, this is difficult because the dependency graph is sometimes a string array and sometimes a JSON object)
-        let moduleNames = !self.module.isEmpty ? self.module : packageJSON.targets.compactMap(\.a).filter({ $0.type == .regular }).filter({ $0.pluginUsages != nil }).map(\.name)
+        let moduleNames = !self.module.isEmpty ? self.module : packageJSON.targets.compactMap(\.a).filter({ $0.type == "regular" }).filter({ $0.pluginUsages != nil }).map(\.name)
 
         // when specified, the output folder; otherwise, relative the the specified project folder's .build folder
         let buildFolder = self.project + "/.build"

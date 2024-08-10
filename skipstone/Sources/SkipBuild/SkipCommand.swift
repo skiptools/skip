@@ -906,13 +906,13 @@ extension ProjectCommand {
 /// A `ToolOptionsCommand` holds options that can be used to control the paths of commonly-used tools
 protocol ToolOptionsCommand : OutputOptionsCommand {
     /// This command's tool options
-    var toolOptions: ToolOptions { get }
+    var toolOptions: ToolOptions { get set }
 }
 
 extension ToolOptionsCommand {
     /// Run swift package dump-package and return the parsed JSON results
-    func parseSwiftPackage(with out: MessageQueue, at projectPath: String) async throws -> PackageManifest {
-        try await decodeCommand(with: out, title: "Check Swift Package", cmd: ["swift", "package", "dump-package", "--package-path", projectPath]).get()
+    func parseSwiftPackage(with out: MessageQueue, at projectPath: String, swift swiftCommand: String = "swift") async throws -> PackageManifest {
+        try await decodeCommand(with: out, title: "Check Swift Package", cmd: [swiftCommand, "package", "dump-package", "--package-path", projectPath]).get()
     }
 
     /// Invokes the given command that launches an executable and is expected to output JSON, which we parse into the specified data structure
@@ -1040,16 +1040,8 @@ public struct PackageManifest : Hashable, Decodable {
     public var cxxLanguageStandard: String?
 
     public struct Target: Hashable, Decodable {
-        public enum TargetType: String, Hashable, Decodable {
-            case regular
-            case test
-            case system
-            case binary
-            case executable
-        }
-
         public var packageAccess: Bool?
-        public var `type`: TargetType
+        public var `type`: String
         public var name: String
         public var path: String?
         public var excludedPaths: [String]?

@@ -34,11 +34,10 @@ protocol AndroidOperationCommand : MessageCommand, ToolOptionsCommand {
 }
 
 fileprivate extension AndroidOperationCommand {
-    private func runCommand(command: [String], with out: MessageQueue) async throws {
+    private func runCommand(command: [String], env: [String: String], with out: MessageQueue) async throws {
         #if !canImport(SkipDriveExternal)
         throw ToolLaunchError(errorDescription: "Cannot launch android command without SkipDriveExternal")
         #else
-        let env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths
 
         for try await outputLine in Process.streamLines(command: command, environment: env, includeStdErr: true, onExit: { result in
             guard case .terminated(0) = result.exitStatus else {
@@ -73,9 +72,22 @@ fileprivate extension AndroidOperationCommand {
         }
 
         for arch in architectures {
-            var cmd: [String] = []
-            cmd += ["swift", "build"]
             let tc = try createToolchainDestinationJSON(for: arch)
+
+            var env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths
+            let toolchainBin = tc.destination.toolchain.appendingPathComponent("usr/bin")
+            let path = toolchainBin.path + ":" + (env["PATH"] ?? "")
+            env["PATH"] = path
+
+            let swiftCmd = toolchainBin.appendingPathComponent("swift").path
+            if !FileManager.default.fileExists(atPath: swiftCmd) {
+                throw CrossCompilerError(errorDescription: "Could not locate swift command at: \(swiftCmd)")
+            }
+            var cmd: [String] = []
+
+            //cmd += [swiftCmd] // causes weird error with the Swift 6 toolchain: "error: invalid absolute path ''"
+            cmd += ["swift"]
+            cmd += ["build"]
             cmd += ["--destination", tc.url.path]
             if runTests {
                 cmd += ["--build-tests"]
@@ -97,7 +109,7 @@ fileprivate extension AndroidOperationCommand {
                 cmd += ["--configuration", configuration.rawValue]
             }
             cmd += args
-            try await runCommand(command: cmd, with: out)
+            try await runCommand(command: cmd, env: env, with: out)
 
             let buildOutputFolder = [
                 packageDir,
@@ -139,7 +151,7 @@ fileprivate extension AndroidOperationCommand {
 
             if runTests {
                 // to figure out the generated executable name, we need to parse the Package.swift
-                let packageManifest = try await parseSwiftPackage(with: out, at: packageDir)
+                let packageManifest = try await parseSwiftPackage(with: out, at: packageDir, swift: swiftCmd)
                 let packageName = packageManifest.name
 
                 // take the ./.build/aarch64-unknown-linux-android24/debug/android-native-demoPackageTests.xctest file
@@ -167,17 +179,17 @@ fileprivate extension AndroidOperationCommand {
                 var testTmp = "/data/local/tmp/"
                 testTmp += packageName + "-" + UUID().uuidString + "/"
 
-                try await runCommand(command: [adb, "shell", "mkdir", "-p", testTmp], with: out)
-                try await runCommand(command: [adb, "push"] + testFiles.map(\.path) + [testTmp], with: out)
+                try await runCommand(command: [adb, "shell", "mkdir", "-p", testTmp], env: env, with: out)
+                try await runCommand(command: [adb, "push"] + testFiles.map(\.path) + [testTmp], env: env, with: out)
                 var runFailure: Error?
                 do {
-                    try await runCommand(command: [adb, "shell", testTmp + "/" + testExecutableName], with: out)
+                    try await runCommand(command: [adb, "shell", testTmp + "/" + testExecutableName], env: env, with: out)
                 } catch {
                     runFailure = error
                 }
                 // clean up the test folder after running; we can't do this in a defer block, since it is async (and throws)
                 if testCleanup == true {
-                    try await runCommand(command: [adb, "shell", "rm", "-r", testTmp], with: out)
+                    try await runCommand(command: [adb, "shell", "rm", "-r", testTmp], env: env, with: out)
                 }
                 if let runFailure = runFailure {
                     throw runFailure
@@ -378,7 +390,8 @@ fileprivate extension AndroidOperationCommand {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes, .sortedKeys]
         let encoded = try encoder.encode(tc.destination)
-        let tmpFile = try createTempDir().appendingPathComponent("destination.json")
+        // create a temporary destination JSON file like "aarch64-unknown-linux-android24.json"
+        let tmpFile = try createTempDir().appendingPathComponent((tc.destination.target ?? "destination") + ".json")
         try encoded.write(to: tmpFile)
         return (destination: tc, url: tmpFile)
     }
@@ -460,7 +473,7 @@ struct ToolchainOptions: ParsableArguments {
     @Option(help: ArgumentHelp("Custom scratch directory path", valueName: ".build"))
     var scratchPath: String? = nil
 
-    @Option(help: ArgumentHelp("Build with configuration", valueName: "debug"))
+    @Option(name: [.customShort("c"), .long], help: ArgumentHelp("Build with configuration", valueName: "debug"))
     var configuration: BuildConfiguration? = nil
 
     @Option(help: ArgumentHelp("Destination architectures"))
