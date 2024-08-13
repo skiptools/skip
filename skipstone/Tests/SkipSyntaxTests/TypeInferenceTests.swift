@@ -1223,7 +1223,7 @@ final class TypeInferenceTests: XCTestCase {
         """)
     }
 
-    func testSameNamedVarAndFunc() async throws {
+    func testSameNamedVariableAndFunction() async throws {
         try await check(supportingSwift: """
         struct Array<Element>: Collection<Element> {
         }
@@ -1262,6 +1262,35 @@ final class TypeInferenceTests: XCTestCase {
             constructor(filtered: Array<Filtered>? = null) {
                 this.filtered = filtered.sref()
             }
+        }
+        """)
+
+        try await check(supportingSwift: """
+        struct URL {
+            var path: String?
+            func path(p: Bool = true) -> String? {
+                return nil
+            }
+        }
+        """, swift: """
+        func f() {
+            let url = URL()
+            let p1 = url.path
+            let p2 = url.path()
+
+            let optionalURL: URL? = nil
+            let p3 = optionalURL?.path
+            let p4 = optionalURL?.path()
+        }
+        """, kotlin: """
+        internal fun f() {
+            val url = URL()
+            val p1 = url.path
+            val p2 = url.path()
+
+            val optionalURL: URL? = null
+            val p3 = optionalURL?.path
+            val p4 = optionalURL?.path()
         }
         """)
     }

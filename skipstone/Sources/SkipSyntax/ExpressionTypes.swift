@@ -855,6 +855,11 @@ final class FunctionCall: Expression, APICallExpression, MemberAccessExpression 
             if isUnchainedOptional {
                 isCallOnOptional = true
             }
+
+            // Update our function expression's API match now that we've resolved it
+            if match.1.declarationType == .functionDeclaration, var functionExpression = function as? APICallExpression, matchBaseType?.isNamed("Optional") != true {
+                functionExpression.apiMatch = match.1
+            }
         } else {
             returnType = expecting
         }

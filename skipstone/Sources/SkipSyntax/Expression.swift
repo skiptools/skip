@@ -123,7 +123,7 @@ protocol APICallExpression {
     /// Additional information about the API call represented by this expression.
     ///
     /// Use `nil` the API call could not be determined.
-    var apiMatch: APIMatch? { get }
+    var apiMatch: APIMatch? { get set }
 }
 
 /// An expression that creates binding variables.
