@@ -747,6 +747,64 @@ final class SwiftUITests: XCTestCase {
         """)
     }
 
+    func testSubclassStateObject() async throws {
+        try await check(supportingSwift: baseSupportingSwift + """
+        class BaseViewModel: ObservableObject {
+        }
+        class SubViewModel: BaseViewModel {
+        }
+        """, swift: """
+        import SwiftUI
+
+        struct V: View {
+            @StateObject private var viewModel = SubViewModel()
+            var body: some View {
+                Text("test")
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
+
+        internal class V: View {
+            private var viewModel: SubViewModel
+                get() = _viewModel.wrappedValue
+                set(newValue) {
+                    _viewModel.wrappedValue = newValue
+                }
+            private var _viewModel: skip.ui.State<SubViewModel>
+            override fun body(): View {
+                return ComposeBuilder { composectx: ComposeContext -> Text("test").Compose(composectx) }
+            }
+
+            @Composable
+            @Suppress("UNCHECKED_CAST")
+            override fun ComposeContent(composectx: ComposeContext) {
+                val rememberedviewModel by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<SubViewModel>, Any>) { mutableStateOf(_viewModel) }
+                _viewModel = rememberedviewModel
+
+                super.ComposeContent(composectx)
+            }
+
+            private constructor(viewModel: SubViewModel = SubViewModel(), privatep: Nothing? = null) {
+                this._viewModel = skip.ui.State(viewModel)
+            }
+
+            constructor(): this(privatep = null) {
+            }
+        }
+        """)
+    }
+
     func testIfLetStateVariable() async throws {
         try await check(supportingSwift: baseSupportingSwift, swift: """
         import SwiftUI

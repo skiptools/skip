@@ -1317,7 +1317,7 @@ public final class CodebaseInfo {
                 inheritInit.moduleName = typeInfo.moduleName
                 inheritInit.sourceFile = typeInfo.sourceFile
                 inheritInit.declaringType = typeInfo.signature
-                inheritInit.signature = inheritInit.signature.mappingTypes(from: inheritGenerics, to: targetGenerics)
+                inheritInit.signature = inheritInit.signature.withReturnType(typeInfo.signature).mappingTypes(from: inheritGenerics, to: targetGenerics)
                 inheritInit.isGenerated = true
                 typeInfo.functions.append(inheritInit)
             }
