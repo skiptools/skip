@@ -1543,10 +1543,6 @@ enum Tab : String, Hashable {
     case welcome, home, settings
 }
 
-#Preview {
-    ContentView()
-}
-
 """
 
         let contentViewFileBase = "ContentView.swift"
