@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash -ex
 #
 # This script will coorinate releasing a binary artifact of:
 # https://github.com/skiptools/skiptool.git
@@ -204,6 +204,8 @@ echo '```' >> ${RELNOTES}
 
 cat ${RELNOTES}
 
+# need to wait a bit for the tag to show up
+sleep 5
 gh release -R github.com/skiptools/skip create -F releasenotes.md "${SKIP_VERSION}" *.zip checksums.txt
 cd '-'
 
