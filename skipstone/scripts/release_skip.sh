@@ -187,9 +187,6 @@ git commit --allow-empty --allow-empty-message -m "Release ${SKIP_VERSION}"
 git tag "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
 git push --follow-tags
 
-# also grab the latest skiphub version and update it in the README
-SKIPHUB_VERSION=`git ls-remote --tags https://github.com/skiptools/skiphub | awk -F/ '$NF ~ /^v?[0-9]+\.[0-9]+\.[0-9]+$/ {print $NF}' | sort -V | tail -n1`
-
 cp -a ${SKIPSTONEDIR}/${DIR}/${PLUGIN_ZIP} ${RELSTAGING}
 
 RELNOTES="${RELSTAGING}/releasenotes.md"

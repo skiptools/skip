@@ -69,8 +69,8 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
-                .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0")
+                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "SomeModule", dependencies: (zero ? [] : [.product(name: "SkipFoundation", package: "skip-foundation")]), resources: [.process("Resources")], plugins: skipstone),
@@ -117,8 +117,8 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "TeenyModule", type: .dynamic, targets: ["TeenyModule"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
-                .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0")
+                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "TeenyModule", dependencies: [.product(name: "SkipFoundation", package: "skip-foundation")], plugins: [.plugin(name: "skipstone", package: "skip")]),
@@ -175,8 +175,8 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
-                .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0")
+                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "SomeModule", dependencies: [.product(name: "SkipFoundation", package: "skip-foundation")], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
@@ -242,8 +242,8 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "FreeModule", type: .dynamic, targets: ["FreeModule"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
-                .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0")
+                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "FreeModule", dependencies: [.product(name: "SkipFoundation", package: "skip-foundation")], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
@@ -634,10 +634,10 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "BOTTOM_MODULE", type: .dynamic, targets: ["BOTTOM_MODULE"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
-                .package(url: "https://source.skip.tools/skip-ui.git", from: "0.0.0"),
-                .package(url: "https://source.skip.tools/skip-model.git", from: "0.0.0"),
-                .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0")
+                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-ui.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-model.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "TOP_MODULE", dependencies: ["MIDDLE_MODULE"] + (zero ? [] : [.product(name: "SkipUI", package: "skip-ui")]), resources: [.process("Resources")], plugins: skipstone),
@@ -752,10 +752,10 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "M5", type: .dynamic, targets: ["M5"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "0.0.0"),
-                .package(url: "https://source.skip.tools/skip-ui.git", from: "0.0.0"),
-                .package(url: "https://source.skip.tools/skip-model.git", from: "0.0.0"),
-                .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0")
+                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-ui.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-model.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "M1", dependencies: ["M2", .product(name: "SkipUI", package: "skip-ui")], plugins: [.plugin(name: "skipstone", package: "skip")]),

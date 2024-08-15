@@ -76,7 +76,7 @@ class FrameworkProjectLayout {
 
 
 #if DEBUG
-        let skipPackageVersion = "0.0.0"
+        let skipPackageVersion = "1.0.0"
 #else
         let skipPackageVersion = skipVersion
 #endif
@@ -637,7 +637,7 @@ class FrameworkProjectLayout {
             var skipModuleDeps: [String] = []
             for modDep in modDeps {
                 if let repoName = modDep.repositoryName {
-                    let depVersion = modDep.repositoryVersion ?? "0.0.0"
+                    let depVersion = modDep.repositoryVersion ?? "1.0.0"
                     let packDep = ".package(url: \"https://source.skip.tools/\(repoName).git\", from: \"\(depVersion)\")"
                     if !packageDependencies.contains(packDep) {
                         packageDependencies.append(packDep)
