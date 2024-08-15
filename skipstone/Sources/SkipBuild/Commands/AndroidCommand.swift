@@ -85,8 +85,8 @@ fileprivate extension AndroidOperationCommand {
             }
             var cmd: [String] = []
 
-            //cmd += [swiftCmd] // causes weird error with the Swift 6 toolchain: "error: invalid absolute path ''"
-            cmd += ["swift"]
+            cmd += [swiftCmd] // causes weird error with the Swift 6 toolchain: "error: invalid absolute path ''"
+            //cmd += ["swift"]
             cmd += ["build"]
             cmd += ["--destination", tc.url.path]
             if runTests {
@@ -183,7 +183,10 @@ fileprivate extension AndroidOperationCommand {
                 try await runCommand(command: [adb, "push"] + testFiles.map(\.path) + [testTmp], env: env, with: out)
                 var runFailure: Error?
                 do {
-                    try await runCommand(command: [adb, "shell", testTmp + "/" + testExecutableName], env: env, with: out)
+                    let testCmd = testTmp + "/" + testExecutableName
+                    // in theory, we should be able to skip individual tests using the _SWIFTPM_SKIP_TESTS_LIST environment variable, but is seems to not work
+                    //testCmd = "_SWIFTPM_SKIP_TESTS_LIST=TestClass.testName" + " " + testCmd
+                    try await runCommand(command: [adb, "shell", testCmd], env: env, with: out)
                 } catch {
                     runFailure = error
                 }
@@ -444,6 +447,12 @@ struct AndroidTestCommand: AndroidOperationCommand {
 
     @OptionGroup(title: "Toolchain Options")
     var toolchainOptions: ToolchainOptions
+
+    // TODO: how to handle test case filter/skip? It isn't an argument to `swift build`, and the _SWIFTPM_SKIP_TESTS_LIST environment variable doesn't seem to work
+    //@Option(help: ArgumentHelp("Skip test cases matching regular expression", valueName: "skip"))
+    //var skip: [String] = []
+    //@Option(help: ArgumentHelp("Run test cases matching regular expression", valueName: "filter"))
+    //var filter: [String] = []
 
     /// Any arguments that are not recognized are passed through to the underlying swift build command
     @Argument(parsing: .allUnrecognized, help: ArgumentHelp("Command arguments"))
