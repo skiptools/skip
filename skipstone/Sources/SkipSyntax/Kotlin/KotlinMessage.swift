@@ -261,6 +261,10 @@ extension Message {
         return Message(kind: .error, message: "Skip is unable to determine the owning type for member '\(member)'. This often occurs when other issues prevent Skip from matching the surrounding API call, and it may resolve when those issues are fixed. Or add the owning type explicitly (e.g. MyType.\(member))", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinNameReservedType(_ sourceDerived: SourceDerived, source: Source, type: String) -> Message {
+        return Message(kind: .error, message: "\(type) is a reserved type name in Kotlin. Please rename this type", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinNumericCast(_ sourceDerived: SourceDerived, source: Source, type: String) -> Message {
         return Message(kind: .error, message: "Cast required, e.g. \(type)(<value>). Kotlin requires specific type matching when dealing with Floats, Int128, and unsigned types. We generally recommend avoiding Float in favor of Double and unsigned types in favor of signed types", sourceDerived: sourceDerived, source: source)
     }

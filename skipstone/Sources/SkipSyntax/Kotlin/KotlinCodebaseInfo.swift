@@ -19,6 +19,18 @@ extension CodebaseInfo {
         "Set"
     ]
 
+    /// Names of built-in Kotlin types that are reserved and cannot be used.
+    static let kotlinReservedBuiltinNames: Set<String> = [
+        "Boolean",
+        "Char",
+        "Exception",
+        "Long",
+        "Nothing",
+        "Short",
+        "Throwable",
+        "Unit"
+    ]
+
     /// Names of built-in Kotlin types. These must be explicitly imported if defined by Swift modules.
     static let kotlinAdditionalBuiltinNames: Set<String> = [
         "Annotation",

@@ -1030,6 +1030,9 @@ final class KotlinClassDeclaration: KotlinStatement {
             kstatement.processEnumMemberDeclarations(translator: translator)
         }
 
+        if CodebaseInfo.kotlinReservedBuiltinNames.contains(kstatement.name) {
+            kstatement.messages.append(.kotlinNameReservedType(kstatement, source: translator.syntaxTree.source, type: kstatement.name))
+        }
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
         if kstatement.declarationType == .actorDeclaration && !kstatement.inherits.contains(where: { $0.isNamed("Actor", moduleName: "Swift") }) {
             kstatement.inherits.append(.named("Actor", []))
@@ -2428,6 +2431,9 @@ final class KotlinInterfaceDeclaration: KotlinStatement {
         }
         kstatement.members = originalMembers + newMembers
 
+        if CodebaseInfo.kotlinReservedBuiltinNames.contains(kstatement.name) {
+            kstatement.messages.append(.kotlinNameReservedType(kstatement, source: translator.syntaxTree.source, type: kstatement.name))
+        }
         // Kotlin interfaces cannot extend Any
         kstatement.inherits = kstatement.inherits.filter { $0 != .any && $0 != .anyObject }
         kstatement.companionInherits = kstatement.inherits.compactMap {

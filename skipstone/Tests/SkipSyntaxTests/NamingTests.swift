@@ -66,6 +66,20 @@ final class NamingTests: XCTestCase {
             """)
     }
 
+    func testReservedTypeNames() async throws {
+        try await checkProducesMessage(swift: """
+        struct Unit {
+            var x = 1
+        }
+        """)
+
+        try await checkProducesMessage(swift: """
+        struct Short {
+            var x = 1
+        }
+        """)
+    }
+
     func testMutableStructTypeVariableKeyword() async throws {
         try await check(swift: """
         struct S {
