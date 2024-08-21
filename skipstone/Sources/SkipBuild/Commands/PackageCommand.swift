@@ -47,13 +47,13 @@ struct CreateOptions : ParsableArguments {
     @Option(name: [.customShort("c"), .long], help: ArgumentHelp("Configuration debug/release", valueName: "c"))
     var configuration: BuildConfiguration = .debug
 
-    @Option(name: [.customShort("t"), .long], help: ArgumentHelp("Template name/ID for new project", valueName: "id"))
+    @Option(name: [.long], help: ArgumentHelp("Template name/ID for new project", valueName: "id"))
     var template: String = "skipapp"
 
-    @Option(name: [.customShort("h"), .long], help: ArgumentHelp("The host name for the template repository", valueName: "host"))
+    @Option(name: [.long], help: ArgumentHelp("The host name for the template repository", valueName: "host"))
     var templateHost: String = "https://github.com"
 
-    @Option(name: [.customShort("f"), .long], help: ArgumentHelp("A path to the template zip file to use", valueName: "zip"))
+    @Option(name: [.long], help: ArgumentHelp("A path to the template zip file to use", valueName: "zip"))
     var templateFile: String?
 
 //    @Option(help: ArgumentHelp("The package dependencies for this module"))
