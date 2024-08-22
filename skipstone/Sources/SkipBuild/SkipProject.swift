@@ -1482,7 +1482,7 @@ public struct ContentView: View {
     public var body: some View {
         TabView(selection: $tab) {
             VStack(spacing: 0) {
-                Text("Hello \\(name)!")
+                Text("Hello [\\(name)](https://skip.tools)!")
                     .padding()
                 Image(systemName: "heart.fill")
                     .foregroundStyle(.red)
