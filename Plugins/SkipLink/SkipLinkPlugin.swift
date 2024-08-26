@@ -19,9 +19,9 @@ import PackagePlugin
         for targetName in inputTargets {
             let skipstoneTargetOutput = skipLinkOutut
                 .deletingLastPathComponent()
-                .appending(path: packageID + ".output")
-                .appending(path: targetName)
-                .appending(path: "skipstone")
+                .appendingPathComponent(packageID + ".output")
+                .appendingPathComponent(targetName)
+                .appendingPathComponent("skipstone")
                 .resolvingSymlinksInPath()
 
             if (try? skipstoneTargetOutput.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true {
@@ -29,7 +29,7 @@ import PackagePlugin
             } else {
                 // create the link from the local folder to the derived data output, replacing any existing link
                 try FileManager.default.createDirectory(at: skipLinkFolder, withIntermediateDirectories: true)
-                let targetLinkFolder = skipLinkFolder.appending(path: targetName)
+                let targetLinkFolder = skipLinkFolder.appendingPathComponent(targetName)
                 Diagnostics.remark("creating link from \(skipstoneTargetOutput.path) to \(targetLinkFolder.path)")
 
                 // clear any pre-existing links
