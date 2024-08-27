@@ -315,4 +315,36 @@ final class ObservationTests: XCTestCase {
         }
         """)
     }
+
+    func testContainerOfObservableType() async throws {
+        try await check(swift: """
+        import Observation
+
+        @Observable class S {
+            struct Element {
+            }
+
+            var dict = [String: [Element]]()
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Stable
+        import androidx.compose.runtime.mutableStateOf
+        import skip.lib.Array
+
+        import skip.model.*
+
+        @Stable
+        internal open class S: Observable {
+            internal class Element {
+            }
+
+            internal open var dict: Dictionary<String, Array<S.Element>>
+                get() = _dict.wrappedValue.sref({ this.dict = it })
+                set(newValue) {
+                    _dict.wrappedValue = newValue.sref()
+                }
+            internal var _dict: skip.model.Observed<Dictionary<String, Array<S.Element>>> = skip.model.Observed(Dictionary<String, Array<Element>>())
+        }
+        """)
+    }
 }

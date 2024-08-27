@@ -166,18 +166,37 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     }
 
     /// Convert this type to/from a meta type.
-    func asMetaType(_ meta: Bool) -> TypeSignature {
+    func asMetaType(_ meta: Bool, recursive: Bool = false) -> TypeSignature {
         switch self {
+        case .array(var elementType):
+            if recursive {
+                elementType = elementType?.asMetaType(meta, recursive: true)
+            }
+            return meta ? .metaType(.array(elementType)) : .array(elementType)
+        case .dictionary(var keyType, var valueType):
+            if recursive {
+                keyType = keyType?.asMetaType(meta, recursive: true)
+                valueType = valueType?.asMetaType(meta, recursive: true)
+            }
+            return meta ? .metaType(.dictionary(keyType, valueType)) : .dictionary(keyType, valueType)
         case .metaType(let type):
-            return meta ? self : type
+            if meta {
+                return self
+            }
+            return recursive ? type.asMetaType(false, recursive: true) : type
         case .none:
             return .none
         case .optional(let type):
-            return .optional(type.asMetaType(meta))
+            return .optional(type.asMetaType(meta, recursive: recursive))
+        case .set(var elementType):
+            if recursive {
+                elementType = elementType?.asMetaType(meta, recursive: true)
+            }
+            return meta ? .metaType(.set(elementType)) : .set(elementType)
         case .typealiased(let alias, let type):
-            return .typealiased(alias, type.asMetaType(meta))
+            return .typealiased(alias, type.asMetaType(meta, recursive: recursive))
         case .unwrappedOptional(let type):
-            return .unwrappedOptional(type.asMetaType(meta))
+            return .unwrappedOptional(type.asMetaType(meta, recursive: recursive))
         default:
             return meta ? .metaType(self) : self
         }

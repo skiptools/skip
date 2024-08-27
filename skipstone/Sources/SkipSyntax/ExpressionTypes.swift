@@ -769,7 +769,7 @@ final class FunctionCall: Expression, APICallExpression, MemberAccessExpression 
             // Must be a constructor call, e.g. [String]()
             function.inferTypes(context: context, expecting: expecting)
             if case .array(let element) = function.inferredType {
-                returnType = .array(element?.asMetaType(false))
+                returnType = .array(element?.asMetaType(false, recursive: true))
             } else {
                 returnType = function.inferredType.or(expecting)
             }
@@ -779,7 +779,7 @@ final class FunctionCall: Expression, APICallExpression, MemberAccessExpression 
             // Must be a constructor call, e.g. [String: Int]()
             function.inferTypes(context: context, expecting: expecting)
             if case .dictionary(let keyType, let valueType) = function.inferredType {
-                returnType = .dictionary(keyType?.asMetaType(false), valueType?.asMetaType(false))
+                returnType = .dictionary(keyType?.asMetaType(false, recursive: true), valueType?.asMetaType(false, recursive: true))
             } else {
                 returnType = function.inferredType.or(expecting)
             }
