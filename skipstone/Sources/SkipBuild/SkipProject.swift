@@ -2131,23 +2131,89 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
         let sourceMainKotlinSourceFile = sourceMainKotlinPackage.appendingPathComponent("Main.kt")
         try createKotlinMain(appModulePackage: appModulePackage, appModuleName: appModuleName).write(to: sourceMainKotlinSourceFile.createParentDirectory(), atomically: false, encoding: .utf8)
 
-        if gitRepo == true {
-            // create the .gitignore file
-            let gitignore = """
+        // create the .gitignore file; https://github.com/orgs/skiptools/discussions/208#discussioncomment-10505250
+        let gitignore = """
+## User settings
+
+# vi
 .*.swp
+.*.swo
+
+# macOS
 .DS_Store
-.build
-build
-/Packages
-xcuserdata/
+
+# gradle properties
+local.properties
+.gradle/
+.android/
+.kotlin/
+Android/app/keystore.jks
+Android/app/keystore.properties
+
+# Xcode automatically generates this directory with a .xcworkspacedata file and xcuserdata
+# hence it is not needed unless you have added a package configuration file to your project
+.swiftpm
+.build/
+build/
 DerivedData/
-.swiftpm/configuration/registries.json
-.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
-.netrc
+xcuserdata/
+xcodebuild*.log
+.idea/
+
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+*.xcscmblueprint
+*.xccheckout
+
+## Obj-C/Swift specific
+*.hmap
+
+## App packaging
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# Swift Package Manager
+#
+# Add this line if you want to avoid checking in source code from Swift Package Manager dependencies.
+Packages/
+Package.pins
+Package.resolved
+#*.xcodeproj
+
+Carthage/Build/
+
+# fastlane
+#
+# It is recommended to not store the screenshots in the git repo.
+# Instead, use fastlane to re-generate the screenshots whenever they are needed.
+# For more information about the recommended setup visit:
+# https://docs.fastlane.tools/best-practices/source-control/#source-control
+
+**/fastlane/apikey.json
+**/fastlane/report.xml
+**/fastlane/README.md
+**/fastlane/Preview.html
+**/fastlane/screenshots/**/*.png
+**/fastlane/metadata/android/*/images/**/*.png
+**/fastlane/test_output
 
 """
 
-            try gitignore.write(to: projectURL.appending(path: ".gitignore"), atomically: false, encoding: .utf8)
+        try gitignore.write(to: projectURL.appending(path: ".gitignore"), atomically: false, encoding: .utf8)
+
+        if gitRepo == true {
         }
 
         return (projectURL, appProject)
