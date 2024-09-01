@@ -2960,7 +2960,7 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
         annotations.appendLines(to: output, indentation: indentation)
         output.append(indentation)
         if role.isProperty || role == .global {
-            if !isDelegatingToCompanion && isStatic && visibility != .private && companion?.1.isClass == true && !attributes.contains(.unavailable) {
+            if !isDelegatingToCompanion && isStatic && visibility != .private && companion?.1.isClass == true && !attributes.contains(.unavailable) && extends == nil {
                 output.append("override ")
             } else {
                 output.append(modifiers.kotlinMemberString(isGlobal: role == .global, isOpen: isOpen || isDelegatingToCompanion, suffix: " "))

@@ -28,6 +28,7 @@ public final class CodebaseInfo {
         "AVFoundation": ["SkipAV"],
         "AVKit": ["SkipAV"],
         "Combine": ["SkipModel"],
+        "CoreBluetooth": ["SkipBluetooth"],
         "CoreFoundation": ["SkipFoundation"],
         "CoreGraphics": ["SkipLib"],
         "CryptoKit": ["SkipFoundation"],
@@ -40,6 +41,7 @@ public final class CodebaseInfo {
         "Swift": ["SkipLib"],
         "SwiftUI": ["SkipUI", "SkipFoundation", "SkipModel"],
         "UIKit": ["SkipUI", "SkipFoundation", "SkipModel"],
+        "UserNotifications": ["SkipUI", "SkipFoundation", "SkipModel"],
         "XCTest": ["SkipUnit"],
     ]
 

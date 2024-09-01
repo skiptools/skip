@@ -1,3 +1,4 @@
+@testable import SkipSyntax
 import XCTest
 
 final class StaticTests: XCTestCase {
@@ -155,7 +156,7 @@ final class StaticTests: XCTestCase {
         """)
     }
 
-    func testStaticExtensionMembers() async throws {
+    func testStaticExtensionFinalTypeMembers() async throws {
         // Intentionally do not define the type we're extending so simulate a type in another module
         try await check(swift: """
         extension C {
@@ -223,6 +224,32 @@ final class StaticTests: XCTestCase {
         }
 
         internal fun <T> C.Companion.staticFunc(p: T): T = Unit
+        """)
+    }
+
+    func testStaticExtensionOpenTypeMembers() async throws {
+        let dependentModule = try CodebaseInfo.ModuleExport(of: codebaseInfo(moduleName: "ModuleOne", swift: """
+        public class C {
+        }
+        """))
+
+        try await check(dependentModules: [dependentModule], swift: """
+        import ModuleOne
+
+        extension C {
+            static var staticVar: Int {
+                return 10
+            }
+            static func staticFunc() -> Int {
+                return 20
+            }
+        }
+        """, kotlin: """
+        import module.one.*
+
+        internal val C.CompanionClass.staticVar: Int
+            get() = 10
+        override fun C.CompanionClass.staticFunc(): Int = 20
         """)
     }
 
@@ -700,5 +727,15 @@ final class StaticTests: XCTestCase {
             }
         }
         """)
+    }
+
+    private func codebaseInfo(moduleName: String, swift: String) throws -> CodebaseInfo {
+        let srcFile = try tmpFile(named: "Source_\(moduleName).swift", contents: swift)
+        let source = Source(file: Source.FilePath(path: srcFile.path), content: swift)
+        let syntaxTree = SyntaxTree(source: source)
+        let codebaseInfo = CodebaseInfo(moduleName: moduleName)
+        codebaseInfo.gather(from: syntaxTree)
+        codebaseInfo.prepareForUse()
+        return codebaseInfo
     }
 }
