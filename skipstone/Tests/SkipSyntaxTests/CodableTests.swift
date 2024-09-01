@@ -1047,4 +1047,38 @@ final class CodableTests: XCTestCase {
         }
         """)
     }
+
+    func testEmptyCodable() async throws {
+        try await check(supportingSwift: codableDeclaration, swift: """
+        struct S: Codable {
+        }
+        """, kotlin: """
+        internal class S: Codable {
+
+            private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+                ;
+            }
+
+            override fun encode(to: Encoder) {
+                val container = to.container(keyedBy = CodingKeys::class)
+            }
+
+            constructor(from: Decoder) {
+            }
+
+            constructor() {
+            }
+
+            companion object: DecodableCompanion<S> {
+                override fun init(from: Decoder): S = S(from = from)
+
+                private fun CodingKeys(rawValue: String): CodingKeys? {
+                    return when (rawValue) {
+                        else -> null
+                    }
+                }
+            }
+        }
+        """)
+    }
 }

@@ -41,13 +41,18 @@ final class KotlinCodableTransformer: KotlinTransformer {
             encodeDeclaration?.modifiers.isOverride = true
         }
         var decodeDeclaration: KotlinFunctionDeclaration? = nil
+        var decodableHasConstructors = false
         if isDecodable {
-            decodeDeclaration = classDeclaration.members.first {
-                guard let functionDeclaration = $0 as? KotlinFunctionDeclaration else {
-                    return false
+            for member in classDeclaration.members {
+                guard let functionDeclaration = member as? KotlinFunctionDeclaration else {
+                    continue
                 }
-                return functionDeclaration.isDecodableConstructor
-            } as? KotlinFunctionDeclaration
+                if functionDeclaration.isDecodableConstructor {
+                    decodeDeclaration = functionDeclaration
+                } else if functionDeclaration.type == .constructorDeclaration {
+                    decodableHasConstructors = true
+                }
+            }
             decodeDeclaration?.modifiers.visibility = .public
         }
 
@@ -67,6 +72,10 @@ final class KotlinCodableTransformer: KotlinTransformer {
             }
             if isDecodable && decodeDeclaration == nil {
                 synthesizeDecode(for: classDeclaration, storedVariableDeclarations: storedVariableDeclarations, codingKeysByName: matchedCodingKeysByName, rawValueType: rawValueType, source: translator.syntaxTree.source)
+                // If we add a decodable constructor we need to add a default constructor as well
+                if !decodableHasConstructors && classDeclaration.declarationType == .structDeclaration {
+                    synthesizeDefaultConstructor(for: classDeclaration)
+                }
             }
         }
         if isDecodable {
@@ -164,6 +173,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
             return
         }
         encode.body = KotlinCodeBlock(statements: statements)
+        encode.body?.disallowSingleStatementAppend = true
 
         classDeclaration.members.append(encode)
         encode.parent = classDeclaration
@@ -294,6 +304,17 @@ final class KotlinCodableTransformer: KotlinTransformer {
         classDeclaration.members.append(factory)
         factory.parent = classDeclaration
         factory.assignParentReferences()
+    }
+
+    private func synthesizeDefaultConstructor(for classDeclaration: KotlinClassDeclaration) {
+        let cons = KotlinFunctionDeclaration(name: "constructor")
+        cons.modifiers.visibility = .public
+        cons.extras = .singleNewline
+        cons.isGenerated = true
+        cons.body = KotlinCodeBlock(statements: [])
+        cons.parent = classDeclaration
+        classDeclaration.members.append(cons)
+        cons.assignParentReferences()
     }
 
     private func storedVariableDeclarations(of classDeclaration: KotlinClassDeclaration) -> [KotlinVariableDeclaration] {
