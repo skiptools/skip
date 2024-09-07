@@ -208,15 +208,40 @@ fileprivate extension AndroidOperationCommand {
         try FileManager.default.createDirectory(at: tempURL, withIntermediateDirectories: true)
         return tempURL
     }
+    
+    /// Returns true if the given URL is a directory
+    /// - Parameters:
+    ///   - url: the file URL to check
+    ///   - permitLink: if true, then permit folders that are symbolic links to other folders
+    func isDir(_ url: URL, permitLink: Bool = true) -> Bool {
+        let fm = FileManager.default
+        if !url.isFileURL {
+            return false
+        }
+        var isDirectory: ObjCBool = false
 
-    func isDir(_ url: URL) -> Bool {
-        (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+        let path = url.path
+        if fm.fileExists(atPath: path, isDirectory: &isDirectory) == false {
+            return false
+        }
+
+        if isDirectory.boolValue == true {
+            return true
+        }
+
+        if permitLink == true, let linkDestination = (try? fm.destinationOfSymbolicLink(atPath: path)) {
+            if fm.fileExists(atPath: linkDestination, isDirectory: &isDirectory) {
+                return isDirectory.boolValue == true
+            }
+        }
+
+        return false
     }
 
     /// Returns the sorted list of directories at the given location
-    func dirs(at url: URL) throws -> [URL] {
+    func dirs(at url: URL, permitLink: Bool = true) throws -> [URL] {
         try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey])
-            .filter({ try $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true })
+            .filter({ isDir($0, permitLink: permitLink) })
             .sorted { u1, u2 in
                 u1.lastPathComponent < u2.lastPathComponent
             }
@@ -224,7 +249,7 @@ fileprivate extension AndroidOperationCommand {
 
     /// Returns the sorted list of directories at the given locations
     func dirs(in urls: [URL]) throws -> [URL] {
-        try urls.filter(isDir).map(dirs(at:)).joined().sorted { u1, u2 in
+        try urls.filter({ isDir($0) }).map({ try dirs(at: $0) }).joined().sorted { u1, u2 in
             u1.lastPathComponent < u2.lastPathComponent
         }
     }
@@ -270,9 +295,14 @@ fileprivate extension AndroidOperationCommand {
             return version.path
         }()
 
-        let ndkURL = URL(fileURLWithPath: ndk)
+        var ndkURL = URL(fileURLWithPath: ndk)
         if !isDir(ndkURL) {
-            throw CrossCompilerError(errorDescription: "The Android NDK path could not be found at: \(ndk)")
+            // `brew install android-ndk` puts the NDK at /opt/homebrew/share/android-ndk which links to something like /opt/homebrew/Caskroom/android-ndk/27/AndroidNDK12077973.app/Contents/NDK
+            ndkURL = URL(fileURLWithPath: ProcessInfo.homebrewRoot + "/share/android-ndk")
+        }
+
+        if !isDir(ndkURL) {
+            throw CrossCompilerError(errorDescription: "The Android NDK path could not be found. Try setting the ANDROID_NDK environment variable.")
         }
 
         let ndkPrebuilt = ndkURL.appendingPathComponent("/toolchains/llvm/prebuilt/darwin-x86_64")
