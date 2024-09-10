@@ -192,7 +192,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             let allProjectFiles: [URL] = try FileManager.default.enumeratedURLs(of: projectFolderPath.asURL)
 
             let swiftPathExtensions: Set<String> = ["swift"]
-            let resourcePathExclusions: Set<String> = swiftPathExtensions.union(["kt"]) // resource files are anything that isn't a swift file or a kotlin file
+            let resourcePathExclusions: Set<String> = swiftPathExtensions.union(["kt", "java"]) // resource files are anything that isn't a swift file or a kotlin file
 
             let sourceURLs: [URL] = allProjectFiles.filter({ swiftPathExtensions.contains($0.pathExtension) })
             // also exclude files starting with dot and `skip.yml`
@@ -245,7 +245,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             .filter({ (try? $0.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true })
 
         // validate licenses in all the Skip source files, as well as any custom Kotlin files in the Skip folder
-        let sourcehashes = try await createSourceHashes(validateLicense: ["swift", "kt"], sourceURLs: sourceURLs + skipFolderPathContents)
+        let sourcehashes = try await createSourceHashes(validateLicense: ["swift", "kt", "java"], sourceURLs: sourceURLs + skipFolderPathContents)
         // touch the build marker with the most recent file time from the complete build list
         // if we were to touch it afresh every time, the plugin would be re-executed every time
         defer {
@@ -285,8 +285,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             try addLink(swiftLinkFolder, pointingAt: rootPath, relative: false)
         }
 
-        // the standard base name for Gradle Kotlin source files
+        // the standard base name for Gradle Kotlin and Java source files
         let kotlinOutputFolder = try AbsolutePath(outputFolderPath, validating: "kotlin")
+        let javaOutputFolder = try AbsolutePath(outputFolderPath, validating: "java")
 
         // the standard base name for resources, which will be linked from a path like: src/main/resources/package/name/resname.ext
         let resourcesOutputFolder = try AbsolutePath(outputFolderPath, validating: "resources")
@@ -635,16 +636,19 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             return (currentModuleConfig, aggregateSkipConfig, configMap)
         }
 
-        func kotlinOutputPath(for baseSourceFileName: String, in basePath: AbsolutePath? = nil) throws -> AbsolutePath? {
+        func sourceFileOutputPath(for baseSourceFileName: String, in basePath: AbsolutePath? = nil) throws -> AbsolutePath? {
             if baseSourceFileName == "skip.yml" {
                 // skip metadata files are excluded from copy
                 return nil
             }
 
+            // Kotlin (.kt) files go to src/main/kotlin/package/name/File.kt, and Java (.java) files go to src/main/java/package/name/File.kt
+            let rawSourceDestination = baseSourceFileName.hasSuffix(".kt") ? kotlinOutputFolder : javaOutputFolder
+
             // the "AndroidManifest.xml" file is special: it needs to go in the root src/main/ folder
             let isManifest = baseSourceFileName == AndroidManifestName
             // if an empty basePath, treat as a source file and place in package-derived folders
-            return try (basePath ?? kotlinOutputFolder
+            return try (basePath ?? rawSourceDestination
                 .appending(components: isManifest ? [".."] : packageName.split(separator: ".").map(\.description)))
                 .appending(RelativePath(validating: baseSourceFileName))
         }
@@ -673,7 +677,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                     let subPaths = try linkSkipFolder(sourcePath, to: outputPath, topLevel: false)
                     copiedFiles.formUnion(subPaths)
                 } else {
-                    if let outputFilePath = try kotlinOutputPath(for: sourcePath.basename, in: topLevel ? nil : outputFilePath) {
+                    if let outputFilePath = try sourceFileOutputPath(for: sourcePath.basename, in: topLevel ? nil : outputFilePath) {
                         copiedFiles.insert(outputFilePath)
                         try fs.createDirectory(outputFilePath.parentDirectory, recursive: true) // ensure parent exists
                         // we make links instead of copying so the file can be edited from the gradle project structure without needing to be manually synchronized
@@ -719,7 +723,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 trace("path: \(kotlinOutputFolder)")
 
                 let kotlinName = transpilation.kotlinFileName
-                guard let outputFilePath = try kotlinOutputPath(for: kotlinName) else {
+                guard let outputFilePath = try sourceFileOutputPath(for: kotlinName) else {
                     throw error("No output path for \(kotlinName)")
                 }
 

@@ -189,24 +189,11 @@ git push --follow-tags
 
 cp -a ${SKIPSTONEDIR}/${DIR}/${PLUGIN_ZIP} ${RELSTAGING}
 
-RELNOTES="${RELSTAGING}/releasenotes.md"
-#echo "Updating relnotes: ${RELNOTES}"
-cat > ${RELNOTES} << EOF
-Skip release ${SKIP_VERSION}.
-EOF
-
 cd ${RELSTAGING}
-
-shasum -a 256 *.zip >> checksums.txt
-echo '```' >> ${RELNOTES}
-cat checksums.txt >> ${RELNOTES}
-echo '```' >> ${RELNOTES}
-
-cat ${RELNOTES}
 
 # need to wait a bit for the tag to show up
 sleep 5
-gh release -R github.com/skiptools/skip create -F releasenotes.md "${SKIP_VERSION}" *.zip checksums.txt
+gh release -R github.com/skiptools/skip create --generate-notes "${SKIP_VERSION}" *.zip
 cd '-'
 
 echo "Waiting to download to become available…"

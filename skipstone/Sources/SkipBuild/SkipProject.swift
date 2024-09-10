@@ -1285,7 +1285,6 @@ Dotenv.load '../../Skip.env'
             try """
 
 copyright "#{Time.now.year}"
-default_language("en-US")
 
 force(true) # Skip HTML report verification
 automatic_release(true)

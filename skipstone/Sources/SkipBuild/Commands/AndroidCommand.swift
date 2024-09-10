@@ -6,7 +6,7 @@ import ArgumentParser
 import SkipSyntax
 #if canImport(SkipDriveExternal)
 import SkipDriveExternal
-fileprivate let androidCommandEnabled = false // advanced command, so do not display
+fileprivate let androidCommandEnabled = true
 #else
 fileprivate let androidCommandEnabled = false
 #endif
@@ -15,10 +15,11 @@ fileprivate let androidCommandEnabled = false
 struct AndroidCommand: AsyncParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "android",
-        abstract: "Android commands",
+        abstract: "Perform a native Android package command",
         shouldDisplay: androidCommandEnabled,
         subcommands: [
             AndroidBuildCommand.self,
+            AndroidRunCommand.self,
             AndroidTestCommand.self,
         ])
 
@@ -58,12 +59,11 @@ fileprivate extension AndroidOperationCommand {
     }
     
     /// Run `swift build` for the given Android architectures, optionally running the test cases on the device or copying all the files to the given `archiveOutputFolder`
-    func runSwiftPM(testCleanup: Bool? = nil, archiveOutputFolder: URL? = nil, with out: MessageQueue) async throws {
-        let runTests = testCleanup != nil
+    func runSwiftPM(cleanup: Bool? = nil, execute executable: String? = nil, remoteFolder: String? = nil, archiveOutputFolder: URL? = nil, with out: MessageQueue) async throws {
         let packageDir = toolchainOptions.packagePath ?? "."
         var architectures = toolchainOptions.arch
         if architectures.isEmpty {
-            // pick the default architecture based on the current host
+            // pick the default architecture based on the current host; for running executables and tests, this will likely be the one that matches an attached emulator, but for an attached device, we don't know (e.g., an x86_64 host may be connecting to an aarch64 device).
             if ProcessInfo.isARM {
                 architectures.append(.aarch64)
             } else {
@@ -89,6 +89,8 @@ fileprivate extension AndroidOperationCommand {
             //cmd += ["swift"]
             cmd += ["build"]
             cmd += ["--destination", tc.url.path]
+
+            let runTests = cleanup != nil && executable == nil
             if runTests {
                 cmd += ["--build-tests"]
             }
@@ -108,7 +110,11 @@ fileprivate extension AndroidOperationCommand {
             if let configuration = toolchainOptions.configuration {
                 cmd += ["--configuration", configuration.rawValue]
             }
-            cmd += args
+            // when executable is specified, then the arguments are the command to run;
+            // otherwise, they are considered build arguments
+            if executable == nil {
+                cmd += args
+            }
             try await runCommand(command: cmd, env: env, with: out)
 
             let buildOutputFolder = [
@@ -129,7 +135,8 @@ fileprivate extension AndroidOperationCommand {
                     throw AndroidError(errorDescription: "Android SDK library folder did not exist at: \(libFolder)")
                 }
                 // check for .so files like libswift_Concurrency.so or libxml2.so.2.13.3
-                let sharedObjects = try files(at: libFolder).filter({ $0.lastPathComponent.contains(".so") })
+                // we need to preserve symbolic links because some libraries link to a linked version
+                let sharedObjects = try files(at: libFolder, allowLinks: true).filter({ $0.lastPathComponent.contains(".so") })
                 return sharedObjects
             }
 
@@ -149,54 +156,62 @@ fileprivate extension AndroidOperationCommand {
                 }
             }
 
-            if runTests {
-                // to figure out the generated executable name, we need to parse the Package.swift
-                let packageManifest = try await parseSwiftPackage(with: out, at: packageDir, swift: swiftCmd)
-                let packageName = packageManifest.name
+            if executable == nil && runTests == false {
+                continue // nothing to do but build, so more on to the next list arch…
+            }
 
-                // take the ./.build/aarch64-unknown-linux-android24/debug/android-native-demoPackageTests.xctest file
-                // and copy it with all the dependent .so files to the Android host and execute the test executable
-                let testExecutableName = packageName + "PackageTests.xctest"
+            // to figure out the generated test executable name, we need to parse the Package.swift
+            let packageManifest = try await parseSwiftPackage(with: out, at: packageDir, swift: swiftCmd)
+            let packageName = packageManifest.name
 
-                let xctestExecutable = buildOutputFolderURL.appendingPathComponent(testExecutableName)
-                if !FileManager.default.isExecutableFile(atPath: xctestExecutable.path) {
-                    throw AndroidError(errorDescription: "Expected test executable did not exist at: \(xctestExecutable)")
-                }
+            // take the ./.build/aarch64-unknown-linux-android24/debug/android-native-demoPackageTests.xctest file
+            // and copy it with all the dependent .so files to the Android host and execute the test executable
+            let executableBase = executable ?? packageName + "PackageTests.xctest"
 
-                // create the list of files that need to be uploaded to the device to run the test cases
-                var testFiles = [xctestExecutable]
+            let executablePath = buildOutputFolderURL.appendingPathComponent(executableBase)
+            if !FileManager.default.isExecutableFile(atPath: executablePath.path) {
+                throw AndroidError(errorDescription: "Expected executable did not exist at: \(executablePath.path)")
+            }
 
-                // add any resource folders used by the tests (e.g., "swift-crypto_CryptoTests.resources")
-                let resources = try dirs(at: buildOutputFolderURL)
-                    .filter({ $0.pathExtension == "resources" })
-                    .filter({ try files(at: $0).isEmpty == false })
+            // create the list of files that need to be uploaded to the device to run the test cases
+            var transferFiles = [executablePath]
 
-                testFiles += resources
+            // add any resource folders used by the tests (e.g., "swift-crypto_CryptoTests.resources")
+            let resources = try dirs(at: buildOutputFolderURL)
+                .filter({ $0.pathExtension == "resources" })
+                .filter({ try files(at: $0).isEmpty == false })
 
-                testFiles.append(contentsOf: try dependencySharedObjectFiles())
+            transferFiles += resources
 
-                let adb = try toolOptions.toolPath(for: "adb")
-                var testTmp = "/data/local/tmp/"
-                testTmp += packageName + "-" + UUID().uuidString + "/"
+            transferFiles.append(contentsOf: try dependencySharedObjectFiles())
 
-                try await runCommand(command: [adb, "shell", "mkdir", "-p", testTmp], env: env, with: out)
-                try await runCommand(command: [adb, "push"] + testFiles.map(\.path) + [testTmp], env: env, with: out)
-                var runFailure: Error?
-                do {
-                    let testCmd = testTmp + "/" + testExecutableName
-                    // in theory, we should be able to skip individual tests using the _SWIFTPM_SKIP_TESTS_LIST environment variable, but is seems to not work
-                    //testCmd = "_SWIFTPM_SKIP_TESTS_LIST=TestClass.testName" + " " + testCmd
-                    try await runCommand(command: [adb, "shell", testCmd], env: env, with: out)
-                } catch {
-                    runFailure = error
-                }
-                // clean up the test folder after running; we can't do this in a defer block, since it is async (and throws)
-                if testCleanup == true {
-                    try await runCommand(command: [adb, "shell", "rm", "-r", testTmp], env: env, with: out)
-                }
-                if let runFailure = runFailure {
-                    throw runFailure
-                }
+            let adb = try toolOptions.toolPath(for: "adb")
+            let stagingDir = remoteFolder ?? "/data/local/tmp/swift-android/" + packageName + "-" + UUID().uuidString + "/"
+
+            // create the staging folder
+            await run(with: out, "Connecting to Android", [adb, "shell", "mkdir", "-p", stagingDir], additionalEnvironment: env)
+
+            // Note: one shortcoming of `adb push` is that it doesn't copy symbolic links as links, but insead pushes the underlying file; so, for example, the link libxml2.so -> libxml2.so.2.13.3 will be copies as two separate yet identical files, which increases the size of the transfer unnecessarily. In practice, this isn't a proble, since the linker will work, but it means that the directory of dependent shared objects will be bigger than it needs to be. One workaround to this might be to first archive all the files together (e.g., with tar), transfer the archive, and then unarchive them on the device, but this adds complexity to the process.
+            await run(with: out, "Copying \(runTests ? "test" : "executable") files", [adb, "push"] + transferFiles.map(\.path) + [stagingDir], additionalEnvironment: env)
+
+            var runFailure: Error?
+            do {
+                let testCmd = stagingDir + "/" + executableBase
+                // when not running tests, pass through the specified arguments to the command
+                let cmdArgs = executable != nil ? args.dropFirst() : []
+                // in theory, we should be able to skip individual tests using the _SWIFTPM_SKIP_TESTS_LIST environment variable, but is seems to not work
+                //testCmd = "_SWIFTPM_SKIP_TESTS_LIST=TestClass.testName" + " " + testCmd
+                try await runCommand(command: [adb, "shell", testCmd] + cmdArgs, env: env, with: out)
+            } catch {
+                runFailure = error
+            }
+            // clean up the test folder after running; we can't do this in a defer block, since it is async (and throws)
+            // only perform cleanup if the "remote-folder" is unset
+            if cleanup == true && remoteFolder == nil {
+                try await runCommand(command: [adb, "shell", "rm", "-r", stagingDir], env: env, with: out)
+            }
+            if let runFailure = runFailure {
+                throw runFailure
             }
         }
     }
@@ -255,9 +270,17 @@ fileprivate extension AndroidOperationCommand {
     }
 
     /// Returns the sorted list of regular files at the given locations
-    func files(at url: URL) throws -> [URL] {
-        try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isRegularFileKey])
-            .filter({ try $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true })
+    func files(at url: URL, allowLinks: Bool = false) throws -> [URL] {
+        try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+            .filter({
+                if try $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true {
+                    return true
+                }
+                if try allowLinks == true && $0.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink == true {
+                    return true
+                }
+                return false
+            })
             .sorted { u1, u2 in
                 u1.lastPathComponent < u2.lastPathComponent
             }
@@ -458,6 +481,35 @@ struct AndroidBuildCommand: AndroidOperationCommand {
     }
 }
 
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct AndroidRunCommand: AndroidOperationCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "run",
+        abstract: "Run the executable target Android device or emulator",
+        shouldDisplay: true)
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    @OptionGroup(title: "Tool Options")
+    var toolOptions: ToolOptions
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Cleanup temporary folders after running"))
+    var cleanup: Bool = true
+
+    @Option(help: ArgumentHelp("Remote folder on emulator/device for build upload", valueName: "path"))
+    var remoteFolder: String? = nil
+
+    @OptionGroup(title: "Toolchain Options")
+    var toolchainOptions: ToolchainOptions
+
+    @Argument(parsing: .allUnrecognized, help: ArgumentHelp("Command arguments"))
+    var args: [String] = []
+
+    func performCommand(with out: MessageQueue) async throws {
+        try await runSwiftPM(cleanup: cleanup, execute: args.first, remoteFolder: remoteFolder, with: out)
+    }
+}
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 struct AndroidTestCommand: AndroidOperationCommand {
@@ -473,7 +525,10 @@ struct AndroidTestCommand: AndroidOperationCommand {
     var toolOptions: ToolOptions
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Cleanup test folders after running"))
-    var cleanupTests: Bool = true
+    var cleanup: Bool = true
+
+    @Option(help: ArgumentHelp("Remote folder on emulator/device for build upload", valueName: "path"))
+    var remoteFolder: String? = nil
 
     @OptionGroup(title: "Toolchain Options")
     var toolchainOptions: ToolchainOptions
@@ -489,7 +544,7 @@ struct AndroidTestCommand: AndroidOperationCommand {
     var args: [String] = []
 
     func performCommand(with out: MessageQueue) async throws {
-        try await runSwiftPM(testCleanup: cleanupTests, with: out)
+        try await runSwiftPM(cleanup: cleanup, remoteFolder: remoteFolder, with: out)
     }
 }
 
