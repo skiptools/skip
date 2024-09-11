@@ -47,10 +47,19 @@ fileprivate extension AndroidOperationCommand {
             }
         }) {
             //print(outputLine.line)
+
             if outputLine.err {
                 print(outputLine.line, to: &stderrStream)
                 stderrStream.flush()
             } else {
+                // squelch common warnings in non-verbose output mode
+                if !outputOptions.verbose && (
+                    outputLine.line.hasPrefix("warning: Could not read SDKSettings.json for SDK")
+                    || outputLine.line.hasPrefix("<unknown>:0: warning: glibc not found for")
+                ) {
+                    continue
+                }
+
                 print(outputLine.line, to: &stdoutStream)
                 stdoutStream.flush()
             }
@@ -300,37 +309,39 @@ fileprivate extension AndroidOperationCommand {
         // GH Runner ANDROID_NDK=/Users/runner/Library/Android/sdk/ndk/26.3.11579264
         // https://github.com/actions/runner-images/blob/main/images/macos/macos-13-Readme.md#environment-variables-1
 
-        let ndk = try toolchainOptions.ndk ?? ProcessInfo.processInfo.environment["ANDROID_NDK"] ?? {
+        // `brew install android-ndk` puts the NDK at /opt/homebrew/share/android-ndk which links to something like /opt/homebrew/Caskroom/android-ndk/27/AndroidNDK12077973.app/Contents/NDK
+        var ndkURL = URL(fileURLWithPath: toolchainOptions.ndk ?? ProcessInfo.processInfo.environment["ANDROID_NDK"] ?? (ProcessInfo.homebrewRoot + "/share/android-ndk"))
+
+        // if it is not there, then fallback to checking the local ANDROID_HOME location for any installed NDKs
+        if !isDir(ndkURL) {
             // GH Runner ANDROID_HOME=/Users/runner/Library/Android/sdk
             let androidHome = ProcessInfo.processInfo.environment["ANDROID_HOME"] ?? homeDir.appendingPathComponent("Library/Android/sdk").path
 
             let androidNDKHome = URL(fileURLWithPath: androidHome).appendingPathComponent("ndk")
-            if !isDir(androidNDKHome) {
-                throw CrossCompilerError(errorDescription: "The Android NDK could not be located at: \(androidNDKHome.path)")
+            if isDir(androidNDKHome) {
+                let versions = try dirs(at: androidNDKHome).filter { dir in
+                    // filter out old NDK versions that won't work with the toolchain (26 or 27+ are needed)
+                    !dir.lastPathComponent.hasPrefix("25.")
+                        && !dir.lastPathComponent.hasPrefix("24.")
+                        && !dir.lastPathComponent.hasPrefix("23.")
+                        && !dir.lastPathComponent.hasPrefix("22.")
+                        && !dir.lastPathComponent.hasPrefix("21.")
+                        && !dir.lastPathComponent.hasPrefix("20.")
+                }
+
+                if let version = versions.last {
+                    ndkURL = URL(fileURLWithPath: version.path)
+                }
             }
-
-            let versions = try dirs(at: androidNDKHome)
-
-            guard let version = versions.last else {
-                throw CrossCompilerError(errorDescription: "No valid NDK installations were found in: \(androidNDKHome.path)")
-            }
-
-            return version.path
-        }()
-
-        var ndkURL = URL(fileURLWithPath: ndk)
-        if !isDir(ndkURL) {
-            // `brew install android-ndk` puts the NDK at /opt/homebrew/share/android-ndk which links to something like /opt/homebrew/Caskroom/android-ndk/27/AndroidNDK12077973.app/Contents/NDK
-            ndkURL = URL(fileURLWithPath: ProcessInfo.homebrewRoot + "/share/android-ndk")
         }
 
         if !isDir(ndkURL) {
-            throw CrossCompilerError(errorDescription: "The Android NDK path could not be found. Try setting the ANDROID_NDK environment variable.")
+            throw CrossCompilerError(errorDescription: "The Android NDK path could not be found. Try passing the --ndk flag or setting the ANDROID_NDK environment variable.")
         }
 
         let ndkPrebuilt = ndkURL.appendingPathComponent("/toolchains/llvm/prebuilt/darwin-x86_64")
         if !isDir(ndkPrebuilt) {
-            throw CrossCompilerError(errorDescription: "The Android NDK prebuilt path could not be found at: \(ndkPrebuilt.path)")
+            throw CrossCompilerError(errorDescription: "The Android NDK prebuilt path could not be found at: \(ndkPrebuilt.path). Try passing the --ndk flag or setting the ANDROID_NDK environment variable.")
         }
 
         let sdk = try toolchainOptions.sdk ?? {
