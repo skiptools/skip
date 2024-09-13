@@ -117,6 +117,23 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
         let assembleAction = variants == [.debug] ? "assembleDebug" : variants == [.release] ? "assembleRelease" : "assemble"
         let bundleAction = variants == [.debug] ? "bundleDebug" : variants == [.release] ? "bundleRelease" : "bundle"
 
+
+        func buildOutputFolder(forModule moduleName: String) throws -> AbsolutePath {
+            var buildOutputFolder = buildFolderAbsolute.appending(components: ["plugins", "outputs", packageName, moduleName])
+            // accomiate the change in plugin output folders for Swift 6/Xcode 16:
+            // Swift 5: .build/plugins/outputs/skipapp-hello/HelloSkip/skipstone
+            // Swift 6: .build/plugins/outputs/skipapp-hello/HelloSkip/destination/skipstone
+            if (try? buildOutputFolder.appending(component: "destination").asURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+                buildOutputFolder = buildOutputFolder.appending(component: "destination")
+            }
+
+            buildOutputFolder = buildOutputFolder.appending(component: "skipstone")
+            if (try? buildOutputFolder.asURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true {
+                throw error("The expected build output folder \(buildOutputFolder.pathString) did not exist")
+            }
+            return buildOutputFolder
+        }
+
         if isAppProject, let appModuleName = moduleNames.first {
             let projectURL = URL(fileURLWithPath: self.project)
 
@@ -176,7 +193,7 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
         } else { // not an app project; export the individual modules instead
             for moduleName in moduleNames {
                 var gradleArgs: [String] = []
-                let skipOutputFolder = buildFolderAbsolute.appending(components: ["plugins", "outputs", packageName, moduleName, "skipstone"])
+                let skipOutputFolder = try buildOutputFolder(forModule: moduleName)
 
                 if !fs.isDirectory(skipOutputFolder) {
                     throw error("The transpilation output folder \(skipOutputFolder.pathString) does not exist. Please ensure the project can be transpiled by running swift test")
@@ -217,7 +234,7 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
         }
 
         if exportProject, let moduleName = moduleNames.first {
-            let skipOutputFolder = buildFolderAbsolute.appending(components: ["plugins", "outputs", packageName, moduleName, "skipstone"])
+            let skipOutputFolder = try buildOutputFolder(forModule: moduleName)
 
             let projectOutputBaseFolder = outputFolderAbsolute.appending(components: ["project"])
             let projectOutputFolder = projectOutputBaseFolder.appending(components: [moduleName])

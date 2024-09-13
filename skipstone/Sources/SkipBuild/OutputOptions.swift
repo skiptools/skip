@@ -251,7 +251,7 @@ extension ToolOptionsCommand {
         let args = [cmd] + commandArgs.dropFirst()
 
         // write the command output directly to stderr
-        self.outputOptions.logMessage("executing command: \(args.joined(separator: " "))")
+        self.outputOptions.logMessage("executing command\(workingDirectory == nil ? "" : " in \(workingDirectory!.path)"): \(args.joined(separator: " "))")
 
         return await outputOptions.monitor(with: messenger, message, watch: watch, resultHandler: resultHandler) { outputHandler in
             //let result = try await Process.popen(arguments: args, environment: environment, loggingHandler: outputHandler)
