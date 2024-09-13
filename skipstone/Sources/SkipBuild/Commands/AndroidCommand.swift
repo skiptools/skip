@@ -40,6 +40,10 @@ fileprivate extension AndroidOperationCommand {
         throw ToolLaunchError(errorDescription: "Cannot launch android command without SkipDriveExternal")
         #else
 
+        if outputOptions.verbose {
+            print("running command: \(command.joined(separator: " "))")
+        }
+
         for try await outputLine in Process.streamLines(command: command, environment: env, includeStdErr: true, onExit: { result in
             guard case .terminated(0) = result.exitStatus else {
                 // we failed, but did not expect an error
@@ -68,7 +72,7 @@ fileprivate extension AndroidOperationCommand {
     }
     
     /// Run `swift build` for the given Android architectures, optionally running the test cases on the device or copying all the files to the given `archiveOutputFolder`
-    func runSwiftPM(cleanup: Bool? = nil, execute executable: String? = nil, remoteFolder: String? = nil, archiveOutputFolder: URL? = nil, with out: MessageQueue) async throws {
+    func runSwiftPM(cleanup: Bool? = nil, execute executable: String? = nil, commandEnvironment: [String] = [], remoteFolder: String? = nil, archiveOutputFolder: URL? = nil, with out: MessageQueue) async throws {
         let packageDir = toolchainOptions.packagePath ?? "."
         var architectures = toolchainOptions.arch
         if architectures.isEmpty {
@@ -204,12 +208,12 @@ fileprivate extension AndroidOperationCommand {
 
             var runFailure: Error?
             do {
-                let testCmd = stagingDir + "/" + executableBase
+                let execCommand = stagingDir + "/" + executableBase
                 // when not running tests, pass through the specified arguments to the command
                 let cmdArgs = executable != nil ? args.dropFirst() : []
                 // in theory, we should be able to skip individual tests using the _SWIFTPM_SKIP_TESTS_LIST environment variable, but is seems to not work
-                //testCmd = "_SWIFTPM_SKIP_TESTS_LIST=TestClass.testName" + " " + testCmd
-                try await runCommand(command: [adb, "shell", testCmd] + cmdArgs, env: env, with: out)
+                //execCommand = "_SWIFTPM_SKIP_TESTS_LIST=TestClass.testName" + " " + execCommand
+                try await runCommand(command: [adb, "shell"] + commandEnvironment + [execCommand] + cmdArgs, env: env, with: out)
             } catch {
                 runFailure = error
             }
@@ -514,11 +518,14 @@ struct AndroidRunCommand: AndroidOperationCommand {
     @OptionGroup(title: "Toolchain Options")
     var toolchainOptions: ToolchainOptions
 
+    @Option(help: ArgumentHelp("Environment key/value pairs for remote execution", valueName: "key=value"))
+    var env: [String] = []
+
     @Argument(parsing: .allUnrecognized, help: ArgumentHelp("Command arguments"))
     var args: [String] = []
 
     func performCommand(with out: MessageQueue) async throws {
-        try await runSwiftPM(cleanup: cleanup, execute: args.first, remoteFolder: remoteFolder, with: out)
+        try await runSwiftPM(cleanup: cleanup, execute: args.first, commandEnvironment: env, remoteFolder: remoteFolder, with: out)
     }
 }
 
@@ -550,12 +557,15 @@ struct AndroidTestCommand: AndroidOperationCommand {
     //@Option(help: ArgumentHelp("Run test cases matching regular expression", valueName: "filter"))
     //var filter: [String] = []
 
+    @Option(help: ArgumentHelp("Environment key/value pairs for remote execution", valueName: "key=value"))
+    var env: [String] = []
+
     /// Any arguments that are not recognized are passed through to the underlying swift build command
     @Argument(parsing: .allUnrecognized, help: ArgumentHelp("Command arguments"))
     var args: [String] = []
 
     func performCommand(with out: MessageQueue) async throws {
-        try await runSwiftPM(cleanup: cleanup, remoteFolder: remoteFolder, with: out)
+        try await runSwiftPM(cleanup: cleanup, commandEnvironment: env, remoteFolder: remoteFolder, with: out)
     }
 }
 
