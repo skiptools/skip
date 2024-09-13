@@ -185,10 +185,9 @@ fileprivate extension AndroidOperationCommand {
             // create the list of files that need to be uploaded to the device to run the test cases
             var transferFiles = [executablePath]
 
-            // add any resource folders used by the tests (e.g., "swift-crypto_CryptoTests.resources")
+            // add any resource folders used by the tests (e.g., "swift-corelibs-foundation_TestFoundation.resources")
             let resources = try dirs(at: buildOutputFolderURL)
                 .filter({ $0.pathExtension == "resources" })
-                .filter({ try files(at: $0).isEmpty == false })
 
             transferFiles += resources
 
@@ -310,7 +309,7 @@ fileprivate extension AndroidOperationCommand {
         // https://github.com/actions/runner-images/blob/main/images/macos/macos-13-Readme.md#environment-variables-1
 
         // `brew install android-ndk` puts the NDK at /opt/homebrew/share/android-ndk which links to something like /opt/homebrew/Caskroom/android-ndk/27/AndroidNDK12077973.app/Contents/NDK
-        var ndkURL = URL(fileURLWithPath: toolchainOptions.ndk ?? ProcessInfo.processInfo.environment["ANDROID_NDK"] ?? (ProcessInfo.homebrewRoot + "/share/android-ndk"))
+        var ndkURL = URL(fileURLWithPath: toolchainOptions.ndk ?? ProcessInfo.processInfo.environment["ANDROID_NDK_HOME"] ?? (ProcessInfo.homebrewRoot + "/share/android-ndk"))
 
         // if it is not there, then fallback to checking the local ANDROID_HOME location for any installed NDKs
         if !isDir(ndkURL) {
@@ -320,13 +319,14 @@ fileprivate extension AndroidOperationCommand {
             let androidNDKHome = URL(fileURLWithPath: androidHome).appendingPathComponent("ndk")
             if isDir(androidNDKHome) {
                 let versions = try dirs(at: androidNDKHome).filter { dir in
+                    guard let initialPart = dir.lastPathComponent.split(separator: ".").first else {
+                        return false
+                    }
+                    guard let initialNumber = Int(initialPart.description) else {
+                        return false
+                    }
                     // filter out old NDK versions that won't work with the toolchain (26 or 27+ are needed)
-                    !dir.lastPathComponent.hasPrefix("25.")
-                        && !dir.lastPathComponent.hasPrefix("24.")
-                        && !dir.lastPathComponent.hasPrefix("23.")
-                        && !dir.lastPathComponent.hasPrefix("22.")
-                        && !dir.lastPathComponent.hasPrefix("21.")
-                        && !dir.lastPathComponent.hasPrefix("20.")
+                    return initialNumber >= 26
                 }
 
                 if let version = versions.last {
