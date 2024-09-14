@@ -420,6 +420,23 @@ actor MessageQueue {
 
 extension StreamingCommand {
 
+    /// Returns the plugin build output filder with the given module and package names, taking into account changes in the SwiftPM output folder structure between different Swift versions.
+    func buildPluginOutputFolder(forModule moduleName: String, withPackageName packageName: String, inBuildFolder buildFolderAbsolute: AbsolutePath) throws -> AbsolutePath {
+        var buildOutputFolder = buildFolderAbsolute.appending(components: ["plugins", "outputs", packageName, moduleName])
+        // accomodate the change in plugin output folders for Swift 6/Xcode 16:
+        // Swift 5: .build/plugins/outputs/skipapp-hello/HelloSkip/skipstone
+        // Swift 6: .build/plugins/outputs/skipapp-hello/HelloSkip/destination/skipstone
+        if (try? buildOutputFolder.appending(component: "destination").asURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+            buildOutputFolder = buildOutputFolder.appending(component: "destination")
+        }
+
+        buildOutputFolder = buildOutputFolder.appending(component: "skipstone")
+        if (try? buildOutputFolder.asURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) != true {
+            throw error("The expected build output folder \(buildOutputFolder.pathString) did not exist")
+        }
+        return buildOutputFolder
+    }
+
     /// Perform the given operation, logging to a temporary file and displaying the results of the command once it has completed.
     /// - Parameters:
     ///   - out: the message queue for outputting messages and statuses
@@ -932,7 +949,6 @@ extension ToolOptionsCommand {
         let output = await run(with: out, title, cmd)
         return decodeResult(output)
     }
-
 }
 
 struct ToolOptions: ParsableArguments {

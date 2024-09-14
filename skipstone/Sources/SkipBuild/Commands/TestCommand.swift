@@ -1,6 +1,7 @@
 import Foundation
 import ArgumentParser
 import SkipSyntax
+import TSCBasic
 #if canImport(SkipDriveExternal)
 import SkipDriveExternal
 fileprivate let testCommandEnabled = true
@@ -158,8 +159,13 @@ extension TestCommand {
                     await out.yield(MessageBlock(status: .warn, "Folder name does not match package name in Package.swift"))
                     packageName = folderName
                 }
-                let testOutput = ".build/plugins/outputs/\(packageName)/\(skipModule)Tests/skipstone/\(skipModule)/.build/\(skipModule)/test-results/test\(configuration.capitalized)UnitTest/"
-                junitFolder = URL(fileURLWithPath: testOutput, isDirectory: true)
+
+                let buildFolderBase = try AbsolutePath(validating: ".build", relativeTo: AbsolutePath(validating: project, relativeTo: AbsolutePath(validating: FileManager.default.currentDirectoryPath)))
+                let testOutputBase = try buildPluginOutputFolder(forModule: skipModule + "Tests", withPackageName: packageName, inBuildFolder: buildFolderBase)
+
+                let testOutput = testOutputBase.appending(components: [skipModule.description, ".build", skipModule.description, "test-results", "test\(configuration.capitalized)UnitTest"])
+
+                junitFolder = testOutput.asURL
             }
 
             var isDir: Foundation.ObjCBool = false
