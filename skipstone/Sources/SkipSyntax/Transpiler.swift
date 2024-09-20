@@ -6,14 +6,16 @@ import SwiftSyntax
 public struct Transpiler {
     private let packageName: String?
     private let sourceFiles: [Source.FilePath]
+    private let bridgeFiles: [Source.FilePath]
     private let codebaseInfo: CodebaseInfo
     public var preprocessorSymbols: Set<String>
     public var transformers: [KotlinTransformer]
 
     /// Supply files to transpile.
-    public init(packageName: String? = nil, sourceFiles: [Source.FilePath], codebaseInfo: CodebaseInfo, preprocessorSymbols: Set<String> = [], transformers: [KotlinTransformer] = []) {
+    public init(packageName: String? = nil, sourceFiles: [Source.FilePath], bridgeFiles: [Source.FilePath] = [], codebaseInfo: CodebaseInfo, preprocessorSymbols: Set<String> = [], transformers: [KotlinTransformer] = []) {
         self.packageName = packageName
         self.sourceFiles = sourceFiles
+        self.bridgeFiles = bridgeFiles
         self.codebaseInfo = codebaseInfo
         self.preprocessorSymbols = preprocessorSymbols
         self.transformers = transformers
@@ -41,9 +43,25 @@ public struct Transpiler {
                     symbolFiles.insert(syntaxTree.source.file)
                 }
             }
-            codebaseInfo.prepareForUse()
-            transformers.forEach { $0.prepareForUse(codebaseInfo: codebaseInfo) }
         }
+        try await withThrowingTaskGroup(of: SyntaxTree?.self) { group in
+            for bridgeFile in bridgeFiles {
+                group.addTask {
+                    return try SyntaxTree(bridgeSource: Source(file: bridgeFile), preprocessorSymbols: preprocessorSymbols)
+                }
+            }
+            for try await syntaxTree in group {
+                guard let syntaxTree else {
+                    continue
+                }
+                codebaseInfo.gather(from: syntaxTree)
+                transformers.forEach { $0.gather(from: syntaxTree) }
+            }
+        }
+
+        codebaseInfo.prepareForUse()
+        transformers.forEach { $0.prepareForUse(codebaseInfo: codebaseInfo) }
+
         // Next perform transpilation with populated info
         try await withThrowingTaskGroup(of: Transpilation.self) { group in
             for sourceFile in sourceFiles where !symbolFiles.contains(sourceFile) {
