@@ -72,7 +72,7 @@ fileprivate extension AndroidOperationCommand {
     }
     
     /// Run `swift build` for the given Android architectures, optionally running the test cases on the device or copying all the files to the given `archiveOutputFolder`
-    func runSwiftPM(cleanup: Bool? = nil, execute executable: String? = nil, commandEnvironment: [String] = [], remoteFolder: String? = nil, archiveOutputFolder: URL? = nil, with out: MessageQueue) async throws {
+    func runSwiftPM(cleanup: Bool? = nil, execute executable: String? = nil, commandEnvironment: [String] = [], remoteFolder: String? = nil, copy: [String] = [], archiveOutputFolder: URL? = nil, with out: MessageQueue) async throws {
         let packageDir = toolchainOptions.packagePath ?? "."
         var architectures = toolchainOptions.arch
         if architectures.isEmpty {
@@ -194,7 +194,6 @@ fileprivate extension AndroidOperationCommand {
                 .filter({ $0.pathExtension == "resources" })
 
             transferFiles += resources
-
             transferFiles.append(contentsOf: try dependencySharedObjectFiles())
 
             let adb = try toolOptions.toolPath(for: "adb")
@@ -203,17 +202,16 @@ fileprivate extension AndroidOperationCommand {
             // create the staging folder
             await run(with: out, "Connecting to Android", [adb, "shell", "mkdir", "-p", stagingDir], additionalEnvironment: env)
 
-            // Note: one shortcoming of `adb push` is that it doesn't copy symbolic links as links, but insead pushes the underlying file; so, for example, the link libxml2.so -> libxml2.so.2.13.3 will be copies as two separate yet identical files, which increases the size of the transfer unnecessarily. In practice, this isn't a proble, since the linker will work, but it means that the directory of dependent shared objects will be bigger than it needs to be. One workaround to this might be to first archive all the files together (e.g., with tar), transfer the archive, and then unarchive them on the device, but this adds complexity to the process.
-            await run(with: out, "Copying \(runTests ? "test" : "executable") files", [adb, "push"] + transferFiles.map(\.path) + [stagingDir], additionalEnvironment: env)
+            // Note: one shortcoming of `adb push` is that it doesn't copy symbolic links as links, but instead pushes the underlying file; so, for example, the link libxml2.so -> libxml2.so.2.13.3 will be copied as two separate yet identical files, which increases the size of the transfer unnecessarily. In practice, this isn't a proble, since the linker will work, but it means that the directory of dependent shared objects will be bigger than it needs to be. One workaround to this might be to first archive all the files together (e.g., with tar), transfer the archive, and then unarchive them on the device, but this adds complexity to the process.
+            await run(with: out, "Copying \(runTests ? "test" : "executable") files", [adb, "push"] + transferFiles.map(\.path) + copy + [stagingDir], additionalEnvironment: env)
 
             var runFailure: Error?
             do {
-                let execCommand = stagingDir + "/" + executableBase
                 // when not running tests, pass through the specified arguments to the command
                 let cmdArgs = executable != nil ? args.dropFirst() : []
                 // in theory, we should be able to skip individual tests using the _SWIFTPM_SKIP_TESTS_LIST environment variable, but is seems to not work
                 //execCommand = "_SWIFTPM_SKIP_TESTS_LIST=TestClass.testName" + " " + execCommand
-                try await runCommand(command: [adb, "shell"] + commandEnvironment + [execCommand] + cmdArgs, env: env, with: out)
+                try await runCommand(command: [adb, "shell", "cd '\(stagingDir)'", "&&"] + commandEnvironment + ["./" + executableBase] + cmdArgs, env: env, with: out)
             } catch {
                 runFailure = error
             }
@@ -521,11 +519,14 @@ struct AndroidRunCommand: AndroidOperationCommand {
     @Option(help: ArgumentHelp("Environment key/value pairs for remote execution", valueName: "key=value"))
     var env: [String] = []
 
+    @Option(help: ArgumentHelp("Additional files or folders to copy to Android", valueName: "file/folder"))
+    var copy: [String] = []
+
     @Argument(parsing: .allUnrecognized, help: ArgumentHelp("Command arguments"))
     var args: [String] = []
 
     func performCommand(with out: MessageQueue) async throws {
-        try await runSwiftPM(cleanup: cleanup, execute: args.first, commandEnvironment: env, remoteFolder: remoteFolder, with: out)
+        try await runSwiftPM(cleanup: cleanup, execute: args.first, commandEnvironment: env, remoteFolder: remoteFolder, copy: copy, with: out)
     }
 }
 
@@ -560,12 +561,15 @@ struct AndroidTestCommand: AndroidOperationCommand {
     @Option(help: ArgumentHelp("Environment key/value pairs for remote execution", valueName: "key=value"))
     var env: [String] = []
 
+    @Option(help: ArgumentHelp("Additional files or folders to copy to Android", valueName: "file/folder"))
+    var copy: [String] = []
+
     /// Any arguments that are not recognized are passed through to the underlying swift build command
     @Argument(parsing: .allUnrecognized, help: ArgumentHelp("Command arguments"))
     var args: [String] = []
 
     func performCommand(with out: MessageQueue) async throws {
-        try await runSwiftPM(cleanup: cleanup, commandEnvironment: env, remoteFolder: remoteFolder, with: out)
+        try await runSwiftPM(cleanup: cleanup, commandEnvironment: env, remoteFolder: remoteFolder, copy: copy, with: out)
     }
 }
 
