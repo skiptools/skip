@@ -148,7 +148,7 @@ final class ConcurrencyTests: XCTestCase {
     func testMainActorRun() async throws {
         let supportingSwift = """
         class MainActor {
-            // SKIP ATTRIBUTES: nodispatch
+            // SKIP @nodispatch
             static func run<T>(body: () throws -> T) async -> T {
                 fatalError()
             }
@@ -421,11 +421,11 @@ final class ConcurrencyTests: XCTestCase {
     func testTaskGroup() async throws {
         let supportingSwift = """
         struct ThrowingTaskGroup<ChildTaskResult, Failure> where Failure : Error {
-            // SKIP ATTRIBUTES: nodispatch
+            // SKIP @nodispatch
             public mutating func addTask(priority: TaskPriority? = nil, operation: () async throws -> ChildTaskResult) {
             }
         }
-        // SKIP ATTRIBUTES: nodispatch
+        // SKIP @nodispatch
         func withThrowingTaskGroup<ChildTaskResult, GroupResult>(of childTaskResultType: ChildTaskResult.Type, returning returnType: GroupResult.Type? = nil, body: (ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult) async rethrows -> GroupResult {
             fatalError()
         }

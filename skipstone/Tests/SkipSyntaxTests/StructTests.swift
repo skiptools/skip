@@ -505,7 +505,7 @@ final class StructTests: XCTestCase {
 
     func testNocopyDirective() async throws {
         try await check(swift: """
-        // SKIP ATTRIBUTES: nocopy
+        // SKIP @nocopy
         struct S {
             var x = 1
         }
@@ -540,7 +540,7 @@ final class StructTests: XCTestCase {
         """)
 
         try await check(swift: """
-        // SKIP ATTRIBUTES: nocopy
+        // SKIP @nocopy
         struct S {
             var x = 1
 
