@@ -96,7 +96,9 @@ enum KotlinCompanionType {
     }
 }
 
-enum KotlinDirectiveAttribute: String {
+enum KotlinDirective: String {
+    case bridge
+    case nobridge
     case nocopy
     case nodispatch
 }
@@ -274,11 +276,6 @@ extension Accessor where B: CodeBlock {
 }
 
 extension Attributes {
-    /// Whether the given directive attribute is present.
-    func kotlinHasDirective(_ directive: KotlinDirectiveAttribute) -> Bool {
-        return of(kind: .directive).contains { $0.tokens.contains(directive.rawValue) }
-    }
-
     func append(to output: OutputGenerator, indentation: Indentation) {
         attributes.forEach { $0.append(to: output, indentation: indentation) }
     }

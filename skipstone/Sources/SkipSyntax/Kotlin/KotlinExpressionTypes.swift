@@ -609,7 +609,7 @@ final class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
             guard case .function(_, _, _, let attributes) = (parent as? KotlinFunctionCall)?.apiMatch?.signature else {
                 return false
             }
-            return attributes?.kotlinHasDirective(.nodispatch) == true
+            return attributes?.contains(directive: KotlinDirective.nodispatch) == true
         }
         set {
             _isNoDispatch = newValue

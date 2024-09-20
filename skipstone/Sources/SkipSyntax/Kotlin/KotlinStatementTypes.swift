@@ -1733,7 +1733,7 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
         return name == "<" && modifiers.isStatic && parameters.count == 2
     }
     var isNoDispatch: Bool {
-        return attributes.kotlinHasDirective(.nodispatch)
+        return attributes.contains(directive: KotlinDirective.nodispatch)
     }
 
     enum Role {

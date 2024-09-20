@@ -185,16 +185,24 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
         return .function(parameters, returnType, allAPIFlags, allAttributes.isEmpty ? nil : Attributes(attributes: allAttributes))
     }
 
-    func contains(_ kind: Attribute.Kind) -> Bool {
-        return attributes.contains { $0.kind == kind }
+    var isEmpty: Bool {
+        return attributes.isEmpty
     }
 
     func of(kind: Attribute.Kind) -> [Attribute] {
         return attributes.filter { $0.kind == kind }
     }
 
-    var isEmpty: Bool {
-        return attributes.isEmpty
+    func contains(_ kind: Attribute.Kind) -> Bool {
+        return attributes.contains { $0.kind == kind }
+    }
+
+    func contains(directive: String) -> Bool {
+        return of(kind: .directive).contains { $0.tokens.contains(directive) }
+    }
+
+    func contains(directive: any RawRepresentable<String>) -> Bool {
+        return contains(directive: directive.rawValue)
     }
 
     /// Some property wrappers are non-mutating.
