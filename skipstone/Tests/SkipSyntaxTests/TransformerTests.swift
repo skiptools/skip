@@ -79,7 +79,7 @@ final class TransformerTests: XCTestCase {
         internal fun f() {
             val path = Bundle.module.path()
         }
-        """, packageSupportKotlin: """
+        """, kotlinPackageSupport: """
         internal val skip.foundation.Bundle.Companion.module: skip.foundation.Bundle
             get() = _moduleBundle
         private val _moduleBundle : skip.foundation.Bundle by lazy { skip.foundation.Bundle(_ModuleBundleLocator::class) }
@@ -96,7 +96,7 @@ final class TransformerTests: XCTestCase {
         internal fun f() {
             val path = Foundation.Bundle.module.path()
         }
-        """, packageSupportKotlin: """
+        """, kotlinPackageSupport: """
         internal val skip.foundation.Bundle.Companion.module: skip.foundation.Bundle
             get() = _moduleBundle
         private val _moduleBundle : skip.foundation.Bundle by lazy { skip.foundation.Bundle(_ModuleBundleLocator::class) }
@@ -113,7 +113,7 @@ final class TransformerTests: XCTestCase {
         internal fun f() {
             val path = Local.Bundle.module.path()
         }
-        """, packageSupportKotlin: """
+        """, kotlinPackageSupport: """
         """)
     }
 }

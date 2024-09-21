@@ -35,7 +35,7 @@ final class TupleTests: XCTestCase {
         let pair = (i: 1, s: "a")
         """, kotlin: """
         internal val pair = Tuple2(1, "a")
-        """, packageSupportKotlin: """
+        """, kotlinPackageSupport: """
         internal val <E0, E1> Tuple2<E0, E1>.i: E0
             get() = element0
 
@@ -51,7 +51,7 @@ final class TupleTests: XCTestCase {
         import skip.lib.Array
         
         internal fun f(p: Tuple2<String, Int>): Array<Tuple3<Int, Int, Double>> = arrayOf(Tuple3(1, 2, 3.0))
-        """, packageSupportKotlin: """
+        """, kotlinPackageSupport: """
         internal val <E0, E1, E2> Tuple3<E0, E1, E2>.x: E0
             get() = element0
 
@@ -323,7 +323,7 @@ final class TupleTests: XCTestCase {
         internal fun f(d: Dictionary<String, Int>) {
             val a = d.compactMap { it -> it.value == Int.min }
         }
-        """, packageSupportKotlin: """
+        """, kotlinPackageSupport: """
         internal val <E0, E1> Tuple2<E0, E1>.value: E1
             get() = element1
         """)
@@ -352,7 +352,7 @@ final class TupleTests: XCTestCase {
 
         internal fun f(a: Array<String>): Unit = g(elements = a.enumerated(), id = { it.index })
         internal fun <E> g(elements: Array<E>, id: (E) -> Int) = Unit
-        """, packageSupportKotlin: """
+        """, kotlinPackageSupport: """
         internal val <E0, E1> Tuple2<E0, E1>.index: E0
             get() = element0
         """)
