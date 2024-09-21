@@ -221,7 +221,7 @@ extension CodebaseInfo.Context {
         assert(global.kotlin != nil)
         let typeInfos = typeInfos(forNamed: type)
         if let structInfo = typeInfos.first(where: { $0.declarationType == .structDeclaration }) {
-            guard !structInfo.attributes.kotlinHasDirective(.nocopy) else {
+            guard !structInfo.attributes.contains(directive: KotlinDirective.nocopy) else {
                 return false
             }
             if structInfo.variables.contains(where: { $0.apiFlags?.options.contains(.writeable) == true && !$0.attributes.isNonMutating }) || structInfo.functions.contains(where: \.isMutating) {
@@ -229,7 +229,7 @@ extension CodebaseInfo.Context {
             }
             // Special case for OptionSets, where the transpiler adds mutability
             return global.protocolSignatures(forNamed: type).contains { $0.isNamed("OptionSet", moduleName: "Swift") }
-        } else if typeInfos.contains(where: { $0.declarationType == .protocolDeclaration && !$0.attributes.kotlinHasDirective(.nocopy) }) {
+        } else if typeInfos.contains(where: { $0.declarationType == .protocolDeclaration && !$0.attributes.contains(directive: KotlinDirective.nocopy) }) {
             // If this is a protocol that is constrained to class impls, then it isn't a mutable struct. Otherwise it could be
             return !global.protocolSignatures(forNamed: type).contains(.anyObject)
         } else if typeInfos.isEmpty {

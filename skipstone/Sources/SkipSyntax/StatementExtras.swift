@@ -39,7 +39,8 @@ struct StatementExtras {
         var triviaLines: [String] = []
         var isMultilineCommentDirective = false
         var multilineCommentDirectiveIndentation = 0
-        let attributesPrefix = "SKIP ATTRIBUTES:"
+        let attributesPrefix = "SKIP @"
+        let attributesPrefixOld = "SKIP ATTRIBUTES:"
         let insertPrefix = "SKIP INSERT:"
         let replacePrefix = "SKIP REPLACE:"
         let declarationPrefix = "SKIP DECLARE:"
@@ -53,7 +54,9 @@ struct StatementExtras {
             let directiveString = directiveLines.joined().trimmingCharacters(in: .whitespacesAndNewlines)
             switch currentDirective {
             case .attributes:
-                let attributes = directiveString.components(separatedBy: .whitespaces)
+                let attributes = directiveString.components(separatedBy: .whitespaces).map {
+                    $0.hasPrefix("@") ? String($0.dropFirst()) : $0
+                }
                 directives.append(.attributes(attributes))
             case .insert:
                 directives.append(.insert(directiveString, triviaLines))
@@ -147,6 +150,9 @@ struct StatementExtras {
                     directive = .declaration("")
                     directiveLines.append(String(trimmedLine.dropFirst(declarationPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
                 } else if trimmedLine.hasPrefix(attributesPrefix) {
+                    directive = .attributes([])
+                    directiveLines.append(String(trimmedLine.dropFirst(attributesPrefix.count - 1)).trimmingCharacters(in: .whitespaces) + "\n")
+                } else if trimmedLine.hasPrefix(attributesPrefixOld) {
                     directive = .attributes([])
                     directiveLines.append(String(trimmedLine.dropFirst(attributesPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
                 } else if trimmedLine.hasPrefix(noWarnPrefix) {

@@ -96,7 +96,7 @@ enum KotlinCompanionType {
     }
 }
 
-enum KotlinDirectiveAttribute: String {
+enum KotlinDirective: String {
     case nocopy
     case nodispatch
 }
@@ -274,11 +274,6 @@ extension Accessor where B: CodeBlock {
 }
 
 extension Attributes {
-    /// Whether the given directive attribute is present.
-    func kotlinHasDirective(_ directive: KotlinDirectiveAttribute) -> Bool {
-        return of(kind: .directive).contains { $0.tokens.contains(directive.rawValue) }
-    }
-
     func append(to output: OutputGenerator, indentation: Indentation) {
         attributes.forEach { $0.append(to: output, indentation: indentation) }
     }
@@ -490,6 +485,15 @@ extension Source.FilePath {
     func kotlinPackageSupport(tests: Bool) -> Source.FilePath {
         var filePath = self
         filePath.name = "PackageSupport\(tests ? "Test" : "").swift"
+        return filePath
+    }
+
+    /// Synthetic source that will be translated to a file appropriate for bridge support code.
+    ///
+    /// - Parameter tests: whether this is for a test package, in which case the generated file will be "SwiftBridgeTest.swift" in order to not clash with the primary module's "SwiftBridge.swift"
+    func swiftBridgeSupport(tests: Bool) -> Source.FilePath {
+        var filePath = self
+        filePath.name = "SwiftBridge\(tests ? "Test" : "").swift"
         return filePath
     }
 }
