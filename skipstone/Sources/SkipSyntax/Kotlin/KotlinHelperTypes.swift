@@ -97,8 +97,6 @@ enum KotlinCompanionType {
 }
 
 enum KotlinDirective: String {
-    case bridge
-    case nobridge
     case nocopy
     case nodispatch
 }

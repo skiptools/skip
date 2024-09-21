@@ -472,6 +472,12 @@ enum CaptureType {
     case weak
 }
 
+/// Known directives in `Attributes`.
+enum Directive: String {
+    case bridge
+    case nobridge
+}
+
 /// Generic information for a type or API.
 ///
 /// - Note: `Codable` for use in `CodebaseInfo`.
