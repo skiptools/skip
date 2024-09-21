@@ -18,10 +18,17 @@ public protocol KotlinTransformer {
     /// Apply this transformer to the given Kotlin syntax tree.
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator)
 
-    /// Apply this transformer to the package-level generated source file. There is nothing in this tree except code added by the transfomer chain.
+    /// Apply this transformer to the package-level generated source file.
+    ///
+    /// There is nothing in this tree except code added by the transfomer chain.
     ///
     /// - Returns: Whether any code was added to the tree.
     func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> Bool
+
+    /// Apply this transformer to the package-level generated Swift bridge file.
+    ///
+    /// - Returns: Whether any code was added to the bridge output.
+    func append(toSwiftBridge output: OutputGenerator, imports: Set<String>, translator: KotlinTranslator) -> Bool
 }
 
 /// The set of builtin transformers in the order in which they should run.
@@ -66,6 +73,7 @@ public let builtinKotlinTransformerTypes: [KotlinTransformer.Type] = [
     KotlinImportsTransformer.self,
     KotlinUnitTestTransformer.self,
     KotlinModuleBundleTransformer.self,
+    KotlinBridgeTransformer.self,
 ]
 
 /// The builtin transformers can implement this protocol to modify how type signatures are output.
@@ -89,6 +97,10 @@ extension KotlinTransformer {
     }
 
     func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> Bool {
+        return false
+    }
+
+    func append(toSwiftBridge output: OutputGenerator, imports: Set<String>, translator: KotlinTranslator) -> Bool {
         return false
     }
 }

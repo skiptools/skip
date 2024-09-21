@@ -1663,8 +1663,12 @@ final class VariableDeclaration: Statement {
             declaredType = TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
         }
         var value: Expression? = nil
-        if !syntaxTree.isBridgeFile || declaredType == .none, let valueSyntax = syntax.initializer?.value {
+        if let valueSyntax = syntax.initializer?.value {
             value = ExpressionDecoder.decode(syntax: valueSyntax, in: syntaxTree)
+            // RawExpression indicates an error decoding. Ignore for bridge code
+            if syntaxTree.isBridgeFile && value is RawExpression {
+                value = nil
+            }
         }
 
         var accessors: Accessors = Accessors()
