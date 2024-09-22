@@ -4,29 +4,16 @@ import SwiftSyntax
 /// Representation of the Swift syntax tree.
 public final class SyntaxTree: PrettyPrintable {
     let source: Source
-    let syntax: SourceFileSyntax
     let preprocessorSymbols: Set<String>
     let root: CodeBlock = CodeBlock(statements: [])
 
     /// - Note: `unavailableAPI` is not used when `codebaseInfo` is available
-    public convenience init(source: Source, preprocessorSymbols: Set<String> = [], codebaseInfo: CodebaseInfo? = nil, unavailableAPI: UnavailableAPI? = nil) {
-        self.init(source: source, isBridgeFile: false, preprocessorSymbols: preprocessorSymbols, codebaseInfo: codebaseInfo, unavailableAPI: unavailableAPI)
-    }
-
-    public convenience init?(bridgeSource: Source, preprocessorSymbols: Set<String> = [], codebaseInfo: CodebaseInfo? = nil, unavailableAPI: UnavailableAPI? = nil) {
-        // Most compiled files do not contain bridging code
-        guard bridgeSource.content.contains("@bridge") else {
-            return nil
-        }
-        self.init(source: bridgeSource, isBridgeFile: true, preprocessorSymbols: preprocessorSymbols, codebaseInfo: codebaseInfo, unavailableAPI: unavailableAPI)
-    }
-
-    private init(source: Source, isBridgeFile: Bool, preprocessorSymbols: Set<String> = [], codebaseInfo: CodebaseInfo? = nil, unavailableAPI: UnavailableAPI? = nil) {
+    public init(source: Source, isBridgeFile: Bool = false, preprocessorSymbols: Set<String> = [], codebaseInfo: CodebaseInfo? = nil, unavailableAPI: UnavailableAPI? = nil) {
         self.source = source
         self.isBridgeFile = isBridgeFile
         self.preprocessorSymbols = preprocessorSymbols
         var parser = Parser(source.content, experimentalFeatures: [.sendingArgsAndResults])
-        self.syntax = SourceFileSyntax.parse(from: &parser)
+        let syntax = SourceFileSyntax.parse(from: &parser)
         self.root.statements = StatementDecoder.decode(syntaxListContainer: syntax, in: self)
 
         let importedModuleNames = root.statements.importedModulePaths.compactMap(\.moduleName)

@@ -83,6 +83,33 @@ public final class KotlinTranslator {
         return transpilation
     }
 
+    /// Transpile the package support file containing any needed package-level code.
+    public static func transpileBridgeSupport(sourceFile: Source.FilePath, codebaseInfo: CodebaseInfo, transformers: [KotlinTransformer]) -> Transpilation? {
+        let startTime = Date().timeIntervalSinceReferenceDate
+        let syntaxTree = SyntaxTree(source: Source(file: sourceFile, content: ""))
+        var imports: Set<String> = []
+        let translator = KotlinTranslator(syntaxTree: syntaxTree)
+        let codebaseInfoContext = codebaseInfo.context(sourceFile: sourceFile)
+        translator.codebaseInfo = codebaseInfoContext
+        translator.packageName = codebaseInfo.kotlin?.packageName
+        let results = transformers.map { $0.apply(toSwiftBridge: syntaxTree, imports: &imports, translator: translator) }
+        guard results.contains(true) else {
+            return nil
+        }
+
+        let messages = syntaxTree.messages + codebaseInfo.messages(for: syntaxTree.source.file) + transformers.flatMap { $0.messages(for: syntaxTree.source.file) }
+        let outputFile = syntaxTree.source.file.outputFile(withExtension: "swift")
+        var importContent = imports.sorted().map { "import " + $0 }.joined(separator: "\n")
+        if !importContent.isEmpty {
+            importContent += "\n\n"
+        }
+        let content = importContent + syntaxTree.root.statements.compactMap { ($0 as? RawStatement)?.sourceCode }.joined(separator: "\n")
+        let output = Source(file: outputFile, content: content)
+        let endTime = Date().timeIntervalSinceReferenceDate
+        let transpilation = Transpilation(input: syntaxTree.source, output: output, messages: messages, duration: endTime - startTime)
+        return transpilation
+    }
+
     /// Translate syntax trees only.
     public func translateSyntaxTree() -> KotlinSyntaxTree {
         let translatedStatements = syntaxTree.root.statements.flatMap { translateStatement($0) }
@@ -90,7 +117,7 @@ public final class KotlinTranslator {
         let dependencies = gatherDependencies(from: importsFirstStatements)
         let kotlinRoot = KotlinCodeBlock(statements: importsFirstStatements)
         kotlinRoot.messages = syntaxTree.root.messages
-        let kotlinSyntaxTree = KotlinSyntaxTree(source: syntaxTree.source, root: kotlinRoot, dependencies: dependencies)
+        let kotlinSyntaxTree = KotlinSyntaxTree(source: syntaxTree.source, isBridgeFile: syntaxTree.isBridgeFile, root: kotlinRoot, dependencies: dependencies)
         kotlinSyntaxTree.root.assignParentReferences()
         return kotlinSyntaxTree
     }

@@ -11,7 +11,7 @@ final class KotlinTupleLabelTransformer: KotlinTransformer {
     private typealias TupleLabels = [Int: [Int: Set<String>]]
 
     private var tupleLabels: TupleLabels = [:]
-    private let tupleLabelsLock = NSLock()
+    private var tupleLabelsLock = NSLock()
     private var packageSourceFile: Source.FilePath? = nil
     private var packageMessages: [Message] = []
 
