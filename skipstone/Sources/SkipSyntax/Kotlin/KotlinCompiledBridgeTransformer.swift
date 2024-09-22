@@ -2,7 +2,6 @@ import Foundation
 
 /// Generate compiled Swift to Kotlin bridging code.
 final class KotlinCompiledBridgeTransformer: KotlinTransformer {
-    private var unbridgedConstants: Set<String> = []
     private var cdeclFunctions: [CDeclFunction] = []
     private var lock = NSLock()
 
@@ -10,19 +9,17 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         guard syntaxTree.isBridgeFile else {
             return
         }
-        var localUnbridgedConstants: Set<String> = []
         var localCdeclFunctions: [CDeclFunction] = []
         syntaxTree.root.visit { node in
             if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global || variableDeclaration.role == .property {
-                updateVariableDeclaration(variableDeclaration, unbridgedConstants: &localUnbridgedConstants, cdeclFunctions: &localCdeclFunctions, translator: translator)
+                updateVariableDeclaration(variableDeclaration, cdeclFunctions: &localCdeclFunctions, translator: translator)
             }
             return .recurse(nil)
         }
-        if !localUnbridgedConstants.isEmpty || !localCdeclFunctions.isEmpty {
-            lock.withLock {
-                unbridgedConstants.formUnion(localUnbridgedConstants)
-                cdeclFunctions += localCdeclFunctions
-            }
+        if !localCdeclFunctions.isEmpty {
+            lock.lock()
+            cdeclFunctions += localCdeclFunctions
+            lock.unlock()
         }
     }
 
@@ -39,7 +36,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         return true
     }
 
-    private func updateVariableDeclaration(_ variableDeclaration: KotlinVariableDeclaration, unbridgedConstants: inout Set<String>, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+    private func updateVariableDeclaration(_ variableDeclaration: KotlinVariableDeclaration, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
         guard checkNonPrivate(variableDeclaration, modifiers: variableDeclaration.modifiers, translator: translator) else {
             return
         }
@@ -55,7 +52,6 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         let (cdecl, cdeclName) = cdecl(for: variableDeclaration, name: externalName, translator: translator)
         if let value = variableDeclaration.value {
             guard !variableDeclaration.isLet || !(value is KotlinNullLiteral || value is KotlinNumericLiteral || value is KotlinStringLiteral) else {
-                unbridgedConstants.insert(cdeclName)
                 return
             }
             variableDeclaration.value = nil

@@ -59,9 +59,9 @@ final class KotlinTupleLabelTransformer: KotlinTransformer {
             return .recurse(nil)
         }
         if !localLabels.isEmpty {
-            tupleLabelsLock.withLock {
-                mergeTupleLabels(localLabels, into: &tupleLabels)
-            }
+            tupleLabelsLock.lock()
+            mergeTupleLabels(localLabels, into: &tupleLabels)
+            tupleLabelsLock.unlock()
         }
     }
 
