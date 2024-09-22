@@ -1,10 +1,10 @@
-import os.lock
+import Foundation
 
 /// Generate compiled Swift to Kotlin bridging code.
 final class KotlinCompiledBridgeTransformer: KotlinTransformer {
     private var unbridgedConstants: Set<String> = []
     private var cdeclFunctions: [CDeclFunction] = []
-    private var lock = os_unfair_lock()
+    private var lock = NSLock()
 
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
         guard syntaxTree.isBridgeFile else {
@@ -19,10 +19,10 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
             return .recurse(nil)
         }
         if !localUnbridgedConstants.isEmpty || !localCdeclFunctions.isEmpty {
-            os_unfair_lock_lock(&lock)
-            unbridgedConstants.formUnion(localUnbridgedConstants)
-            cdeclFunctions += localCdeclFunctions
-            os_unfair_lock_unlock(&lock)
+            lock.withLock {
+                unbridgedConstants.formUnion(localUnbridgedConstants)
+                cdeclFunctions += localCdeclFunctions
+            }
         }
     }
 
