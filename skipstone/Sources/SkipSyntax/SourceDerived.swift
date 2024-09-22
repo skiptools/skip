@@ -1,5 +1,5 @@
 /// An entity that may have been parsed or translated from source.
-protocol SourceDerived {
+protocol SourceDerived: AnyObject {
     var sourceFile: Source.FilePath? { get }
     var sourceRange: Source.Range? { get }
 

@@ -92,15 +92,26 @@ public struct Source : Encodable {
             }
         }
 
-        public var isSwift: Bool {
-            return path.hasSuffix(".swift")
+        public var `extension`: String {
+            get {
+                guard let dotIndex = path.lastIndex(of: ".") else {
+                    return ""
+                }
+                return String(path[path.index(after: dotIndex)...])
+            }
+            set {
+                var path = self.path
+                if let dotIndex = path.lastIndex(of: ".") {
+                    path = String(path[..<dotIndex])
+                }
+                self.path = newValue.isEmpty ? path : path + "." + newValue
+            }
         }
 
         public func outputFile(withExtension: String) -> Source.FilePath {
-            guard let dotIndex = path.lastIndex(of: ".") else {
-                return FilePath(path: "\(path).\(withExtension)")
-            }
-            return FilePath(path: path[...dotIndex] + withExtension)
+            var output = self
+            output.extension = withExtension
+            return output
         }
     }
 
