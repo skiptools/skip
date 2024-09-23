@@ -2828,11 +2828,11 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
 
         // Warnings and fixups
         kstatement.declaredType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source)
-        if kstatement.declaredType == .float || kstatement.declaredType == .int128 || kstatement.declaredType.isUnsigned, let literal = kstatement.value as? KotlinNumericLiteral, literal.suffix.isEmpty {
+        if !translator.syntaxTree.isBridgeFile, kstatement.declaredType == .float || kstatement.declaredType == .int128 || kstatement.declaredType.isUnsigned, let literal = kstatement.value as? KotlinNumericLiteral, literal.suffix.isEmpty {
             kstatement.messages.append(.kotlinNumericCast(kstatement, source: translator.syntaxTree.source, type: kstatement.declaredType.kotlin))
         }
         if kstatement.role.isProperty || kstatement.role == .global {
-            if kstatement.propertyType.isUnwrappedOptional && kstatement.propertyType.kotlinIsNative(primitive: true) {
+            if !translator.syntaxTree.isBridgeFile, kstatement.propertyType.isUnwrappedOptional && kstatement.propertyType.kotlinIsNative(primitive: true) {
                 kstatement.messages.append(.kotlinLateinitPrimitive(kstatement, source: translator.syntaxTree.source))
             }
         } else {
