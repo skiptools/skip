@@ -1,17 +1,17 @@
 import XCTest
 
 final class CompiledBridgingTests: XCTestCase {
-//    func testPrivate() async throws {
-//        try await checkProducesMessage(swift: """
-//        // SKIP @bridge
-//        private let i = 1
-//        """)
-//
-//        try await checkProducesMessage(swift: """
-//        // SKIP @bridge
-//        fileprivate let i = 1
-//        """)
-//    }
+    func testPrivate() async throws {
+        try await checkProducesMessage(swift: """
+        // SKIP @bridge
+        private let i = 1
+        """, isSwiftBridge: true)
+
+        try await checkProducesMessage(swift: """
+        // SKIP @bridge
+        fileprivate let i = 1
+        """, isSwiftBridge: true)
+    }
 
     func testLetSupportedLiteral() async throws {
         try await check(swift: """
