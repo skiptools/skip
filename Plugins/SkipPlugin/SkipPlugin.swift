@@ -130,14 +130,14 @@ import PackagePlugin
             }
         }
 
-        // the output files contains the .skipcode.json, and the input files contains all the dependent .skipcode.json files
+        // the output files contains the .skipcode.json, and the input files contain all the dependent .skipcode.json files
         let outputURL = URL(fileURLWithPath: outputFolder.string, isDirectory: true)
         let sourceHashDot = "."
         let sourcehashOutputPath = Path(outputURL.appendingPathComponent(sourceHashDot + peerTarget.name + sourcehashExtension, isDirectory: false).path)
         //Diagnostics.warning("add sourcehash output for \(target.name): \(sourcehashOutputPath)", file: sourcehashOutputPath.string)
 
-//        let swiftExtensionsOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + "-Skip.swift", isDirectory: false).path)
-        //Diagnostics.warning("add skip extensions output for \(target.name): \(swiftExtensionsOutputPath)", file: swiftExtensionsOutputPath.string)
+        let skipBridgeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + "SwiftBridge.swift", isDirectory: false).path)
+        //Diagnostics.warning("add skip extensions output for \(target.name): \(skipBridgeOutputPath)", file: skipBridgeOutputPath.string)
 
         struct Dep : Identifiable {
             let package: Package
@@ -205,7 +205,7 @@ import PackagePlugin
         var deps = dependencies(for: target.dependencies, in: context.package)
         deps = makeUniqueById(deps)
 
-        let outputFiles: [Path] = [sourcehashOutputPath, /* swiftExtensionsOutputPath */]
+        let outputFiles: [Path] = [sourcehashOutputPath, skipBridgeOutputPath]
         // input files consist of the source files, as well as all the dependent module output source hash directory files, which will be modified whenever a transpiled module changes
         // note that using the directory as the input will cause the transpile to re-run for any sub-folder change, although this behavior is not explicitly documented
         var inputFiles: [Path] = [target.directory] + target.sourceFiles.map(\.path)
@@ -260,6 +260,7 @@ import PackagePlugin
                 "--project", swiftSourceTarget.directory.string,
                 "--skip-folder", skipFolder.string,
                 "--sourcehash", sourcehashOutputPath.string,
+                "--skipbridge", skipBridgeOutputPath.string,
                 "--output-folder", sourceBase.path,
                 "--module-root", outputBase.path,
                 ]
