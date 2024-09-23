@@ -13,6 +13,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         syntaxTree.root.visit { node in
             if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global || variableDeclaration.role == .property {
                 updateVariableDeclaration(variableDeclaration, cdeclFunctions: &localCdeclFunctions, translator: translator)
+                return .skip
             }
             return .recurse(nil)
         }
@@ -31,8 +32,8 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         imports.insert("SkipJNI")
         // TODO: Update cdecls to add argument type encodings on conflicting functions
         // TODO: Imports
-        let cdeclFunctionDefinitions = cdeclFunctions.map { cdeclFunctionDefinition(for: $0) }
-        syntaxTree.root.statements += cdeclFunctionDefinitions
+        let cdeclStatements = cdeclFunctions.map { cdeclFunctionStatement(for: $0) }
+        syntaxTree.root.statements += cdeclStatements
         return true
     }
 
@@ -165,7 +166,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         return TypeSignature.Parameter(label: "Swift_Peer", type: .named("SwiftObjectPtr", []))
     }
 
-    private func cdeclFunctionDefinition(`for` function: CDeclFunction) -> RawStatement {
+    private func cdeclFunctionStatement(for function: CDeclFunction) -> RawStatement {
         var parameters = ""
         for parameter in function.signature.parameters {
             parameters += ", _"
