@@ -491,7 +491,7 @@ extension Source.FilePath {
     /// Synthetic source that will be translated to a file appropriate for bridge support code.
     ///
     /// - Parameter tests: whether this is for a test package, in which case the generated file will be "SwiftBridgeTest.swift" in order to not clash with the primary module's "SwiftBridge.swift"
-    func swiftBridgeSupport(tests: Bool) -> Source.FilePath {
+    public func swiftBridgeSupport(tests: Bool) -> Source.FilePath {
         var filePath = self
         filePath.name = "SwiftBridge\(tests ? "Test" : "").swift"
         return filePath

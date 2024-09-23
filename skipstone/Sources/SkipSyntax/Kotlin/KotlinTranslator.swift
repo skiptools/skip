@@ -99,11 +99,12 @@ public final class KotlinTranslator {
 
         let messages = syntaxTree.messages + codebaseInfo.messages(for: syntaxTree.source.file) + transformers.flatMap { $0.messages(for: syntaxTree.source.file) }
         let outputFile = syntaxTree.source.file.outputFile(withExtension: "swift")
-        var importContent = imports.sorted().map { "import " + $0 }.joined(separator: "\n")
+        var importContent = imports.sorted().flatMap { ["#if canImport(" + $0 + ")", "import " + $0] }.joined(separator: "\n")
         if !importContent.isEmpty {
             importContent += "\n\n"
         }
-        let content = importContent + syntaxTree.root.statements.compactMap { ($0 as? RawStatement)?.sourceCode }.joined(separator: "\n")
+        let canImportClose = "\n\n" + imports.map { _ in "#endif" }.joined(separator: "\n")
+        let content = importContent + syntaxTree.root.statements.compactMap { ($0 as? RawStatement)?.sourceCode }.joined(separator: "\n") + canImportClose
         let output = Source(file: outputFile, content: content)
         let endTime = Date().timeIntervalSinceReferenceDate
         let transpilation = Transpilation(input: syntaxTree.source, output: output, messages: messages, duration: endTime - startTime)

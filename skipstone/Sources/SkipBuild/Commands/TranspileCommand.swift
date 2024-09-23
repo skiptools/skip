@@ -130,6 +130,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         var outputFiles: [AbsolutePath] = []
 
+        // The contents of the ModuleNameSkipBridge.swift file to write, if there is any bridging code
+        var skipBridgeContents: String = ""
+
         func cleanupStaleOutputFiles() {
             let staleFiles = Set(outputFilesSnapshot.map(\.path))
                 .subtracting(outputFiles.map(\.pathString))
@@ -348,6 +351,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         try await transpiler.transpile(handler: handleTranspilation)
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json
+        try saveSkipBridgeCode()
 
         let sourceModules = try linkDependentModuleSources()
         try linkResources()
@@ -432,6 +436,13 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             let outputFilePath = try moduleBasePath.appending(moduleExportPath(forModule: primaryModuleName))
             let moduleExport = CodebaseInfo.ModuleExport(of: codebaseInfo)
             try writeChanges(tag: "codebase", to: outputFilePath, contents: encoder.encode(moduleExport), readOnly: true)
+        }
+
+        func saveSkipBridgeCode() throws {
+            // we always write out to the ModuleNameSwiftBridge.swift file, even when there is no bridging code, because the transpiler plugin expect it as an output file and will fail if it doesn't exist
+            if let skipbridgePath = transpileOptions.skipbridge {
+                try writeChanges(tag: "skipbridge", to: AbsolutePath(validating: skipbridgePath), contents: skipBridgeContents.utf8Data, readOnly: true)
+            }
         }
 
         func generateGradle(for sourceModules: [String], with skipConfig: SkipConfig, isApp: Bool) throws {
@@ -713,6 +724,13 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 await out.yield(message)
             }
 
+            let isBridgeFile = transpilation.input.file == transpilation.input.file.swiftBridgeSupport(tests: false) || transpilation.input.file == transpilation.input.file.swiftBridgeSupport(tests: true) // i.e., SwiftBridge.swift or SwiftBridgeTest.swift
+            if isBridgeFile {
+                // bridge files are all aggregated and saved to the single file that the plugin specifies
+                skipBridgeContents += transpilation.output.content
+                return
+            }
+
             let sourcePath = try AbsolutePath(validating: transpilation.input.file.path)
 
             let (outputFile, changed, overridden) = try saveTranspilation()
@@ -964,6 +982,9 @@ struct TranspileCommandOptions: ParsableArguments {
 
     @Option(name: [.long], help: ArgumentHelp("The path to the source hash file to output", valueName: "path"))
     var sourcehash: String // --sourcehash
+
+    @Option(name: [.long], help: ArgumentHelp("The path to the skip bridge output", valueName: "path"))
+    var skipbridge: String? // --skipbridge
 
     @Option(help: ArgumentHelp("Condition for transpile phase", valueName: "force/no"))
     var transpile: PhaseGuard = .onDemand // --transpile
