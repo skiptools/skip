@@ -1077,6 +1077,15 @@ struct Parameter<V>: Hashable {
 enum StringLiteralSegment<E> {
     case string(String)
     case expression(E)
+
+    var isExpression: Bool {
+        switch self {
+        case .string:
+            return false
+        case .expression:
+            return true
+        }
+    }
 }
 
 /// The result of visiting a syntax node.

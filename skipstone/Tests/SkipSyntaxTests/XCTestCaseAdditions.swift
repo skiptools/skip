@@ -120,7 +120,10 @@ extension XCTestCase {
             } else if transpilation.input.file == srcFiles.first?.swiftBridgeSupport(tests: false) {
                 if let swiftBridgeSupport {
                     let content = fixup(code: trimmedContent(transpilation: transpilation))
-                    let swiftCode = swiftBridgeSupport.trimmingCharacters(in: .whitespacesAndNewlines)
+                    var swiftCode = swiftBridgeSupport.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !swiftCode.isEmpty {
+                        swiftCode = "#if canImport(SkipJNI)\nimport SkipJNI\n\n" + swiftCode + "\n#endif"
+                    }
                     XCTAssertEqual(swiftCode, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
                 } else {
                     XCTFail("Transpilation produced unexpected bridge support content: \(transpilation.output.content)", file: file, line: line)

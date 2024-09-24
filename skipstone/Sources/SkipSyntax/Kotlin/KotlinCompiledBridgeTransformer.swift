@@ -24,12 +24,10 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         }
     }
 
-    func apply(toSwiftBridge syntaxTree: SyntaxTree, imports: inout Set<String>, translator: KotlinTranslator) -> Bool {
+    func apply(toSwiftBridge syntaxTree: SyntaxTree, translator: KotlinTranslator) -> Bool {
         guard !cdeclFunctions.isEmpty else {
             return false
         }
-        
-        imports.insert("SkipJNI")
         // TODO: Update cdecls to add argument type encodings on conflicting functions
         // TODO: Imports
         let cdeclStatements = cdeclFunctions.map { cdeclFunctionStatement(for: $0) }
@@ -38,12 +36,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
     }
 
     private func updateVariableDeclaration(_ variableDeclaration: KotlinVariableDeclaration, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
-        guard checkNonPrivate(variableDeclaration, modifiers: variableDeclaration.modifiers, translator: translator) else {
-            return
-        }
-        let type = variableDeclaration.declaredType.or(variableDeclaration.propertyType)
-        guard type != .none else {
-            variableDeclaration.messages.append(Message.kotlinBridgeUnknownType(variableDeclaration, source: translator.syntaxTree.source))
+        guard let type = variableDeclaration.checkBridgable(translator: translator) else {
             return
         }
         // If this is a let constant with a supported literal value, we'll re-declare rather than bridge it
@@ -59,14 +52,14 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
 
         let propertyName = variableDeclaration.propertyName
         let externalName = "Swift_" + propertyName
-        let externalType = type.external
+        let externalType = type.kotlinExternal
         var externalFunctionDeclarations: [String] = []
         let (cdecl, cdeclName) = cdecl(for: variableDeclaration, name: externalName, translator: translator)
 
         // Getter
         let getterBody = [
             "val value_swift = " + externalName + "()",
-            "return " + type.convertFromExternal(value: "value_swift")
+            "return " + type.kotlinConvertFromExternal(value: "value_swift")
         ]
         variableDeclaration.getter = Accessor(body: KotlinCodeBlock(statements: getterBody.map { KotlinRawStatement(sourceCode: $0) }))
         externalFunctionDeclarations.append("private external fun " + externalName + "(): " + externalType.kotlin)
@@ -90,7 +83,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         // Setter
         if variableDeclaration.apiFlags.options.contains(.writeable) && variableDeclaration.modifiers.setVisibility != .private && variableDeclaration.modifiers.setVisibility != .fileprivate {
             let setterBody = [
-                "val newValue_swift = " + type.convertToExternal(value: "newValue"),
+                "val newValue_swift = " + type.kotlinConvertToExternal(value: "newValue"),
                 externalName + "_set(newValue_swift)"
             ]
             variableDeclaration.setter = Accessor(parameterName: "newValue", body: KotlinCodeBlock(statements: setterBody.map { KotlinRawStatement(sourceCode: $0) }))
@@ -135,11 +128,14 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         // example we don't support Floats because Kotlin requires Float(value)
         switch type.asOptional(false) {
         case .bool:
-            return variableDeclaration.value is KotlinBooleanLiteral
+            return variableDeclaration.value?.type == .booleanLiteral
         case .double, .int, .int32:
-            return variableDeclaration.value is KotlinNumericLiteral
+            return variableDeclaration.value?.type == .numericLiteral
         case .string:
-            return variableDeclaration.value is KotlinStringLiteral
+            guard let stringLiteral = variableDeclaration.value as? KotlinStringLiteral else {
+                return false
+            }
+            return !stringLiteral.segments.contains { $0.isExpression }
         default:
             return false
         }
@@ -187,14 +183,6 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         """
         return RawStatement(sourceCode: sourceCode)
     }
-
-    private func checkNonPrivate(_ sourceDerived: SourceDerived, modifiers: Modifiers, translator: KotlinTranslator) -> Bool {
-        guard modifiers.visibility == .private || modifiers.visibility == .fileprivate else {
-            return true
-        }
-        sourceDerived.messages.append(Message.kotlinBridgePrivate(sourceDerived, source: translator.syntaxTree.source))
-        return false
-    }
 }
 
 private struct CDeclFunction {
@@ -202,68 +190,4 @@ private struct CDeclFunction {
     let cdecl: String
     let signature: TypeSignature
     let body: [String]
-}
-
-extension String {
-    fileprivate var cdeclEscaped: String {
-        // TODO: Unicode chars
-        return replacing("_", with: "_1")
-    }
-}
-
-extension TypeSignature {
-    fileprivate var external: TypeSignature {
-        switch self {
-        case .int:
-            return .int64
-        default:
-            return self // TODO: All other types
-        }
-    }
-
-    fileprivate func convertToExternal(value: String) -> String {
-        switch self {
-        case .int:
-            return value + ".toLong()"
-        default:
-            return value // TODO: All other types
-        }
-    }
-
-    fileprivate func convertFromExternal(value: String) -> String {
-        switch self {
-        case .int:
-            return value + ".toInt()"
-        default:
-            return value // TODO: All other types
-        }
-    }
-
-    fileprivate var cdecl: TypeSignature {
-        // TODO: Object types, etc
-        switch self {
-        case .string:
-            return .named("JavaString", [])
-        default:
-            return self.external
-        }
-    }
-
-    fileprivate func convertToCDecl(value: String) -> String {
-        switch self {
-        case .string:
-            return value + ".toJavaObject()!"
-        default:
-            return value // TODO: All other types
-        }
-    }
-
-    fileprivate func convertFromCDecl(value: String) -> String {
-        switch self {
-        case .string:
-            return "try! String.fromJavaObject(" + value + ")"
-        default:
-            return value // TODO: All other types
-        }
-    }
 }
