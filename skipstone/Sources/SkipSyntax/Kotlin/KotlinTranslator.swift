@@ -87,25 +87,25 @@ public final class KotlinTranslator {
     public static func transpileBridgeSupport(sourceFile: Source.FilePath, codebaseInfo: CodebaseInfo, transformers: [KotlinTransformer]) -> Transpilation? {
         let startTime = Date().timeIntervalSinceReferenceDate
         let syntaxTree = SyntaxTree(source: Source(file: sourceFile, content: ""))
-        var imports: Set<String> = []
         let translator = KotlinTranslator(syntaxTree: syntaxTree)
         let codebaseInfoContext = codebaseInfo.context(sourceFile: sourceFile)
         translator.codebaseInfo = codebaseInfoContext
         translator.packageName = codebaseInfo.kotlin?.packageName
-        let results = transformers.map { $0.apply(toSwiftBridge: syntaxTree, imports: &imports, translator: translator) }
+        let results = transformers.map { $0.apply(toSwiftBridge: syntaxTree, translator: translator) }
         guard results.contains(true) else {
             return nil
         }
 
         let messages = syntaxTree.messages + codebaseInfo.messages(for: syntaxTree.source.file) + transformers.flatMap { $0.messages(for: syntaxTree.source.file) }
         let outputFile = syntaxTree.source.file.outputFile(withExtension: "swift")
-        var importContent = imports.sorted().flatMap { ["#if canImport(" + $0 + ")", "import " + $0] }.joined(separator: "\n")
+        var leadingContent = "#if canImport(SkipJNI)\nimport SkipJNI\n\n"
+        let trailingContent = "\n#endif\n"
+        let importContent = bridgeSupportImports(for: syntaxTree.root.statements.compactMap { $0 as? ImportDeclaration })
         if !importContent.isEmpty {
-            importContent += "\n\n"
+            leadingContent += importContent + "\n\n"
         }
-        let canImportClose = "\n\n" + imports.map { _ in "#endif" }.joined(separator: "\n")
-        let content = importContent + syntaxTree.root.statements.compactMap { ($0 as? RawStatement)?.sourceCode }.joined(separator: "\n") + canImportClose
-        let output = Source(file: outputFile, content: content)
+        let content = syntaxTree.root.statements.compactMap { ($0 as? RawStatement)?.sourceCode }.joined(separator: "\n")
+        let output = Source(file: outputFile, content: leadingContent + content + trailingContent)
         let endTime = Date().timeIntervalSinceReferenceDate
         let transpilation = Transpilation(input: syntaxTree.source, output: output, messages: messages, duration: endTime - startTime)
         return transpilation
@@ -387,5 +387,10 @@ public final class KotlinTranslator {
         var statements = modulePathStrings.sorted().map { KotlinRawStatement(sourceCode: "import " + $0) }
         statements.append(KotlinRawStatement(sourceCode: "")) // Spacer
         return statements
+    }
+
+    private static func bridgeSupportImports(for statements: [ImportDeclaration]) -> String {
+        let imports = Set(statements.map { $0.modulePath.joined(separator: ".") }).sorted()
+        return imports.map { "import " + $0 }.joined(separator: "\n")
     }
 }

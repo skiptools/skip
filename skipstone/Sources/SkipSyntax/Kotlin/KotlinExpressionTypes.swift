@@ -2561,6 +2561,7 @@ final class KotlinSRef: KotlinExpression {
 
 final class KotlinStringLiteral: KotlinExpression {
     var segments: [StringLiteralSegment<KotlinExpression>] = []
+    var swiftString: String?
     var isMultiline = false
     var isCharacter = false
     var expressibleByStringLiteralType: TypeSignature?
@@ -2569,10 +2570,14 @@ final class KotlinStringLiteral: KotlinExpression {
     static func translate(expression: StringLiteral, translator: KotlinTranslator) -> KotlinStringLiteral {
         let kexpression = KotlinStringLiteral(expression: expression)
         var segments: [StringLiteralSegment<KotlinExpression>] = []
+        var swiftString: String? = nil
         for segment in expression.segments {
             switch segment {
             case .string(let string):
                 let kstring = translateStringSegment(string)
+                if kstring == string, expression.segments.count == 1 {
+                    swiftString = string
+                }
                 segments.append(.string(kstring))
             case .expression(let expression):
                 let kexpression = translator.translateExpression(expression)
@@ -2580,6 +2585,7 @@ final class KotlinStringLiteral: KotlinExpression {
             }
         }
         kexpression.segments = segments
+        kexpression.swiftString = swiftString
         kexpression.isMultiline = expression.isMultiline
         kexpression.isCharacter = expression.inferredType == .character
         kexpression.expressibleByStringLiteralType = expression.expressibleByStringLiteralType
@@ -2637,6 +2643,7 @@ final class KotlinStringLiteral: KotlinExpression {
     init(literal: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         super.init(type: .stringLiteral, sourceFile: sourceFile, sourceRange: sourceRange)
         self.segments = [.string(literal)]
+        self.swiftString = literal
     }
 
     private init(expression: StringLiteral) {

@@ -91,8 +91,6 @@ final class CompiledBridgingTests: XCTestCase {
             }
         private external fun Swift_f(): Float
         """, swiftBridgeSupport: """
-        import SkipJNI
-
         @_cdecl("Java_SourceKt_Swift_1f")
         func SourceKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Float {
             let value_swift = f
@@ -111,12 +109,28 @@ final class CompiledBridgingTests: XCTestCase {
             }
         private external fun Swift_i(): Long
         """, swiftBridgeSupport: """
-        import SkipJNI
-
         @_cdecl("Java_SourceKt_Swift_1i")
         func SourceKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int64 {
             let value_swift = i
             return value_swift
+        }
+        """)
+
+        try await check(swift: """
+        // SKIP @bridge
+        let s = "ab\\(1 + 1)c"
+        """, isSwiftBridge: true, kotlin: """
+        internal val s: String
+            get() {
+                val value_swift = Swift_s()
+                return value_swift
+            }
+        private external fun Swift_s(): String
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_SourceKt_Swift_1s")
+        func SourceKt_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
+            let value_swift = s
+            return value_swift.toJavaObject()!
         }
         """)
     }
@@ -133,8 +147,6 @@ final class CompiledBridgingTests: XCTestCase {
             }
         private external fun Swift_i(): Long
         """, swiftBridgeSupport: """
-        import SkipJNI
-        
         @_cdecl("Java_SourceKt_Swift_1i")
         func SourceKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int64 {
             let value_swift = i
@@ -153,8 +165,6 @@ final class CompiledBridgingTests: XCTestCase {
             }
         private external fun Swift_i(): Int
         """, swiftBridgeSupport: """
-        import SkipJNI
-
         @_cdecl("Java_SourceKt_Swift_1i")
         func SourceKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int32 {
             let value_swift = i
@@ -173,8 +183,6 @@ final class CompiledBridgingTests: XCTestCase {
             }
         private external fun Swift_s(): String
         """, swiftBridgeSupport: """
-        import SkipJNI
-
         @_cdecl("Java_SourceKt_Swift_1s")
         func SourceKt_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
             let value_swift = s
@@ -200,8 +208,6 @@ final class CompiledBridgingTests: XCTestCase {
         private external fun Swift_i(): Long
         private external fun Swift_i_set(value: Long)
         """, swiftBridgeSupport: """
-        import SkipJNI
-
         @_cdecl("Java_SourceKt_Swift_1i")
         func SourceKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int64 {
             let value_swift = i
@@ -237,8 +243,6 @@ final class CompiledBridgingTests: XCTestCase {
         private external fun Swift_s(): String
         private external fun Swift_s_set(value: String)
         """, swiftBridgeSupport: """
-        import SkipJNI
-
         @_cdecl("Java_SourceKt_Swift_1s")
         func SourceKt_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
             let value_swift = s
