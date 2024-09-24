@@ -459,7 +459,7 @@ extension Parameter where V: Expression {
         if let defaultValue {
             kdefaultValue = translator.translateExpression(defaultValue)
         }
-        return Parameter<KotlinExpression>(externalLabel: externalLabel, internalLabel: internalLabel, declaredType: declaredType, isInOut: isInOut, isVariadic: isVariadic, attributes: attributes, defaultValue: kdefaultValue)
+        return Parameter<KotlinExpression>(externalLabel: externalLabel, internalLabel: _internalLabel, declaredType: declaredType, isInOut: isInOut, isVariadic: isVariadic, attributes: attributes, defaultValue: kdefaultValue, defaultValueSwift: defaultValueSwift)
     }
 }
 

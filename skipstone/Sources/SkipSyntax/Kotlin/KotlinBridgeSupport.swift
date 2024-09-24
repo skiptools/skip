@@ -54,6 +54,8 @@ extension TypeSignature {
     var cdecl: TypeSignature {
         // TODO: Object types, etc
         switch self {
+        case .int:
+            return .int64
         case .string:
             return .named("JavaString", [])
         default:
@@ -64,6 +66,8 @@ extension TypeSignature {
     /// Return code that converst the given value of this type to its `@_cdecl` function form.
     func convertToCDecl(value: String) -> String {
         switch self {
+        case .int:
+            return "Int64(" + value + ")"
         case .string:
             return value + ".toJavaObject()!"
         default:
@@ -74,6 +78,8 @@ extension TypeSignature {
     /// Return code that converts the given value of our `@_cdecl` function type back to this type.
     func convertFromCDecl(value: String) -> String {
         switch self {
+        case .int:
+            return "Int(" + value + ")"
         case .string:
             return "try! String.fromJavaObject(" + value + ")"
         default:
@@ -228,6 +234,25 @@ extension Modifiers.Visibility {
     }
 }
 
+extension Parameter {
+    var swift: String {
+        var str = ""
+        if let externalLabel {
+            str += externalLabel
+        } else {
+            str += "_"
+        }
+        if let internalLabel = _internalLabel {
+            str += " " + internalLabel
+        }
+        str += ": " + declaredType.description
+        if let defaultValueSwift, !defaultValueSwift.isEmpty {
+            str += " " + defaultValueSwift
+        }
+        return str
+    }
+}
+
 extension KotlinVariableDeclaration {
     /// Check that this variable is bridgable and return its bridgable type.
     ///
@@ -242,6 +267,18 @@ extension KotlinVariableDeclaration {
             return nil
         }
         return type
+    }
+}
+
+extension KotlinFunctionDeclaration {
+    /// Check that this function is bridgable.
+    ///
+    /// This function will add messages about invalid modifiers or types to this variable.
+    func checkBridgable(translator: KotlinTranslator) -> Bool {
+        guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
+            return false
+        }
+        return true
     }
 }
 

@@ -1017,11 +1017,12 @@ struct Parameter<V>: Hashable {
     var isVariadic: Bool
     var attributes: Attributes
     var defaultValue: V?
+    var defaultValueSwift: String?
     var signature: TypeSignature.Parameter {
         return TypeSignature.Parameter(label: externalLabel, type: declaredType, isInOut: isInOut, isVariadic: isVariadic, hasDefaultValue: defaultValue != nil)
     }
 
-    init(externalLabel: String?, internalLabel: String? = nil, declaredType: TypeSignature = .none, isInOut: Bool = false, isVariadic: Bool = false, attributes: Attributes = Attributes(), defaultValue: V? = nil) {
+    init(externalLabel: String?, internalLabel: String? = nil, declaredType: TypeSignature = .none, isInOut: Bool = false, isVariadic: Bool = false, attributes: Attributes = Attributes(), defaultValue: V? = nil, defaultValueSwift: String? = nil) {
         self.externalLabel = externalLabel == "" || externalLabel == "_" ? nil : externalLabel
         _internalLabel = internalLabel
         self.declaredType = attributes.apply(toFunction: declaredType)
@@ -1029,6 +1030,7 @@ struct Parameter<V>: Hashable {
         self.isVariadic = isVariadic
         self.attributes = attributes
         self.defaultValue = defaultValue
+        self.defaultValueSwift = defaultValueSwift
     }
 
     var prettyPrintTree: PrettyPrintTree {
