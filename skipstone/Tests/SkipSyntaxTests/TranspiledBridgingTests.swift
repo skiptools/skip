@@ -212,6 +212,10 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
     }
 
+    func testPrivateSetVar() async throws {
+        // TODO
+    }
+
     func testWillSetDidSet() async throws {
         // TODO
     }
@@ -302,5 +306,69 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testBridgedObjectFunction() async throws {
         // TODO: Parameter and return bridged types
+    }
+
+    func testClass() async throws {
+        // TODO
+    }
+
+    func testPublicClass() async throws {
+        // TODO
+    }
+
+    func testPrivateClass() async throws {
+        // TODO
+    }
+
+    func testPrivateConstructor() async throws {
+        // TODO: How do we differentiate between a private constructor and no constructors?
+    }
+
+    func testConstructor() async throws {
+        // TODO
+    }
+
+    func testMemberConstant() async throws {
+        // TODO
+    }
+
+    func testMemberVar() async throws {
+        // TODO
+    }
+
+    func testMemberFunction() async throws {
+        // TODO
+    }
+
+    func testStaticVar() async throws {
+        // TODO
+    }
+
+    func testStaticFunction() async throws {
+        // TODO
+    }
+
+    func testUnbridgedMember() async throws {
+        // TODO
+    }
+
+    func testBridgedMemberInUnbridgedClass() async throws {
+        // TODO
+    }
+
+    func testCommonProtocols() async throws {
+        // TODO: Handling of Equatable, Hashable, Codable, etc
+    }
+
+    func testSubclass() async throws {
+        // TODO: Include superclass override property, inherited superclass constructors (param default values may be a problem?)
+    }
+
+    func testClassInit() async throws {
+        // TODO
+    }
+
+    func testClassDeinit() async throws {
+        // TODO
     }
 }

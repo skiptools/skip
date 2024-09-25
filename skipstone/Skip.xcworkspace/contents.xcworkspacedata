@@ -32,7 +32,7 @@
       location = "group:../skip-firebase">
    </FileRef>
    <FileRef
-      location = "group:../skip-jni">
+      location = "group:../skip-bridge">
    </FileRef>
    <FileRef
       location = "group:../skip-kit">

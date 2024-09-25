@@ -20,6 +20,8 @@ extension String {
 }
 
 extension TypeSignature {
+    static let swiftObjectPtr: TypeSignature = .named("SwiftObjectPtr", [])
+    
     /// Return the external function equivalent of this type.
     var kotlinExternal: TypeSignature {
         switch self {
@@ -272,6 +274,18 @@ extension KotlinVariableDeclaration {
 
 extension KotlinFunctionDeclaration {
     /// Check that this function is bridgable.
+    ///
+    /// This function will add messages about invalid modifiers or types to this variable.
+    func checkBridgable(translator: KotlinTranslator) -> Bool {
+        guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
+            return false
+        }
+        return true
+    }
+}
+
+extension KotlinClassDeclaration {
+    /// Check that this class is bridgable.
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
     func checkBridgable(translator: KotlinTranslator) -> Bool {
