@@ -14,6 +14,9 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
             if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global || variableDeclaration.role == .property {
                 updateVariableDeclaration(variableDeclaration, cdeclFunctions: &localCdeclFunctions, translator: translator)
                 return .skip
+            } else if let functionDeclaration = node as? KotlinFunctionDeclaration, functionDeclaration.role == .global {
+                updateFunctionDeclaration(functionDeclaration, cdeclFunctions: &localCdeclFunctions, translator: translator)
+                return .skip
             }
             return .recurse(nil)
         }
@@ -28,7 +31,6 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         guard !cdeclFunctions.isEmpty else {
             return false
         }
-        // TODO: Update cdecls to add argument type encodings on conflicting functions
         // TODO: Imports
         let cdeclStatements = cdeclFunctions.map { cdeclFunctionStatement(for: $0) }
         syntaxTree.root.statements += cdeclStatements
@@ -39,6 +41,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         guard let type = variableDeclaration.checkBridgable(translator: translator) else {
             return
         }
+        variableDeclaration.extras = nil
         // If this is a let constant with a supported literal value, we'll re-declare rather than bridge it
         guard !isSupportedConstant(variableDeclaration, type: type) else {
             return
@@ -141,12 +144,68 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         }
     }
 
+    private func updateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+        guard functionDeclaration.checkBridgable(translator: translator) else {
+            return
+        }
+        functionDeclaration.extras = nil
+
+        let functionName = functionDeclaration.name
+        let externalName = "Swift_" + functionName
+
+        var body: [String] = []
+        var cdeclBody: [String] = []
+        var externalParameterNames: [String] = []
+        for p in functionDeclaration.parameters {
+            let externalParameterName = p.internalLabel + "_swift"
+            body.append("val " + externalParameterName + " = " + p.declaredType.kotlinConvertToExternal(value: p.internalLabel))
+            cdeclBody.append("let " + externalParameterName + " = " + p.declaredType.convertFromCDecl(value: p.internalLabel))
+            externalParameterNames.append(externalParameterName)
+        }
+        let externalCall = externalName + "(" + externalParameterNames.joined(separator: ", ")  + ")"
+        let cdeclCall = functionName + "(" + functionDeclaration.parameters.enumerated().map { index, p in
+            if let externalLabel = p.externalLabel {
+                return externalLabel + ": " + externalParameterNames[index]
+            } else {
+                return externalParameterNames[index]
+            }
+        }.joined(separator: ", ") + ")"
+        if functionDeclaration.returnType == .void {
+            body.append(externalCall)
+            cdeclBody.append(cdeclCall)
+        } else {
+            body.append("val f_return_swift = " + externalCall)
+            body.append("return " + functionDeclaration.returnType.kotlinConvertFromExternal(value: "f_return_swift"))
+
+            cdeclBody.append("let f_return_swift = " + cdeclCall)
+            cdeclBody.append("return " + functionDeclaration.returnType.convertToCDecl(value: "f_return_swift"))
+        }
+        functionDeclaration.body = KotlinCodeBlock(statements: body.map { KotlinRawStatement(sourceCode: $0) })
+
+        var externalFunctionDeclaration = "private external fun " + externalName + "("
+        externalFunctionDeclaration += functionDeclaration.parameters.map { p in
+            p.internalLabel + ": " + p.declaredType.kotlinExternal.kotlin
+        }.joined(separator: ", ")
+        externalFunctionDeclaration += ")"
+        if functionDeclaration.returnType != .void {
+            externalFunctionDeclaration += ": " + functionDeclaration.returnType.kotlinExternal.kotlin
+        }
+        (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [KotlinRawStatement(sourceCode: externalFunctionDeclaration)], after: functionDeclaration)
+
+        let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: externalName, translator: translator)
+        let functionType = functionDeclaration.functionType
+        let cdeclType: TypeSignature = .function(functionType.parameters.map { p in
+            TypeSignature.Parameter(label: p.label, type: p.type.cdecl)
+        }, functionType.returnType.cdecl, APIFlags(), nil)
+        let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
+        cdeclFunctions.append(cdeclFunction)
+    }
+
     private func cdecl(for statement: KotlinStatement, name: String, translator: KotlinTranslator) -> (cdecl: String, cdeclFunctionName: String) {
         var cdeclPrefix = "Java_"
         if let package = translator.packageName {
             cdeclPrefix += package.cdeclEscaped.replacing(".", with: "_") + "_"
         }
-        // TODO: Protocols, nesting, etc
         let typeName: String
         if let classDeclaration = statement.parent as? KotlinClassDeclaration {
             typeName = classDeclaration.name

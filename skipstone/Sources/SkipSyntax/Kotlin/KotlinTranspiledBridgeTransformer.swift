@@ -11,8 +11,15 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         }
         var localSwiftDefinitions: [SwiftDefinitions] = []
         syntaxTree.root.visit { node in
-            if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global, variableDeclaration.attributes.contains(directive: Directive.bridge) {
-                addSwiftDefinitions(forGlobal: variableDeclaration, to: &localSwiftDefinitions, translator: translator)
+            if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global {
+                if variableDeclaration.attributes.contains(directive: Directive.bridge) {
+                    addSwiftDefinitions(forGlobal: variableDeclaration, to: &localSwiftDefinitions, translator: translator)
+                }
+                return .skip
+            } else if let functionDeclaration = node as? KotlinFunctionDeclaration, functionDeclaration.role == .global {
+                if functionDeclaration.attributes.contains(directive: Directive.bridge) {
+                    addSwiftDefinitions(forGlobal: functionDeclaration, to: &localSwiftDefinitions, translator: translator)
+                }
                 return .skip
             }
             return .recurse(nil)
@@ -53,19 +60,30 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
 
         let propertyName = variableDeclaration.propertyName
         var swift: [String] = []
-        swift.append("var " + propertyName + ": " + type.description + " {")
+        let visibility = variableDeclaration.modifiers.visibility.swift(suffix: " ")
+        swift.append(visibility + "var " + propertyName + ": " + type.description + " {")
 
         // Getter
         swift.append(1, "get {")
-        swift.append(2, "let value_java: " + type.java.description + " = try! " + globalsClassDeclaration.identifier + ".getStatic(field: " + propertyName + "_fieldID)")
-        swift.append(2, "return " + type.convertFromJava(value: "value_java"))
+        swift.append(2, [
+            "let value_java: " + type.java.description + " = try! " + globalsClassDeclaration.identifier + ".getStatic(field: " + propertyName + "_fieldID)",
+            "return " + type.convertFromJava(value: "value_java")
+        ])
         swift.append(1, "}")
 
         // Setter
         if variableDeclaration.apiFlags.options.contains(.writeable) && variableDeclaration.modifiers.setVisibility != .private && variableDeclaration.modifiers.setVisibility != .fileprivate {
-            swift.append(1, "set {")
-            swift.append(2, "let value_java = " + type.convertToJava(value: "newValue"))
-            swift.append(2, globalsClassDeclaration.identifier + ".setStatic(field: " + propertyName + "_fieldID, value: value_java)")
+            let visibility: String
+            if variableDeclaration.modifiers.setVisibility < variableDeclaration.modifiers.visibility {
+                visibility = variableDeclaration.modifiers.setVisibility.swift(suffix: " ")
+            } else {
+                visibility = ""
+            }
+            swift.append(1, visibility + "set {")
+            swift.append(2, [
+                "let value_java = " + type.convertToJava(value: "newValue"),
+                globalsClassDeclaration.identifier + ".setStatic(field: " + propertyName + "_fieldID, value: value_java)"
+            ])
             swift.append(1, "}")
         }
         
@@ -129,6 +147,42 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         return TypeSignature.for(name: functionName, genericTypes: []).isNumeric ? numberLiteral : nil
     }
 
+    private func addSwiftDefinitions(forGlobal functionDeclaration: KotlinFunctionDeclaration, to swiftDefinitions: inout [SwiftDefinitions], translator: KotlinTranslator) {
+        guard functionDeclaration.checkBridgable(translator: translator) else {
+            return
+        }
+        let globalsClassDeclaration = globalsClassDeclaration(translator: translator)
+
+        let functionName = functionDeclaration.name
+        let visibility = functionDeclaration.modifiers.visibility.swift(suffix: " ")
+        let parameterString = functionDeclaration.parameters.map(\.swift).joined(separator: ", ")
+        let returnString = functionDeclaration.returnType == .void ? "" : " -> " + functionDeclaration.returnType.description
+
+        var swift: [String] = []
+        swift.append(visibility + "func " + functionName + "(" + parameterString + ")" + returnString + " {")
+        var javaParameterNames: [String] = []
+        for p in functionDeclaration.parameters {
+            let javaParameterName = p.internalLabel + "_java"
+            swift.append(1, "let " + javaParameterName + " = " + p.declaredType.convertToJava(value: p.internalLabel) + ".toJavaParameter()")
+            javaParameterNames.append(javaParameterName)
+        }
+        let call = "try! " + globalsClassDeclaration.identifier + ".callStatic(method: " + functionName + "_methodID, [" + javaParameterNames.joined(separator: ", ") + "])"
+        if functionDeclaration.returnType == .void {
+            swift.append(1, call)
+        } else {
+            swift.append(1, [
+                "let f_return_java: " + functionDeclaration.returnType.java.description + " = " + call,
+                "return " + functionDeclaration.returnType.convertFromJava(value: "f_return_java")
+            ])
+        }
+
+        swift.append("}")
+        swift.append("private let " + functionDeclaration.name + "_methodID = " + globalsClassDeclaration.identifier + ".getStaticMethodID(name: \"" + functionDeclaration.name + "\", sig: \"" + functionDeclaration.functionType.jni + "\")!")
+
+        let definitions = SwiftDefinitions(globalsClassDeclaration: globalsClassDeclaration, definitions: swift)
+        swiftDefinitions.append(definitions)
+    }
+
     private func swiftDefinitionStatements(for swiftDefinitions: SwiftDefinitions) -> RawStatement {
         let sourceCode = swiftDefinitions.definitions.joined(separator: "\n")
         return RawStatement(sourceCode: sourceCode)
@@ -165,5 +219,9 @@ private struct SwiftDefinitions {
 extension Array where Element == String {
     fileprivate mutating func append(_ indentation: Indentation, _ value: String) {
         self.append(indentation.description + value)
+    }
+
+    fileprivate mutating func append(_ indentation: Indentation, _ value: [String]) {
+        value.forEach { append(indentation, $0) }
     }
 }
