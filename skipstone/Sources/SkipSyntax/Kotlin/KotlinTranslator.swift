@@ -98,7 +98,7 @@ public final class KotlinTranslator {
 
         let messages = syntaxTree.messages + codebaseInfo.messages(for: syntaxTree.source.file) + transformers.flatMap { $0.messages(for: syntaxTree.source.file) }
         let outputFile = syntaxTree.source.file.outputFile(withExtension: "swift")
-        var leadingContent = "#if canImport(SkipJNI)\nimport SkipJNI\n\n"
+        var leadingContent = "#if canImport(SkipBridge)\nimport SkipBridge\n\n"
         let trailingContent = "\n#endif\n"
         let importContent = bridgeSupportImports(for: syntaxTree.root.statements.compactMap { $0 as? ImportDeclaration })
         if !importContent.isEmpty {

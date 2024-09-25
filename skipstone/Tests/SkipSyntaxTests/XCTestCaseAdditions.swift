@@ -122,7 +122,7 @@ extension XCTestCase {
                     let content = fixup(code: trimmedContent(transpilation: transpilation))
                     var swiftCode = swiftBridgeSupport.trimmingCharacters(in: .whitespacesAndNewlines)
                     if !swiftCode.isEmpty {
-                        swiftCode = "#if canImport(SkipJNI)\nimport SkipJNI\n\n" + swiftCode + "\n#endif"
+                        swiftCode = "#if canImport(SkipBridge)\nimport SkipBridge\n\n" + swiftCode + "\n#endif"
                     }
                     XCTAssertEqual(swiftCode, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
                 } else {
