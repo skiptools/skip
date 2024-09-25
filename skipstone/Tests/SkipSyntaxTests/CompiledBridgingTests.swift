@@ -289,6 +289,10 @@ final class CompiledBridgingTests: XCTestCase {
         """, isSwiftBridge: true)
     }
 
+    func testPrivateSetVar() async throws {
+        // TODO
+    }
+
     func testUnicodeNameVar() async throws {
         // TODO
     }
@@ -362,6 +366,10 @@ final class CompiledBridgingTests: XCTestCase {
         // TODO
     }
 
+    func testUngridgableTypeVar() async throws {
+        // TODO
+    }
+
     func testFunction() async throws {
         try await check(swift: """
         // SKIP @bridge
@@ -421,5 +429,193 @@ final class CompiledBridgingTests: XCTestCase {
 
     func testBridgedObjectFunction() async throws {
         // TODO: Parameter and return bridged types
+    }
+
+    func testUnbridgableObjectFunction() async throws {
+        // TODO: Parameter and return bridged types
+    }
+
+    func testClass() async throws {
+        try await check(swift: """
+        // SKIP @bridge
+        class C {
+            var i = 1
+        }
+        """, isSwiftBridge: true, kotlin: """
+        internal open class C {
+            var Swift_peer: SwiftObjectPtr
+
+            constructor(Swift_peer: SwiftObjectPtr) {
+                this.Swift_peer = Swift_ptrref(Swift_peer)
+            }
+            private external fun Swift_ptrref(Swift_peer: SwiftObjectPtr): SwiftObjectPtr
+
+            fun finalize() {
+                Swift_ptrderef(Swift_peer)
+                Swift_peer = SwiftObjectNil
+            }
+            private external fun Swift_ptrderef(Swift_peer: SwiftObjectPtr)
+
+            constructor() {
+                Swift_peer = Swift_constructor()
+            }
+            private external fun Swift_constructor(): SwiftObjectPtr
+
+            internal open var i: Int
+                get() {
+                    val value_swift = Swift_i(Swift_peer)
+                    return value_swift.toInt()
+                }
+                set(newValue) {
+                    val newValue_swift = newValue.toLong()
+                    Swift_i_set(Swift_peer, newValue_swift)
+                }
+            private external fun Swift_i(Swift_peer: SwiftObjectPtr): Long
+            private external fun Swift_i_set(Swift_peer: SwiftObjectPtr, value: Long)
+        }
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_C_Swift_1constructor")
+        func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPtr {
+            let f_return_swift = C()
+            return SwiftObjectPtr.forSwift(f_return_swift, retain: true)
+        }
+        @_cdecl("Java_C_Swift_1ptrref")
+        func C_Swift_ptrref(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPtr) -> SwiftObjectPtr {
+            return refSwift(Swift_peer, type: C.self)
+        }
+        @_cdecl("Java_C_Swift_1ptrderef")
+        func C_Swift_ptrderef(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPtr) {
+            derefSwift(Swift_peer, type: C.self)
+        }
+        @_cdecl("Java_C_Swift_1i")
+        func C_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPtr) -> Int64 {
+            let peer_swift: C = Swift_peer.toSwift()
+            let value_swift = peer_swift.i
+            return Int64(value_swift)
+        }
+        @_cdecl("Java_C_Swift_1i_1set")
+        func C_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPtr, _ value: Int64) {
+            let peer_swift: C = Swift_peer.toSwift()
+            let value_swift = Int(value)
+            peer_swift.i = value_swift
+        }
+        """)
+    }
+
+    func testPublicClass() async throws {
+        // TODO
+    }
+
+    func testPrivateClass() async throws {
+        // TODO
+    }
+
+    func testPrivateConstructor() async throws {
+        // TODO: How do we differentiate between a private constructor and no constructors?
+    }
+
+    func testConstructor() async throws {
+        // TODO
+    }
+
+    func testMemberConstant() async throws {
+        // TODO
+    }
+
+    func testMemberVar() async throws {
+        // TODO
+    }
+
+    func testMemberFunction() async throws {
+        try await check(swift: """
+        // SKIP @bridge
+        class C {
+            func add(a: Int, b: Int) -> Int {
+                return a + b
+            }
+        }
+        """, isSwiftBridge: true, kotlin: """
+        internal open class C {
+            var Swift_peer: SwiftObjectPtr
+
+            constructor(Swift_peer: SwiftObjectPtr) {
+                this.Swift_peer = Swift_ptrref(Swift_peer)
+            }
+            private external fun Swift_ptrref(Swift_peer: SwiftObjectPtr): SwiftObjectPtr
+
+            fun finalize() {
+                Swift_ptrderef(Swift_peer)
+                Swift_peer = SwiftObjectNil
+            }
+            private external fun Swift_ptrderef(Swift_peer: SwiftObjectPtr)
+
+            constructor() {
+                Swift_peer = Swift_constructor()
+            }
+            private external fun Swift_constructor(): SwiftObjectPtr
+
+            internal open fun add(a: Int, b: Int): Int {
+                val a_swift = a.toLong()
+                val b_swift = b.toLong()
+                val f_return_swift = Swift_add(Swift_peer, a_swift, b_swift)
+                return f_return_swift.toInt()
+            }
+            private external fun Swift_add(Swift_peer: SwiftObjectPtr, a: Long, b: Long): Long
+        }
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_C_Swift_1constructor")
+        func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPtr {
+            let f_return_swift = C()
+            return SwiftObjectPtr.forSwift(f_return_swift, retain: true)
+        }
+        @_cdecl("Java_C_Swift_1ptrref")
+        func C_Swift_ptrref(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPtr) -> SwiftObjectPtr {
+            return refSwift(Swift_peer, type: C.self)
+        }
+        @_cdecl("Java_C_Swift_1ptrderef")
+        func C_Swift_ptrderef(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPtr) {
+            derefSwift(Swift_peer, type: C.self)
+        }
+        @_cdecl("Java_C_Swift_1add")
+        func C_Swift_add(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPtr, _ a: Int64, _ b: Int64) -> Int64 {
+            let a_swift = Int(a)
+            let b_swift = Int(b)
+            let peer_swift: C = Swift_peer.toSwift()
+            let f_return_swift = peer_swift.add(a: a_swift, b: b_swift)
+            return Int64(f_return_swift)
+        }
+        """)
+    }
+
+    func testStaticVar() async throws {
+        // TODO
+    }
+
+    func testStaticFunction() async throws {
+        // TODO
+    }
+
+    func testUnbridgedMember() async throws {
+        // TODO
+    }
+
+    func testBridgedMemberInUnbridgedClass() async throws {
+        // TODO
+    }
+
+    func testCommonProtocols() async throws {
+        // TODO: Handling of Equatable, Hashable, Codable, etc
+    }
+
+    func testSubclass() async throws {
+        // TODO: Include superclass override property, inherited superclass constructors (param default values may be a problem?)
+    }
+
+    func testClassInit() async throws {
+        // TODO
+    }
+
+    func testClassDeinit() async throws {
+        // TODO
     }
 }

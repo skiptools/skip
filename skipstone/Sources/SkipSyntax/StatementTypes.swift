@@ -874,7 +874,7 @@ final class EnumCaseDeclaration: Statement {
         var attributes = Attributes.for(syntax: enumCaseDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: enumCaseDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, modifiers: modifiers, asMember: true) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: true) else {
             return []
         }
         return enumCaseDecl.elements.enumerated().map { (index, element) in
@@ -953,7 +953,7 @@ final class ExtensionDeclaration: TypeDeclaration {
         var attributes = Attributes.for(syntax: extensionDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, modifiers: modifiers, asMember: false) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
             return []
         }
         let (inherits, inheritsMessages) = extensionDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
@@ -1035,7 +1035,7 @@ final class FunctionDeclaration: Statement {
         var attributes = Attributes.for(syntax: functionDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: functionDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, modifiers: modifiers, asMember: asMember) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: asMember) else {
             return nil
         }
         let name = functionDecl.name.text.removingBacktickEscaping
@@ -1057,7 +1057,7 @@ final class FunctionDeclaration: Statement {
         var attributes = Attributes.for(syntax: initializerDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: initializerDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, modifiers: modifiers, asMember: true) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: true) else {
             return nil
         }
         let isOptionalInit = initializerDecl.optionalMark != nil
@@ -1231,7 +1231,7 @@ final class SubscriptDeclaration: Statement {
         var attributes = Attributes.for(syntax: subscriptDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: subscriptDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, modifiers: modifiers, asMember: true) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: true) else {
             return []
         }
         let elementType = TypeSignature.for(syntax: subscriptDecl.returnClause.type, in: syntaxTree)
@@ -1242,6 +1242,9 @@ final class SubscriptDeclaration: Statement {
             switch accessor {
             case .accessors(let syntax):
                 accessors = syntax.accessors(decodeBody: !syntaxTree.isBridgeFile, in: syntaxTree)
+                if syntaxTree.isBridgeFile, !isBridge(attributes: attributes, visibility: modifiers.setVisibility, asMember: true) {
+                    accessors.setter = nil
+                }
             case .getter(let syntax):
                 if syntaxTree.isBridgeFile {
                     accessors.getter = Accessor()
@@ -1347,7 +1350,7 @@ final class TypealiasDeclaration: Statement {
         var attributes = Attributes.for(syntax: typealiasDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: typealiasDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, modifiers: modifiers, asMember: false) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
             return []
         }
         let name = typealiasDecl.name.text.removingBacktickEscaping
@@ -1453,7 +1456,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: classDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: classDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, modifiers: modifiers, asMember: false) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
             return nil
         }
         let name = classDecl.name.text.removingBacktickEscaping
@@ -1469,7 +1472,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: structDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: structDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, modifiers: modifiers, asMember: false) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
             return nil
         }
         let name = structDecl.name.text.removingBacktickEscaping
@@ -1485,7 +1488,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: protocolDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, modifiers: modifiers, asMember: false) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
             return nil
         }
         let name = protocolDecl.name.text.removingBacktickEscaping
@@ -1503,7 +1506,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: enumDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, modifiers: modifiers, asMember: false) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
             return nil
         }
         let name = enumDecl.name.text.removingBacktickEscaping
@@ -1519,7 +1522,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: actorDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: actorDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, modifiers: modifiers, asMember: false) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
             return nil
         }
         let name = actorDecl.name.text.removingBacktickEscaping
@@ -1642,7 +1645,7 @@ final class VariableDeclaration: Statement {
         var attributes = Attributes.for(syntax: variableDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras)
         let modifiers = Modifiers.for(syntax: variableDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, modifiers: modifiers, asMember: asMember) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: asMember) else {
             return []
         }
         let isLet = variableDecl.bindingSpecifier.text == "let"
@@ -1676,6 +1679,9 @@ final class VariableDeclaration: Statement {
             switch accessor {
             case .accessors(let syntax):
                 accessors = syntax.accessors(decodeBody: !syntaxTree.isBridgeFile, in: syntaxTree)
+                if syntaxTree.isBridgeFile, !isBridge(attributes: attributes, visibility: modifiers.setVisibility, asMember: true) {
+                    accessors.setter = nil
+                }
             case .getter(let syntax):
                 if syntaxTree.isBridgeFile {
                     accessors.getter = Accessor()

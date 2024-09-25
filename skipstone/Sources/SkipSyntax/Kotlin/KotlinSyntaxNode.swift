@@ -44,6 +44,18 @@ class KotlinSyntaxNode: SourceDerived, OutputNode {
         }
     }
 
+    /// Find the nearest type declaration by traversing up the syntax tree.
+    final var owningTypeDeclaration: KotlinStatement? {
+        var current: KotlinSyntaxNode? = self
+        while current != nil {
+            if current is KotlinClassDeclaration || current is KotlinInterfaceDeclaration {
+                return current as? KotlinStatement
+            }
+            current = current?.parent
+        }
+        return nil
+    }
+
     var messages: [Message] = []
 
     /// All messages rooted in this subtree.
