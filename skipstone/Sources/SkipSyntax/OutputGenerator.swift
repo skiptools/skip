@@ -19,13 +19,13 @@ public final class OutputGenerator {
         return ret
     }
 
-    @discardableResult func append(_ node: OutputNode, indentation: Indentation) -> OutputGenerator {
+    @discardableResult public func append(_ node: OutputNode, indentation: Indentation) -> OutputGenerator {
         return append(node, indentation: indentation) {
             node.append(to: $0, indentation: indentation)
         }
     }
 
-    @discardableResult func append(_ node: OutputNode, indentation: Indentation, appendContent: (OutputGenerator) -> Void) -> OutputGenerator {
+    @discardableResult public func append(_ node: OutputNode, indentation: Indentation, appendContent: (OutputGenerator) -> Void) -> OutputGenerator {
         append(node.leadingTrivia(indentation: indentation))
         let startOffset = content.utf8.count
         appendContent(self)
@@ -48,17 +48,17 @@ public final class OutputGenerator {
         return self
     }
 
-    @discardableResult func append(_ nodes: [OutputNode], indentation: Indentation) -> OutputGenerator {
+    @discardableResult public func append(_ nodes: [OutputNode], indentation: Indentation) -> OutputGenerator {
         nodes.forEach { append($0, indentation: indentation) }
         return self
     }
 
-    @discardableResult func append(_ string: String) -> OutputGenerator {
+    @discardableResult public func append(_ string: String) -> OutputGenerator {
         content += string
         return self
     }
 
-    @discardableResult func append(_ convertible: CustomStringConvertible) -> OutputGenerator {
+    @discardableResult public func append(_ convertible: CustomStringConvertible) -> OutputGenerator {
         append(convertible.description)
         return self
     }
@@ -70,7 +70,7 @@ public final class OutputGenerator {
 }
 
 /// A node in the output graph.
-protocol OutputNode {
+public protocol OutputNode {
     var sourceFile: Source.FilePath? { get }
     var sourceRange: Source.Range? { get }
 

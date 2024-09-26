@@ -1,26 +1,36 @@
 /// Indentation helper.
-struct Indentation: ExpressibleByIntegerLiteral, CustomStringConvertible {
-    static let zero = Indentation(level: 0)
-    
-    let level: Int
+public struct Indentation: ExpressibleByIntegerLiteral, CustomStringConvertible {
+    public static let zero = Indentation(level: 0)
 
-    init(level: Int) {
+    public let level: Int
+
+    public init(level: Int) {
         self.level = level
     }
 
-    init(integerLiteral: Int) {
+    public init(integerLiteral: Int) {
         self.level = integerLiteral
     }
 
-    func inc() -> Indentation {
+    public func inc() -> Indentation {
         return Indentation(level: level + 1)
     }
 
-    func dec() -> Indentation {
+    public func dec() -> Indentation {
         return Indentation(level: max(0, level - 1))
     }
 
-    var description: String {
+    public var description: String {
         return String(repeating: "    ", count: level)
+    }
+}
+
+extension Array where Element == String {
+    public mutating func append(_ indentation: Indentation, _ value: String) {
+        self.append(indentation.description + value)
+    }
+
+    public mutating func append(_ indentation: Indentation, _ value: [String]) {
+        value.forEach { append(indentation, $0) }
     }
 }

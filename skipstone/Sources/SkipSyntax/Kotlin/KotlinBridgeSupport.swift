@@ -1,3 +1,40 @@
+/// Used in Swift code generation.
+struct SwiftDefinition: OutputNode {
+    let sourceFile: Source.FilePath?
+    let sourceRange: Source.Range?
+    var children: [SwiftDefinition] = []
+    var appendTo: (OutputGenerator, Indentation, [SwiftDefinition]) -> Void = { output, indentation, children in
+        children.forEach { $0.append(to: output, indentation: indentation) }
+    }
+
+    init(statement: SourceDerived? = nil, children: [SwiftDefinition] = [], appendTo: ((OutputGenerator, Indentation, [SwiftDefinition]) -> Void)? = nil) {
+        self.sourceFile = statement?.sourceFile
+        self.sourceRange = statement?.sourceRange
+        self.children = children
+        if let appendTo {
+            self.appendTo = appendTo
+        }
+    }
+
+    init(statement: SourceDerived? = nil, swift: [String]) {
+        self = .init(statement: statement) { output, indentation, _ in
+            swift.forEach { output.append(indentation).append($0).append("\n") }
+        }
+    }
+
+    func leadingTrivia(indentation: Indentation) -> String {
+        return ""
+    }
+
+    func trailingTrivia(indentation: Indentation) -> String {
+        return ""
+    }
+
+    func append(to output: OutputGenerator, indentation: Indentation) {
+        appendTo(output, indentation, children)
+    }
+}
+
 extension Source.FilePath {
     /// Return the JNI class name for this file in the given package.
     func jniClassName(packageName: String?) -> String {

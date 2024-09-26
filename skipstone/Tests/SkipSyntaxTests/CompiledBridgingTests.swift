@@ -506,6 +506,10 @@ final class CompiledBridgingTests: XCTestCase {
         // TODO
     }
 
+    func testInnerClass() async throws {
+        // TODO: Include ensuring that outer class is also bridged
+    }
+
     func testPrivateClass() async throws {
         // TODO
     }
@@ -515,6 +519,10 @@ final class CompiledBridgingTests: XCTestCase {
     }
 
     func testConstructor() async throws {
+        // TODO
+    }
+
+    func testDestructor() async throws {
         // TODO
     }
 
