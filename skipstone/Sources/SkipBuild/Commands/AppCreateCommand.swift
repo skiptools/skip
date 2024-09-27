@@ -54,7 +54,7 @@ struct AppCreateCommand: MessageCommand, ToolOptionsCommand {
             let fileSize = try? result?.get().resourceValues(forKeys: [.fileSizeKey]).fileSize
             return (result, MessageBlock(status: result?.messageStatusAny, "Downloaded \(tmsg) \(ByteCountFormatter.string(fromByteCount: Int64(fileSize ?? 0), countStyle: .file))"))
         }) { loggingHandler in
-            let (url, response) = try await URLSession.shared.download(from: templateURL)
+            let (url, response) = try await URLSession.shared.download(from: templateURL, delegate: URLSessionTaskDelegate?.none)
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             if !(200..<300).contains(code) {
                 throw CreateError(errorDescription: "Download for template URL \(templateURL.absoluteString) returned error: \(code)")

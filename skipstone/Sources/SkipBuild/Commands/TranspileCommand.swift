@@ -281,8 +281,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             try addLink(extLink, pointingAt: projectFolderPath, relative: false)
         }
 
-        if isNativeSwiftProject {
-            // Link src/main/swift/ to the relative cmake target
+        if baseSkipConfig.skip?.mode != nil {
+            // Link src/main/swift/ to the relative Swift project folder
+            // TODO: create links each file/dir in the directory *except* Package.swift, which we should copy and augment
             let swiftLinkFolder = try AbsolutePath(outputFolderPath, validating: "swift")
             try fs.createDirectory(swiftLinkFolder.parentDirectory, recursive: true)
             try addLink(swiftLinkFolder, pointingAt: rootPath, relative: false)

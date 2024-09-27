@@ -60,6 +60,7 @@ fileprivate extension AndroidOperationCommand {
                 if !outputOptions.verbose && (
                     outputLine.line.hasPrefix("warning: Could not read SDKSettings.json for SDK")
                     || outputLine.line.hasPrefix("<unknown>:0: warning: glibc not found for")
+                    || outputLine.line.hasPrefix("<unknown>:0: warning: libc not found for")
                 ) {
                     continue
                 }
@@ -70,7 +71,7 @@ fileprivate extension AndroidOperationCommand {
         }
         #endif
     }
-    
+
     /// Run `swift build` for the given Android architectures, optionally running the test cases on the device or copying all the files to the given `archiveOutputFolder`
     func runSwiftPM(cleanup: Bool? = nil, execute executable: String? = nil, commandEnvironment: [String] = [], remoteFolder: String? = nil, copy: [String] = [], archiveOutputFolder: URL? = nil, with out: MessageQueue) async throws {
         let packageDir = toolchainOptions.packagePath ?? "."
