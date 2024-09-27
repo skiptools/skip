@@ -57,8 +57,8 @@ extension String {
 }
 
 extension TypeSignature {
-    static let swiftObjectPtr: TypeSignature = .named("SwiftObjectPtr", [])
-    
+    static let swiftObjectPointer: TypeSignature = .named("SwiftObjectPointer", [])
+
     /// Return the external function equivalent of this type.
     var kotlinExternal: TypeSignature {
         switch self {
