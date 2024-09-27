@@ -204,10 +204,14 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
     private func swift(for functionDeclaration: KotlinFunctionDeclaration, targetIdentifier: String, classIdentifier: String, methodIdentifier: String) -> [String] {
         var swift: [String] = []
 
+        var functionType = functionDeclaration.functionType
+        if functionDeclaration.type == .constructorDeclaration {
+            functionType = functionType.withReturnType(.void)
+        }
         let visibility = functionDeclaration.modifiers.visibility.swift(suffix: " ")
         let parameterString = functionDeclaration.parameters.map(\.swift).joined(separator: ", ")
-        let returnString = functionDeclaration.returnType == .void ? "" : " -> " + functionDeclaration.returnType.description
-        swift.append(visibility + "func " + functionDeclaration.name + "(" + parameterString + ")" + returnString + " {")
+        let returnString = functionType.returnType == .void ? "" : " -> " + functionType.returnType.description
+        swift.append(visibility + (functionDeclaration.type == .constructorDeclaration ? "init" : "func " + functionDeclaration.name) + "(" + parameterString + ")" + returnString + " {")
 
         var javaParameterNames: [String] = []
         for p in functionDeclaration.parameters {
@@ -216,20 +220,25 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
             swift.append(1, "let " + name + " = " + p.declaredType.convertToJava(value: p.internalLabel) + ".toJavaParameter()")
         }
 
-        let callType = functionDeclaration.role == .global ? "callStatic" : "call"
-        let callMethod = functionDeclaration.role == .global ? methodIdentifier : "Self." + methodIdentifier
-        let call = "try! " + targetIdentifier + "." + callType + "(method: " + callMethod + ", [" + javaParameterNames.joined(separator: ", ") + "])"
-        if functionDeclaration.returnType == .void {
-            swift.append(1, call)
+        if functionDeclaration.type == .constructorDeclaration {
+            swift.append(1, "let ptr = try! Self.Java_class.create(ctor: Self." + methodIdentifier + ", [" + javaParameterNames.joined(separator: ", ") + "])")
+            swift.append(1, "Java_peer = JObject(ptr)")
         } else {
-            swift.append(1, "let f_return_java: " + functionDeclaration.returnType.java.description + " = " + call)
-            swift.append(1, "return " + functionDeclaration.returnType.convertFromJava(value: "f_return_java"))
+            let callType = functionDeclaration.role == .global ? "callStatic" : "call"
+            let callMethod = functionDeclaration.role == .global ? methodIdentifier : "Self." + methodIdentifier
+            let call = "try! " + targetIdentifier + "." + callType + "(method: " + callMethod + ", [" + javaParameterNames.joined(separator: ", ") + "])"
+            if functionType.returnType == .void {
+                swift.append(1, call)
+            } else {
+                swift.append(1, "let f_return_java: " + functionType.returnType.java.description + " = " + call)
+                swift.append(1, "return " + functionType.returnType.convertFromJava(value: "f_return_java"))
+            }
         }
         swift.append("}")
 
         let declarationType = functionDeclaration.role == .global ? "let " : "static let "
         let getType = functionDeclaration.role == .global ? "getStaticMethodID" : "getMethodID"
-        let methodID = "private " + declarationType + methodIdentifier + " = " + classIdentifier + "." + getType + "(name: \"" + functionDeclaration.name + "\", sig: \"" + functionDeclaration.functionType.jni + "\")!"
+        let methodID = "private " + declarationType + methodIdentifier + " = " + classIdentifier + "." + getType + "(name: \"" + (functionDeclaration.type == .constructorDeclaration ? "<init>" : functionDeclaration.name) + "\", sig: \"" + functionType.jni + "\")!"
         swift.append(methodID)
         return swift
     }
@@ -257,10 +266,10 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         if !classDeclaration.members.contains(where: { $0.type == .constructorDeclaration }) {
             swift.append(1, [
                 visibility + "init() {",
-                "    let ptr = try! Self.Java_class.create(ctor: Self.Java_init_methodID, [])",
+                "    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, [])",
                 "    Java_peer = JObject(ptr)",
                 "}",
-                "private static let Java_init_methodID = Java_class.getMethodID(name: \"<init>\", sig: \"()V\")!"
+                "private static let Java_constructor_methodID = Java_class.getMethodID(name: \"<init>\", sig: \"()V\")!"
             ])
             swift.append("")
         }

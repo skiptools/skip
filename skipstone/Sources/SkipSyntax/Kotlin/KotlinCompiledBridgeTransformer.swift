@@ -25,6 +25,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
             }
         }
         if !localCdeclFunctions.isEmpty {
+            syntaxTree.dependencies.imports.insert("skip.bridge.*")
             lock.lock()
             cdeclFunctions += localCdeclFunctions
             lock.unlock()
@@ -210,7 +211,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
 
         let swiftCallTarget: String
         var externalArgumentsString = ""
-        if let classDeclaration {
+        if let classDeclaration, functionDeclaration.type != .constructorDeclaration {
             cdeclBody.append("let peer_swift: " + classDeclaration.signature.description + " = Swift_peer.toSwift()")
             swiftCallTarget = "peer_swift."
 
@@ -230,7 +231,11 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
             }
         }.joined(separator: ", ")
         
-        if functionDeclaration.returnType == .void {
+        if let classDeclaration, functionDeclaration.type == .constructorDeclaration {
+            body.append("Swift_peer = " + externalName + "(" + externalArgumentsString + ")")
+            cdeclBody.append("let f_return_swift = " + classDeclaration.name + "(" + swiftArgumentsString + ")")
+            cdeclBody.append("return SwiftObjectPtr.forSwift(f_return_swift, retain: true)")
+        } else if functionDeclaration.returnType == .void {
             body.append(externalName + "(" + externalArgumentsString + ")")
             cdeclBody.append(swiftCallTarget + functionName + "(" + swiftArgumentsString + ")")
         } else {
@@ -243,7 +248,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         functionDeclaration.body = KotlinCodeBlock(statements: body.map { KotlinRawStatement(sourceCode: $0) })
 
         var externalFunctionDeclaration = "private external fun " + externalName + "("
-        if classDeclaration != nil {
+        if classDeclaration != nil, functionDeclaration.type != .constructorDeclaration {
             externalFunctionDeclaration += "Swift_peer: SwiftObjectPtr"
             if !functionDeclaration.parameters.isEmpty {
                 externalFunctionDeclaration += ", "
@@ -253,17 +258,20 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
             p.internalLabel + ": " + p.declaredType.kotlinExternal.kotlin
         }.joined(separator: ", ")
         externalFunctionDeclaration += ")"
-        if functionDeclaration.returnType != .void {
+        if functionDeclaration.type == .constructorDeclaration {
+            externalFunctionDeclaration += ": SwiftObjectPtr"
+        } else if functionDeclaration.returnType != .void {
             externalFunctionDeclaration += ": " + functionDeclaration.returnType.kotlinExternal.kotlin
         }
         (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [KotlinRawStatement(sourceCode: externalFunctionDeclaration)], after: functionDeclaration)
 
         let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: externalName, translator: translator)
         let functionType = functionDeclaration.functionType
-        let instanceParameter = classDeclaration != nil ? [cdeclInstanceParameter] : []
+        let instanceParameter = classDeclaration != nil && functionDeclaration.type != .constructorDeclaration ? [cdeclInstanceParameter] : []
+        let returnType: TypeSignature = functionDeclaration.type == .constructorDeclaration ? .swiftObjectPtr : functionType.returnType
         let cdeclType: TypeSignature = .function(instanceParameter + functionType.parameters.map { p in
             TypeSignature.Parameter(label: p.label, type: p.type.cdecl)
-        }, functionType.returnType.cdecl, APIFlags(), nil)
+        }, returnType.cdecl, APIFlags(), nil)
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
         cdeclFunctions.append(cdeclFunction)
     }

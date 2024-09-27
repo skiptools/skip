@@ -82,6 +82,8 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         let f: Float = 1
         """, isSwiftBridge: true, kotlin: """
+        import skip.bridge.*
+
         internal val f: Float
             get() {
                 val value_swift = Swift_f()
@@ -100,6 +102,8 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         let i: Int64 = 1
         """, isSwiftBridge: true, kotlin: """
+        import skip.bridge.*
+
         internal val i: Long
             get() {
                 val value_swift = Swift_i()
@@ -118,6 +122,8 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         let s = "ab\\(1 + 1)c"
         """, isSwiftBridge: true, kotlin: """
+        import skip.bridge.*
+
         internal val s: String
             get() {
                 val value_swift = Swift_s()
@@ -138,6 +144,8 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         let i = 1 + 1
         """, isSwiftBridge: true, kotlin: """
+        import skip.bridge.*
+
         internal val i: Int
             get() {
                 val value_swift = Swift_i()
@@ -156,6 +164,8 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         let i: Int32 = 1 + 1
         """, isSwiftBridge: true, kotlin: """
+        import skip.bridge.*
+
         internal val i: Int
             get() {
                 val value_swift = Swift_i()
@@ -174,6 +184,8 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         let s = "ab" + "c"
         """, isSwiftBridge: true, kotlin: """
+        import skip.bridge.*
+
         internal val s: String
             get() {
                 val value_swift = Swift_s()
@@ -194,6 +206,8 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         var i = 1
         """, isSwiftBridge: true, kotlin: """
+        import skip.bridge.*
+
         internal var i: Int
             get() {
                 val value_swift = Swift_i()
@@ -222,6 +236,8 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         var s = ""
         """, isSwiftBridge: true, kotlin: """
+        import skip.bridge.*
+
         internal var s: String
             get() {
                 val value_swift = Swift_s()
@@ -252,6 +268,8 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         public var i = 1
         """, isSwiftBridge: true, kotlin: """
+        import skip.bridge.*
+
         var i: Int
             get() {
                 val value_swift = Swift_i()
@@ -309,6 +327,8 @@ final class CompiledBridgingTests: XCTestCase {
             }
         }
         """, isSwiftBridge: true, kotlin: """
+        import skip.bridge.*
+
         internal var s: String
             get() {
                 val value_swift = Swift_s()
@@ -377,6 +397,8 @@ final class CompiledBridgingTests: XCTestCase {
             return i + (Int(s) ?? 0)
         }
         """, isSwiftBridge: true, kotlin: """
+        import skip.bridge.*
+
         internal fun f(i: Int, s: String): Int {
             val i_swift = i.toLong()
             val s_swift = s
@@ -396,11 +418,42 @@ final class CompiledBridgingTests: XCTestCase {
     }
 
     func testPublicFunction() async throws {
-        // TODO
+        try await check(swift: """
+        // SKIP @bridge
+        public func f(i: Int, s: String) -> Int {
+            return i + (Int(s) ?? 0)
+        }
+        """, isSwiftBridge: true, kotlin: """
+        import skip.bridge.*
+
+        fun f(i: Int, s: String): Int {
+            val i_swift = i.toLong()
+            val s_swift = s
+            val f_return_swift = Swift_f(i_swift, s_swift)
+            return f_return_swift.toInt()
+        }
+        private external fun Swift_f(i: Long, s: String): Long
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_SourceKt_Swift_1f")
+        func SourceKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ i: Int64, _ s: JavaString) -> Int64 {
+            let i_swift = Int(i)
+            let s_swift = try! String.fromJavaObject(s)
+            let f_return_swift = f(i: i_swift, s: s_swift)
+            return Int64(f_return_swift)
+        }
+        """)
     }
 
     func testPrivateFunction() async throws {
-        // TODO
+        try await checkProducesMessage(swift: """
+        // SKIP @bridge
+        private func f() { }
+        """, isSwiftBridge: true)
+
+        try await checkProducesMessage(swift: """
+        // SKIP @bridge
+        fileprivate func f() { }
+        """, isSwiftBridge: true)
     }
 
     func testFunctionParameterLabel() async throws {
@@ -442,6 +495,8 @@ final class CompiledBridgingTests: XCTestCase {
             var i = 1
         }
         """, isSwiftBridge: true, kotlin: """
+        import skip.bridge.*
+
         internal open class C {
             var Swift_peer: SwiftObjectPtr
 
@@ -519,7 +574,51 @@ final class CompiledBridgingTests: XCTestCase {
     }
 
     func testConstructor() async throws {
-        // TODO
+        try await check(swift: """
+        // SKIP @bridge
+        class C {
+            init(i: Int) {
+            }
+        }
+        """, isSwiftBridge: true, kotlin: """
+        import skip.bridge.*
+
+        internal open class C {
+            var Swift_peer: SwiftObjectPtr
+
+            constructor(Swift_peer: SwiftObjectPtr) {
+                this.Swift_peer = Swift_ptrref(Swift_peer)
+            }
+            private external fun Swift_ptrref(Swift_peer: SwiftObjectPtr): SwiftObjectPtr
+
+            fun finalize() {
+                Swift_ptrderef(Swift_peer)
+                Swift_peer = SwiftObjectNil
+            }
+            private external fun Swift_ptrderef(Swift_peer: SwiftObjectPtr)
+
+            internal constructor(i: Int) {
+                val i_swift = i.toLong()
+                Swift_peer = Swift_constructor(i_swift)
+            }
+            private external fun Swift_constructor(i: Long): SwiftObjectPtr
+        }
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_C_Swift_1ptrref")
+        func C_Swift_ptrref(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPtr) -> SwiftObjectPtr {
+            return refSwift(Swift_peer, type: C.self)
+        }
+        @_cdecl("Java_C_Swift_1ptrderef")
+        func C_Swift_ptrderef(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPtr) {
+            derefSwift(Swift_peer, type: C.self)
+        }
+        @_cdecl("Java_C_Swift_1constructor")
+        func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ i: Int64) -> SwiftObjectPtr {
+            let i_swift = Int(i)
+            let f_return_swift = C(i: i_swift)
+            return SwiftObjectPtr.forSwift(f_return_swift, retain: true)
+        }
+        """)
     }
 
     func testDestructor() async throws {
@@ -543,6 +642,8 @@ final class CompiledBridgingTests: XCTestCase {
             }
         }
         """, isSwiftBridge: true, kotlin: """
+        import skip.bridge.*
+        
         internal open class C {
             var Swift_peer: SwiftObjectPtr
 

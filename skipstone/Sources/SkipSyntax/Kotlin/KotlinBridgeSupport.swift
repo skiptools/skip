@@ -314,6 +314,9 @@ extension KotlinFunctionDeclaration {
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
     func checkBridgable(translator: KotlinTranslator) -> Bool {
+        guard type != .finalizerDeclaration else {
+            return false
+        }
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
             return false
         }
