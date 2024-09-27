@@ -131,7 +131,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
             "return " + type.kotlinConvertFromExternal(value: "value_swift")
         ]
         variableDeclaration.getter = Accessor(body: KotlinCodeBlock(statements: getterBody.map { KotlinRawStatement(sourceCode: $0) }))
-        externalFunctionDeclarations.append("private external fun " + externalName + "(Swift_peer: SwiftObjectPtr): " + externalType.kotlin)
+        externalFunctionDeclarations.append("private external fun " + externalName + "(Swift_peer: SwiftObjectPointer): " + externalType.kotlin)
 
         let cdeclGetterBody = [
             "let peer_swift: " + classDeclaration.signature.description + " = Swift_peer.toSwift()",
@@ -148,7 +148,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
                 externalName + "_set(Swift_peer, newValue_swift)"
             ]
             variableDeclaration.setter = Accessor(parameterName: "newValue", body: KotlinCodeBlock(statements: setterBody.map { KotlinRawStatement(sourceCode: $0) }))
-            externalFunctionDeclarations.append("private external fun " + externalName + "_set(Swift_peer: SwiftObjectPtr, value: " + externalType.kotlin + ")")
+            externalFunctionDeclarations.append("private external fun " + externalName + "_set(Swift_peer: SwiftObjectPointer, value: " + externalType.kotlin + ")")
 
             let cdeclSetterBody = [
                 "let peer_swift: " + classDeclaration.signature.description + " = Swift_peer.toSwift()",
@@ -234,7 +234,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         if let classDeclaration, functionDeclaration.type == .constructorDeclaration {
             body.append("Swift_peer = " + externalName + "(" + externalArgumentsString + ")")
             cdeclBody.append("let f_return_swift = " + classDeclaration.name + "(" + swiftArgumentsString + ")")
-            cdeclBody.append("return SwiftObjectPtr.forSwift(f_return_swift, retain: true)")
+            cdeclBody.append("return SwiftObjectPointer.forSwift(f_return_swift, retain: true)")
         } else if functionDeclaration.returnType == .void {
             body.append(externalName + "(" + externalArgumentsString + ")")
             cdeclBody.append(swiftCallTarget + functionName + "(" + swiftArgumentsString + ")")
@@ -249,7 +249,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
 
         var externalFunctionDeclaration = "private external fun " + externalName + "("
         if classDeclaration != nil, functionDeclaration.type != .constructorDeclaration {
-            externalFunctionDeclaration += "Swift_peer: SwiftObjectPtr"
+            externalFunctionDeclaration += "Swift_peer: SwiftObjectPointer"
             if !functionDeclaration.parameters.isEmpty {
                 externalFunctionDeclaration += ", "
             }
@@ -259,7 +259,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         }.joined(separator: ", ")
         externalFunctionDeclaration += ")"
         if functionDeclaration.type == .constructorDeclaration {
-            externalFunctionDeclaration += ": SwiftObjectPtr"
+            externalFunctionDeclaration += ": SwiftObjectPointer"
         } else if functionDeclaration.returnType != .void {
             externalFunctionDeclaration += ": " + functionDeclaration.returnType.kotlinExternal.kotlin
         }
@@ -268,7 +268,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: externalName, translator: translator)
         let functionType = functionDeclaration.functionType
         let instanceParameter = classDeclaration != nil && functionDeclaration.type != .constructorDeclaration ? [cdeclInstanceParameter] : []
-        let returnType: TypeSignature = functionDeclaration.type == .constructorDeclaration ? .swiftObjectPtr : functionType.returnType
+        let returnType: TypeSignature = functionDeclaration.type == .constructorDeclaration ? .swiftObjectPointer : functionType.returnType
         let cdeclType: TypeSignature = .function(instanceParameter + functionType.parameters.map { p in
             TypeSignature.Parameter(label: p.label, type: p.type.cdecl)
         }, returnType.cdecl, APIFlags(), nil)
@@ -283,22 +283,22 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         classDeclaration.extras = nil
 
         var insertStatements: [KotlinStatement] = []
-        let swiftPeer = KotlinVariableDeclaration(names: ["Swift_peer"], variableTypes: [.swiftObjectPtr])
+        let swiftPeer = KotlinVariableDeclaration(names: ["Swift_peer"], variableTypes: [.swiftObjectPointer])
         swiftPeer.modifiers.visibility = .public
         swiftPeer.apiFlags.options = .writeable
-        swiftPeer.declaredType = .swiftObjectPtr
+        swiftPeer.declaredType = .swiftObjectPointer
         swiftPeer.isGenerated = true
         insertStatements.append(swiftPeer)
 
         let swiftPeerConstructor = KotlinFunctionDeclaration(name: "constructor")
         swiftPeerConstructor.modifiers.visibility = .public
-        swiftPeerConstructor.parameters = [Parameter<KotlinExpression>(externalLabel: "Swift_peer", declaredType: .swiftObjectPtr)]
+        swiftPeerConstructor.parameters = [Parameter<KotlinExpression>(externalLabel: "Swift_peer", declaredType: .swiftObjectPointer)]
         swiftPeerConstructor.body = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: "this.Swift_peer = Swift_ptrref(Swift_peer)")])
         swiftPeerConstructor.ensureLeadingNewlines(1)
         swiftPeerConstructor.isGenerated = true
         insertStatements.append(swiftPeerConstructor)
 
-        let ptrref = KotlinRawStatement(sourceCode: "private external fun Swift_ptrref(Swift_peer: SwiftObjectPtr): SwiftObjectPtr")
+        let ptrref = KotlinRawStatement(sourceCode: "private external fun Swift_ptrref(Swift_peer: SwiftObjectPointer): SwiftObjectPointer")
         insertStatements.append(ptrref)
 
         let finalize = KotlinFunctionDeclaration(name: "finalize")
@@ -311,7 +311,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         finalize.isGenerated = true
         insertStatements.append(finalize)
 
-        let ptrderef = KotlinRawStatement(sourceCode: "private external fun Swift_ptrderef(Swift_peer: SwiftObjectPtr)")
+        let ptrderef = KotlinRawStatement(sourceCode: "private external fun Swift_ptrderef(Swift_peer: SwiftObjectPointer)")
         insertStatements.append(ptrderef)
 
         if !classDeclaration.members.contains(where: { $0.type == .constructorDeclaration }) {
@@ -321,22 +321,22 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
             constructor.ensureLeadingNewlines(1)
             constructor.isGenerated = true
             insertStatements.append(constructor)
-            let externalConstructor = KotlinRawStatement(sourceCode: "private external fun Swift_constructor(): SwiftObjectPtr")
+            let externalConstructor = KotlinRawStatement(sourceCode: "private external fun Swift_constructor(): SwiftObjectPointer")
             insertStatements.append(externalConstructor)
 
             let constructorCdecl = cdecl(for: classDeclaration, name: "Swift_constructor", translator: translator)
             let constructorBody = [
                 "let f_return_swift = " + classDeclaration.signature.description + "()",
-                "return SwiftObjectPtr.forSwift(f_return_swift, retain: true)"
+                "return SwiftObjectPointer.forSwift(f_return_swift, retain: true)"
             ]
-            cdeclFunctions.append(CDeclFunction(name: constructorCdecl.cdeclFunctionName, cdecl: constructorCdecl.cdecl, signature: .function([], .swiftObjectPtr, APIFlags(), nil), body: constructorBody))
+            cdeclFunctions.append(CDeclFunction(name: constructorCdecl.cdeclFunctionName, cdecl: constructorCdecl.cdecl, signature: .function([], .swiftObjectPointer, APIFlags(), nil), body: constructorBody))
         }
 
         let ptrrefCdecl = cdecl(for: classDeclaration, name: "Swift_ptrref", translator: translator)
         let ptrrefBody = [
             "return refSwift(Swift_peer, type: " + classDeclaration.signature.description + ".self)"
         ]
-        cdeclFunctions.append(CDeclFunction(name: ptrrefCdecl.cdeclFunctionName, cdecl: ptrrefCdecl.cdecl, signature: .function([cdeclInstanceParameter], .swiftObjectPtr, APIFlags(), nil), body: ptrrefBody))
+        cdeclFunctions.append(CDeclFunction(name: ptrrefCdecl.cdeclFunctionName, cdecl: ptrrefCdecl.cdecl, signature: .function([cdeclInstanceParameter], .swiftObjectPointer, APIFlags(), nil), body: ptrrefBody))
 
         let ptrderefCdecl = cdecl(for: classDeclaration, name: "Swift_ptrderef", translator: translator)
         let ptrderefBody = [
@@ -373,7 +373,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
     }
 
     private var cdeclInstanceParameter: TypeSignature.Parameter {
-        return TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPtr)
+        return TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer)
     }
 }
 
