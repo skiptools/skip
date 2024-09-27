@@ -104,7 +104,7 @@ public final class KotlinTranslator {
         if !importContent.isEmpty {
             leadingContent += importContent + "\n\n"
         }
-        let rootOutputNode = SwiftDefinition() { output, indentation, _ in
+        let rootOutputNode = SwiftDefinition { output, indentation, _ in
             output.append(leadingContent)
             outputNodes.forEach { output.append($0, indentation: indentation) }
             output.append(trailingContent)

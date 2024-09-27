@@ -45,17 +45,18 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
             return nil
         }
         // TODO: Imports
-        let globalsJavaClasses = self.globalsJavaClasses
-        return SwiftDefinition(children: swiftDefinitions) { output, indentation, children in
-            globalsJavaClasses.map(\.description).sorted().forEach {
+        let globalsJavaClasses = self.globalsJavaClasses.map(\.description).sorted()
+        let swiftDefinitions = self.swiftDefinitions.sorted { ($0.sourceFile?.path ?? "") < ($1.sourceFile?.path ?? "") }
+        return SwiftDefinition { output, indentation, _ in
+            globalsJavaClasses.forEach {
                 output.append(indentation).append($0).append("\n")
             }
-            children.forEach { output.append($0, indentation: indentation) }
+            swiftDefinitions.forEach { output.append($0, indentation: indentation) }
         }
     }
 
     private func addSwiftDefinitions(forGlobal variableDeclaration: KotlinVariableDeclaration, to swiftDefinitions: inout [SwiftDefinition], globalsJavaClasses: inout Set<JavaClassRef>, translator: KotlinTranslator) {
-        guard let type = variableDeclaration.checkBridgable(translator: translator) else {
+        guard let (type, strategy) = variableDeclaration.checkBridgable(translator: translator) else {
             return
         }
         guard !addConstantDefinition(for: variableDeclaration, type: type, to: &swiftDefinitions, translator: translator) else {
@@ -64,7 +65,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         let classRef = globalsJavaClass(translator: translator)
         globalsJavaClasses.insert(classRef)
 
-        let swift = swift(for: variableDeclaration, type: type, targetIdentifier: classRef.identifier, classIdentifier: classRef.identifier, fieldIdentifier: "Java_" + variableDeclaration.propertyName + "_fieldID")
+        let swift = swift(for: variableDeclaration, type: type, strategy: strategy, targetIdentifier: classRef.identifier, classIdentifier: classRef.identifier, fieldIdentifier: "Java_" + variableDeclaration.propertyName + "_fieldID")
         swiftDefinitions.append(SwiftDefinition(statement: variableDeclaration, swift: swift))
     }
 
@@ -72,22 +73,23 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         guard variableDeclaration.modifiers.visibility != .private && variableDeclaration.modifiers.visibility != .fileprivate && !variableDeclaration.attributes.contains(directive: Directive.nobridge) else {
             return
         }
-        guard let type = variableDeclaration.checkBridgable(translator: translator) else {
+        guard let (type, strategy) = variableDeclaration.checkBridgable(translator: translator) else {
             return
         }
         guard !addConstantDefinition(for: variableDeclaration, type: type, to: &swiftDefinitions, translator: translator) else {
             return
         }
 
-        let swift = swift(for: variableDeclaration, type: type, targetIdentifier: "Java_peer", classIdentifier: "Java_class", fieldIdentifier: "Java_" + variableDeclaration.propertyName + "_fieldID")
+        let swift = swift(for: variableDeclaration, type: type, strategy: strategy, targetIdentifier: "Java_peer", classIdentifier: "Java_class", fieldIdentifier: "Java_" + variableDeclaration.propertyName + "_fieldID")
         swiftDefinitions.append(SwiftDefinition(statement: variableDeclaration, swift: swift))
     }
 
-    private func swift(for variableDeclaration: KotlinVariableDeclaration, type: TypeSignature, targetIdentifier: String, classIdentifier: String, fieldIdentifier: String) -> [String] {
+    private func swift(for variableDeclaration: KotlinVariableDeclaration, type: TypeSignature, strategy: BridgeStrategy, targetIdentifier: String, classIdentifier: String, fieldIdentifier: String) -> [String] {
         var swift: [String] = []
         let propertyName = variableDeclaration.propertyName
+        let preEscapedPropertyName = variableDeclaration.preEscapedPropertyName
         let visibility = variableDeclaration.modifiers.visibility.swift(suffix: " ")
-        swift.append(visibility + "var " + propertyName + ": " + type.description + " {")
+        swift.append(visibility + "var " + (preEscapedPropertyName ?? propertyName) + ": " + type.description + " {")
 
         // Getter
         let getType = variableDeclaration.role == .global ? "getStatic" : "get"
@@ -95,7 +97,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         swift.append(1, "get {")
         swift.append(2, [
             "let value_java: " + type.java.description + " = try! " + targetIdentifier + "." + getType + "(field: " + callField  + ")",
-            "return " + type.convertFromJava(value: "value_java")
+            "return " + type.convertFromJava(value: "value_java", strategy: strategy)
         ])
         swift.append(1, "}")
 
@@ -110,7 +112,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
             let setType = variableDeclaration.role == .global ? "setStatic" : "set"
             swift.append(1, setVisibility + "set {")
             swift.append(2, [
-                "let value_java = " + type.convertToJava(value: "newValue"),
+                "let value_java = " + type.convertToJava(value: "newValue", strategy: strategy),
                 targetIdentifier + "." + setType + "(field: " + callField + ", value: value_java)"
             ])
             swift.append(1, "}")
@@ -217,7 +219,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         for p in functionDeclaration.parameters {
             let name = p.internalLabel + "_java"
             javaParameterNames.append(name)
-            swift.append(1, "let " + name + " = " + p.declaredType.convertToJava(value: p.internalLabel) + ".toJavaParameter()")
+            swift.append(1, "let " + name + " = " + p.declaredType.convertToJava(value: p.internalLabel, strategy: .direct) + ".toJavaParameter()")
         }
 
         if functionDeclaration.type == .constructorDeclaration {
@@ -231,7 +233,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
                 swift.append(1, call)
             } else {
                 swift.append(1, "let f_return_java: " + functionType.returnType.java.description + " = " + call)
-                swift.append(1, "return " + functionType.returnType.convertFromJava(value: "f_return_java"))
+                swift.append(1, "return " + functionType.returnType.convertFromJava(value: "f_return_java", strategy: .direct))
             }
         }
         swift.append("}")
@@ -254,16 +256,16 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         swift.append(visibility + "class " + classDeclaration.name + " {")
 
         swift.append(1, "private static let Java_class = try! JClass(name: \"" + classRef.className + "\")")
-        swift.append(1, "let Java_peer: JObject")
+        swift.append(1, visibility + "let Java_peer: JObject")
         swift.append("")
         swift.append(1, [
             "init(Java_ptr: JavaObjectPointer) {",
             "    Java_peer = JObject(Java_ptr)",
             "}"
         ])
-        swift.append("")
 
         if !classDeclaration.members.contains(where: { $0.type == .constructorDeclaration }) {
+            swift.append("")
             swift.append(1, [
                 visibility + "init() {",
                 "    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, [])",
@@ -271,7 +273,6 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
                 "}",
                 "private static let Java_constructor_methodID = Java_class.getMethodID(name: \"<init>\", sig: \"()V\")!"
             ])
-            swift.append("")
         }
 
         var memberDefinitions: [SwiftDefinition] = []
@@ -286,7 +287,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         let definition = SwiftDefinition(statement: classDeclaration, children: memberDefinitions) { output, indentation, children in
             swift.forEach { output.append(indentation).append($0).append("\n") }
             let childIndentation = indentation.inc()
-            children.forEach { output.append($0, indentation: childIndentation) }
+            children.forEach { output.append("\n").append($0, indentation: childIndentation) }
             output.append(indentation).append("}\n")
         }
         swiftDefinitions.append(definition)

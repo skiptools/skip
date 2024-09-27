@@ -26,7 +26,7 @@ extension XCTestCase {
     ///   - swiftBridgeSupport: the expected swift in the generated bridge file
     ///   - file: the file of the call site, expected to be `#file`
     ///   - line: the line of the call site, expected to be `#line`
-    public func check(expectFailure: Bool = false, expectMessages: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], dependentModules: [CodebaseInfo.ModuleExport] = [], supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, isSwiftBridge: Bool = false, kotlin: String, fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, kotlinPackageSupport: String? = nil, swiftBridgeSupport: String? = nil, transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
+    public func check(expectFailure: Bool = false, expectMessages: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], dependentModules: [CodebaseInfo.ModuleExport] = [], supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, swiftBridge: String? = nil, kotlin: String, fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, kotlinPackageSupport: String? = nil, swiftBridgeSupport: String? = nil, transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
 
         func fixup(code: String) -> String {
             var code = fixupKotlinBlock(code)
@@ -46,10 +46,11 @@ extension XCTestCase {
         }
 
         var swiftString = swift?.description ?? ""
+        let swiftBridgeString = swiftBridge?.description ?? ""
 
         // the URL of the test case call site, which is used to extract Swift blocks
         let sourceURL = URL(fileURLWithPath: file.description)
-        if swift == nil {
+        if swift == nil && swiftBridge == nil {
             if swiftCode == nil {
                 // ensure that we have specified a block
                 return XCTFail("must specify either `swift` or `swiftCode` block", file: file, line: line)
@@ -75,25 +76,35 @@ extension XCTestCase {
             }
         }
 
-        if swiftString.isEmpty {
-            return XCTFail("must specify either `swift` or `swiftCode` block", file: file, line: line)
+        if swiftString.isEmpty && swiftBridgeString.isEmpty {
+            return XCTFail("must specify either `swift` or `swiftCode` block, or `swiftBridge`", file: file, line: line)
         }
 
-        let srcFile = try tmpFile(named: "Source.swift", contents: swiftString)
-        var srcFiles = [Source.FilePath(path: srcFile.path)]
-        if let supportingSwift {
-            let supportingFile = try tmpFile(named: "Support.swift", contents: supportingSwift)
-            srcFiles.append(Source.FilePath(path: supportingFile.path))
+        var srcFiles: [Source.FilePath] = []
+        if !swiftString.isEmpty {
+            let srcFile = try tmpFile(named: "Source.swift", contents: swiftString)
+            srcFiles.append(Source.FilePath(path: srcFile.path))
+        }
+        var bridgeFiles: [Source.FilePath] = []
+        if !swiftBridgeString.isEmpty {
+            let srcFile = try tmpFile(named: "Bridge.swift", contents: swiftBridgeString)
+            bridgeFiles.append(Source.FilePath(path: srcFile.path))
+        }
+        if let supportingSwift, !supportingSwift.isEmpty {
+            let srcFile = try tmpFile(named: "Support.swift", contents: supportingSwift)
+            srcFiles.append(Source.FilePath(path: srcFile.path))
         }
         let codebaseInfo = CodebaseInfo()
         codebaseInfo.dependentModules = dependentModules
-        let tp = Transpiler(sourceFiles: isSwiftBridge ? [] : srcFiles, bridgeFiles: isSwiftBridge ? srcFiles : [], codebaseInfo: codebaseInfo, transformers: transformers)
+        let tp = Transpiler(sourceFiles: srcFiles, bridgeFiles: bridgeFiles, codebaseInfo: codebaseInfo, transformers: transformers)
         var transpilations: [Transpilation] = []
         try await tp.transpile { transpilations.append($0) }
         guard !transpilations.isEmpty else {
             return XCTFail("transpilation produced no result", file: file, line: line)
         }
 
+        var transpiledKotlin = ""
+        var transpiledKotlinMessagesString = ""
         var messages: [Message] = []
         for transpilation in transpilations {
             let messagesString = transpilation.messages.map(\.formattedMessage).joined(separator: ",")
@@ -102,33 +113,53 @@ extension XCTestCase {
                 XCTFail("Transpilation produced unexpected messages: \(messagesString)", file: file, line: line)
             }
             if transpilation.input.file == srcFiles.first {
-                let content = fixup(code: trimmedContent(transpilation: transpilation))
-                let kotlinCode = kotlin.trimmingCharacters(in: .whitespacesAndNewlines)
-                if expectFailure {
-                    XCTAssertNotEqual(kotlinCode, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
+                let code = fixup(code: trimmedContent(transpilation: transpilation)).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !transpiledKotlin.isEmpty {
+                    transpiledKotlin = code + "\n" + transpiledKotlin
                 } else {
-                    XCTAssertEqual(kotlinCode, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
+                    transpiledKotlin = code
                 }
-            } else if transpilation.input.file == srcFiles.first?.kotlinPackageSupport(tests: false) {
+                if !transpiledKotlinMessagesString.isEmpty {
+                    transpiledKotlinMessagesString = messagesString + "\n" + transpiledKotlinMessagesString
+                } else {
+                    transpiledKotlinMessagesString = messagesString
+                }
+            } else if transpilation.input.file == bridgeFiles.first {
+                if !transpiledKotlin.isEmpty {
+                    transpiledKotlin += "\n"
+                }
+                transpiledKotlin += fixup(code: trimmedContent(transpilation: transpilation)).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !transpiledKotlinMessagesString.isEmpty {
+                    transpiledKotlinMessagesString += "\n"
+                }
+                transpiledKotlinMessagesString += messagesString
+            } else if transpilation.input.file == (srcFiles.first ?? bridgeFiles.first)?.kotlinPackageSupport(tests: false) {
                 if let kotlinPackageSupport {
                     let content = fixup(code: trimmedContent(transpilation: transpilation))
-                    let kotlinCode = kotlinPackageSupport.trimmingCharacters(in: .whitespacesAndNewlines)
-                    XCTAssertEqual(kotlinCode, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
+                    let expectedKotlin = kotlinPackageSupport.trimmingCharacters(in: .whitespacesAndNewlines)
+                    XCTAssertEqual(expectedKotlin, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
                 } else {
                     XCTFail("Transpilation produced unexpected package support content: \(transpilation.output.content)", file: file, line: line)
                 }
-            } else if transpilation.input.file == srcFiles.first?.swiftBridgeSupport(tests: false) {
+            } else if transpilation.input.file == (bridgeFiles.first ?? srcFiles.first)?.swiftBridgeSupport(tests: false) {
                 if let swiftBridgeSupport {
                     let content = fixup(code: trimmedContent(transpilation: transpilation))
-                    var swiftCode = swiftBridgeSupport.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !swiftCode.isEmpty {
-                        swiftCode = "#if canImport(SkipBridge)\nimport SkipBridge\n\n" + swiftCode + "\n\n#endif"
+                    var expectedSwift = swiftBridgeSupport.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !expectedSwift.isEmpty {
+                        expectedSwift = "#if canImport(SkipBridge)\nimport SkipBridge\n\n" + expectedSwift + "\n\n#endif"
                     }
-                    XCTAssertEqual(swiftCode, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
+                    XCTAssertEqual(expectedSwift, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
                 } else {
                     XCTFail("Transpilation produced unexpected bridge support content: \(transpilation.output.content)", file: file, line: line)
                 }
             }
+        }
+
+        let expectedKotlin = kotlin.trimmingCharacters(in: .whitespacesAndNewlines)
+        if expectFailure {
+            XCTAssertNotEqual(expectedKotlin, transpiledKotlin, transpiledKotlinMessagesString, file: file, line: line)
+        } else {
+            XCTAssertEqual(expectedKotlin, transpiledKotlin, transpiledKotlinMessagesString, file: file, line: line)
         }
 
         if messages.isEmpty {
@@ -153,9 +184,7 @@ extension XCTestCase {
         }
         let kotlinResult = try await kotlinc(compiler: compiler, source: kotlinLines.joined(separator: "\n"), script: true)
 
-        if let swiftCode = swiftCode,
-           let swiftResult = try swiftCode() {
-            
+        if let swiftCode = swiftCode, let swiftResult = try swiftCode() {
             XCTAssertEqual(swiftResult, kotlinResult, file: file, line: line)
         }
     }

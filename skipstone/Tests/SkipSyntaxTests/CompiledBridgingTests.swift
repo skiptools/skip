@@ -2,86 +2,86 @@ import XCTest
 
 final class CompiledBridgingTests: XCTestCase {
     func testLetSupportedLiteral() async throws {
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         let b = true
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         internal val b = true
         """, swiftBridgeSupport: """
         """)
 
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         let i = 1
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         internal val i = 1
         """, swiftBridgeSupport: """
         """)
 
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         let i: Int32 = 1
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         internal val i: Int = 1
         """, swiftBridgeSupport: """
         """)
 
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         let d = 5.0
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         internal val d = 5.0
         """, swiftBridgeSupport: """
         """)
 
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         let d: Double = 5
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         internal val d: Double = 5.0
         """, swiftBridgeSupport: """
         """)
 
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         let d: Double? = nil
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         internal val d: Double? = null
         """, swiftBridgeSupport: """
         """)
 
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         let d: Double? = 5
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         internal val d: Double? = 5.0
         """, swiftBridgeSupport: """
         """)
 
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         let s = "Hello"
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         internal val s = "Hello"
         """, swiftBridgeSupport: """
         """)
     }
 
     func testPublicLetSupportedLiteral() async throws {
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         public let b = true
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         val b = true
         """, swiftBridgeSupport: """
         """)
     }
 
     func testLetUnsupportedLiteral() async throws {
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         let f: Float = 1
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         import skip.bridge.*
 
         internal val f: Float
@@ -91,17 +91,17 @@ final class CompiledBridgingTests: XCTestCase {
             }
         private external fun Swift_f(): Float
         """, swiftBridgeSupport: """
-        @_cdecl("Java_SourceKt_Swift_1f")
-        func SourceKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Float {
+        @_cdecl("Java_BridgeKt_Swift_1f")
+        func BridgeKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Float {
             let value_swift = f
             return value_swift
         }
         """)
 
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         let i: Int64 = 1
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         import skip.bridge.*
 
         internal val i: Long
@@ -111,17 +111,17 @@ final class CompiledBridgingTests: XCTestCase {
             }
         private external fun Swift_i(): Long
         """, swiftBridgeSupport: """
-        @_cdecl("Java_SourceKt_Swift_1i")
-        func SourceKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int64 {
+        @_cdecl("Java_BridgeKt_Swift_1i")
+        func BridgeKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int64 {
             let value_swift = i
             return value_swift
         }
         """)
 
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         let s = "ab\\(1 + 1)c"
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         import skip.bridge.*
 
         internal val s: String
@@ -131,8 +131,8 @@ final class CompiledBridgingTests: XCTestCase {
             }
         private external fun Swift_s(): String
         """, swiftBridgeSupport: """
-        @_cdecl("Java_SourceKt_Swift_1s")
-        func SourceKt_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
+        @_cdecl("Java_BridgeKt_Swift_1s")
+        func BridgeKt_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
             let value_swift = s
             return value_swift.toJavaObject()!
         }
@@ -140,10 +140,10 @@ final class CompiledBridgingTests: XCTestCase {
     }
 
     func testLetNonLiteral() async throws {
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         let i = 1 + 1
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         import skip.bridge.*
 
         internal val i: Int
@@ -153,17 +153,17 @@ final class CompiledBridgingTests: XCTestCase {
             }
         private external fun Swift_i(): Long
         """, swiftBridgeSupport: """
-        @_cdecl("Java_SourceKt_Swift_1i")
-        func SourceKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int64 {
+        @_cdecl("Java_BridgeKt_Swift_1i")
+        func BridgeKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int64 {
             let value_swift = i
             return Int64(value_swift)
         }
         """)
 
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         let i: Int32 = 1 + 1
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         import skip.bridge.*
 
         internal val i: Int
@@ -173,17 +173,17 @@ final class CompiledBridgingTests: XCTestCase {
             }
         private external fun Swift_i(): Int
         """, swiftBridgeSupport: """
-        @_cdecl("Java_SourceKt_Swift_1i")
-        func SourceKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int32 {
+        @_cdecl("Java_BridgeKt_Swift_1i")
+        func BridgeKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int32 {
             let value_swift = i
             return value_swift
         }
         """)
 
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         let s = "ab" + "c"
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         import skip.bridge.*
 
         internal val s: String
@@ -193,8 +193,8 @@ final class CompiledBridgingTests: XCTestCase {
             }
         private external fun Swift_s(): String
         """, swiftBridgeSupport: """
-        @_cdecl("Java_SourceKt_Swift_1s")
-        func SourceKt_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
+        @_cdecl("Java_BridgeKt_Swift_1s")
+        func BridgeKt_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
             let value_swift = s
             return value_swift.toJavaObject()!
         }
@@ -202,10 +202,10 @@ final class CompiledBridgingTests: XCTestCase {
     }
 
     func testStoredVar() async throws {
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         var i = 1
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         import skip.bridge.*
 
         internal var i: Int
@@ -220,22 +220,22 @@ final class CompiledBridgingTests: XCTestCase {
         private external fun Swift_i(): Long
         private external fun Swift_i_set(value: Long)
         """, swiftBridgeSupport: """
-        @_cdecl("Java_SourceKt_Swift_1i")
-        func SourceKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int64 {
+        @_cdecl("Java_BridgeKt_Swift_1i")
+        func BridgeKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int64 {
             let value_swift = i
             return Int64(value_swift)
         }
-        @_cdecl("Java_SourceKt_Swift_1i_1set")
-        func SourceKt_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: Int64) {
+        @_cdecl("Java_BridgeKt_Swift_1i_1set")
+        func BridgeKt_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: Int64) {
             let value_swift = Int(value)
             i = value_swift
         }
         """)
 
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         var s = ""
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         import skip.bridge.*
 
         internal var s: String
@@ -250,13 +250,13 @@ final class CompiledBridgingTests: XCTestCase {
         private external fun Swift_s(): String
         private external fun Swift_s_set(value: String)
         """, swiftBridgeSupport: """
-        @_cdecl("Java_SourceKt_Swift_1s")
-        func SourceKt_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
+        @_cdecl("Java_BridgeKt_Swift_1s")
+        func BridgeKt_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
             let value_swift = s
             return value_swift.toJavaObject()!
         }
-        @_cdecl("Java_SourceKt_Swift_1s_1set")
-        func SourceKt_Swift_s_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaString) {
+        @_cdecl("Java_BridgeKt_Swift_1s_1set")
+        func BridgeKt_Swift_s_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaString) {
             let value_swift = try! String.fromJavaObject(value)
             s = value_swift
         }
@@ -264,10 +264,10 @@ final class CompiledBridgingTests: XCTestCase {
     }
 
     func testPublicVar() async throws {
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         public var i = 1
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         import skip.bridge.*
 
         var i: Int
@@ -282,13 +282,13 @@ final class CompiledBridgingTests: XCTestCase {
         private external fun Swift_i(): Long
         private external fun Swift_i_set(value: Long)
         """, swiftBridgeSupport: """
-        @_cdecl("Java_SourceKt_Swift_1i")
-        func SourceKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int64 {
+        @_cdecl("Java_BridgeKt_Swift_1i")
+        func BridgeKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int64 {
             let value_swift = i
             return Int64(value_swift)
         }
-        @_cdecl("Java_SourceKt_Swift_1i_1set")
-        func SourceKt_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: Int64) {
+        @_cdecl("Java_BridgeKt_Swift_1i_1set")
+        func BridgeKt_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: Int64) {
             let value_swift = Int(value)
             i = value_swift
         }
@@ -316,7 +316,7 @@ final class CompiledBridgingTests: XCTestCase {
     }
 
     func testWillSetDidSet() async throws {
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         var s = "" {
             willSet {
@@ -326,7 +326,7 @@ final class CompiledBridgingTests: XCTestCase {
                 print("didSet")
             }
         }
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         import skip.bridge.*
 
         internal var s: String
@@ -341,13 +341,13 @@ final class CompiledBridgingTests: XCTestCase {
         private external fun Swift_s(): String
         private external fun Swift_s_set(value: String)
         """, swiftBridgeSupport: """
-        @_cdecl("Java_SourceKt_Swift_1s")
-        func SourceKt_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
+        @_cdecl("Java_BridgeKt_Swift_1s")
+        func BridgeKt_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
             let value_swift = s
             return value_swift.toJavaObject()!
         }
-        @_cdecl("Java_SourceKt_Swift_1s_1set")
-        func SourceKt_Swift_s_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaString) {
+        @_cdecl("Java_BridgeKt_Swift_1s_1set")
+        func BridgeKt_Swift_s_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaString) {
             let value_swift = try! String.fromJavaObject(value)
             s = value_swift
         }
@@ -382,21 +382,73 @@ final class CompiledBridgingTests: XCTestCase {
         // TODO
     }
 
-    func testBridgedTypeVar() async throws {
+    func testTranspiledBridgedTypeVar() async throws {
+        try await check(swift: """
+        // SKIP @bridge
+        class C {
+        }
+        """, swiftBridge: """
+        // SKIP @bridge
+        var c = C()
+        """, kotlin: """
+        internal open class C {
+        }
+        import skip.bridge.*
+
+        internal var c: C
+            get() {
+                val value_swift = Swift_c()
+                return value_swift
+            }
+            set(newValue) {
+                val newValue_swift = newValue
+                Swift_c_set(newValue_swift)
+            }
+        private external fun Swift_c(): C
+        private external fun Swift_c_set(value: C)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1c")
+        func BridgeKt_Swift_c(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
+            let value_swift = c
+            return value_swift.Java_peer.ptr
+        }
+        @_cdecl("Java_BridgeKt_Swift_1c_1set")
+        func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
+            let value_swift = C(Java_ptr: value)
+            c = value_swift
+        }
+        class C {
+            private static let Java_class = try! JClass(name: "C")
+            let Java_peer: JObject
+
+            init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+
+            init() {
+                let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, [])
+                Java_peer = JObject(ptr)
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+        }
+        """)
+    }
+
+    func testCompiledBridgedTypeVar() async throws {
         // TODO
     }
 
-    func testUngridgableTypeVar() async throws {
+    func testUnbridgableTypeVar() async throws {
         // TODO
     }
 
     func testFunction() async throws {
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         func f(i: Int, s: String) -> Int {
             return i + (Int(s) ?? 0)
         }
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         import skip.bridge.*
 
         internal fun f(i: Int, s: String): Int {
@@ -407,8 +459,8 @@ final class CompiledBridgingTests: XCTestCase {
         }
         private external fun Swift_f(i: Long, s: String): Long
         """, swiftBridgeSupport: """
-        @_cdecl("Java_SourceKt_Swift_1f")
-        func SourceKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ i: Int64, _ s: JavaString) -> Int64 {
+        @_cdecl("Java_BridgeKt_Swift_1f")
+        func BridgeKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ i: Int64, _ s: JavaString) -> Int64 {
             let i_swift = Int(i)
             let s_swift = try! String.fromJavaObject(s)
             let f_return_swift = f(i: i_swift, s: s_swift)
@@ -418,12 +470,12 @@ final class CompiledBridgingTests: XCTestCase {
     }
 
     func testPublicFunction() async throws {
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         public func f(i: Int, s: String) -> Int {
             return i + (Int(s) ?? 0)
         }
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         import skip.bridge.*
 
         fun f(i: Int, s: String): Int {
@@ -434,8 +486,8 @@ final class CompiledBridgingTests: XCTestCase {
         }
         private external fun Swift_f(i: Long, s: String): Long
         """, swiftBridgeSupport: """
-        @_cdecl("Java_SourceKt_Swift_1f")
-        func SourceKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ i: Int64, _ s: JavaString) -> Int64 {
+        @_cdecl("Java_BridgeKt_Swift_1f")
+        func BridgeKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ i: Int64, _ s: JavaString) -> Int64 {
             let i_swift = Int(i)
             let s_swift = try! String.fromJavaObject(s)
             let f_return_swift = f(i: i_swift, s: s_swift)
@@ -488,13 +540,17 @@ final class CompiledBridgingTests: XCTestCase {
         // TODO: Parameter and return bridged types
     }
 
+    func testVariadicFunction() async throws {
+        // TODO
+    }
+
     func testClass() async throws {
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         class C {
             var i = 1
         }
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         import skip.bridge.*
 
         internal open class C {
@@ -534,14 +590,6 @@ final class CompiledBridgingTests: XCTestCase {
             let f_return_swift = C()
             return SwiftObjectPointer.forSwift(f_return_swift, retain: true)
         }
-        @_cdecl("Java_C_Swift_1ptrref")
-        func C_Swift_ptrref(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
-            return refSwift(Swift_peer, type: C.self)
-        }
-        @_cdecl("Java_C_Swift_1ptrderef")
-        func C_Swift_ptrderef(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
-            derefSwift(Swift_peer, type: C.self)
-        }
         @_cdecl("Java_C_Swift_1i")
         func C_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> Int64 {
             let peer_swift: C = Swift_peer.toSwift()
@@ -553,6 +601,14 @@ final class CompiledBridgingTests: XCTestCase {
             let peer_swift: C = Swift_peer.toSwift()
             let value_swift = Int(value)
             peer_swift.i = value_swift
+        }
+        @_cdecl("Java_C_Swift_1ptrderef")
+        func C_Swift_ptrderef(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            derefSwift(Swift_peer, type: C.self)
+        }
+        @_cdecl("Java_C_Swift_1ptrref")
+        func C_Swift_ptrref(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
+            return refSwift(Swift_peer, type: C.self)
         }
         """)
     }
@@ -574,13 +630,13 @@ final class CompiledBridgingTests: XCTestCase {
     }
 
     func testConstructor() async throws {
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         class C {
             init(i: Int) {
             }
         }
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         import skip.bridge.*
 
         internal open class C {
@@ -604,19 +660,19 @@ final class CompiledBridgingTests: XCTestCase {
             private external fun Swift_constructor(i: Long): SwiftObjectPointer
         }
         """, swiftBridgeSupport: """
-        @_cdecl("Java_C_Swift_1ptrref")
-        func C_Swift_ptrref(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
-            return refSwift(Swift_peer, type: C.self)
-        }
-        @_cdecl("Java_C_Swift_1ptrderef")
-        func C_Swift_ptrderef(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
-            derefSwift(Swift_peer, type: C.self)
-        }
         @_cdecl("Java_C_Swift_1constructor")
         func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ i: Int64) -> SwiftObjectPointer {
             let i_swift = Int(i)
             let f_return_swift = C(i: i_swift)
             return SwiftObjectPointer.forSwift(f_return_swift, retain: true)
+        }
+        @_cdecl("Java_C_Swift_1ptrderef")
+        func C_Swift_ptrderef(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            derefSwift(Swift_peer, type: C.self)
+        }
+        @_cdecl("Java_C_Swift_1ptrref")
+        func C_Swift_ptrref(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
+            return refSwift(Swift_peer, type: C.self)
         }
         """)
     }
@@ -634,14 +690,14 @@ final class CompiledBridgingTests: XCTestCase {
     }
 
     func testMemberFunction() async throws {
-        try await check(swift: """
+        try await check(swiftBridge: """
         // SKIP @bridge
         class C {
             func add(a: Int, b: Int) -> Int {
                 return a + b
             }
         }
-        """, isSwiftBridge: true, kotlin: """
+        """, kotlin: """
         import skip.bridge.*
         
         internal open class C {
@@ -672,19 +728,6 @@ final class CompiledBridgingTests: XCTestCase {
             private external fun Swift_add(Swift_peer: SwiftObjectPointer, a: Long, b: Long): Long
         }
         """, swiftBridgeSupport: """
-        @_cdecl("Java_C_Swift_1constructor")
-        func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
-            let f_return_swift = C()
-            return SwiftObjectPointer.forSwift(f_return_swift, retain: true)
-        }
-        @_cdecl("Java_C_Swift_1ptrref")
-        func C_Swift_ptrref(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
-            return refSwift(Swift_peer, type: C.self)
-        }
-        @_cdecl("Java_C_Swift_1ptrderef")
-        func C_Swift_ptrderef(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
-            derefSwift(Swift_peer, type: C.self)
-        }
         @_cdecl("Java_C_Swift_1add")
         func C_Swift_add(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ a: Int64, _ b: Int64) -> Int64 {
             let a_swift = Int(a)
@@ -692,6 +735,19 @@ final class CompiledBridgingTests: XCTestCase {
             let peer_swift: C = Swift_peer.toSwift()
             let f_return_swift = peer_swift.add(a: a_swift, b: b_swift)
             return Int64(f_return_swift)
+        }
+        @_cdecl("Java_C_Swift_1constructor")
+        func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
+            let f_return_swift = C()
+            return SwiftObjectPointer.forSwift(f_return_swift, retain: true)
+        }
+        @_cdecl("Java_C_Swift_1ptrderef")
+        func C_Swift_ptrderef(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            derefSwift(Swift_peer, type: C.self)
+        }
+        @_cdecl("Java_C_Swift_1ptrref")
+        func C_Swift_ptrref(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
+            return refSwift(Swift_peer, type: C.self)
         }
         """)
     }

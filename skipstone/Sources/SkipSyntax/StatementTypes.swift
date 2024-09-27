@@ -872,7 +872,7 @@ final class EnumCaseDeclaration: Statement {
             return nil
         }
         var attributes = Attributes.for(syntax: enumCaseDecl.attributes, in: syntaxTree)
-        attributes.addDirectives(from: extras)
+        attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: enumCaseDecl.modifiers)
         guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: true) else {
             return []
@@ -951,7 +951,7 @@ final class ExtensionDeclaration: TypeDeclaration {
             return nil
         }
         var attributes = Attributes.for(syntax: extensionDecl.attributes, in: syntaxTree)
-        attributes.addDirectives(from: extras)
+        attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
         guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
             return []
@@ -1033,7 +1033,7 @@ final class FunctionDeclaration: Statement {
 
     private static func decodeFunctionDeclaration(_ functionDecl: FunctionDeclSyntax, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) -> FunctionDeclaration? {
         var attributes = Attributes.for(syntax: functionDecl.attributes, in: syntaxTree)
-        attributes.addDirectives(from: extras)
+        attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: functionDecl.modifiers)
         guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: asMember) else {
             return nil
@@ -1055,7 +1055,7 @@ final class FunctionDeclaration: Statement {
 
     private static func decodeInitializerDeclaration(_ initializerDecl: InitializerDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> FunctionDeclaration? {
         var attributes = Attributes.for(syntax: initializerDecl.attributes, in: syntaxTree)
-        attributes.addDirectives(from: extras)
+        attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: initializerDecl.modifiers)
         guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: true) else {
             return nil
@@ -1080,7 +1080,7 @@ final class FunctionDeclaration: Statement {
             return nil
         }
         var attributes = Attributes.for(syntax: deinitializerDecl.attributes, in: syntaxTree)
-        attributes.addDirectives(from: extras)
+        attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: deinitializerDecl.modifiers)
         var body: CodeBlock? = nil
         if let bodySyntax = deinitializerDecl.body {
@@ -1229,7 +1229,7 @@ final class SubscriptDeclaration: Statement {
             return nil
         }
         var attributes = Attributes.for(syntax: subscriptDecl.attributes, in: syntaxTree)
-        attributes.addDirectives(from: extras)
+        attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: subscriptDecl.modifiers)
         guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: true) else {
             return []
@@ -1348,7 +1348,7 @@ final class TypealiasDeclaration: Statement {
             return nil
         }
         var attributes = Attributes.for(syntax: typealiasDecl.attributes, in: syntaxTree)
-        attributes.addDirectives(from: extras)
+        attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: typealiasDecl.modifiers)
         guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
             return []
@@ -1454,7 +1454,7 @@ class TypeDeclaration: Statement {
 
     private static func decodeClassDeclaration(_ classDecl: ClassDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
         var attributes = Attributes.for(syntax: classDecl.attributes, in: syntaxTree)
-        attributes.addDirectives(from: extras)
+        attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: classDecl.modifiers)
         guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
             return nil
@@ -1470,7 +1470,7 @@ class TypeDeclaration: Statement {
 
     private static func decodeStructDeclaration(_ structDecl: StructDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
         var attributes = Attributes.for(syntax: structDecl.attributes, in: syntaxTree)
-        attributes.addDirectives(from: extras)
+        attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: structDecl.modifiers)
         guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
             return nil
@@ -1486,7 +1486,7 @@ class TypeDeclaration: Statement {
 
     private static func decodeProtocolDeclaration(_ protocolDecl: ProtocolDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
         var attributes = Attributes.for(syntax: protocolDecl.attributes, in: syntaxTree)
-        attributes.addDirectives(from: extras)
+        attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
         guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
             return nil
@@ -1504,7 +1504,7 @@ class TypeDeclaration: Statement {
 
     private static func decodeEnumDeclaration(_ enumDecl: EnumDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
         var attributes = Attributes.for(syntax: enumDecl.attributes, in: syntaxTree)
-        attributes.addDirectives(from: extras)
+        attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
         guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
             return nil
@@ -1520,7 +1520,7 @@ class TypeDeclaration: Statement {
 
     private static func decodeActorDeclaration(_ actorDecl: ActorDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
         var attributes = Attributes.for(syntax: actorDecl.attributes, in: syntaxTree)
-        attributes.addDirectives(from: extras)
+        attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: actorDecl.modifiers)
         guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
             return nil
@@ -1643,7 +1643,7 @@ final class VariableDeclaration: Statement {
             return nil
         }
         var attributes = Attributes.for(syntax: variableDecl.attributes, in: syntaxTree)
-        attributes.addDirectives(from: extras)
+        attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: variableDecl.modifiers)
         guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: asMember) else {
             return []

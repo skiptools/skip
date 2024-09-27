@@ -213,19 +213,131 @@ final class TranspiledBridgingTests: XCTestCase {
     }
 
     func testPrivateSetVar() async throws {
-        // TODO
+        try await check(swift: """
+        // SKIP @bridge
+        private(set) var i = 1
+        """, kotlin: """
+        internal var i = 1
+            private set
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        var i: Int {
+            get {
+                let value_java: Int32 = try! Java_SourceKt.getStatic(field: Java_i_fieldID)
+                return Int(value_java)
+            }
+        }
+        private let Java_i_fieldID = Java_SourceKt.getStaticFieldID(name: "i", sig: "I")!
+        """)
+
+        try await check(swift: """
+        // SKIP @bridge
+        private(set) var d: Double {
+            get {
+                return 1.0
+            }
+            set {
+            }
+        }
+        """, kotlin: """
+        internal var d: Double
+            get() = 1.0
+            private set(newValue) {
+            }
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        var d: Double {
+            get {
+                let value_java: Double = try! Java_SourceKt.getStatic(field: Java_d_fieldID)
+                return value_java
+            }
+        }
+        private let Java_d_fieldID = Java_SourceKt.getStaticFieldID(name: "d", sig: "D")!
+        """)
     }
 
     func testWillSetDidSet() async throws {
-        // TODO
+        try await check(swift: """
+        // SKIP @bridge
+        private(set) var i: Int32 = 1 {
+            willSet {
+                print("willSet")
+            }
+            didSet {
+                print("didSet")
+            }
+        }
+        """, kotlin: """
+        internal var i: Int = 1
+            private set(newValue) {
+                print("willSet")
+                field = newValue
+                print("didSet")
+            }
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        var i: Int32 {
+            get {
+                let value_java: Int32 = try! Java_SourceKt.getStatic(field: Java_i_fieldID)
+                return value_java
+            }
+        }
+        private let Java_i_fieldID = Java_SourceKt.getStaticFieldID(name: "i", sig: "I")!
+        """)
     }
 
     func testComputedVar() async throws {
-        // TODO
+        try await check(swift: """
+        // SKIP @bridge
+        var i: Int64 {
+            get {
+                return 1
+            }
+            set {
+            }
+        }
+        """, kotlin: """
+        internal var i: Long
+            get() = 1
+            set(newValue) {
+            }
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        var i: Int64 {
+            get {
+                let value_java: Int64 = try! Java_SourceKt.getStatic(field: Java_i_fieldID)
+                return value_java
+            }
+            set {
+                let value_java = newValue
+                Java_SourceKt.setStatic(field: Java_i_fieldID, value: value_java)
+            }
+        }
+        private let Java_i_fieldID = Java_SourceKt.getStaticFieldID(name: "i", sig: "J")!
+        """)
     }
 
     func testKeywordVar() async throws {
-        // TODO
+        try await check(swift: """
+        // SKIP @bridge
+        public var object: String {
+            get {
+                return ""
+            }
+        }
+        """, kotlin: """
+        val object_: String
+            get() = ""
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        public var object: String {
+            get {
+                let value_java: String = try! Java_SourceKt.getStatic(field: Java_object__fieldID)
+                return value_java
+            }
+        }
+        private let Java_object__fieldID = Java_SourceKt.getStaticFieldID(name: "object_", sig: "Ljava/lang/String;")!
+        """)
     }
 
     func testThrowsVar() async throws {
@@ -248,8 +360,63 @@ final class TranspiledBridgingTests: XCTestCase {
         // TODO
     }
 
-    func testBridgedTypeVar() async throws {
+    func testTranspiledBridgedTypeVar() async throws {
+        try await check(swift: """
+        // SKIP @bridge
+        class C {
+        }
+        // SKIP @bridge
+        var c = C()
+        """, kotlin: """
+        internal open class C {
+        }
+        internal var c = C()
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        class C {
+            private static let Java_class = try! JClass(name: "C")
+            let Java_peer: JObject
+
+            init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+
+            init() {
+                let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, [])
+                Java_peer = JObject(ptr)
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+        }
+        var c: C {
+            get {
+                let value_java: JavaObjectPointer = try! Java_SourceKt.getStatic(field: Java_c_fieldID)
+                return C(Java_ptr: value_java)
+            }
+            set {
+                let value_java = newValue.Java_peer.ptr
+                Java_SourceKt.setStatic(field: Java_c_fieldID, value: value_java)
+            }
+        }
+        private let Java_c_fieldID = Java_SourceKt.getStaticFieldID(name: "c", sig: "LC;")!
+        """)
+    }
+
+    func testCompiledBridgedTypeVar() async throws {
         // TODO
+    }
+
+    func testUnbridgableTypeVar() async throws {
+        try await checkProducesMessage(swift: """
+        // SKIP @bridge
+        var c: C = C()
+        """)
+
+        try await checkProducesMessage(swift: """
+        class C {
+        }
+        // SKIP @bridge
+        var c = C()
+        """)
     }
 
     func testFunction() async throws {
@@ -330,6 +497,10 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testBridgedObjectFunction() async throws {
         // TODO: Parameter and return bridged types
+    }
+
+    func testVariadicFunction() async throws {
+        // TODO
     }
 
     func testClass() async throws {
