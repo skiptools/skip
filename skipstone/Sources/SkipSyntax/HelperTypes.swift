@@ -138,14 +138,18 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
     }
 
     /// Add all the attribute directives in the given extras.
-    mutating func addDirectives(from extras: StatementExtras?) {
+    mutating func addDirectives(from extras: StatementExtras?, in syntaxTree: SyntaxTree) {
         guard let extras else {
             return
         }
         var attrs: [Attribute] = []
         for directive in extras.directives {
-            guard case .attributes(let tokens) = directive else {
+            guard case .attributes(var tokens) = directive else {
                 continue
+            }
+            // Differentiate bridging types from bridge files, i.e. compiled bridged types
+            if syntaxTree.isBridgeFile && tokens.contains(Directive.bridge.rawValue) {
+                tokens.append(Directive.bridgeFileType.rawValue)
             }
             attrs.append(Attribute(signature: .named("directive", []), tokens: tokens))
         }
@@ -278,7 +282,7 @@ struct Attribute: Hashable, Codable {
         case binding
         case deprecated
         case discardableResult
-        /// Recorded from `StatementExtras.attributes`
+        /// Recorded from `StatementExtras.attributes`.
         case directive
         case environment
         case environmentObject
@@ -476,6 +480,8 @@ enum CaptureType {
 enum Directive: String {
     case bridge
     case nobridge
+    /// Artificial attribute added to types from bridge files.
+    case bridgeFileType
 }
 
 /// Generic information for a type or API.

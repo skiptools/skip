@@ -54,8 +54,16 @@ extension Message {
         return Message(kind: .error, message: "Private members cannot be bridged", sourceDerived: sourceDerived, source: source)
     }
 
-    static func kotlinBridgeUnknownType(_ sourceDerived: SourceDerived, source: Source) -> Message {
+    static func kotlinBridgeNeedsTypeDeclaration(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Skip is unable to determine the type of this property for bridging. Add an explicit type to the declaration", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinBridgeUnbridgedType(_ sourceDerived: SourceDerived, type: String, source: Source) -> Message {
+        return Message(kind: .error, message: "'\(type)' is not a bridged type", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinBridgeUnknownType(_ sourceDerived: SourceDerived, type: String, source: Source) -> Message {
+        return Message(kind: .error, message: "Skip is not able to determine whether '\(type)' is bridgable. Ensure that it is in a Skip-enabled module and is a bridged type", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinCatchCaseCast(_ sourceDerived: SourceDerived, source: Source) -> Message {

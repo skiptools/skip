@@ -7,17 +7,17 @@ struct SwiftDefinition: OutputNode {
         children.forEach { $0.append(to: output, indentation: indentation) }
     }
 
-    init(statement: SourceDerived? = nil, children: [SwiftDefinition] = [], appendTo: ((OutputGenerator, Indentation, [SwiftDefinition]) -> Void)? = nil) {
-        self.sourceFile = statement?.sourceFile
-        self.sourceRange = statement?.sourceRange
+    init(statement: SourceDerived? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, children: [SwiftDefinition] = [], appendTo: ((OutputGenerator, Indentation, [SwiftDefinition]) -> Void)? = nil) {
+        self.sourceFile = sourceFile ?? statement?.sourceFile
+        self.sourceRange = sourceRange ?? statement?.sourceRange
         self.children = children
         if let appendTo {
             self.appendTo = appendTo
         }
     }
 
-    init(statement: SourceDerived? = nil, swift: [String]) {
-        self = .init(statement: statement) { output, indentation, _ in
+    init(statement: SourceDerived? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, swift: [String]) {
+        self = .init(statement: statement, sourceFile: sourceFile, sourceRange: sourceRange) { output, indentation, _ in
             swift.forEach { output.append(indentation).append($0).append("\n") }
         }
     }
@@ -33,6 +33,13 @@ struct SwiftDefinition: OutputNode {
     func append(to output: OutputGenerator, indentation: Indentation) {
         appendTo(output, indentation, children)
     }
+}
+
+/// Strategies for bridging types.
+enum BridgeStrategy {
+    case direct
+    case javaPeer
+    case swiftPeer
 }
 
 extension Source.FilePath {
@@ -57,6 +64,7 @@ extension String {
 }
 
 extension TypeSignature {
+    static let javaObjectPointer: TypeSignature = .named("JavaObjectPointer", [])
     static let swiftObjectPointer: TypeSignature = .named("SwiftObjectPointer", [])
 
     /// Return the external function equivalent of this type.
@@ -90,7 +98,7 @@ extension TypeSignature {
     }
 
     /// Return the `@_cdecl` function equivalent of this type.
-    var cdecl: TypeSignature {
+    func cdecl(strategy: BridgeStrategy) -> TypeSignature {
         // TODO: Object types, etc
         switch self {
         case .int:
@@ -98,31 +106,46 @@ extension TypeSignature {
         case .string:
             return .named("JavaString", [])
         default:
-            return self.kotlinExternal
+            switch strategy {
+            case .javaPeer:
+                return .javaObjectPointer
+            case .swiftPeer:
+                return .swiftObjectPointer
+            default:
+                return self.kotlinExternal
+            }
         }
     }
 
     /// Return code that converst the given value of this type to its `@_cdecl` function form.
-    func convertToCDecl(value: String) -> String {
+    func convertToCDecl(value: String, strategy: BridgeStrategy) -> String {
         switch self {
         case .int:
             return "Int64(" + value + ")"
         case .string:
             return value + ".toJavaObject()!"
         default:
-            return value // TODO: All other types
+            if strategy == .javaPeer {
+                return value + ".Java_peer.ptr"
+            } else {
+                return value // TODO: All other types
+            }
         }
     }
 
     /// Return code that converts the given value of our `@_cdecl` function type back to this type.
-    func convertFromCDecl(value: String) -> String {
+    func convertFromCDecl(value: String, strategy: BridgeStrategy) -> String {
         switch self {
         case .int:
             return "Int(" + value + ")"
         case .string:
             return "try! String.fromJavaObject(" + value + ")"
         default:
-            return value // TODO: All other types
+            if strategy == .javaPeer {
+                return description + "(Java_ptr: " + value + ")"
+            } else {
+                return value // TODO: All other types
+            }
         }
     }
 
@@ -132,27 +155,35 @@ extension TypeSignature {
         case .int:
             return .int32
         default:
-            return self // TODO: All other types
+            return isNamedType ? .javaObjectPointer : self // TODO: All other types
         }
     }
 
     /// Return code that converts the given value of this type to its Java form.
-    func convertToJava(value: String) -> String {
+    func convertToJava(value: String, strategy: BridgeStrategy) -> String {
         switch self {
         case .int:
             return "Int32(" + value + ")"
         default:
-            return value // TODO: All other types
+            if strategy == .javaPeer {
+                return value + ".Java_peer.ptr"
+            } else {
+                return value // TODO: All other types
+            }
         }
     }
 
     /// Return code that converts the given value of our Java type back to this type.
-    func convertFromJava(value: String) -> String {
+    func convertFromJava(value: String, strategy: BridgeStrategy) -> String {
         switch self {
         case .int:
             return "Int(" + value + ")"
         default:
-            return value // TODO: All other types
+            if strategy == .javaPeer {
+                return description + "(Java_ptr: " + value + ")"
+            } else {
+                return value // TODO: All other types
+            }
         }
     }
 
@@ -296,16 +327,30 @@ extension KotlinVariableDeclaration {
     /// Check that this variable is bridgable and return its bridgable type.
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
-    func checkBridgable(translator: KotlinTranslator) -> TypeSignature? {
+    func checkBridgable(translator: KotlinTranslator) -> (TypeSignature, BridgeStrategy)? {
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
             return nil
         }
         let type = declaredType.or(propertyType)
         guard type != .none else {
-            messages.append(Message.kotlinBridgeUnknownType(self, source: translator.syntaxTree.source))
+            messages.append(Message.kotlinBridgeNeedsTypeDeclaration(self, source: translator.syntaxTree.source))
             return nil
         }
-        return type
+        let strategy: BridgeStrategy
+        if type.isNamedType, let codebaseInfo = translator.codebaseInfo {
+            guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: type) else {
+                messages.append(Message.kotlinBridgeUnknownType(self, type: type.description, source: translator.syntaxTree.source))
+                return nil
+            }
+            guard typeInfo.attributes.contains(directive: Directive.bridge) else {
+                messages.append(Message.kotlinBridgeUnbridgedType(self, type: type.description, source: translator.syntaxTree.source))
+                return nil
+            }
+            strategy = typeInfo.attributes.contains(directive: Directive.bridgeFileType) ? .swiftPeer : .javaPeer
+        } else {
+            strategy = .direct
+        }
+        return (type, strategy)
     }
 }
 
