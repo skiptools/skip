@@ -25,11 +25,10 @@ public protocol KotlinTransformer {
     /// - Returns: Whether any code was added to the tree.
     func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> Bool
 
-    /// Apply this transformer to the package-level generated Swift bridge file.
+    /// Generate output to bridge all processed syntax trees to Swift.
     ///
-    /// - Warning: Only `ImportDeclaration` and `RawStatement` are supported.
-    /// - Returns: Whether any code was added to the bridge output.
-    func apply(toSwiftBridge syntaxTree: SyntaxTree, translator: KotlinTranslator) -> Bool
+    /// Attach any required imports to `translator.syntaxTree`.
+    func swiftBridgeOutput(translator: KotlinTranslator) -> OutputNode?
 }
 
 /// The set of builtin transformers in the order in which they should run.
@@ -102,7 +101,7 @@ extension KotlinTransformer {
         return false
     }
 
-    func apply(toSwiftBridge syntaxTree: SyntaxTree, translator: KotlinTranslator) -> Bool {
-        return false
+    func swiftBridgeOutput(translator: KotlinTranslator) -> OutputNode? {
+        return nil
     }
 }

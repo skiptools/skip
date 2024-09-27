@@ -91,8 +91,8 @@ public final class KotlinTranslator {
         let codebaseInfoContext = codebaseInfo.context(sourceFile: sourceFile)
         translator.codebaseInfo = codebaseInfoContext
         translator.packageName = codebaseInfo.kotlin?.packageName
-        let results = transformers.map { $0.apply(toSwiftBridge: syntaxTree, translator: translator) }
-        guard results.contains(true) else {
+        let outputNodes = transformers.compactMap { $0.swiftBridgeOutput(translator: translator) }
+        guard !outputNodes.isEmpty else {
             return nil
         }
 
@@ -104,10 +104,15 @@ public final class KotlinTranslator {
         if !importContent.isEmpty {
             leadingContent += importContent + "\n\n"
         }
-        let content = syntaxTree.root.statements.compactMap { ($0 as? RawStatement)?.sourceCode }.joined(separator: "\n")
-        let output = Source(file: outputFile, content: leadingContent + content + trailingContent)
+        let rootOutputNode = SwiftDefinition() { output, indentation, _ in
+            output.append(leadingContent)
+            outputNodes.forEach { output.append($0, indentation: indentation) }
+            output.append(trailingContent)
+        }
+        let outputGenerator = OutputGenerator(root: rootOutputNode)
+        let (output, outputMap) = outputGenerator.generateOutput(file: outputFile)
         let endTime = Date().timeIntervalSinceReferenceDate
-        let transpilation = Transpilation(input: syntaxTree.source, output: output, messages: messages, duration: endTime - startTime)
+        let transpilation = Transpilation(input: syntaxTree.source, output: output, outputMap: outputMap, messages: messages, duration: endTime - startTime)
         return transpilation
     }
 

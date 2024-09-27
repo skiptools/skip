@@ -31,14 +31,15 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         }
     }
 
-    func apply(toSwiftBridge syntaxTree: SyntaxTree, translator: KotlinTranslator) -> Bool {
+    func swiftBridgeOutput(translator: KotlinTranslator) -> OutputNode? {
         guard !cdeclFunctions.isEmpty else {
-            return false
+            return nil
         }
         // TODO: Imports
-        let cdeclStatements = cdeclFunctions.map { cdeclFunctionStatement(for: $0) }
-        syntaxTree.root.statements += cdeclStatements
-        return true
+        let cdeclFunctions = self.cdeclFunctions
+        return SwiftDefinition() { output, indentation, _ in
+            cdeclFunctions.forEach { $0.append(to: output, indentation: indentation) }
+        }
     }
 
     private func updateGlobalVariableDeclaration(_ variableDeclaration: KotlinVariableDeclaration, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
@@ -366,28 +367,6 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
     private var cdeclInstanceParameter: TypeSignature.Parameter {
         return TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPtr)
     }
-
-    private func cdeclFunctionStatement(for function: CDeclFunction) -> RawStatement {
-        var parameters = ""
-        for parameter in function.signature.parameters {
-            parameters += ", _"
-            if let label = parameter.label {
-                parameters += " " + label
-            }
-            parameters += ": " + parameter.type.description
-        }
-        let returnType = function.signature.returnType
-        let ret = returnType == .void ? "" : " -> " + returnType.description
-
-        let body = function.body.map { "    " + $0 }.joined(separator: "\n")
-        let sourceCode = """
-        @_cdecl("\(function.cdecl)")
-        func \(function.name)(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer\(parameters))\(ret) {
-        \(body)
-        }
-        """
-        return RawStatement(sourceCode: sourceCode)
-    }
 }
 
 private struct CDeclFunction {
@@ -395,4 +374,26 @@ private struct CDeclFunction {
     let cdecl: String
     let signature: TypeSignature
     let body: [String]
+
+    func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation).append("@_cdecl(\"").append(cdecl).append("\")\n")
+        output.append(indentation).append("func ").append(name).append("(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer")
+        for parameter in signature.parameters {
+            output.append(", _")
+            if let label = parameter.label {
+                output.append(" ").append(label)
+            }
+            output.append(": ").append(parameter.type.description)
+        }
+        output.append(")")
+        if signature.returnType != .void {
+            output.append(" -> ").append(signature.returnType.description)
+        }
+        output.append(" {\n")
+
+        let bodyIndentation = indentation.inc()
+        body.forEach { output.append(bodyIndentation).append($0).append("\n") }
+
+        output.append(indentation).append("}\n")
+    }
 }

@@ -111,14 +111,14 @@ final class TranspiledBridgingTests: XCTestCase {
         """, kotlin: """
         internal val s = "ab${1 + 1}c"
         """, swiftBridgeSupport: """
-        private let SourceKt_fileClass = try! JClass(name: "SourceKt")
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
         var s: String {
             get {
-                let value_java: String = try! SourceKt_fileClass.getStatic(field: s_fieldID)
+                let value_java: String = try! Java_SourceKt.getStatic(field: Java_s_fieldID)
                 return value_java
             }
         }
-        private let s_fieldID = SourceKt_fileClass.getStaticFieldID(name: "s", sig: "Ljava/lang/String;")!
+        private let Java_s_fieldID = Java_SourceKt.getStaticFieldID(name: "s", sig: "Ljava/lang/String;")!
         """)
     }
 
@@ -129,14 +129,14 @@ final class TranspiledBridgingTests: XCTestCase {
         """, kotlin: """
         internal val i = 1 + 1
         """, swiftBridgeSupport: """
-        private let SourceKt_fileClass = try! JClass(name: "SourceKt")
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
         var i: Int {
             get {
-                let value_java: Int32 = try! SourceKt_fileClass.getStatic(field: i_fieldID)
+                let value_java: Int32 = try! Java_SourceKt.getStatic(field: Java_i_fieldID)
                 return Int(value_java)
             }
         }
-        private let i_fieldID = SourceKt_fileClass.getStaticFieldID(name: "i", sig: "I")!
+        private let Java_i_fieldID = Java_SourceKt.getStaticFieldID(name: "i", sig: "I")!
         """)
 
         try await check(swift: """
@@ -145,14 +145,14 @@ final class TranspiledBridgingTests: XCTestCase {
         """, kotlin: """
         internal val i = Long(1 + 1)
         """, swiftBridgeSupport: """
-        private let SourceKt_fileClass = try! JClass(name: "SourceKt")
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
         var i: Int64 {
             get {
-                let value_java: Int64 = try! SourceKt_fileClass.getStatic(field: i_fieldID)
+                let value_java: Int64 = try! Java_SourceKt.getStatic(field: Java_i_fieldID)
                 return value_java
             }
         }
-        private let i_fieldID = SourceKt_fileClass.getStaticFieldID(name: "i", sig: "J")!
+        private let Java_i_fieldID = Java_SourceKt.getStaticFieldID(name: "i", sig: "J")!
         """)
     }
 
@@ -163,18 +163,18 @@ final class TranspiledBridgingTests: XCTestCase {
         """, kotlin: """
         internal var i = 1
         """, swiftBridgeSupport: """
-        private let SourceKt_fileClass = try! JClass(name: "SourceKt")
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
         var i: Int {
             get {
-                let value_java: Int32 = try! SourceKt_fileClass.getStatic(field: i_fieldID)
+                let value_java: Int32 = try! Java_SourceKt.getStatic(field: Java_i_fieldID)
                 return Int(value_java)
             }
             set {
                 let value_java = Int32(newValue)
-                SourceKt_fileClass.setStatic(field: i_fieldID, value: value_java)
+                Java_SourceKt.setStatic(field: Java_i_fieldID, value: value_java)
             }
         }
-        private let i_fieldID = SourceKt_fileClass.getStaticFieldID(name: "i", sig: "I")!
+        private let Java_i_fieldID = Java_SourceKt.getStaticFieldID(name: "i", sig: "I")!
         """)
     }
 
@@ -185,18 +185,18 @@ final class TranspiledBridgingTests: XCTestCase {
         """, kotlin: """
         var i = 1
         """, swiftBridgeSupport: """
-        private let SourceKt_fileClass = try! JClass(name: "SourceKt")
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
         public var i: Int {
             get {
-                let value_java: Int32 = try! SourceKt_fileClass.getStatic(field: i_fieldID)
+                let value_java: Int32 = try! Java_SourceKt.getStatic(field: Java_i_fieldID)
                 return Int(value_java)
             }
             set {
                 let value_java = Int32(newValue)
-                SourceKt_fileClass.setStatic(field: i_fieldID, value: value_java)
+                Java_SourceKt.setStatic(field: Java_i_fieldID, value: value_java)
             }
         }
-        private let i_fieldID = SourceKt_fileClass.getStaticFieldID(name: "i", sig: "I")!
+        private let Java_i_fieldID = Java_SourceKt.getStaticFieldID(name: "i", sig: "I")!
         """)
     }
 
@@ -261,14 +261,14 @@ final class TranspiledBridgingTests: XCTestCase {
         """, kotlin: """
         internal fun f(i: Int, s: String): Int = i + (Int(s) ?: 0)
         """, swiftBridgeSupport: """
-        private let SourceKt_fileClass = try! JClass(name: "SourceKt")
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
         func f(i: Int, s: String) -> Int {
             let i_java = Int32(i).toJavaParameter()
             let s_java = s.toJavaParameter()
-            let f_return_java: Int32 = try! SourceKt_fileClass.callStatic(method: f_methodID, [i_java, s_java])
+            let f_return_java: Int32 = try! Java_SourceKt.callStatic(method: Java_f_methodID, [i_java, s_java])
             return Int(f_return_java)
         }
-        private let f_methodID = SourceKt_fileClass.getStaticMethodID(name: "f", sig: "(ILjava/lang/String;)I")!
+        private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "(ILjava/lang/String;)I")!
         """)
     }
 
@@ -309,7 +309,43 @@ final class TranspiledBridgingTests: XCTestCase {
     }
 
     func testClass() async throws {
-        // TODO
+        try await check(swift: """
+        // SKIP @bridge
+        class C {
+            var i = 1
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open var i = 1
+        }
+        """, swiftBridgeSupport: """
+        class C {
+            private static let Java_class = try! JClass(name: "C")
+            let Java_peer: JObject
+
+            init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+
+            init() {
+                let ptr = try! Self.Java_class.create(ctor: Self.Java_init_methodID, [])
+                Java_peer = JObject(ptr)
+            }
+            private static let Java_init_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+
+            var i: Int {
+                get {
+                    let value_java: Int32 = try! Java_peer.get(field: Self.Java_i_fieldID)
+                    return Int(value_java)
+                }
+                set {
+                    let value_java = Int32(newValue)
+                    Java_peer.set(field: Self.Java_i_fieldID, value: value_java)
+                }
+            }
+            private static let Java_i_fieldID = Java_class.getFieldID(name: "i", sig: "I")!
+        }
+        """)
     }
 
     func testPublicClass() async throws {
@@ -320,11 +356,19 @@ final class TranspiledBridgingTests: XCTestCase {
         // TODO
     }
 
+    func testInnerClass() async throws {
+        // TODO: Include ensuring that outer class is also bridged
+    }
+
     func testPrivateConstructor() async throws {
         // TODO: How do we differentiate between a private constructor and no constructors?
     }
 
     func testConstructor() async throws {
+        // TODO
+    }
+
+    func testDestructor() async throws {
         // TODO
     }
 
