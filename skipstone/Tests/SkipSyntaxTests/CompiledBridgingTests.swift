@@ -308,7 +308,52 @@ final class CompiledBridgingTests: XCTestCase {
     }
 
     func testPrivateSetVar() async throws {
-        // TODO
+        try await check(swiftBridge: """
+        // SKIP @bridge
+        private(set) var i = 1
+        """, kotlin: """
+        import skip.bridge.*
+        
+        internal val i: Int
+            get() {
+                val value_swift = Swift_i()
+                return value_swift.toInt()
+            }
+        private external fun Swift_i(): Long
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1i")
+        func BridgeKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int64 {
+            let value_swift = i
+            return Int64(value_swift)
+        }
+        """)
+
+        try await check(swiftBridge: """
+        // SKIP @bridge
+        private(set) var d: Double {
+            get {
+                return 1.0
+            }
+            set {
+                print("set")
+            }
+        }
+        """, kotlin: """
+        import skip.bridge.*
+
+        internal val d: Double
+            get() {
+                val value_swift = Swift_d()
+                return value_swift
+            }
+        private external fun Swift_d(): Double
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1d")
+        func BridgeKt_Swift_d(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Double {
+            let value_swift = d
+            return value_swift
+        }
+        """)
     }
 
     func testUnicodeNameVar() async throws {

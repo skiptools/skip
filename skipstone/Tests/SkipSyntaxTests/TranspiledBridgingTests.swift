@@ -212,6 +212,7 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
     }
 
+    //~~~ may not work if get/set in JVM
     func testPrivateSetVar() async throws {
         try await check(swift: """
         // SKIP @bridge
@@ -237,12 +238,14 @@ final class TranspiledBridgingTests: XCTestCase {
                 return 1.0
             }
             set {
+                print("set")
             }
         }
         """, kotlin: """
         internal var d: Double
             get() = 1.0
             private set(newValue) {
+                print("set")
             }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
@@ -256,6 +259,7 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
     }
 
+    //~~~ may not work if get/set in JVM
     func testWillSetDidSet() async throws {
         try await check(swift: """
         // SKIP @bridge
@@ -286,6 +290,7 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
     }
 
+    //~~~ may not work if get/set in JVM
     func testComputedVar() async throws {
         try await check(swift: """
         // SKIP @bridge
@@ -317,6 +322,7 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
     }
 
+    //~~~ may not work if get/set in JVM
     func testKeywordVar() async throws {
         try await check(swift: """
         // SKIP @bridge
