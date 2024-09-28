@@ -114,11 +114,11 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var s: String {
             get {
-                let value_java: String = try! Java_SourceKt.getStatic(field: Java_s_fieldID)
+                let value_java: String = try! Java_SourceKt.callStatic(method: Java_get_s_methodID, [])
                 return value_java
             }
         }
-        private let Java_s_fieldID = Java_SourceKt.getStaticFieldID(name: "s", sig: "Ljava/lang/String;")!
+        private let Java_get_s_methodID = Java_SourceKt.getStaticMethodID(name: "getS", sig: "()Ljava/lang/String;")!
         """)
     }
 
@@ -132,11 +132,11 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var i: Int {
             get {
-                let value_java: Int32 = try! Java_SourceKt.getStatic(field: Java_i_fieldID)
+                let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, [])
                 return Int(value_java)
             }
         }
-        private let Java_i_fieldID = Java_SourceKt.getStaticFieldID(name: "i", sig: "I")!
+        private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!
         """)
 
         try await check(swift: """
@@ -148,11 +148,11 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var i: Int64 {
             get {
-                let value_java: Int64 = try! Java_SourceKt.getStatic(field: Java_i_fieldID)
+                let value_java: Int64 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, [])
                 return value_java
             }
         }
-        private let Java_i_fieldID = Java_SourceKt.getStaticFieldID(name: "i", sig: "J")!
+        private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()J")!
         """)
     }
 
@@ -166,15 +166,16 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var i: Int {
             get {
-                let value_java: Int32 = try! Java_SourceKt.getStatic(field: Java_i_fieldID)
+                let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, [])
                 return Int(value_java)
             }
             set {
-                let value_java = Int32(newValue)
-                Java_SourceKt.setStatic(field: Java_i_fieldID, value: value_java)
+                let value_java = Int32(newValue).toJavaParameter()
+                try! Java_SourceKt.callStatic(method: Java_set_i_methodID, [value_java])
             }
         }
-        private let Java_i_fieldID = Java_SourceKt.getStaticFieldID(name: "i", sig: "I")!
+        private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!
+        private let Java_set_i_methodID = Java_SourceKt.getStaticMethodID(name: "setI", sig: "(I)V")!
         """)
     }
 
@@ -188,15 +189,16 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public var i: Int {
             get {
-                let value_java: Int32 = try! Java_SourceKt.getStatic(field: Java_i_fieldID)
+                let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, [])
                 return Int(value_java)
             }
             set {
-                let value_java = Int32(newValue)
-                Java_SourceKt.setStatic(field: Java_i_fieldID, value: value_java)
+                let value_java = Int32(newValue).toJavaParameter()
+                try! Java_SourceKt.callStatic(method: Java_set_i_methodID, [value_java])
             }
         }
-        private let Java_i_fieldID = Java_SourceKt.getStaticFieldID(name: "i", sig: "I")!
+        private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!
+        private let Java_set_i_methodID = Java_SourceKt.getStaticMethodID(name: "setI", sig: "(I)V")!
         """)
     }
 
@@ -224,11 +226,11 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var i: Int {
             get {
-                let value_java: Int32 = try! Java_SourceKt.getStatic(field: Java_i_fieldID)
+                let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, [])
                 return Int(value_java)
             }
         }
-        private let Java_i_fieldID = Java_SourceKt.getStaticFieldID(name: "i", sig: "I")!
+        private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!
         """)
 
         try await check(swift: """
@@ -251,11 +253,11 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var d: Double {
             get {
-                let value_java: Double = try! Java_SourceKt.getStatic(field: Java_d_fieldID)
+                let value_java: Double = try! Java_SourceKt.callStatic(method: Java_get_d_methodID, [])
                 return value_java
             }
         }
-        private let Java_d_fieldID = Java_SourceKt.getStaticFieldID(name: "d", sig: "D")!
+        private let Java_get_d_methodID = Java_SourceKt.getStaticMethodID(name: "getD", sig: "()D")!
         """)
     }
 
@@ -282,11 +284,11 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var i: Int32 {
             get {
-                let value_java: Int32 = try! Java_SourceKt.getStatic(field: Java_i_fieldID)
+                let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, [])
                 return value_java
             }
         }
-        private let Java_i_fieldID = Java_SourceKt.getStaticFieldID(name: "i", sig: "I")!
+        private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!
         """)
     }
 
@@ -310,15 +312,16 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var i: Int64 {
             get {
-                let value_java: Int64 = try! Java_SourceKt.getStatic(field: Java_i_fieldID)
+                let value_java: Int64 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, [])
                 return value_java
             }
             set {
-                let value_java = newValue
-                Java_SourceKt.setStatic(field: Java_i_fieldID, value: value_java)
+                let value_java = newValue.toJavaParameter()
+                try! Java_SourceKt.callStatic(method: Java_set_i_methodID, [value_java])
             }
         }
-        private let Java_i_fieldID = Java_SourceKt.getStaticFieldID(name: "i", sig: "J")!
+        private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()J")!
+        private let Java_set_i_methodID = Java_SourceKt.getStaticMethodID(name: "setI", sig: "(J)V")!
         """)
     }
 
@@ -338,11 +341,11 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public var object: String {
             get {
-                let value_java: String = try! Java_SourceKt.getStatic(field: Java_object__fieldID)
+                let value_java: String = try! Java_SourceKt.callStatic(method: Java_get_object__methodID, [])
                 return value_java
             }
         }
-        private let Java_object__fieldID = Java_SourceKt.getStaticFieldID(name: "object_", sig: "Ljava/lang/String;")!
+        private let Java_get_object__methodID = Java_SourceKt.getStaticMethodID(name: "getObject_", sig: "()Ljava/lang/String;")!
         """)
     }
 
@@ -395,15 +398,16 @@ final class TranspiledBridgingTests: XCTestCase {
         }
         var c: C {
             get {
-                let value_java: JavaObjectPointer = try! Java_SourceKt.getStatic(field: Java_c_fieldID)
+                let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, [])
                 return C(Java_ptr: value_java)
             }
             set {
-                let value_java = newValue.Java_peer.ptr
-                Java_SourceKt.setStatic(field: Java_c_fieldID, value: value_java)
+                let value_java = newValue.Java_peer.ptr.toJavaParameter()
+                try! Java_SourceKt.callStatic(method: Java_set_c_methodID, [value_java])
             }
         }
-        private let Java_c_fieldID = Java_SourceKt.getStaticFieldID(name: "c", sig: "LC;")!
+        private let Java_get_c_methodID = Java_SourceKt.getStaticMethodID(name: "getC", sig: "()LC;")!
+        private let Java_set_c_methodID = Java_SourceKt.getStaticMethodID(name: "setC", sig: "(LC;)V")!
         """)
     }
 
@@ -536,15 +540,16 @@ final class TranspiledBridgingTests: XCTestCase {
 
             var i: Int {
                 get {
-                    let value_java: Int32 = try! Java_peer.get(field: Self.Java_i_fieldID)
+                    let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, [])
                     return Int(value_java)
                 }
                 set {
-                    let value_java = Int32(newValue)
-                    Java_peer.set(field: Self.Java_i_fieldID, value: value_java)
+                    let value_java = Int32(newValue).toJavaParameter()
+                    try! Java_peer.call(method: Self.Java_set_i_methodID, [value_java])
                 }
             }
-            private static let Java_i_fieldID = Java_class.getFieldID(name: "i", sig: "I")!
+            private static let Java_get_i_methodID = Java_class.getMethodID(name: "getI", sig: "()I")!
+            private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
         }
         """)
     }

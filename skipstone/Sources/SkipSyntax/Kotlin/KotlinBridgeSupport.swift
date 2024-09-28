@@ -64,6 +64,7 @@ extension String {
 }
 
 extension TypeSignature {
+    static let javaObject: TypeSignature = .named("Object", [])
     static let javaObjectPointer: TypeSignature = .named("JavaObjectPointer", [])
     static let swiftObjectPointer: TypeSignature = .named("SwiftObjectPointer", [])
 
@@ -155,7 +156,7 @@ extension TypeSignature {
         case .int:
             return .int32
         default:
-            return isNamedType ? .javaObjectPointer : self // TODO: All other types
+            return isNamedType ? .javaObject : self // TODO: All other types
         }
     }
 
@@ -166,7 +167,7 @@ extension TypeSignature {
             return "Int32(" + value + ")"
         default:
             if strategy == .javaPeer {
-                return value + ".Java_peer.ptr"
+                return value + ".Java_peer"
             } else {
                 return value // TODO: All other types
             }
@@ -180,7 +181,8 @@ extension TypeSignature {
             return "Int(" + value + ")"
         default:
             if strategy == .javaPeer {
-                return description + "(Java_ptr: " + value + ")"
+                //~~~
+                return description + "(Java_ptr: " + value + ".javaObject.ptr)"
             } else {
                 return value // TODO: All other types
             }
@@ -327,7 +329,7 @@ extension KotlinVariableDeclaration {
     /// Check that this variable is bridgable and return its bridgable type.
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
-    func checkBridgable(translator: KotlinTranslator) -> (TypeSignature, BridgeStrategy)? {
+    func checkBridgable(translator: KotlinTranslator) -> (type: TypeSignature, qualifedType: TypeSignature, strategy: BridgeStrategy)? {
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
             return nil
         }
@@ -336,6 +338,7 @@ extension KotlinVariableDeclaration {
             messages.append(Message.kotlinBridgeNeedsTypeDeclaration(self, source: translator.syntaxTree.source))
             return nil
         }
+        let qualifiedType = type //~~~ QUALIFY
         let strategy: BridgeStrategy
         if type.isNamedType, let codebaseInfo = translator.codebaseInfo {
             guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: type) else {
@@ -350,7 +353,7 @@ extension KotlinVariableDeclaration {
         } else {
             strategy = .direct
         }
-        return (type, strategy)
+        return (type, qualifiedType, strategy)
     }
 }
 
@@ -358,14 +361,14 @@ extension KotlinFunctionDeclaration {
     /// Check that this function is bridgable.
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
-    func checkBridgable(translator: KotlinTranslator) -> Bool {
+    func checkBridgable(translator: KotlinTranslator) -> TypeSignature? {
         guard type != .finalizerDeclaration else {
-            return false
+            return nil
         }
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
-            return false
+            return nil
         }
-        return true
+        return functionType
     }
 }
 
@@ -373,11 +376,11 @@ extension KotlinClassDeclaration {
     /// Check that this class is bridgable.
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
-    func checkBridgable(translator: KotlinTranslator) -> Bool {
+    func checkBridgable(translator: KotlinTranslator) -> TypeSignature? {
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
-            return false
+            return nil
         }
-        return true
+        return signature //~~~ TODO: Qualify
     }
 }
 
