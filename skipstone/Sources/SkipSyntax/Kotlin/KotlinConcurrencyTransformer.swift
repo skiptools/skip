@@ -1,6 +1,6 @@
 /// Update uses of `Task` and main actor information used in `async` calls.
 final class KotlinConcurrencyTransformer: KotlinTransformer {
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         let codebaseInfo = translator.codebaseInfo
         var taskClosureIdentifiers: Set<ObjectIdentifier> = []
         syntaxTree.root.visit { node in
@@ -48,6 +48,7 @@ final class KotlinConcurrencyTransformer: KotlinTransformer {
             }
             return .recurse(nil)
         }
+        return []
     }
 
     private func updateTaskCall(in functionCall: KotlinFunctionCall, codebaseInfo: CodebaseInfo.Context?, source: Source) -> KotlinClosure? {

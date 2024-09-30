@@ -2,11 +2,12 @@
 ///
 /// - Seealso: ``KotlinIf``, ``KotlinWhen``
 final class KotlinIfWhenTransformer: KotlinTransformer {
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         let expressionVisitor = ValueExpressionVisitor()
         syntaxTree.root.visit(perform: expressionVisitor.visit)
         let identifiersVisitor = IdentifiersVisitor()
         syntaxTree.root.visit(perform: identifiersVisitor.visit)
+        return []
     }
 }
 

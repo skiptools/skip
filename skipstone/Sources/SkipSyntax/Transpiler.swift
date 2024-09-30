@@ -65,7 +65,7 @@ public struct Transpiler {
         transformers.forEach { $0.prepareForUse(codebaseInfo: codebaseInfo) }
 
         // Next perform transpilation with populated info
-        try await withThrowingTaskGroup(of: Transpilation.self) { group in
+        try await withThrowingTaskGroup(of: [Transpilation].self) { group in
             for source in sources {
                 group.addTask {
                     let start = Date().timeIntervalSinceReferenceDate
@@ -82,20 +82,18 @@ public struct Transpiler {
                     return translator.transpile(codebaseInfo: codebaseInfo, transformers: transformers, startTime: start)
                 }
             }
-            for try await transpilation in group {
-                try await handler(transpilation)
+            for try await transpilations in group {
+                for transpilation in transpilations {
+                    try await handler(transpilation)
+                }
             }
         }
 
+        // Finally create an additional source files for any package-level code.
         // Suffix the generated file with "Tests" to avoid clashes with the primary modules `PackageSupportKt` class (https://github.com/skiptools/skip/issues/66)
         let isTestModule = codebaseInfo.moduleName?.hasSuffix("Tests") == true
-
-        // Finally create an additional source files for any package-level code
         if let packageSupportTranspilation = KotlinTranslator.transpilePackageSupport(sourceFile: (sourceFiles.first ?? bridgeFiles.first!).kotlinPackageSupport(tests: isTestModule), codebaseInfo: codebaseInfo, transformers: transformers) {
             try await handler(packageSupportTranspilation)
-        }
-        if let bridgeSupportTranspilation = KotlinTranslator.transpileBridgeSupport(sourceFile: (bridgeFiles.first ?? sourceFiles.first!).swiftBridgeSupport(tests: isTestModule), codebaseInfo: codebaseInfo, transformers: transformers) {
-            try await handler(bridgeSupportTranspilation)
         }
     }
 }

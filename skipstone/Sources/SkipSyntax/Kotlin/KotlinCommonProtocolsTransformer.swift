@@ -4,11 +4,12 @@
 ///   2. Remove references to `CustomStringConvertible`, `Equatable`, `Hashable` in inherits lists and generic constraints, because they are just aliases for `Any` in Kotlin.
 ///   3. Change references to `Comparable` in inherits lists and generic constraints to Kotlin's `Comparable<T>`.
 final class KotlinCommonProtocolsTransformer: KotlinTransformer {
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         guard let codebaseInfo = translator.codebaseInfo else {
-            return
+            return []
         }
         syntaxTree.root.visit { visit($0, codebaseInfo: codebaseInfo, source: translator.syntaxTree.source) }
+        return []
     }
 
     private func visit(_ node: KotlinSyntaxNode, codebaseInfo: CodebaseInfo.Context, source: Source) -> VisitResult<KotlinSyntaxNode> {

@@ -33,7 +33,7 @@ final class KotlinTupleLabelTransformer: KotlinTransformer {
         }
     }
 
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         // This function is invoked concurrently on different syntax trees, so gather labels locally and then merge
         var localLabels: TupleLabels = [:]
         syntaxTree.root.visit { node in
@@ -63,6 +63,7 @@ final class KotlinTupleLabelTransformer: KotlinTransformer {
             mergeTupleLabels(localLabels, into: &tupleLabels)
             tupleLabelsLock.unlock()
         }
+        return []
     }
 
     func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> Bool {

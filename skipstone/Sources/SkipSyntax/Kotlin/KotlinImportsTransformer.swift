@@ -1,9 +1,9 @@
 /// Consolidate and map import statements to Skip modules.
 final class KotlinImportsTransformer: KotlinTransformer {
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         // There's no point in running this transformer in the symbol gathering phase
         guard translator.codebaseInfo != nil else {
-            return
+            return []
         }
 
         // Translate imports and remove redundancies
@@ -45,6 +45,7 @@ final class KotlinImportsTransformer: KotlinTransformer {
             }
         }
         syntaxTree.root.insert(statements: additionalImportDeclarations, after: lastImportDeclaration)
+        return []
     }
 
     private func translateImport(modulePath: [String]) -> [[String]] {

@@ -113,6 +113,19 @@ public struct Source : Encodable {
             output.extension = withExtension
             return output
         }
+
+        /// The corresponding Swift file for bridging output.
+        public var bridgeOutputFile: Source.FilePath? {
+            guard self.extension == "swift" else {
+                return nil
+            }
+            return Source.FilePath(path: self.path.dropLast(".swift".count) + "_Bridge.swift")
+        }
+
+        /// Whether this is a bridging output file.
+        public var isBridgeOutputFile: Bool {
+            return path.hasSuffix("_Bridge.swift")
+        }
     }
 
     /// A line and column-based range in the source, appropriate for Xcode reporting.

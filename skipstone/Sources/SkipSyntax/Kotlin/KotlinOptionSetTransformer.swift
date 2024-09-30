@@ -1,6 +1,6 @@
 /// Handle `OptionSet` implementation.
 final class KotlinOptionSetTransformer: KotlinTransformer {
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         syntaxTree.root.visit {
             // We don't need to worry about extensions because they will have already been merged into the class
             if let classDeclaration = $0 as? KotlinClassDeclaration {
@@ -8,6 +8,7 @@ final class KotlinOptionSetTransformer: KotlinTransformer {
             }
             return .recurse(nil)
         }
+        return []
     }
 
     private func handleOptionSet(for classDeclaration: KotlinClassDeclaration, source: Source) {

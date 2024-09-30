@@ -1,5 +1,8 @@
 /// Used in Swift code generation.
 struct SwiftDefinition: OutputNode {
+    static let leadingContent = "#if canImport(SkipBridge)\nimport SkipBridge\n\n"
+    static let trailingContent = "\n#endif\n"
+
     let sourceFile: Source.FilePath?
     let sourceRange: Source.Range?
     var children: [SwiftDefinition] = []
@@ -338,7 +341,7 @@ extension KotlinVariableDeclaration {
             messages.append(Message.kotlinBridgeNeedsTypeDeclaration(self, source: translator.syntaxTree.source))
             return nil
         }
-        let qualifiedType = type //~~~ QUALIFY
+        let qualifiedType = type // TODO: Qualify
         let strategy: BridgeStrategy
         if type.isNamedType, let codebaseInfo = translator.codebaseInfo {
             guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: type) else {
@@ -368,7 +371,7 @@ extension KotlinFunctionDeclaration {
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
             return nil
         }
-        return functionType
+        return functionType // TODO: Qualify
     }
 }
 
@@ -376,11 +379,11 @@ extension KotlinClassDeclaration {
     /// Check that this class is bridgable.
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
-    func checkBridgable(translator: KotlinTranslator) -> TypeSignature? {
+    func checkBridgable(translator: KotlinTranslator) -> Bool {
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
-            return nil
+            return false
         }
-        return signature //~~~ TODO: Qualify
+        return true
     }
 }
 

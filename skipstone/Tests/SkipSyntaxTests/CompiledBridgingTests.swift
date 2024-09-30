@@ -82,7 +82,7 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         let f: Float = 1
         """, kotlin: """
-        import skip.bridge.*
+        import skip.bridge.SkipObjectPointer
 
         internal val f: Float
             get() {
@@ -102,7 +102,7 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         let i: Int64 = 1
         """, kotlin: """
-        import skip.bridge.*
+        import skip.bridge.SkipObjectPointer
 
         internal val i: Long
             get() {
@@ -122,7 +122,7 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         let s = "ab\\(1 + 1)c"
         """, kotlin: """
-        import skip.bridge.*
+        import skip.bridge.SkipObjectPointer
 
         internal val s: String
             get() {
@@ -268,7 +268,7 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         public var i = 1
         """, kotlin: """
-        import skip.bridge.*
+        import skip.bridge.SwiftObjectPointer
 
         var i: Int
             get() {

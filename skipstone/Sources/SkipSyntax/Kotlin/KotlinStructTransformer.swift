@@ -4,8 +4,9 @@
 final class KotlinStructTransformer: KotlinTransformer {
     static let mutationFunctionNames = ("willmutate", "didmutate")
 
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         syntaxTree.root.visit { visit($0, translator: translator) }
+        return []
     }
 
     private func visit(_ node: KotlinSyntaxNode, translator: KotlinTranslator) -> VisitResult<KotlinSyntaxNode> {

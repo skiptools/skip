@@ -27,10 +27,11 @@ final class KotlinDisambiguateFunctionsTransformer: KotlinTransformer {
         }
     }
 
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         if let codebaseInfo = translator.codebaseInfo {
             syntaxTree.root.visit { visit($0, codebaseInfo: codebaseInfo) }
         }
+        return []
     }
 
     func messages(for sourceFile: Source.FilePath) -> [Message] {
