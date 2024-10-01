@@ -66,6 +66,10 @@ extension Message {
         return Message(kind: .error, message: "Skip is not able to determine whether '\(type)' is bridgable. Ensure that it is in a Skip-enabled module and is a bridged type", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinBridgeUnsupportedType(_ sourceDerived: SourceDerived, type: String, source: Source) -> Message {
+        return Message(kind: .error, message: "Skip does not yet support bridging type '\(type)'", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinCatchCaseCast(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin only supports catch clauses that use enum cases, 'is <type>', or 'let <e> as <type>' conditions", sourceDerived: sourceDerived, source: source)
     }

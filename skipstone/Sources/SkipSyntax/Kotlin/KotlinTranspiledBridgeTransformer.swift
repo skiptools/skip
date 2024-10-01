@@ -306,7 +306,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         identifier += "Kt"
         let className: String
         if let packageName = translator.packageName {
-            className = packageName + "." + identifier
+            className = packageName.replacing(".", with: "/") + "/" + identifier
         } else {
             className = identifier
         }
@@ -316,7 +316,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
     private func typeJavaClass(_ classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> JavaClassRef {
         let className: String
         if let packageName = translator.packageName {
-            className = packageName + "." + classDeclaration.name
+            className = packageName.replacing(".", with: "/") + "/" + classDeclaration.name
         } else {
             className = classDeclaration.name
         }

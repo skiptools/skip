@@ -651,26 +651,26 @@ final class CompiledBridgingTests: XCTestCase {
         @_cdecl("Java_C_Swift_1constructor")
         func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
             let f_return_swift = C()
-            return SwiftObjectPointer.forSwift(f_return_swift, retain: true)
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
         }
         @_cdecl("Java_C_Swift_1ptrref")
         func C_Swift_ptrref(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
-            return refSwift(Swift_peer, type: C.self)
+            return Swift_peer.retained(as: C.self)
         }
         @_cdecl("Java_C_Swift_1ptrderef")
         func C_Swift_ptrderef(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
-            derefSwift(Swift_peer, type: C.self)
+            Swift_peer.release(as: C.self)
         }
         @_cdecl("Java_C_Swift_1i")
         func C_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> Int64 {
-            let peer_swift: C = Swift_peer.toSwift()
+            let peer_swift: C = Swift_peer.pointee()!
             let value_swift = peer_swift.i
             return Int64(value_swift)
         }
         @_cdecl("Java_C_Swift_1i_1set")
         func C_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: Int64) {
             let value_swift = Int(value)
-            let peer_swift: C = Swift_peer.toSwift()
+            let peer_swift: C = Swift_peer.pointee()!
             peer_swift.i = value_swift
         }
         """)
@@ -726,17 +726,17 @@ final class CompiledBridgingTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_C_Swift_1ptrref")
         func C_Swift_ptrref(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
-            return refSwift(Swift_peer, type: C.self)
+            return Swift_peer.retained(as: C.self)
         }
         @_cdecl("Java_C_Swift_1ptrderef")
         func C_Swift_ptrderef(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
-            derefSwift(Swift_peer, type: C.self)
+            Swift_peer.release(as: C.self)
         }
         @_cdecl("Java_C_Swift_1constructor")
         func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ i: Int64) -> SwiftObjectPointer {
             let i_swift = Int(i)
             let f_return_swift = C(i: i_swift)
-            return SwiftObjectPointer.forSwift(f_return_swift, retain: true)
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
         }
         """)
     }
@@ -796,21 +796,21 @@ final class CompiledBridgingTests: XCTestCase {
         @_cdecl("Java_C_Swift_1constructor")
         func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
             let f_return_swift = C()
-            return SwiftObjectPointer.forSwift(f_return_swift, retain: true)
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
         }
         @_cdecl("Java_C_Swift_1ptrref")
         func C_Swift_ptrref(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
-            return refSwift(Swift_peer, type: C.self)
+            return Swift_peer.retained(as: C.self)
         }
         @_cdecl("Java_C_Swift_1ptrderef")
         func C_Swift_ptrderef(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
-            derefSwift(Swift_peer, type: C.self)
+            Swift_peer.release(as: C.self)
         }
         @_cdecl("Java_C_Swift_1add")
         func C_Swift_add(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ a: Int64, _ b: Int64) -> Int64 {
             let a_swift = Int(a)
             let b_swift = Int(b)
-            let peer_swift: C = Swift_peer.toSwift()
+            let peer_swift: C = Swift_peer.pointee()!
             let f_return_swift = peer_swift.add(a: a_swift, b: b_swift)
             return Int64(f_return_swift)
         }
