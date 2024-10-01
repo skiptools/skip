@@ -146,9 +146,6 @@ import PackagePlugin
         let sourcehashOutputPath = Path(outputURL.appendingPathComponent(sourceHashDot + peerTarget.name + sourcehashExtension, isDirectory: false).path)
         //Diagnostics.warning("add sourcehash output for \(target.name): \(sourcehashOutputPath)", file: sourcehashOutputPath.string)
 
-        let skipBridgeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + "SwiftBridge.swift", isDirectory: false).path)
-        //Diagnostics.warning("add skip extensions output for \(target.name): \(skipBridgeOutputPath)", file: skipBridgeOutputPath.string)
-
         struct Dep : Identifiable {
             let package: Package
             let target: Target
@@ -215,7 +212,8 @@ import PackagePlugin
         var deps = dependencies(for: target.dependencies, in: context.package)
         deps = makeUniqueById(deps)
 
-        let outputFiles: [Path] = [sourcehashOutputPath, skipBridgeOutputPath]
+        var outputFiles: [Path] = [sourcehashOutputPath]
+
         // input files consist of the source files, as well as all the dependent module output source hash directory files, which will be modified whenever a transpiled module changes
         // note that using the directory as the input will cause the transpile to re-run for any sub-folder change, although this behavior is not explicitly documented
         var inputFiles: [Path] = [target.directory] + target.sourceFiles.map(\.path)
@@ -264,17 +262,27 @@ import PackagePlugin
         let outputBase = URL(fileURLWithPath: kotlinModule, isDirectory: true, relativeTo: outputURL)
         let sourceBase = URL(fileURLWithPath: isTest ? "src/test" : "src/main", isDirectory: true, relativeTo: outputBase)
 
+        var buildArguments = [
+            "transpile",
+            "--project", swiftSourceTarget.directory.string,
+            "--skip-folder", skipFolder.string,
+            "--sourcehash", sourcehashOutputPath.string,
+            "--output-folder", sourceBase.path,
+            "--module-root", outputBase.path,
+            ]
+
+        // only add the generated skip bridge if there are any .swift input files; we must not add them for C projects, since they will prevent the .c files from being built
+        if target.sourceFiles.contains(where: { $0.path.extension == "swift" }) {
+            let skipBridgeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + "SwiftBridge.swift", isDirectory: false).path)
+            //Diagnostics.warning("add skip extensions output for \(target.name): \(skipBridgeOutputPath)", file: skipBridgeOutputPath.string)
+             buildArguments += [ "--skipbridge", skipBridgeOutputPath.string ]
+            outputFiles += [skipBridgeOutputPath]
+        }
+
+        buildArguments += buildModuleArgs
+
         return [
-            .buildCommand(displayName: "Skip \(target.name)", executable: skipToolPath, arguments: [
-                "transpile",
-                "--project", swiftSourceTarget.directory.string,
-                "--skip-folder", skipFolder.string,
-                "--sourcehash", sourcehashOutputPath.string,
-                "--skipbridge", skipBridgeOutputPath.string,
-                "--output-folder", sourceBase.path,
-                "--module-root", outputBase.path,
-                ]
-                + buildModuleArgs,
+            .buildCommand(displayName: "Skip \(target.name)", executable: skipToolPath, arguments: buildArguments,
                 inputFiles: inputFiles,
                 outputFiles: outputFiles)
         ]
