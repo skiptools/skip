@@ -275,7 +275,7 @@ import PackagePlugin
         if target.sourceFiles.contains(where: { $0.path.extension == "swift" }) {
             let skipBridgeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + "SwiftBridge.swift", isDirectory: false).path)
             //Diagnostics.warning("add skip extensions output for \(target.name): \(skipBridgeOutputPath)", file: skipBridgeOutputPath.string)
-             buildArguments += [ "--skipbridge", skipBridgeOutputPath.string ]
+            buildArguments += [ "--skipbridge", skipBridgeOutputPath.string ]
             outputFiles += [skipBridgeOutputPath]
         }
 
