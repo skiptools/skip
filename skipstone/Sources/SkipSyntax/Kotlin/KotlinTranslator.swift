@@ -50,17 +50,17 @@ public final class KotlinTranslator {
     }
 
     /// Translate and transpile to source code.
-    public func transpile(codebaseInfo: CodebaseInfo, transformers: [KotlinTransformer], startTime: TimeInterval) -> Transpilation {
+    public func transpile(codebaseInfo: CodebaseInfo, transformers: [KotlinTransformer], startTime: TimeInterval) -> [Transpilation] {
         let importedModuleNames = syntaxTree.root.statements.importedModulePaths.compactMap(\.moduleName)
         let codebaseInfoContext = codebaseInfo.context(importedModuleNames: importedModuleNames, sourceFile: syntaxTree.source.file)
         self.codebaseInfo = codebaseInfoContext
         self.packageName = codebaseInfo.kotlin?.packageName
 
         let kotlinSyntaxTree = translateSyntaxTree()
-        transformers.forEach { $0.apply(to: kotlinSyntaxTree, translator: self) }
+        let outputs = transformers.flatMap { $0.apply(to: kotlinSyntaxTree, translator: self) }
         addPackageAndRequiredImportStatements(to: kotlinSyntaxTree)
 
-        return transpilation(for: kotlinSyntaxTree, codebaseInfo: codebaseInfo, transformers: transformers, startTime: startTime)
+        return transpilations(for: kotlinSyntaxTree, codebaseInfo: codebaseInfo, transformers: transformers, outputs: outputs, startTime: startTime)
     }
 
     /// Transpile the package support file containing any needed package-level code.
@@ -79,41 +79,8 @@ public final class KotlinTranslator {
         }
         translator.addPackageAndRequiredImportStatements(to: kotlinSyntaxTree)
 
-        let transpilation = translator.transpilation(for: kotlinSyntaxTree, codebaseInfo: codebaseInfo, transformers: transformers, startTime: startTime)
-        return transpilation
-    }
-
-    /// Transpile the package support file containing any needed package-level code.
-    public static func transpileBridgeSupport(sourceFile: Source.FilePath, codebaseInfo: CodebaseInfo, transformers: [KotlinTransformer]) -> Transpilation? {
-        let startTime = Date().timeIntervalSinceReferenceDate
-        let syntaxTree = SyntaxTree(source: Source(file: sourceFile, content: ""))
-        let translator = KotlinTranslator(syntaxTree: syntaxTree)
-        let codebaseInfoContext = codebaseInfo.context(sourceFile: sourceFile)
-        translator.codebaseInfo = codebaseInfoContext
-        translator.packageName = codebaseInfo.kotlin?.packageName
-        let outputNodes = transformers.compactMap { $0.swiftBridgeOutput(translator: translator) }
-        guard !outputNodes.isEmpty else {
-            return nil
-        }
-
-        let messages = syntaxTree.messages + codebaseInfo.messages(for: syntaxTree.source.file) + transformers.flatMap { $0.messages(for: syntaxTree.source.file) }
-        let outputFile = syntaxTree.source.file.outputFile(withExtension: "swift")
-        var leadingContent = "#if canImport(SkipBridge)\nimport SkipBridge\n\n"
-        let trailingContent = "\n#endif\n"
-        let importContent = bridgeSupportImports(for: syntaxTree.root.statements.compactMap { $0 as? ImportDeclaration })
-        if !importContent.isEmpty {
-            leadingContent += importContent + "\n\n"
-        }
-        let rootOutputNode = SwiftDefinition { output, indentation, _ in
-            output.append(leadingContent)
-            outputNodes.forEach { output.append($0, indentation: indentation) }
-            output.append(trailingContent)
-        }
-        let outputGenerator = OutputGenerator(root: rootOutputNode)
-        let (output, outputMap) = outputGenerator.generateOutput(file: outputFile)
-        let endTime = Date().timeIntervalSinceReferenceDate
-        let transpilation = Transpilation(input: syntaxTree.source, output: output, outputMap: outputMap, messages: messages, duration: endTime - startTime)
-        return transpilation
+        let transpilations = translator.transpilations(for: kotlinSyntaxTree, codebaseInfo: codebaseInfo, transformers: transformers, outputs: [], startTime: startTime)
+        return transpilations.first
     }
 
     /// Translate syntax trees only.
@@ -295,13 +262,23 @@ public final class KotlinTranslator {
         }
     }
 
-    private func transpilation(for kotlinSyntaxTree: KotlinSyntaxTree, codebaseInfo: CodebaseInfo, transformers: [KotlinTransformer], startTime: TimeInterval) -> Transpilation {
+    private func transpilations(for kotlinSyntaxTree: KotlinSyntaxTree, codebaseInfo: CodebaseInfo, transformers: [KotlinTransformer], outputs: [KotlinTransformerOutput], startTime: TimeInterval) -> [Transpilation] {
         let messages = kotlinSyntaxTree.messages + codebaseInfo.messages(for: syntaxTree.source.file) + transformers.flatMap { $0.messages(for: syntaxTree.source.file) }
         let outputFile = syntaxTree.source.file.outputFile(withExtension: "kt")
         let outputGenerator = OutputGenerator(root: kotlinSyntaxTree.root)
         let (output, outputMap) = outputGenerator.generateOutput(file: outputFile)
         let endTime = Date().timeIntervalSinceReferenceDate // track the duration for logging
-        return Transpilation(input: kotlinSyntaxTree.source, output: output, outputMap: outputMap, messages: messages, duration: endTime - startTime)
+        let transpilation = Transpilation(input: kotlinSyntaxTree.source, output: output, outputMap: outputMap, messages: messages, duration: endTime - startTime)
+
+        var transpilations: [Transpilation] = []
+        transpilations.append(transpilation)
+        for transformerOutput in outputs {
+            let outputGenerator = OutputGenerator(root: transformerOutput.node)
+            let (output, outputMap) = outputGenerator.generateOutput(file: transformerOutput.file)
+            let transpilation = Transpilation(input: syntaxTree.source, output: output, outputMap: outputMap, messages: [], duration: Date().timeIntervalSinceReferenceDate - endTime)
+            transpilations.append(transpilation)
+        }
+        return transpilations
     }
 
     private func moveImportsToTop(statements: [KotlinStatement]) -> [KotlinStatement] {

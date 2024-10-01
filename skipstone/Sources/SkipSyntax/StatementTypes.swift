@@ -1679,9 +1679,6 @@ final class VariableDeclaration: Statement {
             switch accessor {
             case .accessors(let syntax):
                 accessors = syntax.accessors(decodeBody: !syntaxTree.isBridgeFile, in: syntaxTree)
-                if syntaxTree.isBridgeFile, !isBridge(attributes: attributes, visibility: modifiers.setVisibility, asMember: true) {
-                    accessors.setter = nil
-                }
             case .getter(let syntax):
                 if syntaxTree.isBridgeFile {
                     accessors.getter = Accessor()
@@ -1694,6 +1691,13 @@ final class VariableDeclaration: Statement {
         var attributes = attributes
         if let accessorsAttributes = accessors.attributes {
             attributes.attributes += accessorsAttributes.attributes
+        }
+        if syntaxTree.isBridgeFile, !isBridge(attributes: attributes, visibility: modifiers.setVisibility, asMember: true) {
+            accessors.setter = nil
+            // We need to add a getter so that the variable does not appear to be writeable
+            if accessors.getter == nil {
+                accessors.getter = Accessor()
+            }
         }
 
         guard let names = syntax.pattern.identifierPatterns(in: syntaxTree)?.map(\.name?.removingBacktickEscaping) else {

@@ -1,6 +1,6 @@
 /// Synthesize `Encodable` and `Decodable` conformance.
 final class KotlinCodableTransformer: KotlinTransformer {
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         syntaxTree.root.visit {
             if let classDeclaration = $0 as? KotlinClassDeclaration {
                 if classDeclaration.declarationType == .enumDeclaration && classDeclaration.inherits.contains(where: \.isCodingKey) {
@@ -13,6 +13,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
             }
             return .recurse(nil)
         }
+        return []
     }
 
     private func synthesizeCodable(for classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {

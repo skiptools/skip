@@ -2,13 +2,14 @@
 ///
 /// - Seealso: `SkipUnit/XCTestCase.kt`
 final class KotlinUnitTestTransformer: KotlinTransformer {
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         guard let codebaseInfo = translator.codebaseInfo else {
-            return
+            return []
         }
         var importPackages: Set<String> = []
         syntaxTree.root.visit { visit($0, codebaseInfo: codebaseInfo, importPackages: &importPackages) }
         syntaxTree.dependencies.imports.formUnion(importPackages)
+        return []
     }
 
     private func visit(_ node: KotlinSyntaxNode, codebaseInfo: CodebaseInfo.Context, importPackages: inout Set<String>) -> VisitResult<KotlinSyntaxNode> {

@@ -2316,10 +2316,7 @@ final class KotlinImportDeclaration: KotlinStatement {
             return ""
         }
 
-        // If equivalent package name is the same, assume this is a Kotlin import, otherwise treat as a Swift import
-        // Need to check against the unmodified translated package
-        let packageNameBare = KotlinTranslator.packageName(forModule: modulePath[0], withDefaultPackageSuffix: nil)
-        if packageNameBare == modulePath[0] {
+        if isKotlinImport {
             if modulePath.last == "__" {
                 return modulePath.dropLast().joined(separator: ".") + ".*"
             } else {
@@ -2335,6 +2332,12 @@ final class KotlinImportDeclaration: KotlinStatement {
         }
     }
     var additionalImports: [String] = []
+    var isKotlinImport: Bool {
+        // If equivalent package name is the same, assume this is a Kotlin import, otherwise treat as a Swift import
+        // Need to check against the unmodified translated package
+        let packageNameBare = KotlinTranslator.packageName(forModule: modulePath[0], withDefaultPackageSuffix: nil)
+        return packageNameBare == modulePath[0]
+    }
 
     static func translate(statement: ImportDeclaration, translator: KotlinTranslator) -> KotlinImportDeclaration {
         let kstatement = KotlinImportDeclaration(statement: statement)

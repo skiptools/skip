@@ -1,6 +1,6 @@
 /// Handle `RawRepresentable` implementation.
 final class KotlinRawRepresentableTransformer: KotlinTransformer {
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         syntaxTree.root.visit {
             // We don't need to worry about extensions because they will have already been merged into the class
             if let classDeclaration = $0 as? KotlinClassDeclaration {
@@ -8,6 +8,7 @@ final class KotlinRawRepresentableTransformer: KotlinTransformer {
             }
             return .recurse(nil)
         }
+        return []
     }
 
     private func handleRawValue(for classDeclaration: KotlinClassDeclaration) {

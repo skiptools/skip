@@ -1,10 +1,11 @@
 /// Handle enum constructors and `CaseIterable` synthesis.
 final class KotlinEnumTransformer: KotlinTransformer {
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         guard let codebaseInfo = translator.codebaseInfo else {
-            return
+            return []
         }
         syntaxTree.root.visit { visit($0, in: syntaxTree, codebaseInfo: codebaseInfo) }
+        return []
     }
 
     private func visit(_ node: KotlinSyntaxNode, in syntaxTree: KotlinSyntaxTree, codebaseInfo: CodebaseInfo.Context) -> VisitResult<KotlinSyntaxNode> {

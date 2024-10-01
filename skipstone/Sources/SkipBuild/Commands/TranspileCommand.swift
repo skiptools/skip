@@ -130,8 +130,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         var outputFiles: [AbsolutePath] = []
 
-        // The contents of the ModuleNameSkipBridge.swift file to write, if there is any bridging code
-        var skipBridgeContents: String = ""
+        var skipBridgeTranspilations: [Transpilation] = []
 
         func cleanupStaleOutputFiles() {
             let staleFiles = Set(outputFilesSnapshot.map(\.path))
@@ -440,6 +439,11 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         }
 
         func saveSkipBridgeCode() throws {
+            // for now we just glom all bridging code together
+            let skipBridgeContents = skipBridgeTranspilations
+                .sorted { $0.output.file.path < $1.output.file.path }
+                .map(\.output.content)
+                .joined(separator: "\n\n")
             // we always write out to the ModuleNameSwiftBridge.swift file, even when there is no bridging code, because the transpiler plugin expect it as an output file and will fail if it doesn't exist
             if let skipbridgePath = transpileOptions.skipbridge {
                 try writeChanges(tag: "skipbridge", to: AbsolutePath(validating: skipbridgePath), contents: skipBridgeContents.utf8Data, readOnly: true)
@@ -725,10 +729,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 await out.yield(message)
             }
 
-            let isBridgeFile = transpilation.input.file == transpilation.input.file.swiftBridgeSupport(tests: false) || transpilation.input.file == transpilation.input.file.swiftBridgeSupport(tests: true) // i.e., SwiftBridge.swift or SwiftBridgeTest.swift
-            if isBridgeFile {
-                // bridge files are all aggregated and saved to the single file that the plugin specifies
-                skipBridgeContents += transpilation.output.content
+            guard !transpilation.output.file.isBridgeOutputFile else {
+                skipBridgeTranspilations.append(transpilation)
                 return
             }
 

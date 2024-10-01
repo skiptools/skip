@@ -2,16 +2,16 @@
 final class KotlinModuleBundleTransformer: KotlinTransformer {
     private var needsModuleBundle = false
 
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         guard !needsModuleBundle else {
-            return
+            return []
         }
         // No need to add Bundle.module if not a full build
         guard translator.codebaseInfo != nil else {
-            return
+            return []
         }
         guard syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }).contains(where: { $0.modulePath.first == "Foundation" || $0.modulePath.first == "SkipFoundation" || $0.modulePath.first == "SwiftUI" || $0.modulePath.first == "SkipUI" }) else {
-            return
+            return []
         }
 
         syntaxTree.root.visit { node in
@@ -20,6 +20,7 @@ final class KotlinModuleBundleTransformer: KotlinTransformer {
             }
             return .recurse(nil)
         }
+        return []
     }
 
     func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> Bool {

@@ -2,61 +2,56 @@ import Foundation
 
 /// Generate transpiled Swift (Kotlin) to compiled Swift bridging code.
 final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
-    private var swiftDefinitions: [SwiftDefinition] = []
-    private var globalsJavaClasses: Set<JavaClassRef> = []
-    private var lock = NSLock()
-
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
-        guard !syntaxTree.isBridgeFile, translator.codebaseInfo != nil else {
-            return
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
+        guard !syntaxTree.isBridgeFile, translator.codebaseInfo != nil, let outputFile = syntaxTree.source.file.bridgeOutputFile else {
+            return []
         }
-        var localSwiftDefinitions: [SwiftDefinition] = []
-        var localGlobalsJavaClasses:  Set<JavaClassRef> = []
+        var swiftDefinitions: [SwiftDefinition] = []
+        var globalsJavaClasses:  Set<JavaClassRef> = []
         syntaxTree.root.visit { node in
             if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global {
                 if variableDeclaration.attributes.contains(directive: Directive.bridge) {
-                    addSwiftDefinitions(forGlobal: variableDeclaration, to: &localSwiftDefinitions, globalsJavaClasses: &localGlobalsJavaClasses, translator: translator)
+                    addSwiftDefinitions(forGlobal: variableDeclaration, to: &swiftDefinitions, globalsJavaClasses: &globalsJavaClasses, translator: translator)
                 }
                 return .skip
             } else if let functionDeclaration = node as? KotlinFunctionDeclaration, functionDeclaration.role == .global {
                 if functionDeclaration.attributes.contains(directive: Directive.bridge) {
-                    addSwiftDefinitions(forGlobal: functionDeclaration, to: &localSwiftDefinitions, globalsJavaClasses: &localGlobalsJavaClasses, translator: translator)
+                    addSwiftDefinitions(forGlobal: functionDeclaration, to: &swiftDefinitions, globalsJavaClasses: &globalsJavaClasses, translator: translator)
                 }
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
                 if classDeclaration.attributes.contains(directive: Directive.bridge) {
-                    addSwiftDefinitions(for: classDeclaration, to: &localSwiftDefinitions, translator: translator)
+                    addSwiftDefinitions(for: classDeclaration, to: &swiftDefinitions, translator: translator)
                 }
                 return .recurse(nil)
             } else {
                 return .recurse(nil)
             }
         }
-        if !localSwiftDefinitions.isEmpty {
-            lock.lock()
-            swiftDefinitions += localSwiftDefinitions
-            globalsJavaClasses.formUnion(localGlobalsJavaClasses)
-            lock.unlock()
-        }
-    }
-
-    func swiftBridgeOutput(translator: KotlinTranslator) -> OutputNode? {
         guard !swiftDefinitions.isEmpty else {
-            return nil
+            return []
         }
-        // TODO: Imports
-        let globalsJavaClasses = self.globalsJavaClasses.map(\.description).sorted()
-        let swiftDefinitions = self.swiftDefinitions.sorted { ($0.sourceFile?.path ?? "") < ($1.sourceFile?.path ?? "") }
-        return SwiftDefinition { output, indentation, _ in
-            globalsJavaClasses.forEach {
-                output.append(indentation).append($0).append("\n")
+
+        let importDeclarations = syntaxTree.root.statements
+            .compactMap { $0 as? KotlinImportDeclaration }
+            .filter { !$0.isKotlinImport }
+        let globalsJavaClassDescriptions = globalsJavaClasses.map(\.description).sorted()
+        let outputNode = SwiftDefinition { output, indentation, _ in
+            output.append("#if canImport(SkipBridge)\nimport SkipBridge\n\n")
+            for importDeclaration in importDeclarations {
+                let path = importDeclaration.modulePath.joined(separator: ".")
+                output.append(indentation).append("import ").append(path).append("\n")
             }
+            globalsJavaClassDescriptions.forEach { output.append(indentation).append($0).append("\n") }
             swiftDefinitions.forEach { output.append($0, indentation: indentation) }
+            output.append("\n#endif")
         }
+        let output = KotlinTransformerOutput(file: outputFile, node: outputNode)
+        return [output]
     }
 
     private func addSwiftDefinitions(forGlobal variableDeclaration: KotlinVariableDeclaration, to swiftDefinitions: inout [SwiftDefinition], globalsJavaClasses: inout Set<JavaClassRef>, translator: KotlinTranslator) {
-        guard let (type, strategy) = variableDeclaration.checkBridgable(translator: translator) else {
+        guard let (type, qualifiedType, strategy) = variableDeclaration.checkBridgable(translator: translator) else {
             return
         }
         guard !addConstantDefinition(for: variableDeclaration, type: type, to: &swiftDefinitions, translator: translator) else {
@@ -65,7 +60,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         let classRef = globalsJavaClass(translator: translator)
         globalsJavaClasses.insert(classRef)
 
-        let swift = swift(for: variableDeclaration, type: type, strategy: strategy, targetIdentifier: classRef.identifier, classIdentifier: classRef.identifier, fieldIdentifier: "Java_" + variableDeclaration.propertyName + "_fieldID")
+        let swift = swift(for: variableDeclaration, type: type, qualified: qualifiedType, strategy: strategy, targetIdentifier: classRef.identifier, classIdentifier: classRef.identifier, getMethodIdentifier: "Java_get_" + variableDeclaration.propertyName + "_methodID", setMethodIdentifier: "Java_set_" + variableDeclaration.propertyName + "_methodID", translator: translator)
         swiftDefinitions.append(SwiftDefinition(statement: variableDeclaration, swift: swift))
     }
 
@@ -73,18 +68,18 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         guard variableDeclaration.modifiers.visibility != .private && variableDeclaration.modifiers.visibility != .fileprivate && !variableDeclaration.attributes.contains(directive: Directive.nobridge) else {
             return
         }
-        guard let (type, strategy) = variableDeclaration.checkBridgable(translator: translator) else {
+        guard let (type, qualifiedType, strategy) = variableDeclaration.checkBridgable(translator: translator) else {
             return
         }
         guard !addConstantDefinition(for: variableDeclaration, type: type, to: &swiftDefinitions, translator: translator) else {
             return
         }
 
-        let swift = swift(for: variableDeclaration, type: type, strategy: strategy, targetIdentifier: "Java_peer", classIdentifier: "Java_class", fieldIdentifier: "Java_" + variableDeclaration.propertyName + "_fieldID")
+        let swift = swift(for: variableDeclaration, type: type, qualified: qualifiedType, strategy: strategy, targetIdentifier: "Java_peer", classIdentifier: "Java_class", getMethodIdentifier: "Java_get_" + variableDeclaration.propertyName + "_methodID", setMethodIdentifier: "Java_set_" + variableDeclaration.propertyName + "_methodID", translator: translator)
         swiftDefinitions.append(SwiftDefinition(statement: variableDeclaration, swift: swift))
     }
 
-    private func swift(for variableDeclaration: KotlinVariableDeclaration, type: TypeSignature, strategy: BridgeStrategy, targetIdentifier: String, classIdentifier: String, fieldIdentifier: String) -> [String] {
+    private func swift(for variableDeclaration: KotlinVariableDeclaration, type: TypeSignature, qualified qualifiedType: TypeSignature, strategy: BridgeStrategy, targetIdentifier: String, classIdentifier: String, getMethodIdentifier: String, setMethodIdentifier: String, translator: KotlinTranslator) -> [String] {
         var swift: [String] = []
         let propertyName = variableDeclaration.propertyName
         let preEscapedPropertyName = variableDeclaration.preEscapedPropertyName
@@ -92,37 +87,43 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         swift.append(visibility + "var " + (preEscapedPropertyName ?? propertyName) + ": " + type.description + " {")
 
         // Getter
-        let getType = variableDeclaration.role == .global ? "getStatic" : "get"
-        let callField = variableDeclaration.role == .global ? fieldIdentifier : "Self." + fieldIdentifier
+        let callType = variableDeclaration.role == .global ? "callStatic" : "call"
+        let callGet = variableDeclaration.role == .global ? getMethodIdentifier : "Self." + getMethodIdentifier
         swift.append(1, "get {")
         swift.append(2, [
-            "let value_java: " + type.java.description + " = try! " + targetIdentifier + "." + getType + "(field: " + callField  + ")",
+            "let value_java: " + type.java.description + " = try! " + targetIdentifier + "." + callType + "(method: " + callGet  + ", [])",
             "return " + type.convertFromJava(value: "value_java", strategy: strategy)
         ])
         swift.append(1, "}")
 
         // Setter
-        if variableDeclaration.apiFlags.options.contains(.writeable) && variableDeclaration.modifiers.setVisibility != .private && variableDeclaration.modifiers.setVisibility != .fileprivate {
+        let hasSetter = variableDeclaration.apiFlags.options.contains(.writeable) && variableDeclaration.modifiers.setVisibility != .private && variableDeclaration.modifiers.setVisibility != .fileprivate
+        if hasSetter {
             let setVisibility: String
             if variableDeclaration.modifiers.setVisibility < variableDeclaration.modifiers.visibility {
                 setVisibility = variableDeclaration.modifiers.setVisibility.swift(suffix: " ")
             } else {
                 setVisibility = ""
             }
-            let setType = variableDeclaration.role == .global ? "setStatic" : "set"
+            let callSet = variableDeclaration.role == .global ? setMethodIdentifier : "Self." + setMethodIdentifier
             swift.append(1, setVisibility + "set {")
             swift.append(2, [
-                "let value_java = " + type.convertToJava(value: "newValue", strategy: strategy),
-                targetIdentifier + "." + setType + "(field: " + callField + ", value: value_java)"
+                "let value_java = " + type.convertToJava(value: "newValue", strategy: strategy) + ".toJavaParameter()",
+                "try! " + targetIdentifier + "." + callType + "(method: " + callSet + ", [value_java])"
             ])
             swift.append(1, "}")
         }
         swift.append("}")
 
+        let capitalizedPropertyName = (propertyName.first?.uppercased() ?? "") + propertyName.dropFirst()
         let declarationType = variableDeclaration.role == .global ? "let " : "static let "
-        let getFieldIDType = variableDeclaration.role == .global ? "getStaticFieldID" : "getFieldID"
-        let fieldID = "private " + declarationType + fieldIdentifier + " = " + classIdentifier + "." + getFieldIDType + "(name: \"" + propertyName + "\", sig: \"" + type.jni + "\")!"
-        swift.append(fieldID)
+        let callMethodID = variableDeclaration.role == .global ? "getStaticMethodID" : "getMethodID"
+        let getMethodID = "private " + declarationType + getMethodIdentifier + " = " + classIdentifier + "." + callMethodID + "(name: \"get" + capitalizedPropertyName + "\", sig: \"()" + qualifiedType.jni + "\")!"
+        swift.append(getMethodID)
+        if hasSetter {
+            let setMethodID = "private " + declarationType + setMethodIdentifier + " = " + classIdentifier + "." + callMethodID + "(name: \"set" + capitalizedPropertyName + "\", sig: \"(" + qualifiedType.jni + ")V\")!"
+            swift.append(setMethodID)
+        }
         return swift
     }
 
@@ -180,14 +181,14 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
     }
 
     private func addSwiftDefinitions(forGlobal functionDeclaration: KotlinFunctionDeclaration, to swiftDefinitions: inout [SwiftDefinition], globalsJavaClasses: inout Set<JavaClassRef>, translator: KotlinTranslator) {
-        guard functionDeclaration.checkBridgable(translator: translator) else {
+        guard let qualifiedType = functionDeclaration.checkBridgable(translator: translator) else {
             return
         }
 
         let classRef = globalsJavaClass(translator: translator)
         globalsJavaClasses.insert(classRef)
 
-        let swift = swift(for: functionDeclaration, targetIdentifier: classRef.identifier, classIdentifier: classRef.identifier, methodIdentifier: "Java_" + functionDeclaration.name + "_methodID")
+        let swift = swift(for: functionDeclaration, qualified: qualifiedType, targetIdentifier: classRef.identifier, classIdentifier: classRef.identifier, methodIdentifier: "Java_" + functionDeclaration.name + "_methodID", translator: translator)
         swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: swift))
     }
 
@@ -195,20 +196,22 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         guard functionDeclaration.modifiers.visibility != .private && functionDeclaration.modifiers.visibility != .fileprivate && !functionDeclaration.attributes.contains(directive: Directive.nobridge) else {
             return
         }
-        guard functionDeclaration.checkBridgable(translator: translator) else {
+        guard let qualifiedType = functionDeclaration.checkBridgable(translator: translator) else {
             return
         }
 
-        let swift = swift(for: functionDeclaration, targetIdentifier: "Java_peer", classIdentifier: "Java_class", methodIdentifier: "Java_" + functionDeclaration.name + "_methodID")
+        let swift = swift(for: functionDeclaration, qualified: qualifiedType, targetIdentifier: "Java_peer", classIdentifier: "Java_class", methodIdentifier: "Java_" + functionDeclaration.name + "_methodID", translator: translator)
         swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: swift))
     }
 
-    private func swift(for functionDeclaration: KotlinFunctionDeclaration, targetIdentifier: String, classIdentifier: String, methodIdentifier: String) -> [String] {
+    private func swift(for functionDeclaration: KotlinFunctionDeclaration, qualified qualifiedType: TypeSignature, targetIdentifier: String, classIdentifier: String, methodIdentifier: String, translator: KotlinTranslator) -> [String] {
         var swift: [String] = []
 
         var functionType = functionDeclaration.functionType
+        var qualifiedType = qualifiedType
         if functionDeclaration.type == .constructorDeclaration {
             functionType = functionType.withReturnType(.void)
+            qualifiedType = qualifiedType.withReturnType(.void)
         }
         let visibility = functionDeclaration.modifiers.visibility.swift(suffix: " ")
         let parameterString = functionDeclaration.parameters.map(\.swift).joined(separator: ", ")
@@ -240,7 +243,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
 
         let declarationType = functionDeclaration.role == .global ? "let " : "static let "
         let getType = functionDeclaration.role == .global ? "getStaticMethodID" : "getMethodID"
-        let methodID = "private " + declarationType + methodIdentifier + " = " + classIdentifier + "." + getType + "(name: \"" + (functionDeclaration.type == .constructorDeclaration ? "<init>" : functionDeclaration.name) + "\", sig: \"" + functionType.jni + "\")!"
+        let methodID = "private " + declarationType + methodIdentifier + " = " + classIdentifier + "." + getType + "(name: \"" + (functionDeclaration.type == .constructorDeclaration ? "<init>" : functionDeclaration.name) + "\", sig: \"" + qualifiedType.jni + "\")!"
         swift.append(methodID)
         return swift
     }

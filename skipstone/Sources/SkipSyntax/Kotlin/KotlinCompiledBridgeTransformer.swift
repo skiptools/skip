@@ -1,50 +1,71 @@
-import Foundation
-
 /// Generate compiled Swift to Kotlin bridging code.
 final class KotlinCompiledBridgeTransformer: KotlinTransformer {
-    private var cdeclFunctions: [CDeclFunction] = []
-    private var lock = NSLock()
-
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
-        guard syntaxTree.isBridgeFile, translator.codebaseInfo != nil else {
-            return
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
+        guard syntaxTree.isBridgeFile, let codebaseInfo = translator.codebaseInfo, let outputFile = syntaxTree.source.file.bridgeOutputFile else {
+            return []
         }
-        var localCdeclFunctions: [CDeclFunction] = []
+
+        var cdeclFunctions: [CDeclFunction] = []
+        var nonKotlinImports: [KotlinStatement] = []
         syntaxTree.root.visit { node in
-            if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global {
-                updateGlobalVariableDeclaration(variableDeclaration, cdeclFunctions: &localCdeclFunctions, translator: translator)
+            if let importDeclaration = node as? KotlinImportDeclaration {
+                // Filter compiled-only imports from the transpiled output
+                if !isKotlinImport(importDeclaration, codebaseInfo: codebaseInfo) {
+                    nonKotlinImports.append(importDeclaration)
+                }
+                return .skip
+            } else if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global {
+                updateVariableDeclaration(variableDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
                 return .skip
             } else if let functionDeclaration = node as? KotlinFunctionDeclaration, functionDeclaration.role == .global {
-                updateFunctionDeclaration(functionDeclaration, cdeclFunctions: &localCdeclFunctions, translator: translator)
+                updateFunctionDeclaration(functionDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
-                updateClassDeclaration(classDeclaration, cdeclFunctions: &localCdeclFunctions, translator: translator)
+                updateClassDeclaration(classDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
                 return .recurse(nil)
             } else {
                 return .recurse(nil)
             }
         }
-        if !localCdeclFunctions.isEmpty {
-            syntaxTree.dependencies.imports.insert("skip.bridge.*")
-            lock.lock()
-            cdeclFunctions += localCdeclFunctions
-            lock.unlock()
-        }
-    }
-
-    func swiftBridgeOutput(translator: KotlinTranslator) -> OutputNode? {
+        nonKotlinImports.forEach { syntaxTree.root.remove(statement: $0) }
         guard !cdeclFunctions.isEmpty else {
-            return nil
+            return []
         }
-        // TODO: Imports
-        let cdeclFunctions = self.cdeclFunctions
-        return SwiftDefinition { output, indentation, _ in
-            cdeclFunctions.sorted(by: { $0.cdecl < $1.cdecl }).forEach { $0.append(to: output, indentation: indentation) }
+
+        syntaxTree.dependencies.imports.insert("skip.bridge.SwiftObjectNil")
+        syntaxTree.dependencies.imports.insert("skip.bridge.SwiftObjectPointer")
+        let importDeclarations = translator.syntaxTree.root.statements.compactMap { $0 as? ImportDeclaration }
+        let outputNode = SwiftDefinition { output, indentation, _ in
+            output.append("#if canImport(SkipBridge)\nimport SkipBridge\n\n")
+            for importDeclaration in importDeclarations {
+                let path = importDeclaration.modulePath.joined(separator: ".")
+                output.append(indentation).append("import ").append(path).append("\n")
+            }
+            cdeclFunctions.forEach { $0.append(to: output, indentation: indentation) }
+            output.append("\n#endif")
         }
+        let output = KotlinTransformerOutput(file: outputFile, node: outputNode)
+        return [output]
     }
 
-    private func updateGlobalVariableDeclaration(_ variableDeclaration: KotlinVariableDeclaration, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
-        guard let (type, strategy) = variableDeclaration.checkBridgable(translator: translator) else {
+    private func isKotlinImport(_ importDeclaration: KotlinImportDeclaration, codebaseInfo: CodebaseInfo.Context) -> Bool {
+        guard !importDeclaration.isKotlinImport else {
+            return true
+        }
+        guard let moduleName = importDeclaration.modulePath.first else {
+            return false
+        }
+        guard CodebaseInfo.moduleNameMap[moduleName] == nil else {
+            return true
+        }
+        guard moduleName != codebaseInfo.global.moduleName else {
+            return true
+        }
+        return codebaseInfo.global.dependentModules.contains { moduleName == $0.moduleName }
+    }
+
+    private func updateVariableDeclaration(_ variableDeclaration: KotlinVariableDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+        guard let (type, _, strategy) = variableDeclaration.checkBridgable(translator: translator) else {
             return
         }
         variableDeclaration.extras = nil
@@ -66,96 +87,52 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         let (cdecl, cdeclName) = cdecl(for: variableDeclaration, name: externalName, translator: translator)
 
         // Getter
+        let getterArguments = classDeclaration == nil ? "()" : "(Swift_peer)"
+        let getterParameters = classDeclaration == nil ? "()" : "(Swift_peer: SwiftObjectPointer)"
         let getterBody = [
-            "val value_swift = " + externalName + "()",
+            "val value_swift = " + externalName + getterArguments,
             "return " + type.kotlinConvertFromExternal(value: "value_swift")
         ]
         variableDeclaration.getter = Accessor(body: KotlinCodeBlock(statements: getterBody.map { KotlinRawStatement(sourceCode: $0) }))
-        externalFunctionDeclarations.append("private external fun " + externalName + "(): " + externalType.kotlin)
+        externalFunctionDeclarations.append("private external fun " + externalName + getterParameters + ": " + externalType.kotlin)
 
-        let cdeclGetterBody = [
-            "let value_swift = " + propertyName,
-            "return " + type.convertToCDecl(value: "value_swift", strategy: strategy)
-        ]
-        let cdeclGetter = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: .function([], type.cdecl(strategy: strategy), APIFlags(), nil), body: cdeclGetterBody)
-        cdeclFunctions.append(cdeclGetter)
-
-        // Setter
-        if variableDeclaration.apiFlags.options.contains(.writeable) {
-            let setterBody = [
-                "val newValue_swift = " + type.kotlinConvertToExternal(value: "newValue"),
-                externalName + "_set(newValue_swift)"
-            ]
-            variableDeclaration.setter = Accessor(parameterName: "newValue", body: KotlinCodeBlock(statements: setterBody.map { KotlinRawStatement(sourceCode: $0) }))
-            externalFunctionDeclarations.append("private external fun " + externalName + "_set(value: " + externalType.kotlin + ")")
-
-            let cdeclSetterBody = [
-                "let value_swift = " + type.convertFromCDecl(value: "value", strategy: strategy),
-                propertyName + " = value_swift"
-            ]
-            let cdeclSetter = CDeclFunction(name: cdeclName + "_set", cdecl: cdecl + "_1set", signature: .function([TypeSignature.Parameter(label: "value", type: type.cdecl(strategy: strategy))], .void, APIFlags(), nil), body: cdeclSetterBody)
-            cdeclFunctions.append(cdeclSetter)
-        }
-        variableDeclaration.willSet = nil
-        variableDeclaration.didSet = nil
-
-        // Add function declarations to transpiled output
-        (variableDeclaration.parent as? KotlinStatement)?.insert(statements: externalFunctionDeclarations.map { KotlinRawStatement(sourceCode: $0) }, after: variableDeclaration)
-    }
-
-    private func updateMemberVariableDeclaration(_ variableDeclaration: KotlinVariableDeclaration, in classDeclaration: KotlinClassDeclaration, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
-        guard let (type, strategy) = variableDeclaration.checkBridgable(translator: translator) else {
-            return
-        }
-        variableDeclaration.extras = nil
-        // If this is a let constant with a supported literal value, we'll re-declare rather than bridge it
-        guard !isSupportedConstant(variableDeclaration, type: type) else {
-            return
-        }
-
-        // Remove initial value and make sure type is declared
-        variableDeclaration.value = nil
-        if variableDeclaration.declaredType == .none {
-            variableDeclaration.declaredType = type
-        }
-
-        let propertyName = variableDeclaration.propertyName
-        let externalName = "Swift_" + propertyName
-        let externalType = type.kotlinExternal
-        var externalFunctionDeclarations: [String] = []
-        let (cdecl, cdeclName) = cdecl(for: variableDeclaration, name: externalName, translator: translator)
-
-        // Getter
-        let getterBody = [
-            "val value_swift = " + externalName + "(Swift_peer)",
-            "return " + type.kotlinConvertFromExternal(value: "value_swift")
-        ]
-        variableDeclaration.getter = Accessor(body: KotlinCodeBlock(statements: getterBody.map { KotlinRawStatement(sourceCode: $0) }))
-        externalFunctionDeclarations.append("private external fun " + externalName + "(Swift_peer: SwiftObjectPointer): " + externalType.kotlin)
-
-        let cdeclGetterBody = [
-            "let peer_swift: " + classDeclaration.signature.description + " = Swift_peer.toSwift()",
-            "let value_swift = peer_swift." + propertyName,
-            "return " + type.convertToCDecl(value: "value_swift", strategy: strategy)
-        ]
-        let cdeclGetter = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: .function([cdeclInstanceParameter], type.cdecl(strategy: strategy), APIFlags(), nil), body: cdeclGetterBody)
-        cdeclFunctions.append(cdeclGetter)
-
-        // Setter
-        if variableDeclaration.apiFlags.options.contains(.writeable) {
-            let setterBody = [
-                "val newValue_swift = " + type.kotlinConvertToExternal(value: "newValue"),
-                externalName + "_set(Swift_peer, newValue_swift)"
-            ]
-            variableDeclaration.setter = Accessor(parameterName: "newValue", body: KotlinCodeBlock(statements: setterBody.map { KotlinRawStatement(sourceCode: $0) }))
-            externalFunctionDeclarations.append("private external fun " + externalName + "_set(Swift_peer: SwiftObjectPointer, value: " + externalType.kotlin + ")")
-
-            let cdeclSetterBody = [
+        var cdeclGetterBody: [String]
+        let cdeclInstanceParameters: [TypeSignature.Parameter]
+        if let classDeclaration {
+            cdeclGetterBody = [
                 "let peer_swift: " + classDeclaration.signature.description + " = Swift_peer.toSwift()",
-                "let value_swift = " + type.convertFromCDecl(value: "value", strategy: strategy),
-                "peer_swift." + propertyName + " = value_swift"
+                "let value_swift = peer_swift." + propertyName
             ]
-            let cdeclSetter = CDeclFunction(name: cdeclName + "_set", cdecl: cdecl + "_1set", signature: .function([cdeclInstanceParameter, TypeSignature.Parameter(label: "value", type: type.cdecl(strategy: strategy))], .void, APIFlags(), nil), body: cdeclSetterBody)
+            cdeclInstanceParameters = [cdeclInstanceParameter]
+        } else {
+            cdeclGetterBody = ["let value_swift = " + propertyName]
+            cdeclInstanceParameters = []
+        }
+        cdeclGetterBody.append("return " + type.convertToCDecl(value: "value_swift", strategy: strategy))
+        let cdeclGetter = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: .function(cdeclInstanceParameters, type.cdecl(strategy: strategy), APIFlags(), nil), body: cdeclGetterBody)
+        cdeclFunctions.append(cdeclGetter)
+
+        // Setter
+        if variableDeclaration.apiFlags.options.contains(.writeable) {
+            let setterArguments = classDeclaration == nil ? "newValue_swift" : "Swift_peer, newValue_swift"
+            let setterInstanceParameter = classDeclaration == nil ? "" : "Swift_peer: SwiftObjectPointer, "
+            let setterBody = [
+                "val newValue_swift = " + type.kotlinConvertToExternal(value: "newValue"),
+                externalName + "_set(" + setterArguments + ")"
+            ]
+            variableDeclaration.setter = Accessor(parameterName: "newValue", body: KotlinCodeBlock(statements: setterBody.map { KotlinRawStatement(sourceCode: $0) }))
+            externalFunctionDeclarations.append("private external fun " + externalName + "_set(" + setterInstanceParameter + "value: " + externalType.kotlin + ")")
+
+            var cdeclSetterBody = ["let value_swift = " + type.convertFromCDecl(value: "value", strategy: strategy)]
+            if let classDeclaration {
+                cdeclSetterBody += [
+                    "let peer_swift: " + classDeclaration.signature.description + " = Swift_peer.toSwift()",
+                    "peer_swift." + propertyName + " = value_swift"
+                ]
+            } else {
+                cdeclSetterBody.append(propertyName + " = value_swift")
+            }
+            let cdeclSetter = CDeclFunction(name: cdeclName + "_set", cdecl: cdecl + "_1set", signature: .function(cdeclInstanceParameters + [TypeSignature.Parameter(label: "value", type: type.cdecl(strategy: strategy))], .void, APIFlags(), nil), body: cdeclSetterBody)
             cdeclFunctions.append(cdeclSetter)
         }
         variableDeclaration.willSet = nil
@@ -189,8 +166,8 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         }
     }
 
-    private func updateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
-        guard functionDeclaration.checkBridgable(translator: translator) else {
+    private func updateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+        guard let functionType = functionDeclaration.checkBridgable(translator: translator) else {
             return
         }
         functionDeclaration.extras = nil
@@ -202,10 +179,10 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         var body: [String] = []
         var cdeclBody: [String] = []
         var externalParameterNames: [String] = []
-        for p in functionDeclaration.parameters {
-            let externalParameterName = p.internalLabel + "_swift"
-            body.append("val " + externalParameterName + " = " + p.declaredType.kotlinConvertToExternal(value: p.internalLabel))
-            cdeclBody.append("let " + externalParameterName + " = " + p.declaredType.convertFromCDecl(value: p.internalLabel, strategy: .direct))
+        for parameter in functionDeclaration.parameters {
+            let externalParameterName = parameter.internalLabel + "_swift"
+            body.append("val " + externalParameterName + " = " + parameter.declaredType.kotlinConvertToExternal(value: parameter.internalLabel))
+            cdeclBody.append("let " + externalParameterName + " = " + parameter.declaredType.convertFromCDecl(value: parameter.internalLabel, strategy: .direct))
             externalParameterNames.append(externalParameterName)
         }
 
@@ -233,7 +210,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         
         if let classDeclaration, functionDeclaration.type == .constructorDeclaration {
             body.append("Swift_peer = " + externalName + "(" + externalArgumentsString + ")")
-            cdeclBody.append("let f_return_swift = " + classDeclaration.name + "(" + swiftArgumentsString + ")")
+            cdeclBody.append("let f_return_swift = " + classDeclaration.signature.description + "(" + swiftArgumentsString + ")")
             cdeclBody.append("return SwiftObjectPointer.forSwift(f_return_swift, retain: true)")
         } else if functionDeclaration.returnType == .void {
             body.append(externalName + "(" + externalArgumentsString + ")")
@@ -266,7 +243,6 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [KotlinRawStatement(sourceCode: externalFunctionDeclaration)], after: functionDeclaration)
 
         let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: externalName, translator: translator)
-        let functionType = functionDeclaration.functionType
         let instanceParameter = classDeclaration != nil && functionDeclaration.type != .constructorDeclaration ? [cdeclInstanceParameter] : []
         let returnType: TypeSignature = functionDeclaration.type == .constructorDeclaration ? .swiftObjectPointer : functionType.returnType
         let cdeclType: TypeSignature = .function(instanceParameter + functionType.parameters.map { p in
@@ -346,7 +322,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
 
         for member in classDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
-                updateMemberVariableDeclaration(variableDeclaration, in: classDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
+                updateVariableDeclaration(variableDeclaration, in: classDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
                 updateFunctionDeclaration(functionDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
             }
@@ -363,7 +339,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         }
         let typeName: String
         if let classDeclaration = statement.owningTypeDeclaration as? KotlinClassDeclaration {
-            typeName = classDeclaration.name
+            typeName = classDeclaration.signature.description
         } else {
             var file = translator.syntaxTree.source.file
             file.extension = ""

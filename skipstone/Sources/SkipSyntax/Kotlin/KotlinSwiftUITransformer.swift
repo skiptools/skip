@@ -2,10 +2,10 @@
 ///
 /// We rely on our UI libraries to provide the implementation of the SwiftUI-like API that this translation will result in.
 final class KotlinSwiftUITransformer: KotlinTransformer {
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         // No need to transpile SwiftUI if not a full build
         guard translator.codebaseInfo != nil else {
-            return
+            return []
         }
 
         // Does this file need translation?
@@ -26,6 +26,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
             let visitor = TranslateVisitor(translator: translator)
             syntaxTree.root.visit(perform: visitor.visit)
         }
+        return []
     }
 
     /// Return a string of the init parameters needed to construct an `AppStorage` after the `wrappedValue`.

@@ -16,7 +16,7 @@ public protocol KotlinTransformer {
     func messages(for sourceFile: Source.FilePath) -> [Message]
 
     /// Apply this transformer to the given Kotlin syntax tree.
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator)
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput]
 
     /// Apply this transformer to the package-level generated source file.
     ///
@@ -24,11 +24,11 @@ public protocol KotlinTransformer {
     ///
     /// - Returns: Whether any code was added to the tree.
     func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> Bool
+}
 
-    /// Generate output to bridge all processed syntax trees to Swift.
-    ///
-    /// Attach any required imports to `translator.syntaxTree`.
-    func swiftBridgeOutput(translator: KotlinTranslator) -> OutputNode?
+public struct KotlinTransformerOutput {
+    var file: Source.FilePath
+    var node: OutputNode
 }
 
 /// The set of builtin transformers in the order in which they should run.
@@ -99,9 +99,5 @@ extension KotlinTransformer {
 
     func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> Bool {
         return false
-    }
-
-    func swiftBridgeOutput(translator: KotlinTranslator) -> OutputNode? {
-        return nil
     }
 }
