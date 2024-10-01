@@ -31,7 +31,15 @@ import PackagePlugin
     /// Whether we should run in Skippy or full-transpile mode
     let skippyOnly = ProcessInfo.processInfo.environment["CONFIGURATION"] == "Skippy"
 
+    /// Whether to turn off the Skip plugin manually
+    let skipDisabled = (ProcessInfo.processInfo.environment["SKIP_PLUGIN_DISABLED"]?.count ?? 0) > 0
+
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
+        if skipDisabled {
+            Diagnostics.remark("Skip plugin disabled through SKIP_PLUGIN_DISABLED envrionment variable")
+            return []
+        }
+
         if skipRootTargetNames.contains(target.name) {
             Diagnostics.remark("Skip eliding target name \(target.name)")
             return []
@@ -76,6 +84,8 @@ import PackagePlugin
         let isXcodeBuild = !pkgext.isEmpty
 
         let skip = try context.tool(named: skipPluginCommandName)
+        // enable overriding the path to the Skip tool for local development
+        let skipToolPath = ProcessInfo.processInfo.environment["SKIP_COMMAND_OVERRIDE"].flatMap({ Path($0) }) ?? skip.path
 
         // look for ModuleKotlin/Sources/Skip/skip.yml
         let skipFolder = target.directory.appending(["Skip"])
@@ -255,7 +265,7 @@ import PackagePlugin
         let sourceBase = URL(fileURLWithPath: isTest ? "src/test" : "src/main", isDirectory: true, relativeTo: outputBase)
 
         return [
-            .buildCommand(displayName: "Skip \(target.name)", executable: skip.path, arguments: [
+            .buildCommand(displayName: "Skip \(target.name)", executable: skipToolPath, arguments: [
                 "transpile",
                 "--project", swiftSourceTarget.directory.string,
                 "--skip-folder", skipFolder.string,
