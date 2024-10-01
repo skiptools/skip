@@ -100,7 +100,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         let cdeclInstanceParameters: [TypeSignature.Parameter]
         if let classDeclaration {
             cdeclGetterBody = [
-                "let peer_swift: " + classDeclaration.signature.description + " = Swift_peer.toSwift()",
+                "let peer_swift: " + classDeclaration.signature.description + " = Swift_peer.pointee()!",
                 "let value_swift = peer_swift." + propertyName
             ]
             cdeclInstanceParameters = [cdeclInstanceParameter]
@@ -126,7 +126,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
             var cdeclSetterBody = ["let value_swift = " + type.convertFromCDecl(value: "value", strategy: strategy)]
             if let classDeclaration {
                 cdeclSetterBody += [
-                    "let peer_swift: " + classDeclaration.signature.description + " = Swift_peer.toSwift()",
+                    "let peer_swift: " + classDeclaration.signature.description + " = Swift_peer.pointee()!",
                     "peer_swift." + propertyName + " = value_swift"
                 ]
             } else {
@@ -189,7 +189,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         let swiftCallTarget: String
         var externalArgumentsString = ""
         if let classDeclaration, functionDeclaration.type != .constructorDeclaration {
-            cdeclBody.append("let peer_swift: " + classDeclaration.signature.description + " = Swift_peer.toSwift()")
+            cdeclBody.append("let peer_swift: " + classDeclaration.signature.description + " = Swift_peer.pointee()!")
             swiftCallTarget = "peer_swift."
 
             externalArgumentsString += "Swift_peer"
@@ -211,7 +211,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         if let classDeclaration, functionDeclaration.type == .constructorDeclaration {
             body.append("Swift_peer = " + externalName + "(" + externalArgumentsString + ")")
             cdeclBody.append("let f_return_swift = " + classDeclaration.signature.description + "(" + swiftArgumentsString + ")")
-            cdeclBody.append("return SwiftObjectPointer.forSwift(f_return_swift, retain: true)")
+            cdeclBody.append("return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)")
         } else if functionDeclaration.returnType == .void {
             body.append(externalName + "(" + externalArgumentsString + ")")
             cdeclBody.append(swiftCallTarget + functionName + "(" + swiftArgumentsString + ")")
@@ -303,20 +303,20 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
             let constructorCdecl = cdecl(for: classDeclaration, name: "Swift_constructor", translator: translator)
             let constructorBody = [
                 "let f_return_swift = " + classDeclaration.signature.description + "()",
-                "return SwiftObjectPointer.forSwift(f_return_swift, retain: true)"
+                "return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)"
             ]
             cdeclFunctions.append(CDeclFunction(name: constructorCdecl.cdeclFunctionName, cdecl: constructorCdecl.cdecl, signature: .function([], .swiftObjectPointer, APIFlags(), nil), body: constructorBody))
         }
 
         let ptrrefCdecl = cdecl(for: classDeclaration, name: "Swift_ptrref", translator: translator)
         let ptrrefBody = [
-            "return refSwift(Swift_peer, type: " + classDeclaration.signature.description + ".self)"
+            "return Swift_peer.retained(as: " + classDeclaration.signature.description + ".self)"
         ]
         cdeclFunctions.append(CDeclFunction(name: ptrrefCdecl.cdeclFunctionName, cdecl: ptrrefCdecl.cdecl, signature: .function([cdeclInstanceParameter], .swiftObjectPointer, APIFlags(), nil), body: ptrrefBody))
 
         let ptrderefCdecl = cdecl(for: classDeclaration, name: "Swift_ptrderef", translator: translator)
         let ptrderefBody = [
-            "derefSwift(Swift_peer, type: " + classDeclaration.signature.description + ".self)"
+            "Swift_peer.release(as: " + classDeclaration.signature.description + ".self)"
         ]
         cdeclFunctions.append(CDeclFunction(name: ptrderefCdecl.cdeclFunctionName, cdecl: ptrderefCdecl.cdecl, signature: .function([cdeclInstanceParameter], .void, APIFlags(), nil), body: ptrderefBody))
 
