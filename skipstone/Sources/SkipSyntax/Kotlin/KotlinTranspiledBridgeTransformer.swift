@@ -37,12 +37,14 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
             .filter { !$0.isKotlinImport }
         let globalsJavaClassDescriptions = globalsJavaClasses.map(\.description).sorted()
         let outputNode = SwiftDefinition { output, indentation, _ in
+            output.append("#if canImport(SkipBridge)\nimport SkipBridge\n\n")
             for importDeclaration in importDeclarations {
                 let path = importDeclaration.modulePath.joined(separator: ".")
                 output.append(indentation).append("import ").append(path).append("\n")
             }
             globalsJavaClassDescriptions.forEach { output.append(indentation).append($0).append("\n") }
             swiftDefinitions.forEach { output.append($0, indentation: indentation) }
+            output.append("\n#endif")
         }
         let output = KotlinTransformerOutput(file: outputFile, node: outputNode)
         return [output]
@@ -206,8 +208,10 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         var swift: [String] = []
 
         var functionType = functionDeclaration.functionType
+        var qualifiedType = qualifiedType
         if functionDeclaration.type == .constructorDeclaration {
             functionType = functionType.withReturnType(.void)
+            qualifiedType = qualifiedType.withReturnType(.void)
         }
         let visibility = functionDeclaration.modifiers.visibility.swift(suffix: " ")
         let parameterString = functionDeclaration.parameters.map(\.swift).joined(separator: ", ")
