@@ -69,7 +69,6 @@ extension String {
 }
 
 extension TypeSignature {
-    static let javaObject: TypeSignature = .named("Object", [])
     static let javaObjectPointer: TypeSignature = .named("JavaObjectPointer", [])
     static let swiftObjectPointer: TypeSignature = .named("SwiftObjectPointer", [])
 
@@ -161,7 +160,7 @@ extension TypeSignature {
         case .int:
             return .int32
         default:
-            return isNamedType ? .javaObject : self // TODO: All other types
+            return isNamedType ? .javaObjectPointer : self // TODO: All other types
         }
     }
 
@@ -172,7 +171,7 @@ extension TypeSignature {
             return "Int32(" + value + ")"
         default:
             if strategy == .javaPeer {
-                return value + ".Java_peer"
+                return value + ".Java_peer.ptr"
             } else {
                 return value // TODO: All other types
             }
@@ -186,7 +185,7 @@ extension TypeSignature {
             return "Int(" + value + ")"
         default:
             if strategy == .javaPeer {
-                return description + "(Java_ptr: " + value + ".javaObject.ptr)"
+                return description + "(Java_ptr: " + value + ")"
             } else {
                 return value // TODO: All other types
             }

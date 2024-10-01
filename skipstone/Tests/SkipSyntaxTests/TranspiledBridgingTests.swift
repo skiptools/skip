@@ -394,11 +394,11 @@ final class TranspiledBridgingTests: XCTestCase {
         }
         var c: C {
             get {
-                let value_java: Object = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, [])
-                return C(Java_ptr: value_java.javaObject.ptr)
+                let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, [])
+                return C(Java_ptr: value_java)
             }
             set {
-                let value_java = newValue.Java_peer.toJavaParameter()
+                let value_java = newValue.Java_peer.ptr.toJavaParameter()
                 try! Java_SourceKt.callStatic(method: Java_set_c_methodID, [value_java])
             }
         }
