@@ -92,6 +92,11 @@ fileprivate extension AndroidOperationCommand {
             let toolchainBin = tc.destination.toolchain.appendingPathComponent("usr/bin")
             let path = toolchainBin.path + ":" + (env["PATH"] ?? "")
             env["PATH"] = path
+            // when Xcode invokes gradle which invokes `skip android build` which invokes `swift build`,
+            // the inherited SDKROOT will be something like "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.0.sdk",
+            // which will break the build.
+            // Se we manually clear the SDKROOT environment variable in case it is set.
+            env["SDKROOT"] = nil
 
             let swiftCmd = toolchainBin.appendingPathComponent("swift").path
             if !FileManager.default.fileExists(atPath: swiftCmd) {
