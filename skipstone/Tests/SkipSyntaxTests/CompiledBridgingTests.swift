@@ -620,15 +620,15 @@ final class CompiledBridgingTests: XCTestCase {
             var Swift_peer: SwiftObjectPointer
 
             constructor(Swift_peer: SwiftObjectPointer) {
-                this.Swift_peer = Swift_ptrref(Swift_peer)
+                this.Swift_peer = Swift_retain(Swift_peer)
             }
-            private external fun Swift_ptrref(Swift_peer: SwiftObjectPointer): SwiftObjectPointer
+            private external fun Swift_retain(Swift_peer: SwiftObjectPointer): SwiftObjectPointer
 
             fun finalize() {
-                Swift_ptrderef(Swift_peer)
+                Swift_release(Swift_peer)
                 Swift_peer = SwiftObjectNil
             }
-            private external fun Swift_ptrderef(Swift_peer: SwiftObjectPointer)
+            private external fun Swift_release(Swift_peer: SwiftObjectPointer)
 
             constructor() {
                 Swift_peer = Swift_constructor()
@@ -653,12 +653,12 @@ final class CompiledBridgingTests: XCTestCase {
             let f_return_swift = C()
             return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
         }
-        @_cdecl("Java_C_Swift_1ptrref")
-        func C_Swift_ptrref(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
+        @_cdecl("Java_C_Swift_1retain")
+        func C_Swift_retain(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
             return Swift_peer.retained(as: C.self)
         }
-        @_cdecl("Java_C_Swift_1ptrderef")
-        func C_Swift_ptrderef(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+        @_cdecl("Java_C_Swift_1release")
+        func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
             Swift_peer.release(as: C.self)
         }
         @_cdecl("Java_C_Swift_1i")
@@ -707,15 +707,15 @@ final class CompiledBridgingTests: XCTestCase {
             var Swift_peer: SwiftObjectPointer
 
             constructor(Swift_peer: SwiftObjectPointer) {
-                this.Swift_peer = Swift_ptrref(Swift_peer)
+                this.Swift_peer = Swift_retain(Swift_peer)
             }
-            private external fun Swift_ptrref(Swift_peer: SwiftObjectPointer): SwiftObjectPointer
+            private external fun Swift_retain(Swift_peer: SwiftObjectPointer): SwiftObjectPointer
 
             fun finalize() {
-                Swift_ptrderef(Swift_peer)
+                Swift_release(Swift_peer)
                 Swift_peer = SwiftObjectNil
             }
-            private external fun Swift_ptrderef(Swift_peer: SwiftObjectPointer)
+            private external fun Swift_release(Swift_peer: SwiftObjectPointer)
 
             internal constructor(i: Int) {
                 val i_swift = i.toLong()
@@ -724,12 +724,12 @@ final class CompiledBridgingTests: XCTestCase {
             private external fun Swift_constructor(i: Long): SwiftObjectPointer
         }
         """, swiftBridgeSupport: """
-        @_cdecl("Java_C_Swift_1ptrref")
-        func C_Swift_ptrref(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
+        @_cdecl("Java_C_Swift_1retain")
+        func C_Swift_retain(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
             return Swift_peer.retained(as: C.self)
         }
-        @_cdecl("Java_C_Swift_1ptrderef")
-        func C_Swift_ptrderef(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+        @_cdecl("Java_C_Swift_1release")
+        func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
             Swift_peer.release(as: C.self)
         }
         @_cdecl("Java_C_Swift_1constructor")
@@ -769,15 +769,15 @@ final class CompiledBridgingTests: XCTestCase {
             var Swift_peer: SwiftObjectPointer
 
             constructor(Swift_peer: SwiftObjectPointer) {
-                this.Swift_peer = Swift_ptrref(Swift_peer)
+                this.Swift_peer = Swift_retain(Swift_peer)
             }
-            private external fun Swift_ptrref(Swift_peer: SwiftObjectPointer): SwiftObjectPointer
+            private external fun Swift_retain(Swift_peer: SwiftObjectPointer): SwiftObjectPointer
 
             fun finalize() {
-                Swift_ptrderef(Swift_peer)
+                Swift_release(Swift_peer)
                 Swift_peer = SwiftObjectNil
             }
-            private external fun Swift_ptrderef(Swift_peer: SwiftObjectPointer)
+            private external fun Swift_release(Swift_peer: SwiftObjectPointer)
 
             constructor() {
                 Swift_peer = Swift_constructor()
@@ -798,12 +798,12 @@ final class CompiledBridgingTests: XCTestCase {
             let f_return_swift = C()
             return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
         }
-        @_cdecl("Java_C_Swift_1ptrref")
-        func C_Swift_ptrref(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
+        @_cdecl("Java_C_Swift_1retain")
+        func C_Swift_retain(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
             return Swift_peer.retained(as: C.self)
         }
-        @_cdecl("Java_C_Swift_1ptrderef")
-        func C_Swift_ptrderef(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+        @_cdecl("Java_C_Swift_1release")
+        func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
             Swift_peer.release(as: C.self)
         }
         @_cdecl("Java_C_Swift_1add")
