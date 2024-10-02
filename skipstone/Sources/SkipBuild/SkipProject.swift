@@ -2535,7 +2535,7 @@ extension FrameworkProjectLayout {
     }
 
     /// the Gradle version string to generate
-    static let gradleVersion = "8.6"
+    static let gradleVersion = "8.10.2"
 
     static func defaultGradleWrapperProperties() -> String {
         """
