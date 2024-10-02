@@ -38,15 +38,6 @@ struct SwiftDefinition: OutputNode {
     }
 }
 
-/// Strategies for bridging types.
-enum BridgeStrategy {
-    case direct
-    case copy
-    case javaPeer
-    case swiftPeer
-    case unknown
-}
-
 extension Source.FilePath {
     /// Return the JNI class name for this file in the given package.
     func jniClassName(packageName: String?) -> String {
@@ -103,7 +94,7 @@ extension TypeSignature {
     }
 
     /// Return the `@_cdecl` function equivalent of this type.
-    func cdecl(strategy: BridgeStrategy) -> TypeSignature {
+    func cdecl(strategy: Bridgable.Strategy) -> TypeSignature {
         // TODO: Object types, etc
         switch self {
         case .int:
@@ -123,7 +114,7 @@ extension TypeSignature {
     }
 
     /// Return code that converst the given value of this type to its `@_cdecl` function form.
-    func convertToCDecl(value: String, strategy: BridgeStrategy) -> String {
+    func convertToCDecl(value: String, strategy: Bridgable.Strategy) -> String {
         switch self {
         case .int:
             return "Int64(" + value + ")"
@@ -139,7 +130,7 @@ extension TypeSignature {
     }
 
     /// Return code that converts the given value of our `@_cdecl` function type back to this type.
-    func convertFromCDecl(value: String, strategy: BridgeStrategy) -> String {
+    func convertFromCDecl(value: String, strategy: Bridgable.Strategy) -> String {
         switch self {
         case .int:
             return "Int(" + value + ")"
@@ -165,7 +156,7 @@ extension TypeSignature {
     }
 
     /// Return code that converts the given value of this type to its Java form.
-    func convertToJava(value: String, strategy: BridgeStrategy) -> String {
+    func convertToJava(value: String, strategy: Bridgable.Strategy) -> String {
         switch self {
         case .int:
             return "Int32(" + value + ")"
@@ -179,7 +170,7 @@ extension TypeSignature {
     }
 
     /// Return code that converts the given value of our Java type back to this type.
-    func convertFromJava(value: String, strategy: BridgeStrategy) -> String {
+    func convertFromJava(value: String, strategy: Bridgable.Strategy) -> String {
         switch self {
         case .int:
             return "Int(" + value + ")"
@@ -194,14 +185,13 @@ extension TypeSignature {
 
     /// Return the JNI signature of this type.
     var jni: String {
-        // TODO: Fix
         switch self {
         case .any:
             return "Ljava/lang/Object;"
         case .anyObject:
             return "Ljava/lang/Object;"
-        case .array(_):
-            return "Ljava/lang/Object;"
+        case .array:
+            return "Lskip/lib/Array;"
         case .bool:
             return "Z"
         case .character:
@@ -209,7 +199,7 @@ extension TypeSignature {
         case .composition:
             return "Ljava/lang/Object;"
         case .dictionary:
-            return "Ljava/lang/Object;"
+            return "Lskip/lib/Dictionary;"
         case .double:
             return "D"
         case .float:
@@ -228,13 +218,23 @@ extension TypeSignature {
         case .int64:
             return "J"
         case .int128:
-            return "Ljava/lang/Object;"
-        case .member:
-            return "Ljava/lang/Object;"
-        case .metaType(_):
+            return "Ljava/math/BigInteger;"
+        case .member(let parent, let type):
+            var jni = parent.jni
+            if jni.hasSuffix(";") {
+                jni = String(jni.dropLast())
+            }
+            return jni + "$" + type.jni
+        case .metaType:
             return "Ljava/lang/Class;"
-        case .module(_, let type):
-            return type.jni
+        case .module(let name, let type):
+            let typeName = type.jni
+            if typeName.hasPrefix("L") && typeName.hasSuffix(";") {
+                let packageName = KotlinTranslator.packageName(forModule: name).replacing(".", with: "/")
+                return "L" + packageName + "/" + typeName.dropFirst()
+            } else {
+                return typeName
+            }
         case .named(let name, _):
             return "L" + name.replacing(".", with: "/") + ";"
         case .none:
@@ -259,17 +259,18 @@ extension TypeSignature {
                 return "Ljava/lang/Integer;"
             case .int64:
                 return "Ljava/lang/Long;"
+            // TODO: Unsigned types
             default:
                 return type.jni
             }
         case .range:
             return "Ljava/lang/Object;"
         case .set:
-            return "Ljava/lang/Object;"
+            return "Lskip/lib/Set;"
         case .string:
             return "Ljava/lang/String;"
-        case .tuple(_, _):
-            return "Ljava/lang/Object;"
+        case .tuple(_, let types):
+            return "Lskip/lib/Tuple" + types.count.description + ";"
         case .typealiased(_, let type):
             return type.jni
         case .uint:
@@ -289,116 +290,6 @@ extension TypeSignature {
         case .void:
             return "V"
         }
-    }
-
-//    func qualify(for sourceDerived: SourceDerived, translator: KotlinTranslator) -> (TypeSignature, BridgeStrategy) {
-//        guard let codebaseInfo = translator.codebaseInfo else {
-//            return (self, .unknown)
-//        }
-//
-//        guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: type) else {
-//            messages.append(Message.kotlinBridgeUnknownType(self, type: type.description, source: translator.syntaxTree.source))
-//            return nil
-//        }
-//        guard typeInfo.attributes.contains(directive: Directive.bridge) else {
-//            messages.append(Message.kotlinBridgeUnbridgedType(self, type: type.description, source: translator.syntaxTree.source))
-//            return nil
-//        }
-//        strategy = typeInfo.attributes.contains(directive: Directive.bridgeFileType) ? .swiftPeer : .javaPeer
-//
-//
-//        switch self {
-//        case .any:
-//            sourceDerived.messages.append(Message.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
-//            return (self, .unknown)
-//        case .anyObject:
-//            return (self, .unknown)
-//        case .array(let type):
-//            return (.module("Swift", .array(type)), .copy)
-//        case .bool:
-//            return (self, .direct)
-//        case .character:
-//            return (self, .direct)
-//        case .composition(_):
-//            return (self, .unknown)
-//        case .dictionary(let key, let value):
-//            return (.module("Swift", .dictionary(key, value)), .copy)
-//        case .double:
-//            return (self, .direct)
-//        case .float:
-//            return (self, .direct)
-//        case .function(_, _, _, _):
-//            return (self, .direct)
-//        case .int:
-//            return (self, .direct)
-//        case .int8:
-//            return (self, .direct)
-//        case .int16:
-//            return (self, .direct)
-//        case .int32:
-//            return (self, .direct)
-//        case .int64:
-//            return (self, .direct)
-//        case .int128:
-//            return (self, .direct)
-//        case .member(let parent, let type):
-//            let (qualifiedParent, strategy) = parent.qualify(for: sourceDerived, codebaseInfo: codebaseInfo)
-//            return (.member(qualifiedParent, type), strategy)
-//        case .metaType(let type):
-//            let (qualifiedType, strategy) = type.qualify(for: sourceDerived, codebaseInfo: codebaseInfo)
-//            return (.metaType(qualifiedType), strategy)
-//        case .module:
-//            guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: self) else {
-//                return (self, .unknown)
-//            }
-//            return (self, strategy(for: typeInfo))
-//        case .named(let name, let generics):
-//            guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: self) else {
-//                return (self, .unknown)
-//            }
-//            let strategy = strategy(for: typeInfo)
-//            if let moduleName = typeInfo.moduleName {
-//                return (.module(moduleName, typeInfo.signature.withGenerics(generics)), strategy)
-//            } else {
-//                return (self, strategy)
-//            }
-//        case .none:
-//            return (self, .unknown)
-//        case .optional(let type):
-//            let (qualifiedType, strategy) = type.qualify(for: sourceDerived, codebaseInfo: codebaseInfo)
-//            return (.optional(qualifiedType), strategy)
-//        case .range(let type):
-//            return (.module("Swift", .range(type)), .copy)
-//        case .set(let type):
-//            return (.module("Swift", .set(type)), .copy)
-//        case .string:
-//            return (self, .direct)
-//        case .tuple(let labels, let types):
-//            return (.module("Swift", .tuple(labels, types)), .copy)
-//        case .typealiased(_, let type):
-//            return type.qualify(for: sourceDerived, codebaseInfo: codebaseInfo)
-//        case .uint:
-//            return (self, .direct)
-//        case .uint8:
-//            return (self, .direct)
-//        case .uint16:
-//            return (self, .direct)
-//        case .uint32:
-//            return (self, .direct)
-//        case .uint64:
-//            return (self, .direct)
-//        case .uint128:
-//            return (self, .direct)
-//        case .unwrappedOptional(let type):
-//            let (qualifiedType, strategy) = type.qualify(for: sourceDerived, codebaseInfo: codebaseInfo)
-//            return (.unwrappedOptional(qualifiedType), strategy)
-//        case .void:
-//            return (self, .direct)
-//        }
-//    }
-
-    private func strategy(for typeInfo: CodebaseInfo.TypeInfo) -> BridgeStrategy {
-        return typeInfo.attributes.contains(directive: Directive.bridgeFileType) ? .swiftPeer : .javaPeer
     }
 }
 
@@ -438,34 +329,32 @@ extension Parameter {
     }
 }
 
+/// Information used to bridge values.
+struct Bridgable {
+    /// Strategies for bridging values.
+    enum Strategy {
+        case direct
+        case javaPeer
+        case swiftPeer
+        case custom
+        case unknown
+    }
+
+    let type: TypeSignature
+    let qualifiedType: TypeSignature
+    let strategy: Strategy
+}
+
 extension KotlinVariableDeclaration {
-    /// Check that this variable is bridgable and return its bridgable type.
+    /// Check that this variable is bridgable.
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
-    func checkBridgable(translator: KotlinTranslator) -> (type: TypeSignature, qualified: TypeSignature, strategy: BridgeStrategy)? {
+    func checkBridgable(translator: KotlinTranslator) -> Bridgable? {
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
             return nil
         }
         let type = declaredType.or(propertyType)
-        guard type != .none else {
-            messages.append(Message.kotlinBridgeNeedsTypeDeclaration(self, source: translator.syntaxTree.source))
-            return nil
-        }
-        let strategy: BridgeStrategy
-        if type.isNamedType, let codebaseInfo = translator.codebaseInfo {
-            guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: type) else {
-                messages.append(Message.kotlinBridgeUnknownType(self, type: type.description, source: translator.syntaxTree.source))
-                return nil
-            }
-            guard typeInfo.attributes.contains(directive: Directive.bridge) else {
-                messages.append(Message.kotlinBridgeUnbridgedType(self, type: type.description, source: translator.syntaxTree.source))
-                return nil
-            }
-            strategy = typeInfo.attributes.contains(directive: Directive.bridgeFileType) ? .swiftPeer : .javaPeer
-        } else {
-            strategy = .direct
-        }
-        return (type, type, strategy)
+        return type.checkBridgable(self, translator: translator)
     }
 }
 
@@ -473,14 +362,24 @@ extension KotlinFunctionDeclaration {
     /// Check that this function is bridgable.
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
-    func checkBridgable(translator: KotlinTranslator) -> TypeSignature? {
+    func checkBridgable(translator: KotlinTranslator) -> (parameters: [Bridgable], return: Bridgable)? {
         guard type != .finalizerDeclaration else {
             return nil
         }
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
             return nil
         }
-        return functionType // TODO: Qualify
+        guard let returnBridgable = returnType.checkBridgable(self, translator: translator) else {
+            return nil
+        }
+        var parameterBridgables: [Bridgable] = []
+        for parameter in parameters {
+            guard let bridgable = parameter.declaredType.checkBridgable(self, translator: translator) else {
+                return nil
+            }
+            parameterBridgables.append(bridgable)
+        }
+        return (parameterBridgables, returnBridgable)
     }
 }
 
@@ -493,6 +392,54 @@ extension KotlinClassDeclaration {
             return false
         }
         return true
+    }
+}
+
+extension TypeSignature {
+    /// Check that this type is bridgable, adding any messages to the given source object.
+    fileprivate func checkBridgable(_ sourceDerived: SourceDerived, translator: KotlinTranslator) -> Bridgable? {
+        guard let codebaseInfo = translator.codebaseInfo else {
+            return nil
+        }
+        var firstTypeInfo: CodebaseInfo.TypeInfo? = nil
+        var firstMessage: Message? = nil
+        let qualifiedType = self.moduleQualfied(codebaseInfo: codebaseInfo) { type, typeInfo in
+            if let typeInfo {
+                if firstTypeInfo == nil {
+                    firstTypeInfo = typeInfo
+                }
+                if firstMessage == nil, !typeInfo.attributes.contains(directive: Directive.bridge) {
+                    firstMessage = Message.kotlinBridgeUnbridgedType(sourceDerived, type: type.description, source: translator.syntaxTree.source)
+                }
+            } else if firstMessage == nil {
+                firstMessage = Message.kotlinBridgeUnknownType(sourceDerived, type: type.description, source: translator.syntaxTree.source)
+            }
+        }
+        if let firstMessage {
+            sourceDerived.messages.append(firstMessage)
+            return nil
+        }
+
+        let strategy = strategy(with: firstTypeInfo)
+        return Bridgable(type: self, qualifiedType: qualifiedType, strategy: strategy)
+    }
+
+    /// Return the bridging strategy for this type, given its type info.
+    private func strategy(with typeInfo: CodebaseInfo.TypeInfo?) -> Bridgable.Strategy {
+        switch self.asOptional(false) {
+        case .array, .dictionary, .range, .set, .tuple:
+            return .custom
+        case .typealiased(_, let type):
+            return type.strategy(with: typeInfo)
+        default:
+            guard isNamedType else {
+                return .direct
+            }
+            guard let typeInfo else {
+                return .unknown
+            }
+            return typeInfo.attributes.contains(directive: Directive.bridgeFileType) ? .swiftPeer : .javaPeer
+        }
     }
 }
 
