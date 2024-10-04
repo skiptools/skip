@@ -2398,6 +2398,7 @@ extension FrameworkProjectLayout {
         import androidx.compose.foundation.layout.fillMaxSize
         import androidx.compose.foundation.layout.Box
         import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.SideEffect
         import androidx.compose.runtime.saveable.rememberSaveableStateHolder
         import androidx.compose.ui.Alignment
         import androidx.compose.ui.Modifier
@@ -2435,6 +2436,7 @@ extension FrameworkProjectLayout {
                     val saveableStateHolder = rememberSaveableStateHolder()
                     saveableStateHolder.SaveableStateProvider(true) {
                         PresentationRootView(ComposeContext())
+                        SideEffect { saveableStateHolder.removeState(true) }
                     }
                 }
 
