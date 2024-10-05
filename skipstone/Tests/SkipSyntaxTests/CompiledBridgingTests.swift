@@ -82,9 +82,6 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         let f: Float = 1
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal val f: Float
             get() {
                 val value_swift = Swift_f()
@@ -103,9 +100,6 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         let i: Int64 = 1
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal val i: Long
             get() {
                 val value_swift = Swift_i()
@@ -124,9 +118,6 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         let s = "ab\\(1 + 1)c"
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal val s: String
             get() {
                 val value_swift = Swift_s()
@@ -147,9 +138,6 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         let i = 1 + 1
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal val i: Int
             get() {
                 val value_swift = Swift_i()
@@ -168,9 +156,6 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         let i: Int32 = 1 + 1
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal val i: Int
             get() {
                 val value_swift = Swift_i()
@@ -189,9 +174,6 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         let s = "ab" + "c"
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal val s: String
             get() {
                 val value_swift = Swift_s()
@@ -212,9 +194,6 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         var i = 1
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal var i: Int
             get() {
                 val value_swift = Swift_i()
@@ -243,9 +222,6 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         var s = ""
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal var s: String
             get() {
                 val value_swift = Swift_s()
@@ -276,9 +252,6 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         public var i = 1
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         var i: Int
             get() {
                 val value_swift = Swift_i()
@@ -321,9 +294,6 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         private(set) var i = 1
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal val i: Int
             get() {
                 val value_swift = Swift_i()
@@ -349,9 +319,6 @@ final class CompiledBridgingTests: XCTestCase {
             }
         }
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal val d: Double
             get() {
                 val value_swift = Swift_d()
@@ -383,9 +350,6 @@ final class CompiledBridgingTests: XCTestCase {
             }
         }
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal var s: String
             get() {
                 val value_swift = Swift_s()
@@ -448,9 +412,6 @@ final class CompiledBridgingTests: XCTestCase {
         // SKIP @bridge
         var c = C()
         """, kotlins: ["""
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal var c: C
             get() {
                 val value_swift = Swift_c()
@@ -509,9 +470,6 @@ final class CompiledBridgingTests: XCTestCase {
             return i + (Int(s) ?? 0)
         }
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal fun f(i: Int, s: String): Int {
             val i_swift = i.toLong()
             val s_swift = s
@@ -537,9 +495,6 @@ final class CompiledBridgingTests: XCTestCase {
             return i + (Int(s) ?? 0)
         }
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         fun f(i: Int, s: String): Int {
             val i_swift = i.toLong()
             val s_swift = s
@@ -613,27 +568,24 @@ final class CompiledBridgingTests: XCTestCase {
             var i = 1
         }
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal open class C {
-            var Swift_peer: SwiftObjectPointer
+            var Swift_peer: skip.bridge.SwiftObjectPointer
 
-            constructor(Swift_peer: SwiftObjectPointer) {
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer) {
                 this.Swift_peer = Swift_retain(Swift_peer)
             }
-            private external fun Swift_retain(Swift_peer: SwiftObjectPointer): SwiftObjectPointer
+            private external fun Swift_retain(Swift_peer: skip.bridge.SwiftObjectPointer): skip.bridge.SwiftObjectPointer
 
             fun finalize() {
                 Swift_release(Swift_peer)
-                Swift_peer = SwiftObjectNil
+                Swift_peer = skip.bridge.SwiftObjectNil
             }
-            private external fun Swift_release(Swift_peer: SwiftObjectPointer)
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
 
             constructor() {
                 Swift_peer = Swift_constructor()
             }
-            private external fun Swift_constructor(): SwiftObjectPointer
+            private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer
 
             internal open var i: Int
                 get() {
@@ -644,8 +596,8 @@ final class CompiledBridgingTests: XCTestCase {
                     val newValue_swift = newValue.toLong()
                     Swift_i_set(Swift_peer, newValue_swift)
                 }
-            private external fun Swift_i(Swift_peer: SwiftObjectPointer): Long
-            private external fun Swift_i_set(Swift_peer: SwiftObjectPointer, value: Long)
+            private external fun Swift_i(Swift_peer: skip.bridge.SwiftObjectPointer): Long
+            private external fun Swift_i_set(Swift_peer: skip.bridge.SwiftObjectPointer, value: Long)
         }
         """, swiftBridgeSupport: """
         @_cdecl("Java_C_Swift_1constructor")
@@ -700,28 +652,25 @@ final class CompiledBridgingTests: XCTestCase {
             }
         }
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal open class C {
-            var Swift_peer: SwiftObjectPointer
+            var Swift_peer: skip.bridge.SwiftObjectPointer
 
-            constructor(Swift_peer: SwiftObjectPointer) {
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer) {
                 this.Swift_peer = Swift_retain(Swift_peer)
             }
-            private external fun Swift_retain(Swift_peer: SwiftObjectPointer): SwiftObjectPointer
+            private external fun Swift_retain(Swift_peer: skip.bridge.SwiftObjectPointer): skip.bridge.SwiftObjectPointer
 
             fun finalize() {
                 Swift_release(Swift_peer)
-                Swift_peer = SwiftObjectNil
+                Swift_peer = skip.bridge.SwiftObjectNil
             }
-            private external fun Swift_release(Swift_peer: SwiftObjectPointer)
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
 
             internal constructor(i: Int) {
                 val i_swift = i.toLong()
                 Swift_peer = Swift_constructor(i_swift)
             }
-            private external fun Swift_constructor(i: Long): SwiftObjectPointer
+            private external fun Swift_constructor(i: Long): skip.bridge.SwiftObjectPointer
         }
         """, swiftBridgeSupport: """
         @_cdecl("Java_C_Swift_1retain")
@@ -762,27 +711,24 @@ final class CompiledBridgingTests: XCTestCase {
             }
         }
         """, kotlin: """
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal open class C {
-            var Swift_peer: SwiftObjectPointer
+            var Swift_peer: skip.bridge.SwiftObjectPointer
 
-            constructor(Swift_peer: SwiftObjectPointer) {
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer) {
                 this.Swift_peer = Swift_retain(Swift_peer)
             }
-            private external fun Swift_retain(Swift_peer: SwiftObjectPointer): SwiftObjectPointer
+            private external fun Swift_retain(Swift_peer: skip.bridge.SwiftObjectPointer): skip.bridge.SwiftObjectPointer
 
             fun finalize() {
                 Swift_release(Swift_peer)
-                Swift_peer = SwiftObjectNil
+                Swift_peer = skip.bridge.SwiftObjectNil
             }
-            private external fun Swift_release(Swift_peer: SwiftObjectPointer)
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
 
             constructor() {
                 Swift_peer = Swift_constructor()
             }
-            private external fun Swift_constructor(): SwiftObjectPointer
+            private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer
 
             internal open fun add(a: Int, b: Int): Int {
                 val a_swift = a.toLong()
@@ -790,7 +736,7 @@ final class CompiledBridgingTests: XCTestCase {
                 val f_return_swift = Swift_add(Swift_peer, a_swift, b_swift)
                 return f_return_swift.toInt()
             }
-            private external fun Swift_add(Swift_peer: SwiftObjectPointer, a: Long, b: Long): Long
+            private external fun Swift_add(Swift_peer: skip.bridge.SwiftObjectPointer, a: Long, b: Long): Long
         }
         """, swiftBridgeSupport: """
         @_cdecl("Java_C_Swift_1constructor")

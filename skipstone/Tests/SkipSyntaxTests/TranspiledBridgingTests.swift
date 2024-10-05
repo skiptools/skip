@@ -417,27 +417,24 @@ final class TranspiledBridgingTests: XCTestCase {
         class C {
         }
         """, kotlins: ["""
-        import skip.bridge.SwiftObjectNil
-        import skip.bridge.SwiftObjectPointer
-
         internal open class C {
-            var Swift_peer: SwiftObjectPointer
+            var Swift_peer: skip.bridge.SwiftObjectPointer
 
-            constructor(Swift_peer: SwiftObjectPointer) {
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer) {
                 this.Swift_peer = Swift_retain(Swift_peer)
             }
-            private external fun Swift_retain(Swift_peer: SwiftObjectPointer): SwiftObjectPointer
+            private external fun Swift_retain(Swift_peer: skip.bridge.SwiftObjectPointer): skip.bridge.SwiftObjectPointer
 
             fun finalize() {
                 Swift_release(Swift_peer)
-                Swift_peer = SwiftObjectNil
+                Swift_peer = skip.bridge.SwiftObjectNil
             }
-            private external fun Swift_release(Swift_peer: SwiftObjectPointer)
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
 
             constructor() {
                 Swift_peer = Swift_constructor()
             }
-            private external fun Swift_constructor(): SwiftObjectPointer
+            private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer
         }
         """, """
         internal var c = C()

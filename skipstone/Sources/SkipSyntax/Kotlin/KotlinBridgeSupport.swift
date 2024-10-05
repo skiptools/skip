@@ -61,7 +61,9 @@ extension String {
 
 extension TypeSignature {
     static let javaObjectPointer: TypeSignature = .named("JavaObjectPointer", [])
-    static let swiftObjectPointer: TypeSignature = .named("SwiftObjectPointer", [])
+    static func swiftObjectPointer(java: Bool) -> TypeSignature {
+        return java ? .named("skip.bridge.SwiftObjectPointer", []) : .named("SwiftObjectPointer", [])
+    }
 
     /// Return the external function equivalent of this type.
     var kotlinExternal: TypeSignature {
@@ -105,7 +107,7 @@ extension TypeSignature {
             case .javaPeer:
                 return .javaObjectPointer
             case .swiftPeer:
-                return .swiftObjectPointer
+                return .swiftObjectPointer(java: false)
             case .custom:
                 return self.kotlinExternal // TODO
             case .direct, .unknown:
