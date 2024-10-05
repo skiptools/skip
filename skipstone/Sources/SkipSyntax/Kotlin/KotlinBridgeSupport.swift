@@ -95,7 +95,6 @@ extension TypeSignature {
 
     /// Return the `@_cdecl` function equivalent of this type.
     func cdecl(strategy: Bridgable.Strategy) -> TypeSignature {
-        // TODO: Object types, etc
         switch self {
         case .int:
             return .int64
@@ -107,7 +106,9 @@ extension TypeSignature {
                 return .javaObjectPointer
             case .swiftPeer:
                 return .swiftObjectPointer
-            default:
+            case .custom:
+                return self.kotlinExternal // TODO
+            case .direct, .unknown:
                 return self.kotlinExternal
             }
         }
@@ -121,10 +122,17 @@ extension TypeSignature {
         case .string:
             return value + ".toJavaObject()!"
         default:
-            if strategy == .javaPeer {
+            switch strategy {
+            case .javaPeer:
                 return value + ".Java_peer.ptr"
-            } else {
-                return value // TODO: All other types
+            case .swiftPeer:
+                return value // TODO
+            case .custom:
+                return value // TODO
+            case .direct:
+                return value
+            case .unknown:
+                return value // TODO
             }
         }
     }
@@ -137,10 +145,17 @@ extension TypeSignature {
         case .string:
             return "try! String.fromJavaObject(" + value + ")"
         default:
-            if strategy == .javaPeer {
+            switch strategy {
+            case .javaPeer:
                 return description + "(Java_ptr: " + value + ")"
-            } else {
-                return value // TODO: All other types
+            case .swiftPeer:
+                return value // TODO
+            case .custom:
+                return value // TODO
+            case .direct:
+                return value
+            case .unknown:
+                return value // TODO
             }
         }
     }
@@ -161,10 +176,17 @@ extension TypeSignature {
         case .int:
             return "Int32(" + value + ")"
         default:
-            if strategy == .javaPeer {
+            switch strategy {
+            case .javaPeer:
                 return value + ".Java_peer.ptr"
-            } else {
-                return value // TODO: All other types
+            case .swiftPeer:
+                return value // TODO
+            case .custom:
+                return value // TODO
+            case .direct:
+                return value
+            case .unknown:
+                return value // TODO
             }
         }
     }
@@ -175,10 +197,17 @@ extension TypeSignature {
         case .int:
             return "Int(" + value + ")"
         default:
-            if strategy == .javaPeer {
+            switch strategy {
+            case .javaPeer:
                 return description + "(Java_ptr: " + value + ")"
-            } else {
-                return value // TODO: All other types
+            case .swiftPeer:
+                return value // TODO
+            case .custom:
+                return value // TODO
+            case .direct:
+                return value
+            case .unknown:
+                return value
             }
         }
     }

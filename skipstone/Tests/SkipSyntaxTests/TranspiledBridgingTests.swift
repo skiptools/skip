@@ -407,8 +407,69 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
     }
 
+    //~~~
     func testCompiledBridgedTypeVar() async throws {
-        // TODO
+        try await check(swift: """
+        // SKIP @bridge
+        var c = C()
+        """, swiftBridge: """
+        // SKIP @bridge
+        class C {
+        }
+        """, kotlins: ["""
+        import skip.bridge.SwiftObjectNil
+        import skip.bridge.SwiftObjectPointer
+
+        internal open class C {
+            var Swift_peer: SwiftObjectPointer
+
+            constructor(Swift_peer: SwiftObjectPointer) {
+                this.Swift_peer = Swift_retain(Swift_peer)
+            }
+            private external fun Swift_retain(Swift_peer: SwiftObjectPointer): SwiftObjectPointer
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: SwiftObjectPointer)
+
+            constructor() {
+                Swift_peer = Swift_constructor()
+            }
+            private external fun Swift_constructor(): SwiftObjectPointer
+        }
+        """, """
+        internal var c = C()
+        """], swiftBridgeSupports: ["""
+        @_cdecl("Java_C_Swift_1constructor")
+        func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
+            let f_return_swift = C()
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_C_Swift_1retain")
+        func C_Swift_retain(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
+            return Swift_peer.retained(as: C.self)
+        }
+        @_cdecl("Java_C_Swift_1release")
+        func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: C.self)
+        }
+        """, """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        var c: C {
+            get {
+                let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, [])
+                return value_java
+            }
+            set {
+                let value_java = newValue.toJavaParameter()
+                try! Java_SourceKt.callStatic(method: Java_set_c_methodID, [value_java])
+            }
+        }
+        private let Java_get_c_methodID = Java_SourceKt.getStaticMethodID(name: "getC", sig: "()LC;")!
+        private let Java_set_c_methodID = Java_SourceKt.getStaticMethodID(name: "setC", sig: "(LC;)V")!
+        """])
     }
 
     func testUnbridgableTypeVar() async throws {
