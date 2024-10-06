@@ -86,32 +86,65 @@ extension TypeSignature {
     }
 
     /// Return the external function equivalent of this type.
-    var kotlinExternal: TypeSignature {
+    func kotlinExternal(strategy: Bridgable.Strategy) -> TypeSignature {
         switch self {
         case .int:
             return .int64
         default:
-            return self // TODO: All other types
+            switch strategy {
+            case .javaPeer:
+                return self
+            case .swiftPeer:
+                return .swiftObjectPointer(java: true)
+            case .custom:
+                return self // TODO
+            case .direct:
+                return self
+            case .unknown:
+                return self // TODO
+            }
         }
     }
 
     /// Return code that converts the given value of this type to its external form.
-    func kotlinConvertToExternal(value: String) -> String {
+    func kotlinConvertToExternal(value: String, strategy: Bridgable.Strategy) -> String {
         switch self {
         case .int:
             return value + ".toLong()"
         default:
-            return value // TODO: All other types
+            switch strategy {
+            case .javaPeer:
+                return value
+            case .swiftPeer:
+                return value + ".Swift_peer"
+            case .custom:
+                return value // TODO
+            case .direct:
+                return value
+            case .unknown:
+                return value // TODO
+            }
         }
     }
 
     /// Return code that converts the given value of our external type back to this type.
-    func kotlinConvertFromExternal(value: String) -> String {
+    func kotlinConvertFromExternal(value: String, strategy: Bridgable.Strategy) -> String {
         switch self {
         case .int:
             return value + ".toInt()"
         default:
-            return value // TODO: All other types
+            switch strategy {
+            case .javaPeer:
+                return value
+            case .swiftPeer:
+                return description + "(Swift_peer = " + value + ", marker = null)"
+            case .custom:
+                return value // TODO
+            case .direct:
+                return value
+            case .unknown:
+                return value // TODO
+            }
         }
     }
 
@@ -129,9 +162,11 @@ extension TypeSignature {
             case .swiftPeer:
                 return .swiftObjectPointer(java: false)
             case .custom:
-                return self.kotlinExternal // TODO
-            case .direct, .unknown:
-                return self.kotlinExternal
+                return self // TODO
+            case .direct:
+                return self
+            case .unknown:
+                return self // TODO
             }
         }
     }
@@ -148,7 +183,7 @@ extension TypeSignature {
             case .javaPeer:
                 return value + ".Java_peer.ptr"
             case .swiftPeer:
-                return value // TODO
+                return "SwiftObjectPointer.pointer(to: " + value + ", retain: true)"
             case .custom:
                 return value // TODO
             case .direct:
@@ -171,7 +206,7 @@ extension TypeSignature {
             case .javaPeer:
                 return description + "(Java_ptr: " + value + ")"
             case .swiftPeer:
-                return value // TODO
+                return value + ".pointee()! as " + description
             case .custom:
                 return value // TODO
             case .direct:

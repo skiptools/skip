@@ -83,7 +83,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
 
         let propertyName = variableDeclaration.propertyName
         let externalName = "Swift_" + propertyName
-        let externalType = type.kotlinExternal
+        let externalType = type.kotlinExternal(strategy: bridgable.strategy)
         var externalFunctionDeclarations: [String] = []
         let (cdecl, cdeclName) = cdecl(for: variableDeclaration, name: externalName, translator: translator)
 
@@ -92,7 +92,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         let getterParameters = classDeclaration == nil ? "()" : "(Swift_peer: skip.bridge.SwiftObjectPointer)"
         let getterBody = [
             "val value_swift = " + externalName + getterArguments,
-            "return " + type.kotlinConvertFromExternal(value: "value_swift")
+            "return " + type.kotlinConvertFromExternal(value: "value_swift", strategy: bridgable.strategy)
         ]
         variableDeclaration.getter = Accessor(body: KotlinCodeBlock(statements: getterBody.map { KotlinRawStatement(sourceCode: $0) }))
         externalFunctionDeclarations.append("private external fun " + externalName + getterParameters + ": " + externalType.kotlin)
@@ -118,7 +118,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
             let setterArguments = classDeclaration == nil ? "newValue_swift" : "Swift_peer, newValue_swift"
             let setterInstanceParameter = classDeclaration == nil ? "" : "Swift_peer: skip.bridge.SwiftObjectPointer, "
             let setterBody = [
-                "val newValue_swift = " + type.kotlinConvertToExternal(value: "newValue"),
+                "val newValue_swift = " + type.kotlinConvertToExternal(value: "newValue", strategy: bridgable.strategy),
                 externalName + "_set(" + setterArguments + ")"
             ]
             variableDeclaration.setter = Accessor(parameterName: "newValue", body: KotlinCodeBlock(statements: setterBody.map { KotlinRawStatement(sourceCode: $0) }))
@@ -183,7 +183,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         var externalParameterNames: [String] = []
         for parameter in functionDeclaration.parameters {
             let externalParameterName = parameter.internalLabel + "_swift"
-            body.append("val " + externalParameterName + " = " + parameter.declaredType.kotlinConvertToExternal(value: parameter.internalLabel))
+            body.append("val " + externalParameterName + " = " + parameter.declaredType.kotlinConvertToExternal(value: parameter.internalLabel, strategy: .direct))
             cdeclBody.append("let " + externalParameterName + " = " + parameter.declaredType.convertFromCDecl(value: parameter.internalLabel, strategy: .direct))
             externalParameterNames.append(externalParameterName)
         }
@@ -219,7 +219,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
             cdeclBody.append(swiftCallTarget + functionName + "(" + swiftArgumentsString + ")")
         } else {
             body.append("val f_return_swift = " + externalName + "(" + externalArgumentsString + ")")
-            body.append("return " + functionDeclaration.returnType.kotlinConvertFromExternal(value: "f_return_swift"))
+            body.append("return " + functionDeclaration.returnType.kotlinConvertFromExternal(value: "f_return_swift", strategy: .direct))
 
             cdeclBody.append("let f_return_swift = " + swiftCallTarget + functionName + "(" + swiftArgumentsString + ")")
             cdeclBody.append("return " + functionDeclaration.returnType.convertToCDecl(value: "f_return_swift", strategy: .direct))
@@ -234,13 +234,13 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
             }
         }
         externalFunctionDeclaration += functionDeclaration.parameters.map { p in
-            p.internalLabel + ": " + p.declaredType.kotlinExternal.kotlin
+            p.internalLabel + ": " + p.declaredType.kotlinExternal(strategy: .direct).kotlin
         }.joined(separator: ", ")
         externalFunctionDeclaration += ")"
         if functionDeclaration.type == .constructorDeclaration {
             externalFunctionDeclaration += ": skip.bridge.SwiftObjectPointer"
         } else if functionDeclaration.returnType != .void {
-            externalFunctionDeclaration += ": " + functionDeclaration.returnType.kotlinExternal.kotlin
+            externalFunctionDeclaration += ": " + functionDeclaration.returnType.kotlinExternal(strategy: .direct).kotlin
         }
         (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [KotlinRawStatement(sourceCode: externalFunctionDeclaration)], after: functionDeclaration)
 
