@@ -38,6 +38,26 @@ struct SwiftDefinition: OutputNode {
     }
 }
 
+/// Utilities for declaring a JNI class reference.
+struct JavaClassRef: Hashable, CustomStringConvertible {
+    let identifier: String
+    let className: String
+
+    static func `for`(_ classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> JavaClassRef {
+        let className: String
+        if let packageName = translator.packageName {
+            className = packageName.replacing(".", with: "/") + "/" + classDeclaration.name
+        } else {
+            className = classDeclaration.name
+        }
+        return JavaClassRef(identifier: "Java_class", className: className)
+    }
+
+    var description: String {
+        return "private let " + identifier + " = try! JClass(name: \"" + className + "\")"
+    }
+}
+
 extension Source.FilePath {
     /// Return the JNI class name for this file in the given package.
     func jniClassName(packageName: String?) -> String {
@@ -182,7 +202,7 @@ extension TypeSignature {
             case .javaPeer:
                 return value + ".Java_peer.ptr"
             case .swiftPeer:
-                return value // TODO
+                return value + ".Java_swiftPeerBridged()"
             case .custom:
                 return value // TODO
             case .direct:
@@ -203,7 +223,7 @@ extension TypeSignature {
             case .javaPeer:
                 return description + "(Java_ptr: " + value + ")"
             case .swiftPeer:
-                return value // TODO
+                return "SwiftObjectPointer.peer(of: " + value + ").pointee()!"
             case .custom:
                 return value // TODO
             case .direct:

@@ -568,13 +568,12 @@ final class CompiledBridgingTests: XCTestCase {
             var i = 1
         }
         """, kotlin: """
-        internal open class C {
+        internal open class C: skip.bridge.SwiftPeerBridged {
             var Swift_peer: skip.bridge.SwiftObjectPointer
 
-            constructor(Swift_peer: skip.bridge.SwiftObjectPointer) {
-                this.Swift_peer = Swift_retain(Swift_peer)
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
             }
-            private external fun Swift_retain(Swift_peer: skip.bridge.SwiftObjectPointer): skip.bridge.SwiftObjectPointer
 
             fun finalize() {
                 Swift_release(Swift_peer)
@@ -586,6 +585,8 @@ final class CompiledBridgingTests: XCTestCase {
                 Swift_peer = Swift_constructor()
             }
             private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer
+
+            override fun Swift_bridgedPeer(): skip.bridge.SwiftObjectPointer = Swift_peer
 
             internal open var i: Int
                 get() {
@@ -600,14 +601,18 @@ final class CompiledBridgingTests: XCTestCase {
             private external fun Swift_i_set(Swift_peer: skip.bridge.SwiftObjectPointer, value: Long)
         }
         """, swiftBridgeSupport: """
+        extension C {
+            private static let Java_class = try! JClass(name: "C")
+            func Java_swiftPeerBridged() -> JavaObjectPointer {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+            }
+            private static let Java_swiftPeerBridged_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+        }
         @_cdecl("Java_C_Swift_1constructor")
         func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
             let f_return_swift = C()
             return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
-        }
-        @_cdecl("Java_C_Swift_1retain")
-        func C_Swift_retain(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
-            return Swift_peer.retained(as: C.self)
         }
         @_cdecl("Java_C_Swift_1release")
         func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
@@ -652,19 +657,20 @@ final class CompiledBridgingTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal open class C {
+        internal open class C: skip.bridge.SwiftPeerBridged {
             var Swift_peer: skip.bridge.SwiftObjectPointer
 
-            constructor(Swift_peer: skip.bridge.SwiftObjectPointer) {
-                this.Swift_peer = Swift_retain(Swift_peer)
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
             }
-            private external fun Swift_retain(Swift_peer: skip.bridge.SwiftObjectPointer): skip.bridge.SwiftObjectPointer
 
             fun finalize() {
                 Swift_release(Swift_peer)
                 Swift_peer = skip.bridge.SwiftObjectNil
             }
             private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
+
+            override fun Swift_bridgedPeer(): skip.bridge.SwiftObjectPointer = Swift_peer
 
             internal constructor(i: Int) {
                 val i_swift = i.toLong()
@@ -673,9 +679,13 @@ final class CompiledBridgingTests: XCTestCase {
             private external fun Swift_constructor(i: Long): skip.bridge.SwiftObjectPointer
         }
         """, swiftBridgeSupport: """
-        @_cdecl("Java_C_Swift_1retain")
-        func C_Swift_retain(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
-            return Swift_peer.retained(as: C.self)
+        extension C {
+            private static let Java_class = try! JClass(name: "C")
+            func Java_swiftPeerBridged() -> JavaObjectPointer {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+            }
+            private static let Java_swiftPeerBridged_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
         }
         @_cdecl("Java_C_Swift_1release")
         func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
@@ -711,13 +721,12 @@ final class CompiledBridgingTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal open class C {
+        internal open class C: skip.bridge.SwiftPeerBridged {
             var Swift_peer: skip.bridge.SwiftObjectPointer
 
-            constructor(Swift_peer: skip.bridge.SwiftObjectPointer) {
-                this.Swift_peer = Swift_retain(Swift_peer)
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
             }
-            private external fun Swift_retain(Swift_peer: skip.bridge.SwiftObjectPointer): skip.bridge.SwiftObjectPointer
 
             fun finalize() {
                 Swift_release(Swift_peer)
@@ -730,6 +739,8 @@ final class CompiledBridgingTests: XCTestCase {
             }
             private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer
 
+            override fun Swift_bridgedPeer(): skip.bridge.SwiftObjectPointer = Swift_peer
+
             internal open fun add(a: Int, b: Int): Int {
                 val a_swift = a.toLong()
                 val b_swift = b.toLong()
@@ -739,14 +750,18 @@ final class CompiledBridgingTests: XCTestCase {
             private external fun Swift_add(Swift_peer: skip.bridge.SwiftObjectPointer, a: Long, b: Long): Long
         }
         """, swiftBridgeSupport: """
+        extension C {
+            private static let Java_class = try! JClass(name: "C")
+            func Java_swiftPeerBridged() -> JavaObjectPointer {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+            }
+            private static let Java_swiftPeerBridged_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+        }
         @_cdecl("Java_C_Swift_1constructor")
         func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
             let f_return_swift = C()
             return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
-        }
-        @_cdecl("Java_C_Swift_1retain")
-        func C_Swift_retain(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> SwiftObjectPointer {
-            return Swift_peer.retained(as: C.self)
         }
         @_cdecl("Java_C_Swift_1release")
         func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
