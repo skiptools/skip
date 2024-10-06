@@ -6,17 +6,18 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         guard !syntaxTree.isBridgeFile, translator.codebaseInfo != nil, let outputFile = syntaxTree.source.file.bridgeOutputFile else {
             return []
         }
+        let globalsClassRef = globalsJavaClass(translator: translator)
         var swiftDefinitions: [SwiftDefinition] = []
-        var globalsJavaClasses:  Set<JavaClassRef> = []
+        var needsGlobalsJavaClass = false
         syntaxTree.root.visit { node in
             if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global {
                 if variableDeclaration.attributes.contains(directive: Directive.bridge) {
-                    addSwiftDefinitions(forGlobal: variableDeclaration, to: &swiftDefinitions, globalsJavaClasses: &globalsJavaClasses, translator: translator)
+                    needsGlobalsJavaClass = addSwiftDefinitions(forGlobal: variableDeclaration, to: &swiftDefinitions, globalsClassRef: globalsClassRef, translator: translator) || needsGlobalsJavaClass
                 }
                 return .skip
             } else if let functionDeclaration = node as? KotlinFunctionDeclaration, functionDeclaration.role == .global {
                 if functionDeclaration.attributes.contains(directive: Directive.bridge) {
-                    addSwiftDefinitions(forGlobal: functionDeclaration, to: &swiftDefinitions, globalsJavaClasses: &globalsJavaClasses, translator: translator)
+                    needsGlobalsJavaClass = addSwiftDefinitions(forGlobal: functionDeclaration, to: &swiftDefinitions, globalsClassRef: globalsClassRef, translator: translator) || needsGlobalsJavaClass
                 }
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
@@ -35,14 +36,15 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         let importDeclarations = syntaxTree.root.statements
             .compactMap { $0 as? KotlinImportDeclaration }
             .filter { !$0.isKotlinImport }
-        let globalsJavaClassDescriptions = globalsJavaClasses.map(\.description).sorted()
         let outputNode = SwiftDefinition { output, indentation, _ in
             output.append("#if canImport(SkipBridge)\nimport SkipBridge\n\n")
             for importDeclaration in importDeclarations {
                 let path = importDeclaration.modulePath.joined(separator: ".")
                 output.append(indentation).append("import ").append(path).append("\n")
             }
-            globalsJavaClassDescriptions.forEach { output.append(indentation).append($0).append("\n") }
+            if needsGlobalsJavaClass {
+                output.append(indentation).append(globalsClassRef.description).append("\n")
+            }
             swiftDefinitions.forEach { output.append($0, indentation: indentation) }
             output.append("\n#endif")
         }
@@ -50,18 +52,16 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         return [output]
     }
 
-    private func addSwiftDefinitions(forGlobal variableDeclaration: KotlinVariableDeclaration, to swiftDefinitions: inout [SwiftDefinition], globalsJavaClasses: inout Set<JavaClassRef>, translator: KotlinTranslator) {
+    private func addSwiftDefinitions(forGlobal variableDeclaration: KotlinVariableDeclaration, to swiftDefinitions: inout [SwiftDefinition], globalsClassRef: JavaClassRef, translator: KotlinTranslator) -> Bool {
         guard let bridgable = variableDeclaration.checkBridgable(translator: translator) else {
-            return
+            return false
         }
         guard !addConstantDefinition(for: variableDeclaration, type: bridgable.type, to: &swiftDefinitions, translator: translator) else {
-            return
+            return false
         }
-        let classRef = globalsJavaClass(translator: translator)
-        globalsJavaClasses.insert(classRef)
-
-        let swift = swift(for: variableDeclaration, bridgable: bridgable, targetIdentifier: classRef.identifier, classIdentifier: classRef.identifier, getMethodIdentifier: "Java_get_" + variableDeclaration.propertyName + "_methodID", setMethodIdentifier: "Java_set_" + variableDeclaration.propertyName + "_methodID", translator: translator)
+        let swift = swift(for: variableDeclaration, bridgable: bridgable, targetIdentifier: globalsClassRef.identifier, classIdentifier: globalsClassRef.identifier, getMethodIdentifier: "Java_get_" + variableDeclaration.propertyName + "_methodID", setMethodIdentifier: "Java_set_" + variableDeclaration.propertyName + "_methodID", translator: translator)
         swiftDefinitions.append(SwiftDefinition(statement: variableDeclaration, swift: swift))
+        return true
     }
 
     private func addSwiftDefinitions(for variableDeclaration: KotlinVariableDeclaration, to swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) {
@@ -181,16 +181,14 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         return TypeSignature.for(name: functionName, genericTypes: []).isNumeric ? numberLiteral : nil
     }
 
-    private func addSwiftDefinitions(forGlobal functionDeclaration: KotlinFunctionDeclaration, to swiftDefinitions: inout [SwiftDefinition], globalsJavaClasses: inout Set<JavaClassRef>, translator: KotlinTranslator) {
+    private func addSwiftDefinitions(forGlobal functionDeclaration: KotlinFunctionDeclaration, to swiftDefinitions: inout [SwiftDefinition], globalsClassRef: JavaClassRef, translator: KotlinTranslator) -> Bool {
         guard let bridgables = functionDeclaration.checkBridgable(translator: translator) else {
-            return
+            return false
         }
 
-        let classRef = globalsJavaClass(translator: translator)
-        globalsJavaClasses.insert(classRef)
-
-        let swift = swift(for: functionDeclaration, bridgables: bridgables, targetIdentifier: classRef.identifier, classIdentifier: classRef.identifier, methodIdentifier: "Java_" + functionDeclaration.name + "_methodID", translator: translator)
+        let swift = swift(for: functionDeclaration, bridgables: bridgables, targetIdentifier: globalsClassRef.identifier, classIdentifier: globalsClassRef.identifier, methodIdentifier: "Java_" + functionDeclaration.name + "_methodID", translator: translator)
         swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: swift))
+        return true
     }
 
     private func addSwiftDefinitions(for functionDeclaration: KotlinFunctionDeclaration, to swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) {
@@ -262,7 +260,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         guard classDeclaration.checkBridgable(translator: translator) else {
             return
         }
-        let classRef = typeJavaClass(classDeclaration, translator: translator)
+        let classRef = JavaClassRef.for(classDeclaration, translator: translator)
 
         let visibility = classDeclaration.modifiers.visibility.swift(suffix: " ")
         var swift: [String] = []
@@ -321,24 +319,5 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
             className = identifier
         }
         return JavaClassRef(identifier: "Java_" + identifier, className: className)
-    }
-
-    private func typeJavaClass(_ classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> JavaClassRef {
-        let className: String
-        if let packageName = translator.packageName {
-            className = packageName.replacing(".", with: "/") + "/" + classDeclaration.name
-        } else {
-            className = classDeclaration.name
-        }
-        return JavaClassRef(identifier: "Java_class", className: className)
-    }
-}
-
-private struct JavaClassRef: Hashable, CustomStringConvertible {
-    let identifier: String
-    let className: String
-
-    var description: String {
-        return "private let " + identifier + " = try! JClass(name: \"" + className + "\")"
     }
 }

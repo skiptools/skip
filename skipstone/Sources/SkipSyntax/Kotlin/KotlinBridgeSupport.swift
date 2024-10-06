@@ -38,6 +38,26 @@ struct SwiftDefinition: OutputNode {
     }
 }
 
+/// Utilities for declaring a JNI class reference.
+struct JavaClassRef: Hashable, CustomStringConvertible {
+    let identifier: String
+    let className: String
+
+    static func `for`(_ classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> JavaClassRef {
+        let className: String
+        if let packageName = translator.packageName {
+            className = packageName.replacing(".", with: "/") + "/" + classDeclaration.name
+        } else {
+            className = classDeclaration.name
+        }
+        return JavaClassRef(identifier: "Java_class", className: className)
+    }
+
+    var description: String {
+        return "private let " + identifier + " = try! JClass(name: \"" + className + "\")"
+    }
+}
+
 extension Source.FilePath {
     /// Return the JNI class name for this file in the given package.
     func jniClassName(packageName: String?) -> String {
@@ -61,7 +81,9 @@ extension String {
 
 extension TypeSignature {
     static let javaObjectPointer: TypeSignature = .named("JavaObjectPointer", [])
-    static let swiftObjectPointer: TypeSignature = .named("SwiftObjectPointer", [])
+    static func swiftObjectPointer(java: Bool) -> TypeSignature {
+        return java ? .named("skip.bridge.SwiftObjectPointer", []) : .named("SwiftObjectPointer", [])
+    }
 
     /// Return the external function equivalent of this type.
     var kotlinExternal: TypeSignature {
@@ -95,7 +117,6 @@ extension TypeSignature {
 
     /// Return the `@_cdecl` function equivalent of this type.
     func cdecl(strategy: Bridgable.Strategy) -> TypeSignature {
-        // TODO: Object types, etc
         switch self {
         case .int:
             return .int64
@@ -106,8 +127,10 @@ extension TypeSignature {
             case .javaPeer:
                 return .javaObjectPointer
             case .swiftPeer:
-                return .swiftObjectPointer
-            default:
+                return .swiftObjectPointer(java: false)
+            case .custom:
+                return self.kotlinExternal // TODO
+            case .direct, .unknown:
                 return self.kotlinExternal
             }
         }
@@ -121,10 +144,17 @@ extension TypeSignature {
         case .string:
             return value + ".toJavaObject()!"
         default:
-            if strategy == .javaPeer {
+            switch strategy {
+            case .javaPeer:
                 return value + ".Java_peer.ptr"
-            } else {
-                return value // TODO: All other types
+            case .swiftPeer:
+                return value // TODO
+            case .custom:
+                return value // TODO
+            case .direct:
+                return value
+            case .unknown:
+                return value // TODO
             }
         }
     }
@@ -137,10 +167,17 @@ extension TypeSignature {
         case .string:
             return "try! String.fromJavaObject(" + value + ")"
         default:
-            if strategy == .javaPeer {
+            switch strategy {
+            case .javaPeer:
                 return description + "(Java_ptr: " + value + ")"
-            } else {
-                return value // TODO: All other types
+            case .swiftPeer:
+                return value // TODO
+            case .custom:
+                return value // TODO
+            case .direct:
+                return value
+            case .unknown:
+                return value // TODO
             }
         }
     }
@@ -161,10 +198,17 @@ extension TypeSignature {
         case .int:
             return "Int32(" + value + ")"
         default:
-            if strategy == .javaPeer {
+            switch strategy {
+            case .javaPeer:
                 return value + ".Java_peer.ptr"
-            } else {
-                return value // TODO: All other types
+            case .swiftPeer:
+                return value + ".Java_swiftPeerBridged()"
+            case .custom:
+                return value // TODO
+            case .direct:
+                return value
+            case .unknown:
+                return value // TODO
             }
         }
     }
@@ -175,10 +219,17 @@ extension TypeSignature {
         case .int:
             return "Int(" + value + ")"
         default:
-            if strategy == .javaPeer {
+            switch strategy {
+            case .javaPeer:
                 return description + "(Java_ptr: " + value + ")"
-            } else {
-                return value // TODO: All other types
+            case .swiftPeer:
+                return "SwiftObjectPointer.peer(of: " + value + ").pointee()!"
+            case .custom:
+                return value // TODO
+            case .direct:
+                return value
+            case .unknown:
+                return value
             }
         }
     }

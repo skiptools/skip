@@ -408,7 +408,69 @@ final class TranspiledBridgingTests: XCTestCase {
     }
 
     func testCompiledBridgedTypeVar() async throws {
-        // TODO
+        try await check(swift: """
+        // SKIP @bridge
+        var c = C()
+        """, swiftBridge: """
+        // SKIP @bridge
+        class C {
+        }
+        """, kotlins: ["""
+        internal open class C: skip.bridge.SwiftPeerBridged {
+            var Swift_peer: skip.bridge.SwiftObjectPointer
+
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
+
+            constructor() {
+                Swift_peer = Swift_constructor()
+            }
+            private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer
+
+            override fun Swift_bridgedPeer(): skip.bridge.SwiftObjectPointer = Swift_peer
+        }
+        """, """
+        internal var c = C()
+        """], swiftBridgeSupports: ["""
+        extension C {
+            private static let Java_class = try! JClass(name: "C")
+            func Java_swiftPeerBridged() -> JavaObjectPointer {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+            }
+            private static let Java_swiftPeerBridged_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+        }
+        @_cdecl("Java_C_Swift_1constructor")
+        func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
+            let f_return_swift = C()
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_C_Swift_1release")
+        func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: C.self)
+        }
+        """, """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        var c: C {
+            get {
+                let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, [])
+                return SwiftObjectPointer.peer(of: value_java).pointee()!
+            }
+            set {
+                let value_java = newValue.Java_swiftPeerBridged().toJavaParameter()
+                try! Java_SourceKt.callStatic(method: Java_set_c_methodID, [value_java])
+            }
+        }
+        private let Java_get_c_methodID = Java_SourceKt.getStaticMethodID(name: "getC", sig: "()LC;")!
+        private let Java_set_c_methodID = Java_SourceKt.getStaticMethodID(name: "setC", sig: "(LC;)V")!
+        """])
     }
 
     func testUnbridgableTypeVar() async throws {
