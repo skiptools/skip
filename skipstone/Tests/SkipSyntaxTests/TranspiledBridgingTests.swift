@@ -114,7 +114,7 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var s: String {
             get {
-                let value_java: String = try! Java_SourceKt.callStatic(method: Java_get_s_methodID, [])
+                let value_java: String = try! Java_SourceKt.callStatic(method: Java_get_s_methodID, args: [])
                 return value_java
             }
         }
@@ -132,7 +132,7 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var i: Int {
             get {
-                let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, [])
+                let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
                 return Int(value_java)
             }
         }
@@ -148,7 +148,7 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var i: Int64 {
             get {
-                let value_java: Int64 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, [])
+                let value_java: Int64 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
                 return value_java
             }
         }
@@ -166,12 +166,12 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var i: Int {
             get {
-                let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, [])
+                let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
                 return Int(value_java)
             }
             set {
                 let value_java = Int32(newValue).toJavaParameter()
-                try! Java_SourceKt.callStatic(method: Java_set_i_methodID, [value_java])
+                try! Java_SourceKt.callStatic(method: Java_set_i_methodID, args: [value_java])
             }
         }
         private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!
@@ -189,12 +189,12 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public var i: Int {
             get {
-                let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, [])
+                let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
                 return Int(value_java)
             }
             set {
                 let value_java = Int32(newValue).toJavaParameter()
-                try! Java_SourceKt.callStatic(method: Java_set_i_methodID, [value_java])
+                try! Java_SourceKt.callStatic(method: Java_set_i_methodID, args: [value_java])
             }
         }
         private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!
@@ -225,7 +225,7 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var i: Int {
             get {
-                let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, [])
+                let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
                 return Int(value_java)
             }
         }
@@ -252,7 +252,7 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var d: Double {
             get {
-                let value_java: Double = try! Java_SourceKt.callStatic(method: Java_get_d_methodID, [])
+                let value_java: Double = try! Java_SourceKt.callStatic(method: Java_get_d_methodID, args: [])
                 return value_java
             }
         }
@@ -282,7 +282,7 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var i: Int32 {
             get {
-                let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, [])
+                let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
                 return value_java
             }
         }
@@ -309,12 +309,12 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var i: Int64 {
             get {
-                let value_java: Int64 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, [])
+                let value_java: Int64 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
                 return value_java
             }
             set {
                 let value_java = newValue.toJavaParameter()
-                try! Java_SourceKt.callStatic(method: Java_set_i_methodID, [value_java])
+                try! Java_SourceKt.callStatic(method: Java_set_i_methodID, args: [value_java])
             }
         }
         private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()J")!
@@ -337,7 +337,7 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public var object: String {
             get {
-                let value_java: String = try! Java_SourceKt.callStatic(method: Java_get_object__methodID, [])
+                let value_java: String = try! Java_SourceKt.callStatic(method: Java_get_object__methodID, args: [])
                 return value_java
             }
         }
@@ -387,19 +387,19 @@ final class TranspiledBridgingTests: XCTestCase {
             }
 
             init() {
-                let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, [])
+                let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                 Java_peer = JObject(ptr)
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
         }
         var c: C {
             get {
-                let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, [])
+                let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
                 return C(Java_ptr: value_java)
             }
             set {
-                let value_java = newValue.Java_peer.ptr.toJavaParameter()
-                try! Java_SourceKt.callStatic(method: Java_set_c_methodID, [value_java])
+                let value_java = newValue.Java_peer.safePointer().toJavaParameter()
+                try! Java_SourceKt.callStatic(method: Java_set_c_methodID, args: [value_java])
             }
         }
         private let Java_get_c_methodID = Java_SourceKt.getStaticMethodID(name: "getC", sig: "()LC;")!
@@ -443,7 +443,7 @@ final class TranspiledBridgingTests: XCTestCase {
             private static let Java_class = try! JClass(name: "C")
             func Java_swiftPeerBridged() -> JavaObjectPointer {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
             }
             private static let Java_swiftPeerBridged_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
         }
@@ -460,12 +460,12 @@ final class TranspiledBridgingTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         var c: C {
             get {
-                let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, [])
+                let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
                 return SwiftObjectPointer.peer(of: value_java).pointee()!
             }
             set {
                 let value_java = newValue.Java_swiftPeerBridged().toJavaParameter()
-                try! Java_SourceKt.callStatic(method: Java_set_c_methodID, [value_java])
+                try! Java_SourceKt.callStatic(method: Java_set_c_methodID, args: [value_java])
             }
         }
         private let Java_get_c_methodID = Java_SourceKt.getStaticMethodID(name: "getC", sig: "()LC;")!
@@ -500,7 +500,7 @@ final class TranspiledBridgingTests: XCTestCase {
         func f(i: Int, s: String) -> Int {
             let i_java = Int32(i).toJavaParameter()
             let s_java = s.toJavaParameter()
-            let f_return_java: Int32 = try! Java_SourceKt.callStatic(method: Java_f_methodID, [i_java, s_java])
+            let f_return_java: Int32 = try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [i_java, s_java])
             return Int(f_return_java)
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "(ILjava/lang/String;)I")!
@@ -520,7 +520,7 @@ final class TranspiledBridgingTests: XCTestCase {
         public func f(i: Int, s: String) -> Int {
             let i_java = Int32(i).toJavaParameter()
             let s_java = s.toJavaParameter()
-            let f_return_java: Int32 = try! Java_SourceKt.callStatic(method: Java_f_methodID, [i_java, s_java])
+            let f_return_java: Int32 = try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [i_java, s_java])
             return Int(f_return_java)
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "(ILjava/lang/String;)I")!
@@ -591,19 +591,19 @@ final class TranspiledBridgingTests: XCTestCase {
             }
 
             init() {
-                let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, [])
+                let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                 Java_peer = JObject(ptr)
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
 
             var i: Int {
                 get {
-                    let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, [])
+                    let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
                     return Int(value_java)
                 }
                 set {
                     let value_java = Int32(newValue).toJavaParameter()
-                    try! Java_peer.call(method: Self.Java_set_i_methodID, [value_java])
+                    try! Java_peer.call(method: Self.Java_set_i_methodID, args: [value_java])
                 }
             }
             private static let Java_get_i_methodID = Java_class.getMethodID(name: "getI", sig: "()I")!
@@ -651,7 +651,7 @@ final class TranspiledBridgingTests: XCTestCase {
 
             init(i: Int) {
                 let i_java = Int32(i).toJavaParameter()
-                let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, [i_java])
+                let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [i_java])
                 Java_peer = JObject(ptr)
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(I)V")!

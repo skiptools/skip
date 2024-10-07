@@ -90,6 +90,11 @@ extension TypeSignature {
         switch self {
         case .int:
             return .int64
+        case .optional(let type):
+            let converted = type.kotlinExternal(strategy: strategy)
+            return converted.asOptional(converted != .swiftObjectPointer(java: true))
+        case .unwrappedOptional(let type):
+            return type.kotlinExternal(strategy: strategy)
         default:
             switch strategy {
             case .javaPeer:
@@ -108,15 +113,25 @@ extension TypeSignature {
 
     /// Return code that converts the given value of this type to its external form.
     func kotlinConvertToExternal(value: String, strategy: Bridgable.Strategy) -> String {
-        switch self {
+        switch self.asOptional(false) {
         case .int:
-            return value + ".toLong()"
+            if isOptional {
+                return value + "?.toLong()"
+            } else {
+                return value + ".toLong()"
+            }
+        case .unwrappedOptional(let type):
+            return type.kotlinConvertToExternal(value: value, strategy: strategy)
         default:
             switch strategy {
             case .javaPeer:
                 return value
             case .swiftPeer:
-                return value + ".Swift_peer"
+                if isOptional {
+                    return value + "?.Swift_peer ?: skip.bridge.SwiftObjectNil"
+                } else {
+                    return value + ".Swift_peer"
+                }
             case .custom:
                 return value // TODO
             case .direct:
@@ -129,15 +144,26 @@ extension TypeSignature {
 
     /// Return code that converts the given value of our external type back to this type.
     func kotlinConvertFromExternal(value: String, strategy: Bridgable.Strategy) -> String {
-        switch self {
+        switch self.asOptional(false) {
         case .int:
-            return value + ".toInt()"
+            if isOptional {
+                return value + "?.toInt()"
+            } else {
+                return value + ".toInt()"
+            }
+        case .unwrappedOptional(let type):
+            return type.kotlinConvertFromExternal(value: value, strategy: strategy)
         default:
             switch strategy {
             case .javaPeer:
                 return value
             case .swiftPeer:
-                return description + "(Swift_peer = " + value + ", marker = null)"
+                let converted = description + "(Swift_peer = " + value + ", marker = null)"
+                if isOptional {
+                    return "if (" + value + " == skip.bridge.SwiftObjectNil) null else " + converted
+                } else {
+                    return converted
+                }
             case .custom:
                 return value // TODO
             case .direct:
@@ -153,8 +179,12 @@ extension TypeSignature {
         switch self {
         case .int:
             return .int64
+        case .optional:
+            return .optional(.javaObjectPointer)
         case .string:
             return .named("JavaString", [])
+        case .unwrappedOptional(let type):
+            return type.cdecl(strategy: strategy)
         default:
             switch strategy {
             case .javaPeer:
@@ -173,21 +203,36 @@ extension TypeSignature {
 
     /// Return code that converst the given value of this type to its `@_cdecl` function form.
     func convertToCDecl(value: String, strategy: Bridgable.Strategy) -> String {
-        switch self {
+        switch self.asOptional(false) {
         case .int:
-            return "Int64(" + value + ")"
+            if isOptional {
+                return value + ".toJavaObject()"
+            } else {
+                return "Int64(" + value + ")"
+            }
         case .string:
-            return value + ".toJavaObject()!"
+            let converted = value + ".toJavaObject()"
+            return isOptional ? converted : converted + "!"
+        case .unwrappedOptional(let type):
+            return type.convertToCDecl(value: value, strategy: strategy)
         default:
             switch strategy {
             case .javaPeer:
-                return value + ".Java_peer.ptr"
+                if isOptional {
+                    return value + "?.Java_peer.safePointer()"
+                } else {
+                    return value + ".Java_peer.safePointer()"
+                }
             case .swiftPeer:
                 return "SwiftObjectPointer.pointer(to: " + value + ", retain: true)"
             case .custom:
                 return value // TODO
             case .direct:
-                return value
+                if isOptional {
+                    return value + ".toJavaObject()"
+                } else {
+                    return value
+                }
             case .unknown:
                 return value // TODO
             }
@@ -196,21 +241,39 @@ extension TypeSignature {
 
     /// Return code that converts the given value of our `@_cdecl` function type back to this type.
     func convertFromCDecl(value: String, strategy: Bridgable.Strategy) -> String {
-        switch self {
+        switch self.asOptional(false) {
         case .int:
-            return "Int(" + value + ")"
+            if isOptional {
+                return "try! " + description + ".fromJavaObject(" + value + ")"
+            } else {
+                return "Int(" + value + ")"
+            }
         case .string:
-            return "try! String.fromJavaObject(" + value + ")"
+            return "try! " + description + ".fromJavaObject(" + value + ")"
+        case .unwrappedOptional(let type):
+            return type.convertFromCDecl(value: value, strategy: strategy)
         default:
             switch strategy {
             case .javaPeer:
-                return description + "(Java_ptr: " + value + ")"
+                if isOptional {
+                    return value + " == nil ? nil : " + description + "(Java_ptr: " + value + "!)"
+                } else {
+                    return description + "(Java_ptr: " + value + ")"
+                }
             case .swiftPeer:
-                return value + ".pointee()! as " + description
+                if isOptional {
+                    return value + ".pointee() as " + description
+                } else {
+                    return value + ".pointee()! as " + description
+                }
             case .custom:
                 return value // TODO
             case .direct:
-                return value
+                if isOptional {
+                    return "try! " + description + ".fromJavaObject(" + value + ")"
+                } else {
+                    return value
+                }
             case .unknown:
                 return value // TODO
             }
@@ -222,6 +285,10 @@ extension TypeSignature {
         switch self {
         case .int:
             return .int32
+        case .optional:
+            return .javaObjectPointer
+        case .unwrappedOptional(let type):
+            return type.java
         default:
             return isNamedType ? .javaObjectPointer : self // TODO: All other types
         }
@@ -232,10 +299,12 @@ extension TypeSignature {
         switch self {
         case .int:
             return "Int32(" + value + ")"
+        case .unwrappedOptional(let type):
+            return type.convertToJava(value: value, strategy: strategy)
         default:
             switch strategy {
             case .javaPeer:
-                return value + ".Java_peer.ptr"
+                return value + ".Java_peer.safePointer()"
             case .swiftPeer:
                 return value + ".Java_swiftPeerBridged()"
             case .custom:
@@ -253,6 +322,8 @@ extension TypeSignature {
         switch self {
         case .int:
             return "Int(" + value + ")"
+        case .unwrappedOptional(let type):
+            return type.convertFromJava(value: value, strategy: strategy)
         default:
             switch strategy {
             case .javaPeer:
