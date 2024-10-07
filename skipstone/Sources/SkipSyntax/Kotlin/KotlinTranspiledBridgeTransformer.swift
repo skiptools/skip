@@ -92,7 +92,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         let callGet = variableDeclaration.role == .global ? getMethodIdentifier : "Self." + getMethodIdentifier
         swift.append(1, "get {")
         swift.append(2, [
-            "let value_java: " + type.java.description + " = try! " + targetIdentifier + "." + callType + "(method: " + callGet  + ", [])",
+            "let value_java: " + type.java.description + " = try! " + targetIdentifier + "." + callType + "(method: " + callGet  + ", args: [])",
             "return " + type.convertFromJava(value: "value_java", strategy: bridgable.strategy)
         ])
         swift.append(1, "}")
@@ -110,7 +110,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
             swift.append(1, setVisibility + "set {")
             swift.append(2, [
                 "let value_java = " + type.convertToJava(value: "newValue", strategy: bridgable.strategy) + ".toJavaParameter()",
-                "try! " + targetIdentifier + "." + callType + "(method: " + callSet + ", [value_java])"
+                "try! " + targetIdentifier + "." + callType + "(method: " + callSet + ", args: [value_java])"
             ])
             swift.append(1, "}")
         }
@@ -223,12 +223,12 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         }
 
         if functionDeclaration.type == .constructorDeclaration {
-            swift.append(1, "let ptr = try! Self.Java_class.create(ctor: Self." + methodIdentifier + ", [" + javaParameterNames.joined(separator: ", ") + "])")
+            swift.append(1, "let ptr = try! Self.Java_class.create(ctor: Self." + methodIdentifier + ", args: [" + javaParameterNames.joined(separator: ", ") + "])")
             swift.append(1, "Java_peer = JObject(ptr)")
         } else {
             let callType = functionDeclaration.role == .global ? "callStatic" : "call"
             let callMethod = functionDeclaration.role == .global ? methodIdentifier : "Self." + methodIdentifier
-            let call = "try! " + targetIdentifier + "." + callType + "(method: " + callMethod + ", [" + javaParameterNames.joined(separator: ", ") + "])"
+            let call = "try! " + targetIdentifier + "." + callType + "(method: " + callMethod + ", args: [" + javaParameterNames.joined(separator: ", ") + "])"
             if functionType.returnType == .void {
                 swift.append(1, call)
             } else {
@@ -279,7 +279,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
             swift.append("")
             swift.append(1, [
                 visibility + "init() {",
-                "    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, [])",
+                "    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])",
                 "    Java_peer = JObject(ptr)",
                 "}",
                 "private static let Java_constructor_methodID = Java_class.getMethodID(name: \"<init>\", sig: \"()V\")!"

@@ -376,7 +376,39 @@ final class CompiledBridgingTests: XCTestCase {
     }
 
     func testComputedVar() async throws {
-        // TODO
+        try await check(swiftBridge: """
+        // SKIP @bridge
+        var i: Int64 {
+            get {
+                return 1
+            }
+            set {
+            }
+        }
+        """, kotlin: """
+        internal var i: Long
+            get() {
+                val value_swift = Swift_i()
+                return value_swift
+            }
+            set(newValue) {
+                val newValue_swift = newValue
+                Swift_i_set(newValue_swift)
+            }
+        private external fun Swift_i(): Long
+        private external fun Swift_i_set(value: Long)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1i")
+        func BridgeKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int64 {
+            let value_swift = i
+            return value_swift
+        }
+        @_cdecl("Java_BridgeKt_Swift_1i_1set")
+        func BridgeKt_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: Int64) {
+            let value_swift = value
+            i = value_swift
+        }
+        """)
     }
 
     func testKeywordVar() async throws {
@@ -392,7 +424,33 @@ final class CompiledBridgingTests: XCTestCase {
     }
 
     func testOptionalVar() async throws {
-        // TODO
+        try await check(swiftBridge: """
+        // SKIP @bridge
+        var i: Int? = 1
+        """, kotlin: """
+        internal var i: Int?
+            get() {
+                val value_swift = Swift_i()
+                return value_swift?.toInt()
+            }
+            set(newValue) {
+                val newValue_swift = newValue?.toLong()
+                Swift_i_set(newValue_swift)
+            }
+        private external fun Swift_i(): Long?
+        private external fun Swift_i_set(value: Long?)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1i")
+        func BridgeKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer? {
+            let value_swift = i
+            return value_swift.toJavaObject()
+        }
+        @_cdecl("Java_BridgeKt_Swift_1i_1set")
+        func BridgeKt_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer?) {
+            let value_swift = try! Int?.fromJavaObject(value)
+            i = value_swift
+        }
+        """)
     }
 
     func testUnwrappedOptionalVar() async throws {
@@ -430,7 +488,7 @@ final class CompiledBridgingTests: XCTestCase {
         @_cdecl("Java_BridgeKt_Swift_1c")
         func BridgeKt_Swift_c(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
             let value_swift = c
-            return value_swift.Java_peer.ptr
+            return value_swift.Java_peer.safePointer()
         }
         @_cdecl("Java_BridgeKt_Swift_1c_1set")
         func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
@@ -447,7 +505,7 @@ final class CompiledBridgingTests: XCTestCase {
             }
 
             init() {
-                let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, [])
+                let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                 Java_peer = JObject(ptr)
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
@@ -499,7 +557,7 @@ final class CompiledBridgingTests: XCTestCase {
             private static let Java_class = try! JClass(name: "C")
             func Java_swiftPeerBridged() -> JavaObjectPointer {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
             }
             private static let Java_swiftPeerBridged_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
         }
@@ -671,7 +729,7 @@ final class CompiledBridgingTests: XCTestCase {
             private static let Java_class = try! JClass(name: "C")
             func Java_swiftPeerBridged() -> JavaObjectPointer {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
             }
             private static let Java_swiftPeerBridged_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
         }
@@ -749,7 +807,7 @@ final class CompiledBridgingTests: XCTestCase {
             private static let Java_class = try! JClass(name: "C")
             func Java_swiftPeerBridged() -> JavaObjectPointer {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
             }
             private static let Java_swiftPeerBridged_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
         }
@@ -820,7 +878,7 @@ final class CompiledBridgingTests: XCTestCase {
             private static let Java_class = try! JClass(name: "C")
             func Java_swiftPeerBridged() -> JavaObjectPointer {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
             }
             private static let Java_swiftPeerBridged_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
         }

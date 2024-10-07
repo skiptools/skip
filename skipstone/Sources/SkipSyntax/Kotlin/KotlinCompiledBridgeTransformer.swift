@@ -344,7 +344,7 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         swift.append(1, "private static let Java_class = try! JClass(name: \"" + classRef.className + "\")")
         swift.append(1, classDeclaration.modifiers.visibility.swift(suffix: " ") + "func Java_swiftPeerBridged() -> JavaObjectPointer {")
         swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)")
-        swift.append(2, "return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])")
+        swift.append(2, "return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])")
         swift.append(1, "}")
         swift.append(1, "private static let Java_swiftPeerBridged_methodID = Java_class.getMethodID(name: \"<init>\", sig: \"(JLskip/bridge/SwiftPeerMarker;)V\")!")
         swift.append("}")
