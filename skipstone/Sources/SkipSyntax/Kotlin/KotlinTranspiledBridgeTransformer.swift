@@ -6,7 +6,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         guard !syntaxTree.isBridgeFile, translator.codebaseInfo != nil, let outputFile = syntaxTree.source.file.bridgeOutputFile else {
             return []
         }
-        let globalsClassRef = globalsJavaClass(translator: translator)
+        let globalsClassRef = JavaClassRef(forFile: translator)
         var swiftDefinitions: [SwiftDefinition] = []
         var needsGlobalsJavaClass = false
         syntaxTree.root.visit { node in
@@ -43,7 +43,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
                 output.append(indentation).append("import ").append(path).append("\n")
             }
             if needsGlobalsJavaClass {
-                output.append(indentation).append(globalsClassRef.description).append("\n")
+                output.append(indentation).append(globalsClassRef.declaration).append("\n")
             }
             swiftDefinitions.forEach { output.append($0, indentation: indentation) }
             output.append("\n#endif")
@@ -91,10 +91,12 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         let callType = variableDeclaration.role == .global ? "callStatic" : "call"
         let callGet = variableDeclaration.role == .global ? getMethodIdentifier : "Self." + getMethodIdentifier
         swift.append(1, "get {")
-        swift.append(2, [
+        swift.append(2, "return jniContext {")
+        swift.append(3, [
             "let value_java: " + type.java.description + " = try! " + targetIdentifier + "." + callType + "(method: " + callGet  + ", args: [])",
             "return " + type.convertFromJava(value: "value_java", strategy: bridgable.strategy)
         ])
+        swift.append(2, "}")
         swift.append(1, "}")
 
         // Setter
@@ -108,10 +110,12 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
             }
             let callSet = variableDeclaration.role == .global ? setMethodIdentifier : "Self." + setMethodIdentifier
             swift.append(1, setVisibility + "set {")
-            swift.append(2, [
+            swift.append(2, "jniContext {")
+            swift.append(3, [
                 "let value_java = " + type.convertToJava(value: "newValue", strategy: bridgable.strategy) + ".toJavaParameter()",
                 "try! " + targetIdentifier + "." + callType + "(method: " + callSet + ", args: [value_java])"
             ])
+            swift.append(2, "}")
             swift.append(1, "}")
         }
         swift.append("}")
@@ -215,16 +219,25 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         let returnString = functionType.returnType == .void ? "" : " -> " + functionType.returnType.description
         swift.append(visibility + (functionDeclaration.type == .constructorDeclaration ? "init" : "func " + functionDeclaration.name) + "(" + parameterString + ")" + returnString + " {")
 
+        var jniReturnType = functionDeclaration.type == .constructorDeclaration ? "Java_peer = " : ""
+        if functionType.returnType != .void {
+            jniReturnType += "return "
+        }
+        if functionDeclaration.apiFlags.options.contains(.throws) {
+            jniReturnType += "try "
+        }
+        swift.append(1, jniReturnType + "jniContext {")
+
         var javaParameterNames: [String] = []
         for p in functionDeclaration.parameters {
             let name = p.internalLabel + "_java"
             javaParameterNames.append(name)
-            swift.append(1, "let " + name + " = " + p.declaredType.convertToJava(value: p.internalLabel, strategy: .direct) + ".toJavaParameter()")
+            swift.append(2, "let " + name + " = " + p.declaredType.convertToJava(value: p.internalLabel, strategy: .direct) + ".toJavaParameter()")
         }
 
         if functionDeclaration.type == .constructorDeclaration {
-            swift.append(1, "let ptr = try! Self.Java_class.create(ctor: Self." + methodIdentifier + ", args: [" + javaParameterNames.joined(separator: ", ") + "])")
-            swift.append(1, "Java_peer = JObject(ptr)")
+            swift.append(2, "let ptr = try! Self.Java_class.create(ctor: Self." + methodIdentifier + ", args: [" + javaParameterNames.joined(separator: ", ") + "])")
+            swift.append(2, "return JObject(ptr)")
         } else {
             let callType = functionDeclaration.role == .global ? "callStatic" : "call"
             let callMethod = functionDeclaration.role == .global ? methodIdentifier : "Self." + methodIdentifier
@@ -232,10 +245,11 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
             if functionType.returnType == .void {
                 swift.append(1, call)
             } else {
-                swift.append(1, "let f_return_java: " + functionType.returnType.java.description + " = " + call)
-                swift.append(1, "return " + functionType.returnType.convertFromJava(value: "f_return_java", strategy: .direct))
+                swift.append(2, "let f_return_java: " + functionType.returnType.java.description + " = " + call)
+                swift.append(2, "return " + functionType.returnType.convertFromJava(value: "f_return_java", strategy: .direct))
             }
         }
+        swift.append(1, "}")
         swift.append("}")
 
         let declarationType = functionDeclaration.role == .global ? "let " : "static let "
@@ -260,13 +274,13 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         guard classDeclaration.checkBridgable(translator: translator) else {
             return
         }
-        let classRef = JavaClassRef.for(classDeclaration, translator: translator)
+        let classRef = JavaClassRef(for: classDeclaration, translator: translator)
 
         let visibility = classDeclaration.modifiers.visibility.swift(suffix: " ")
         var swift: [String] = []
         swift.append(visibility + "class " + classDeclaration.name + " {")
 
-        swift.append(1, "private static let Java_class = try! JClass(name: \"" + classRef.className + "\")")
+        swift.append(1, classRef.declaration)
         swift.append(1, visibility + "let Java_peer: JObject")
         swift.append("")
         swift.append(1, [
@@ -277,10 +291,14 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
 
         if !classDeclaration.members.contains(where: { $0.type == .constructorDeclaration }) {
             swift.append("")
+            swift.append(1, visibility + "init() {")
+            swift.append(2, "Java_peer = jniContext {")
+            swift.append(3, [
+                "let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])",
+                "return JObject(ptr)"
+            ])
+            swift.append(2, "}")
             swift.append(1, [
-                visibility + "init() {",
-                "    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])",
-                "    Java_peer = JObject(ptr)",
                 "}",
                 "private static let Java_constructor_methodID = Java_class.getMethodID(name: \"<init>\", sig: \"()V\")!"
             ])
@@ -302,22 +320,5 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
             output.append(indentation).append("}\n")
         }
         swiftDefinitions.append(definition)
-    }
-
-    private func globalsJavaClass(translator: KotlinTranslator) -> JavaClassRef {
-        let file = translator.syntaxTree.source.file
-        var identifier = file.name
-        let ext = file.extension
-        if !ext.isEmpty {
-            identifier = String(identifier.dropLast(ext.count + 1))
-        }
-        identifier += "Kt"
-        let className: String
-        if let packageName = translator.packageName {
-            className = packageName.replacing(".", with: "/") + "/" + identifier
-        } else {
-            className = identifier
-        }
-        return JavaClassRef(identifier: "Java_" + identifier, className: className)
     }
 }
