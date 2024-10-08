@@ -338,10 +338,10 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         classDeclaration.insert(statements: insertStatements, after: nil)
 
         // Add utility function to create a Java object from a Swift instance
-        let classRef = JavaClassRef.for(classDeclaration, translator: translator)
+        let classRef = JavaClassRef(for: classDeclaration, translator: translator)
         var swift: [String] = []
         swift.append("extension " + classDeclaration.signature.description + " {")
-        swift.append(1, "private static let Java_class = try! JClass(name: \"" + classRef.className + "\")")
+        swift.append(1, classRef.declaration)
         swift.append(1, classDeclaration.modifiers.visibility.swift(suffix: " ") + "func Java_swiftPeerBridged() -> JavaObjectPointer {")
         swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)")
         swift.append(2, "return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])")

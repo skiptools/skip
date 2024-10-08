@@ -39,22 +39,44 @@ struct SwiftDefinition: OutputNode {
 }
 
 /// Utilities for declaring a JNI class reference.
-struct JavaClassRef: Hashable, CustomStringConvertible {
+struct JavaClassRef {
     let identifier: String
     let className: String
+    let isFileClass: Bool
 
-    static func `for`(_ classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) -> JavaClassRef {
+    init(for classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
         let className: String
         if let packageName = translator.packageName {
             className = packageName.replacing(".", with: "/") + "/" + classDeclaration.name
         } else {
             className = classDeclaration.name
         }
-        return JavaClassRef(identifier: "Java_class", className: className)
+        self.identifier = "Java_class"
+        self.className = className
+        self.isFileClass = false
     }
 
-    var description: String {
-        return "private let " + identifier + " = try! JClass(name: \"" + className + "\")"
+    init(forFile translator: KotlinTranslator) {
+        let file = translator.syntaxTree.source.file
+        var identifier = file.name
+        let ext = file.extension
+        if !ext.isEmpty {
+            identifier = String(identifier.dropLast(ext.count + 1))
+        }
+        identifier += "Kt"
+        let className: String
+        if let packageName = translator.packageName {
+            className = packageName.replacing(".", with: "/") + "/" + identifier
+        } else {
+            className = identifier
+        }
+        self.identifier = "Java_" + identifier
+        self.className = className
+        self.isFileClass = true
+    }
+
+    var declaration: String {
+        return (isFileClass ? "private let " : "private static let ") + identifier + " = try! JClass(name: \"" + className + "\")"
     }
 }
 
@@ -286,7 +308,7 @@ extension TypeSignature {
         case .int:
             return .int32
         case .optional:
-            return .javaObjectPointer
+            return .optional(.javaObjectPointer)
         case .unwrappedOptional(let type):
             return type.java
         default:
@@ -322,6 +344,8 @@ extension TypeSignature {
         switch self {
         case .int:
             return "Int(" + value + ")"
+        case .optional:
+            return "try! " + description + ".fromJavaObject(" + value + ")"
         case .unwrappedOptional(let type):
             return type.convertFromJava(value: value, strategy: strategy)
         default:

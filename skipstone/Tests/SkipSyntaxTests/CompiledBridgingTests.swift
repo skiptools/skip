@@ -505,8 +505,10 @@ final class CompiledBridgingTests: XCTestCase {
             }
 
             init() {
-                let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
-                Java_peer = JObject(ptr)
+                Java_peer = jniContext {
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    return JObject(ptr)
+                }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
         }
