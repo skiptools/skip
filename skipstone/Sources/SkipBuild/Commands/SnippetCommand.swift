@@ -66,7 +66,7 @@ struct SnippetCommand: SnippetOptionsCommand, StreamingCommand {
             codebaseInfo.dependentModules.append(export)
         }
 
-        let transpiler = Transpiler(packageName: nil, sourceFiles: sourceFiles, codebaseInfo: codebaseInfo, transformers: builtinKotlinTransformers())
+        let transpiler = Transpiler(packageName: nil, transpileFiles: sourceFiles, codebaseInfo: codebaseInfo, transformers: builtinKotlinTransformers())
         try await transpiler.transpile { transpilation in
             // note that transpilation messages are included as part of the output itself, rather than being logged as a message
             let msgs = transpilation.messages

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Generate transpiled Swift (Kotlin) to compiled Swift bridging code.
-final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
+final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         guard !syntaxTree.isBridgeFile, translator.codebaseInfo != nil, let outputFile = syntaxTree.source.file.bridgeOutputFile else {
             return []
@@ -11,18 +11,24 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         var needsGlobalsJavaClass = false
         syntaxTree.root.visit { node in
             if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global {
-                if variableDeclaration.attributes.contains(directive: Directive.bridge) {
+                if variableDeclaration.attributes.contains(directive: Directive.bridgeToSwift) {
                     needsGlobalsJavaClass = addSwiftDefinitions(forGlobal: variableDeclaration, to: &swiftDefinitions, globalsClassRef: globalsClassRef, translator: translator) || needsGlobalsJavaClass
+                } else if variableDeclaration.attributes.contains(directive: Directive.bridgeToKotlin) {
+                    variableDeclaration.messages.append(Message.kotlinBridgeKotlinToKotlin(variableDeclaration, source: translator.syntaxTree.source))
                 }
                 return .skip
             } else if let functionDeclaration = node as? KotlinFunctionDeclaration, functionDeclaration.role == .global {
-                if functionDeclaration.attributes.contains(directive: Directive.bridge) {
+                if functionDeclaration.attributes.contains(directive: Directive.bridgeToSwift) {
                     needsGlobalsJavaClass = addSwiftDefinitions(forGlobal: functionDeclaration, to: &swiftDefinitions, globalsClassRef: globalsClassRef, translator: translator) || needsGlobalsJavaClass
+                } else if functionDeclaration.attributes.contains(directive: Directive.bridgeToKotlin) {
+                    functionDeclaration.messages.append(Message.kotlinBridgeKotlinToKotlin(functionDeclaration, source: translator.syntaxTree.source))
                 }
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
-                if classDeclaration.attributes.contains(directive: Directive.bridge) {
+                if classDeclaration.attributes.contains(directive: Directive.bridgeToSwift) {
                     addSwiftDefinitions(for: classDeclaration, to: &swiftDefinitions, translator: translator)
+                } else if classDeclaration.attributes.contains(directive: Directive.bridgeToKotlin) {
+                    classDeclaration.messages.append(Message.kotlinBridgeKotlinToKotlin(classDeclaration, source: translator.syntaxTree.source))
                 }
                 return .recurse(nil)
             } else {
@@ -229,10 +235,11 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         swift.append(1, jniReturnType + "jniContext {")
 
         var javaParameterNames: [String] = []
-        for p in functionDeclaration.parameters {
-            let name = p.internalLabel + "_java"
+        for (index, parameter) in functionDeclaration.parameters.enumerated() {
+            let name = parameter.internalLabel + "_java"
             javaParameterNames.append(name)
-            swift.append(2, "let " + name + " = " + p.declaredType.convertToJava(value: p.internalLabel, strategy: .direct) + ".toJavaParameter()")
+            let strategy = bridgables.parameters[index].strategy
+            swift.append(2, "let " + name + " = " + parameter.declaredType.convertToJava(value: parameter.internalLabel, strategy: strategy) + ".toJavaParameter()")
         }
 
         if functionDeclaration.type == .constructorDeclaration {
@@ -246,7 +253,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
                 swift.append(1, call)
             } else {
                 swift.append(2, "let f_return_java: " + functionType.returnType.java.description + " = " + call)
-                swift.append(2, "return " + functionType.returnType.convertFromJava(value: "f_return_java", strategy: .direct))
+                swift.append(2, "return " + functionType.returnType.convertFromJava(value: "f_return_java", strategy: bridgables.return.strategy))
             }
         }
         swift.append(1, "}")

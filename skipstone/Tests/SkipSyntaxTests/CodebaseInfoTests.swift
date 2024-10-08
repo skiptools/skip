@@ -514,7 +514,7 @@ final class CodebaseInfoTests: XCTestCase {
         } else {
             srcFiles = [srcFile3, srcFile2, srcFile1]
         }
-        let transpiler = Transpiler(packageName: "tmp.test", sourceFiles: srcFiles.map { Source.FilePath(path: $0.path) }, codebaseInfo: codebaseInfo, transformers: builtinKotlinTransformers())
+        let transpiler = Transpiler(packageName: "tmp.test", transpileFiles: srcFiles.map { Source.FilePath(path: $0.path) }, codebaseInfo: codebaseInfo, transformers: builtinKotlinTransformers())
         var transpilations: [String] = []
         try await transpiler.transpile(handler: { transpilations.append($0.output.content) })
 

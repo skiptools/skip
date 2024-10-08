@@ -1,5 +1,5 @@
 /// Generate compiled Swift to Kotlin bridging code.
-final class KotlinCompiledBridgeTransformer: KotlinTransformer {
+final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         guard syntaxTree.isBridgeFile, let codebaseInfo = translator.codebaseInfo, let outputFile = syntaxTree.source.file.bridgeOutputFile else {
             return []
@@ -65,6 +65,10 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
     }
 
     private func updateVariableDeclaration(_ variableDeclaration: KotlinVariableDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+        guard classDeclaration != nil || !variableDeclaration.attributes.contains(directive: Directive.bridgeToSwift) else {
+            variableDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(variableDeclaration, source: translator.syntaxTree.source))
+            return
+        }
         guard let bridgable = variableDeclaration.checkBridgable(translator: translator) else {
             return
         }
@@ -168,6 +172,10 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
     }
 
     private func updateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+        guard classDeclaration != nil || !functionDeclaration.attributes.contains(directive: Directive.bridgeToSwift) else {
+            functionDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(functionDeclaration, source: translator.syntaxTree.source))
+            return
+        }
         guard let bridgables = functionDeclaration.checkBridgable(translator: translator) else {
             return
         }
@@ -181,10 +189,11 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         var body: [String] = []
         var cdeclBody: [String] = []
         var externalParameterNames: [String] = []
-        for parameter in functionDeclaration.parameters {
+        for (index, parameter) in functionDeclaration.parameters.enumerated() {
             let externalParameterName = parameter.internalLabel + "_swift"
-            body.append("val " + externalParameterName + " = " + parameter.declaredType.kotlinConvertToExternal(value: parameter.internalLabel, strategy: .direct))
-            cdeclBody.append("let " + externalParameterName + " = " + parameter.declaredType.convertFromCDecl(value: parameter.internalLabel, strategy: .direct))
+            let strategy = bridgables.parameters[index].strategy
+            body.append("val " + externalParameterName + " = " + parameter.declaredType.kotlinConvertToExternal(value: parameter.internalLabel, strategy: strategy))
+            cdeclBody.append("let " + externalParameterName + " = " + parameter.declaredType.convertFromCDecl(value: parameter.internalLabel, strategy: strategy))
             externalParameterNames.append(externalParameterName)
         }
 
@@ -219,10 +228,10 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
             cdeclBody.append(swiftCallTarget + functionName + "(" + swiftArgumentsString + ")")
         } else {
             body.append("val f_return_swift = " + externalName + "(" + externalArgumentsString + ")")
-            body.append("return " + functionDeclaration.returnType.kotlinConvertFromExternal(value: "f_return_swift", strategy: .direct))
+            body.append("return " + functionDeclaration.returnType.kotlinConvertFromExternal(value: "f_return_swift", strategy: bridgables.return.strategy))
 
             cdeclBody.append("let f_return_swift = " + swiftCallTarget + functionName + "(" + swiftArgumentsString + ")")
-            cdeclBody.append("return " + functionDeclaration.returnType.convertToCDecl(value: "f_return_swift", strategy: .direct))
+            cdeclBody.append("return " + functionDeclaration.returnType.convertToCDecl(value: "f_return_swift", strategy: bridgables.return.strategy))
         }
         functionDeclaration.body = KotlinCodeBlock(statements: body.map { KotlinRawStatement(sourceCode: $0) })
 
@@ -233,28 +242,34 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
                 externalFunctionDeclaration += ", "
             }
         }
-        externalFunctionDeclaration += functionDeclaration.parameters.map { p in
-            p.internalLabel + ": " + p.declaredType.kotlinExternal(strategy: .direct).kotlin
+        externalFunctionDeclaration += functionDeclaration.parameters.enumerated().map { (index, parameter) in
+            let strategy = bridgables.parameters[index].strategy
+            return parameter.internalLabel + ": " + parameter.declaredType.kotlinExternal(strategy: strategy).kotlin
         }.joined(separator: ", ")
         externalFunctionDeclaration += ")"
         if functionDeclaration.type == .constructorDeclaration {
             externalFunctionDeclaration += ": skip.bridge.SwiftObjectPointer"
         } else if functionDeclaration.returnType != .void {
-            externalFunctionDeclaration += ": " + functionDeclaration.returnType.kotlinExternal(strategy: .direct).kotlin
+            externalFunctionDeclaration += ": " + functionDeclaration.returnType.kotlinExternal(strategy: bridgables.return.strategy).kotlin
         }
         (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [KotlinRawStatement(sourceCode: externalFunctionDeclaration)], after: functionDeclaration)
 
         let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: externalName, translator: translator)
         let instanceParameter = classDeclaration != nil && functionDeclaration.type != .constructorDeclaration ? [cdeclInstanceParameter] : []
         let returnType: TypeSignature = functionDeclaration.type == .constructorDeclaration ? .swiftObjectPointer(java: false) : functionType.returnType
-        let cdeclType: TypeSignature = .function(instanceParameter + functionType.parameters.map { p in
-            TypeSignature.Parameter(label: p.label, type: p.type.cdecl(strategy: .direct))
-        }, returnType.cdecl(strategy: .direct), APIFlags(), nil)
+        let cdeclType: TypeSignature = .function(instanceParameter + functionType.parameters.enumerated().map { (index, parameter) in
+            let strategy = bridgables.parameters[index].strategy
+            return TypeSignature.Parameter(label: parameter.label, type: parameter.type.cdecl(strategy: strategy))
+        }, returnType.cdecl(strategy: bridgables.return.strategy), APIFlags(), nil)
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
         cdeclFunctions.append(cdeclFunction)
     }
 
     private func updateClassDeclaration(_ classDeclaration: KotlinClassDeclaration, swiftDefinitions: inout [SwiftDefinition], cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+        guard !classDeclaration.attributes.contains(directive: Directive.bridgeToSwift) else {
+            classDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(classDeclaration, source: translator.syntaxTree.source))
+            return
+        }
         guard classDeclaration.checkBridgable(translator: translator) else {
             return
         }

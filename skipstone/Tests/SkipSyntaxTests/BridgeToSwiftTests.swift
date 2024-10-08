@@ -1,9 +1,16 @@
 import XCTest
 
-final class TranspiledBridgingTests: XCTestCase {
+final class BridgeToSwiftTests: XCTestCase {
+    func testWrongBridgeType() async throws {
+        try await checkProducesMessage(swift: """
+        // SKIP @bridgeToKotlin
+        var i = 1
+        """)
+    }
+
     func testLetSupportedLiteral() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         let b = true
         """, kotlin: """
         internal val b = true
@@ -12,7 +19,7 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
 
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         let i = 1
         """, kotlin: """
         internal val i = 1
@@ -21,7 +28,7 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
         
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         let i: Int32 = 1
         """, kotlin: """
         internal val i: Int = 1
@@ -30,7 +37,7 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
         
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         let d = 5.0
         """, kotlin: """
         internal val d = 5.0
@@ -39,7 +46,7 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
         
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         let d: Double = 5
         """, kotlin: """
         internal val d: Double = 5.0
@@ -48,7 +55,7 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
         
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         let d: Double? = nil
         """, kotlin: """
         internal val d: Double? = null
@@ -57,7 +64,7 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
         
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         let d: Double? = 5
         """, kotlin: """
         internal val d: Double? = 5.0
@@ -66,7 +73,7 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
 
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         let f = Float(1)
         """, kotlin: """
         internal val f = 1f
@@ -75,7 +82,7 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
 
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         let s = "Hello"
         """, kotlin: """
         internal val s = "Hello"
@@ -84,7 +91,7 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
 
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         let l = Int64(1)
         """, kotlin: """
         internal val l = 1L
@@ -95,7 +102,7 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testPublicLetSupportedLiteral() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         public let b = true
         """, kotlin: """
         val b = true
@@ -106,7 +113,7 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testLetUnsupportedLiteral() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         let s = "ab\\(1 + 1)c"
         """, kotlin: """
         internal val s = "ab${1 + 1}c"
@@ -126,7 +133,7 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testLetNonLiteral() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         let i = 1 + 1
         """, kotlin: """
         internal val i = 1 + 1
@@ -144,7 +151,7 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
 
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         let i = Int64(1 + 1)
         """, kotlin: """
         internal val i = Long(1 + 1)
@@ -164,7 +171,7 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testStoredVar() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         var i = 1
         """, kotlin: """
         internal var i = 1
@@ -191,7 +198,7 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testPublicVar() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         public var i = 1
         """, kotlin: """
         var i = 1
@@ -218,19 +225,19 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testPrivateVar() async throws {
         try await checkProducesMessage(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         private let i = 1
         """)
 
         try await checkProducesMessage(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         fileprivate let i = 1
         """)
     }
 
     func testPrivateSetVar() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         private(set) var i = 1
         """, kotlin: """
         internal var i = 1
@@ -249,7 +256,7 @@ final class TranspiledBridgingTests: XCTestCase {
         """)
 
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         private(set) var d: Double {
             get {
                 return 1.0
@@ -280,7 +287,7 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testWillSetDidSet() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         private(set) var i: Int32 = 1 {
             willSet {
                 print("willSet")
@@ -312,7 +319,7 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testComputedVar() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         var i: Int64 {
             get {
                 return 1
@@ -348,7 +355,7 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testKeywordVar() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         public var object: String {
             get {
                 return ""
@@ -381,7 +388,7 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testOptionalVar() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         var i: Int? = 1
         """, kotlin: """
         internal var i: Int? = 1
@@ -416,10 +423,10 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testTranspiledBridgedTypeVar() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         class C {
         }
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         var c = C()
         """, kotlin: """
         internal open class C {
@@ -464,10 +471,10 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testCompiledBridgedTypeVar() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         var c = C()
         """, swiftBridge: """
-        // SKIP @bridge
+        // SKIP @bridgeToKotlin
         class C {
         }
         """, kotlins: ["""
@@ -534,21 +541,21 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testUnbridgableTypeVar() async throws {
         try await checkProducesMessage(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         var c: C = C()
         """)
 
         try await checkProducesMessage(swift: """
         class C {
         }
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         var c = C()
         """)
     }
 
     func testFunction() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         func f(i: Int, s: String) -> Int {
             return i + (Int(s) ?? 0)
         }
@@ -570,7 +577,7 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testPublicFunction() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         public func f(i: Int, s: String) -> Int {
             return i + (Int(s) ?? 0)
         }
@@ -592,12 +599,12 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testPrivateFunction() async throws {
         try await checkProducesMessage(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         private func f() { }
         """)
 
         try await checkProducesMessage(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         fileprivate func f() { }
         """)
     }
@@ -636,7 +643,7 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testClass() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         class C {
             var i = 1
         }
@@ -699,7 +706,7 @@ final class TranspiledBridgingTests: XCTestCase {
 
     func testConstructor() async throws {
         try await check(swift: """
-        // SKIP @bridge
+        // SKIP @bridgeToSwift
         class C {
             init(i: Int) {
             }

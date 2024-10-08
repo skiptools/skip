@@ -35,7 +35,7 @@ class Statement: SyntaxNode {
             }
             return visibility != .private && visibility != .fileprivate
         } else {
-            return attributes.contains(directive: Directive.bridge)
+            return attributes.contains(directive: Directive.bridgeToKotlin) || attributes.contains(directive: Directive.bridgeToSwift)
         }
     }
 }

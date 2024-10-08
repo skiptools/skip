@@ -589,7 +589,7 @@ extension TypeSignature {
                 if firstTypeInfo == nil {
                     firstTypeInfo = typeInfo
                 }
-                if firstMessage == nil, !typeInfo.attributes.contains(directive: Directive.bridge) {
+                if firstMessage == nil, !typeInfo.attributes.contains(directive: Directive.bridgeToKotlin) && !typeInfo.attributes.contains(directive: Directive.bridgeToSwift) {
                     firstMessage = Message.kotlinBridgeUnbridgedType(sourceDerived, type: type.description, source: translator.syntaxTree.source)
                 }
             } else if firstMessage == nil {
@@ -619,7 +619,7 @@ extension TypeSignature {
             guard let typeInfo else {
                 return .unknown
             }
-            return typeInfo.attributes.contains(directive: Directive.bridgeFileType) ? .swiftPeer : .javaPeer
+            return typeInfo.attributes.contains(directive: Directive.bridgeToKotlin) ? .swiftPeer : .javaPeer
         }
     }
 }

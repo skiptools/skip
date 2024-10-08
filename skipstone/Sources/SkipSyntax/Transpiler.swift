@@ -5,16 +5,16 @@ import SwiftSyntax
 /// Manages the transpilation process.
 public struct Transpiler {
     private let packageName: String?
-    private let sourceFiles: [Source.FilePath]
+    private let transpileFiles: [Source.FilePath]
     private let bridgeFiles: [Source.FilePath]
     private let codebaseInfo: CodebaseInfo
     public var preprocessorSymbols: Set<String>
     public var transformers: [KotlinTransformer]
 
     /// Supply files to transpile.
-    public init(packageName: String? = nil, sourceFiles: [Source.FilePath], bridgeFiles: [Source.FilePath] = [], codebaseInfo: CodebaseInfo, preprocessorSymbols: Set<String> = [], transformers: [KotlinTransformer] = []) {
+    public init(packageName: String? = nil, transpileFiles: [Source.FilePath], bridgeFiles: [Source.FilePath] = [], codebaseInfo: CodebaseInfo, preprocessorSymbols: Set<String> = [], transformers: [KotlinTransformer] = []) {
         self.packageName = packageName
-        self.sourceFiles = sourceFiles
+        self.transpileFiles = transpileFiles
         self.bridgeFiles = bridgeFiles
         self.codebaseInfo = codebaseInfo
         self.preprocessorSymbols = preprocessorSymbols
@@ -23,7 +23,7 @@ public struct Transpiler {
 
     /// Perform transpilation, feeding results to the given handler.
     public func transpile(handler: (Transpilation) async throws -> Void) async throws {
-        guard !sourceFiles.isEmpty || !bridgeFiles.isEmpty else {
+        guard !transpileFiles.isEmpty || !bridgeFiles.isEmpty else {
             return
         }
 
@@ -32,16 +32,16 @@ public struct Transpiler {
         var sources: [Source] = []
         var bridgeSources: [Source] = []
         try await withThrowingTaskGroup(of: SyntaxTree?.self) { group in
-            for sourceFile in sourceFiles {
+            for transpileFile in transpileFiles {
                 group.addTask {
-                    return try SyntaxTree(source: Source(file: sourceFile), preprocessorSymbols: preprocessorSymbols)
+                    return try SyntaxTree(source: Source(file: transpileFile), preprocessorSymbols: preprocessorSymbols)
                 }
             }
             for bridgeFile in bridgeFiles {
                 group.addTask {
                     let bridgeSource = try Source(file: bridgeFile)
                     // Most compiled files do not contain bridging code
-                    guard bridgeSource.content.contains("@bridge") else {
+                    guard bridgeSource.content.contains("@bridgeTo") else {
                         return nil
                     }
                     return SyntaxTree(source: bridgeSource, isBridgeFile: true, preprocessorSymbols: preprocessorSymbols)
@@ -92,7 +92,7 @@ public struct Transpiler {
         // Finally create an additional source files for any package-level code.
         // Suffix the generated file with "Tests" to avoid clashes with the primary modules `PackageSupportKt` class (https://github.com/skiptools/skip/issues/66)
         let isTestModule = codebaseInfo.moduleName?.hasSuffix("Tests") == true
-        if let packageSupportTranspilation = KotlinTranslator.transpilePackageSupport(sourceFile: (sourceFiles.first ?? bridgeFiles.first!).kotlinPackageSupport(tests: isTestModule), codebaseInfo: codebaseInfo, transformers: transformers) {
+        if let packageSupportTranspilation = KotlinTranslator.transpilePackageSupport(sourceFile: (transpileFiles.first ?? bridgeFiles.first!).kotlinPackageSupport(tests: isTestModule), codebaseInfo: codebaseInfo, transformers: transformers) {
             try await handler(packageSupportTranspilation)
         }
     }
