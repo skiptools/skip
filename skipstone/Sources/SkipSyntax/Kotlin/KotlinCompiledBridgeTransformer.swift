@@ -181,10 +181,11 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
         var body: [String] = []
         var cdeclBody: [String] = []
         var externalParameterNames: [String] = []
-        for parameter in functionDeclaration.parameters {
+        for (index, parameter) in functionDeclaration.parameters.enumerated() {
             let externalParameterName = parameter.internalLabel + "_swift"
-            body.append("val " + externalParameterName + " = " + parameter.declaredType.kotlinConvertToExternal(value: parameter.internalLabel, strategy: .direct))
-            cdeclBody.append("let " + externalParameterName + " = " + parameter.declaredType.convertFromCDecl(value: parameter.internalLabel, strategy: .direct))
+            let strategy = bridgables.parameters[index].strategy
+            body.append("val " + externalParameterName + " = " + parameter.declaredType.kotlinConvertToExternal(value: parameter.internalLabel, strategy: strategy))
+            cdeclBody.append("let " + externalParameterName + " = " + parameter.declaredType.convertFromCDecl(value: parameter.internalLabel, strategy: strategy))
             externalParameterNames.append(externalParameterName)
         }
 
@@ -219,10 +220,10 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
             cdeclBody.append(swiftCallTarget + functionName + "(" + swiftArgumentsString + ")")
         } else {
             body.append("val f_return_swift = " + externalName + "(" + externalArgumentsString + ")")
-            body.append("return " + functionDeclaration.returnType.kotlinConvertFromExternal(value: "f_return_swift", strategy: .direct))
+            body.append("return " + functionDeclaration.returnType.kotlinConvertFromExternal(value: "f_return_swift", strategy: bridgables.return.strategy))
 
             cdeclBody.append("let f_return_swift = " + swiftCallTarget + functionName + "(" + swiftArgumentsString + ")")
-            cdeclBody.append("return " + functionDeclaration.returnType.convertToCDecl(value: "f_return_swift", strategy: .direct))
+            cdeclBody.append("return " + functionDeclaration.returnType.convertToCDecl(value: "f_return_swift", strategy: bridgables.return.strategy))
         }
         functionDeclaration.body = KotlinCodeBlock(statements: body.map { KotlinRawStatement(sourceCode: $0) })
 
@@ -233,23 +234,25 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
                 externalFunctionDeclaration += ", "
             }
         }
-        externalFunctionDeclaration += functionDeclaration.parameters.map { p in
-            p.internalLabel + ": " + p.declaredType.kotlinExternal(strategy: .direct).kotlin
+        externalFunctionDeclaration += functionDeclaration.parameters.enumerated().map { (index, parameter) in
+            let strategy = bridgables.parameters[index].strategy
+            return parameter.internalLabel + ": " + parameter.declaredType.kotlinExternal(strategy: strategy).kotlin
         }.joined(separator: ", ")
         externalFunctionDeclaration += ")"
         if functionDeclaration.type == .constructorDeclaration {
             externalFunctionDeclaration += ": skip.bridge.SwiftObjectPointer"
         } else if functionDeclaration.returnType != .void {
-            externalFunctionDeclaration += ": " + functionDeclaration.returnType.kotlinExternal(strategy: .direct).kotlin
+            externalFunctionDeclaration += ": " + functionDeclaration.returnType.kotlinExternal(strategy: bridgables.return.strategy).kotlin
         }
         (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [KotlinRawStatement(sourceCode: externalFunctionDeclaration)], after: functionDeclaration)
 
         let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: externalName, translator: translator)
         let instanceParameter = classDeclaration != nil && functionDeclaration.type != .constructorDeclaration ? [cdeclInstanceParameter] : []
         let returnType: TypeSignature = functionDeclaration.type == .constructorDeclaration ? .swiftObjectPointer(java: false) : functionType.returnType
-        let cdeclType: TypeSignature = .function(instanceParameter + functionType.parameters.map { p in
-            TypeSignature.Parameter(label: p.label, type: p.type.cdecl(strategy: .direct))
-        }, returnType.cdecl(strategy: .direct), APIFlags(), nil)
+        let cdeclType: TypeSignature = .function(instanceParameter + functionType.parameters.enumerated().map { (index, parameter) in
+            let strategy = bridgables.parameters[index].strategy
+            return TypeSignature.Parameter(label: parameter.label, type: parameter.type.cdecl(strategy: strategy))
+        }, returnType.cdecl(strategy: bridgables.return.strategy), APIFlags(), nil)
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
         cdeclFunctions.append(cdeclFunction)
     }

@@ -229,10 +229,11 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
         swift.append(1, jniReturnType + "jniContext {")
 
         var javaParameterNames: [String] = []
-        for p in functionDeclaration.parameters {
-            let name = p.internalLabel + "_java"
+        for (index, parameter) in functionDeclaration.parameters.enumerated() {
+            let name = parameter.internalLabel + "_java"
             javaParameterNames.append(name)
-            swift.append(2, "let " + name + " = " + p.declaredType.convertToJava(value: p.internalLabel, strategy: .direct) + ".toJavaParameter()")
+            let strategy = bridgables.parameters[index].strategy
+            swift.append(2, "let " + name + " = " + parameter.declaredType.convertToJava(value: parameter.internalLabel, strategy: strategy) + ".toJavaParameter()")
         }
 
         if functionDeclaration.type == .constructorDeclaration {
@@ -246,7 +247,7 @@ final class KotlinTranspiledBridgeTransformer: KotlinTransformer {
                 swift.append(1, call)
             } else {
                 swift.append(2, "let f_return_java: " + functionType.returnType.java.description + " = " + call)
-                swift.append(2, "return " + functionType.returnType.convertFromJava(value: "f_return_java", strategy: .direct))
+                swift.append(2, "return " + functionType.returnType.convertFromJava(value: "f_return_java", strategy: bridgables.return.strategy))
             }
         }
         swift.append(1, "}")
