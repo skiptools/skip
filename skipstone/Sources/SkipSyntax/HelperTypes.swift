@@ -147,10 +147,6 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
             guard case .attributes(var tokens) = directive else {
                 continue
             }
-            // Differentiate bridging types from bridge files, i.e. compiled bridged types
-            if syntaxTree.isBridgeFile && tokens.contains(Directive.bridge.rawValue) {
-                tokens.append(Directive.bridgeFileType.rawValue)
-            }
             attrs.append(Attribute(signature: .named("directive", []), tokens: tokens))
         }
         attributes += attrs
@@ -478,10 +474,9 @@ enum CaptureType {
 
 /// Known directives in `Attributes`.
 enum Directive: String {
-    case bridge
+    case bridgeToKotlin
+    case bridgeToSwift
     case nobridge
-    /// Artificial attribute added to types from bridge files.
-    case bridgeFileType
 }
 
 /// Generic information for a type or API.

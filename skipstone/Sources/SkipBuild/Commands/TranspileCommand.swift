@@ -270,7 +270,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         // load and merge each of the skip.yml files for the dependent modules
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
 
-        let isNativeSwiftProject = baseSkipConfig.skip?.mode == "compile"
+        let isNativeSwiftProject = baseSkipConfig.skip?.mode?.lowercased() == "swift"
+        let swiftSourceFolder = skipFolderPath.parentDirectory.appending(component: "Swift")
+        let kotlinSourceFolder = skipFolderPath.parentDirectory.appending(component: "Kotlin")
 
         // projects with a CMakeLists.txt file are built as a native Android library
         // these are only used for purely native code libraries, and so we short-circuit the build generation
@@ -280,7 +282,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             try addLink(extLink, pointingAt: projectFolderPath, relative: false)
         }
 
-        if baseSkipConfig.skip?.mode != nil {
+        if isNativeSwiftProject || fs.exists(swiftSourceFolder) {
             // Link src/main/swift/ to the relative Swift project folder
             // TODO: create links each file/dir in the directory *except* Package.swift, which we should copy and augment
             let swiftLinkFolder = try AbsolutePath(outputFolderPath, validating: "swift")
@@ -328,26 +330,28 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         }
 
         // feed the transpiler the files to transpile and any compiled files to potentially bridge.
-        // we default the file mode based on skip.yml's mode, and anything in 'Bridging' is the opposite mode
-        let bridgePrefix = skipFolderPath.parentDirectory.appending(component: "Bridging").pathString + "/"
+        // we default the file mode based on skip.yml's mode, and anything in 'Swift/' is compiled
+        // and anything in 'Kotlin/' is transpiled
+        let kotlinSourcePrefix = kotlinSourceFolder.pathString + "/"
+        let swiftSourcePrefix = swiftSourceFolder.pathString + "/"
         var transpileFiles: [String] = []
-        var compileFiles: [String] = []
+        var swiftFiles: [String] = []
         for sourceFile in sourceURLs.map(\.path).sorted() {
             if isNativeSwiftProject {
-                if sourceFile.hasPrefix(bridgePrefix) {
+                if sourceFile.hasPrefix(kotlinSourcePrefix) {
                     transpileFiles.append(sourceFile)
                 } else {
-                    compileFiles.append(sourceFile)
+                    swiftFiles.append(sourceFile)
                 }
             } else {
-                if sourceFile.hasPrefix(bridgePrefix) {
-                    compileFiles.append(sourceFile)
+                if sourceFile.hasPrefix(swiftSourcePrefix) {
+                    swiftFiles.append(sourceFile)
                 } else {
                     transpileFiles.append(sourceFile)
                 }
             }
         }
-        let transpiler = Transpiler(packageName: packageName, sourceFiles: transpileFiles.map(Source.FilePath.init(path:)), bridgeFiles: compileFiles.map(Source.FilePath.init(path:)), codebaseInfo: codebaseInfo, preprocessorSymbols: Set(inputOptions.symbols), transformers: transformers)
+        let transpiler = Transpiler(packageName: packageName, transpileFiles: transpileFiles.map(Source.FilePath.init(path:)), bridgeFiles: swiftFiles.map(Source.FilePath.init(path:)), codebaseInfo: codebaseInfo, preprocessorSymbols: Set(inputOptions.symbols), transformers: transformers)
 
         try await transpiler.transpile(handler: handleTranspilation)
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json

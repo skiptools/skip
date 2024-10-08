@@ -18,7 +18,7 @@ struct SkipConfig : Codable {
 struct TranspilationConfig : Codable {
     /// The name of the package this module should be set to
     var package: String?
-    /// Skip mode: compile|transpile
+    /// Skip mode: kotlin|swift
     var mode: String?
 }
 

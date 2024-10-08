@@ -96,7 +96,7 @@ extension XCTestCase {
         }
         let codebaseInfo = CodebaseInfo()
         codebaseInfo.dependentModules = dependentModules
-        let tp = Transpiler(sourceFiles: srcFiles, bridgeFiles: bridgeFiles, codebaseInfo: codebaseInfo, transformers: transformers)
+        let tp = Transpiler(transpileFiles: srcFiles, bridgeFiles: bridgeFiles, codebaseInfo: codebaseInfo, transformers: transformers)
         var transpilations: [Transpilation] = []
         try await tp.transpile { transpilations.append($0) }
         guard !transpilations.isEmpty else {
@@ -238,13 +238,13 @@ extension XCTestCase {
                 transformers.forEach { $0.prepareForUse(codebaseInfo: nil) }
                 let translator = KotlinTranslator(syntaxTree: syntaxTree)
                 let kotlinTree = translator.translateSyntaxTree()
-                transformers.forEach { $0.apply(to: kotlinTree, translator: translator) }
+                transformers.forEach { let _ = $0.apply(to: kotlinTree, translator: translator) }
                 messages += kotlinTree.messages + transformers.flatMap { $0.messages(for: srcFile) }
             }
         } else {
             let codebaseInfo = CodebaseInfo()
             codebaseInfo.dependentModules = dependentModules
-            let tp = Transpiler(sourceFiles: isSwiftBridge ? [] : srcFiles, bridgeFiles: isSwiftBridge ? srcFiles : [], codebaseInfo: codebaseInfo, transformers: transformers)
+            let tp = Transpiler(transpileFiles: isSwiftBridge ? [] : srcFiles, bridgeFiles: isSwiftBridge ? srcFiles : [], codebaseInfo: codebaseInfo, transformers: transformers)
             try await tp.transpile { transpilation in
                 messages += transpilation.messages
             }

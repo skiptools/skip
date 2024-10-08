@@ -1,5 +1,5 @@
 /// Generate compiled Swift to Kotlin bridging code.
-final class KotlinCompiledBridgeTransformer: KotlinTransformer {
+final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         guard syntaxTree.isBridgeFile, let codebaseInfo = translator.codebaseInfo, let outputFile = syntaxTree.source.file.bridgeOutputFile else {
             return []
@@ -65,6 +65,10 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
     }
 
     private func updateVariableDeclaration(_ variableDeclaration: KotlinVariableDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+        guard classDeclaration != nil || !variableDeclaration.attributes.contains(directive: Directive.bridgeToSwift) else {
+            variableDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(variableDeclaration, source: translator.syntaxTree.source))
+            return
+        }
         guard let bridgable = variableDeclaration.checkBridgable(translator: translator) else {
             return
         }
@@ -168,6 +172,10 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
     }
 
     private func updateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+        guard classDeclaration != nil || !functionDeclaration.attributes.contains(directive: Directive.bridgeToSwift) else {
+            functionDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(functionDeclaration, source: translator.syntaxTree.source))
+            return
+        }
         guard let bridgables = functionDeclaration.checkBridgable(translator: translator) else {
             return
         }
@@ -258,6 +266,10 @@ final class KotlinCompiledBridgeTransformer: KotlinTransformer {
     }
 
     private func updateClassDeclaration(_ classDeclaration: KotlinClassDeclaration, swiftDefinitions: inout [SwiftDefinition], cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+        guard !classDeclaration.attributes.contains(directive: Directive.bridgeToSwift) else {
+            classDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(classDeclaration, source: translator.syntaxTree.source))
+            return
+        }
         guard classDeclaration.checkBridgable(translator: translator) else {
             return
         }
