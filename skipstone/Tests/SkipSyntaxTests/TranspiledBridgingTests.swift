@@ -380,7 +380,30 @@ final class TranspiledBridgingTests: XCTestCase {
     }
 
     func testOptionalVar() async throws {
-        // TODO
+        try await check(swift: """
+        // SKIP @bridge
+        var i: Int? = 1
+        """, kotlin: """
+        internal var i: Int? = 1
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        var i: Int? {
+            get {
+                return jniContext {
+                    let value_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
+                    return try! Int?.fromJavaObject(value_java)
+                }
+            }
+            set {
+                jniContext {
+                    let value_java = newValue.toJavaParameter()
+                    try! Java_SourceKt.callStatic(method: Java_set_i_methodID, args: [value_java])
+                }
+            }
+        }
+        private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()Ljava/lang/Integer;")!
+        private let Java_set_i_methodID = Java_SourceKt.getStaticMethodID(name: "setI", sig: "(Ljava/lang/Integer;)V")!
+        """)
     }
 
     func testUnwrappedOptionalVar() async throws {

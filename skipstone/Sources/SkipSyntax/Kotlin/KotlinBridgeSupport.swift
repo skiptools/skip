@@ -308,7 +308,7 @@ extension TypeSignature {
         case .int:
             return .int32
         case .optional:
-            return .javaObjectPointer
+            return .optional(.javaObjectPointer)
         case .unwrappedOptional(let type):
             return type.java
         default:
@@ -344,6 +344,8 @@ extension TypeSignature {
         switch self {
         case .int:
             return "Int(" + value + ")"
+        case .optional:
+            return "try! " + description + ".fromJavaObject(" + value + ")"
         case .unwrappedOptional(let type):
             return type.convertFromJava(value: value, strategy: strategy)
         default:
