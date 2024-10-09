@@ -44,7 +44,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             cdeclFunctions.forEach { $0.append(to: output, indentation: indentation) }
             output.append("\n#endif")
         }
-        let output = KotlinTransformerOutput(file: outputFile, node: outputNode)
+        let output = KotlinTransformerOutput(file: outputFile, node: outputNode, type: .bridgeToKotlin)
         return [output]
     }
 
