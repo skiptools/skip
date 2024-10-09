@@ -29,6 +29,7 @@ public protocol KotlinTransformer {
 public struct KotlinTransformerOutput {
     var file: Source.FilePath
     var node: OutputNode
+    var type: OutputType
 }
 
 /// The set of builtin transformers in the order in which they should run.

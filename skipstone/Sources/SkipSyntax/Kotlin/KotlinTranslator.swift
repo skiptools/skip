@@ -268,14 +268,14 @@ public final class KotlinTranslator {
         let outputGenerator = OutputGenerator(root: kotlinSyntaxTree.root)
         let (output, outputMap) = outputGenerator.generateOutput(file: outputFile)
         let endTime = Date().timeIntervalSinceReferenceDate // track the duration for logging
-        let transpilation = Transpilation(input: kotlinSyntaxTree.source, output: output, outputMap: outputMap, messages: messages, duration: endTime - startTime)
+        let transpilation = Transpilation(input: kotlinSyntaxTree.source, output: output, outputType: .default, outputMap: outputMap, messages: messages, duration: endTime - startTime)
 
         var transpilations: [Transpilation] = []
         transpilations.append(transpilation)
         for transformerOutput in outputs {
             let outputGenerator = OutputGenerator(root: transformerOutput.node)
             let (output, outputMap) = outputGenerator.generateOutput(file: transformerOutput.file)
-            let transpilation = Transpilation(input: syntaxTree.source, output: output, outputMap: outputMap, messages: [], duration: Date().timeIntervalSinceReferenceDate - endTime)
+            let transpilation = Transpilation(input: syntaxTree.source, output: output, outputType: transformerOutput.type, outputMap: outputMap, messages: [], duration: Date().timeIntervalSinceReferenceDate - endTime)
             transpilations.append(transpilation)
         }
         return transpilations

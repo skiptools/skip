@@ -54,7 +54,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             swiftDefinitions.forEach { output.append($0, indentation: indentation) }
             output.append("\n#endif")
         }
-        let output = KotlinTransformerOutput(file: outputFile, node: outputNode)
+        let output = KotlinTransformerOutput(file: outputFile, node: outputNode, type: .bridgeToSwift)
         return [output]
     }
 
