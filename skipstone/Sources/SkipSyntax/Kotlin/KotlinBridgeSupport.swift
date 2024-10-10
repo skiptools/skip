@@ -309,6 +309,8 @@ extension TypeSignature {
     /// Return the Java equivalent of this type.
     var java: TypeSignature {
         switch self {
+        case .function:
+            return .javaObjectPointer
         case .int:
             return .int32
         case .optional:
@@ -323,6 +325,8 @@ extension TypeSignature {
     /// Return code that converts the given value of this type to its Java form.
     func convertToJava(value: String, strategy: Bridgable.Strategy) -> String {
         switch self.asOptional(false) {
+        case .function(let parameters, _, _, _):
+            return "SwiftClosure" + parameters.count.description + ".javaObject(for: " + value + ")"
         case .int:
             return isOptional ? value : "Int32(" + value + ")"
         case .unwrappedOptional(let type):
@@ -356,6 +360,9 @@ extension TypeSignature {
     /// Return code that converts the given value of our Java type back to this type.
     func convertFromJava(value: String, strategy: Bridgable.Strategy) -> String {
         switch self {
+        case .function(let parameters, let returnType, _, _):
+            let parametersString = (0..<parameters.count).map { "p\($0)" }.joined(separator: ", ")
+            return "{ let closure_swift = JavaBackedClosure" + parameters.count.description + "<" + returnType.description + ">(" + value + "); return { " + parametersString + " in try! closure_swift.invoke(" + parametersString + ") } }()"
         case .int:
             return "Int(" + value + ")"
         case .optional:
@@ -386,7 +393,7 @@ extension TypeSignature {
     }
 
     /// Return the JNI signature of this type.
-    var jni: String {
+    func jni(isFunctionDeclaration: Bool = false) -> String {
         switch self {
         case .any:
             return "Ljava/lang/Object;"
@@ -406,9 +413,13 @@ extension TypeSignature {
             return "D"
         case .float:
             return "F"
-        case .function(let arguments, let returnType, _, _):
-            let argumentsJNI = arguments.map(\.type.jni).joined(separator: "")
-            return "(" + argumentsJNI + ")" + returnType.jni
+        case .function(let parameters, let returnType, _, _):
+            if isFunctionDeclaration {
+                let parametersJNI = parameters.map { $0.type.jni() }.joined(separator: "")
+                return "(" + parametersJNI + ")" + returnType.jni()
+            } else {
+                return "Lkotlin/jvm/functions/Function" + parameters.count.description + ";"
+            }
         case .int:
             return "I"
         case .int8:
@@ -422,15 +433,15 @@ extension TypeSignature {
         case .int128:
             return "Ljava/math/BigInteger;"
         case .member(let parent, let type):
-            var jni = parent.jni
+            var jni = parent.jni()
             if jni.hasSuffix(";") {
                 jni = String(jni.dropLast())
             }
-            return jni + "$" + type.jni
+            return jni + "$" + type.jni()
         case .metaType:
             return "Ljava/lang/Class;"
         case .module(let name, let type):
-            let typeName = type.jni
+            let typeName = type.jni()
             if typeName.hasPrefix("L") && typeName.hasSuffix(";") {
                 let packageName = KotlinTranslator.packageName(forModule: name).replacing(".", with: "/")
                 return "L" + packageName + "/" + typeName.dropFirst()
@@ -463,7 +474,7 @@ extension TypeSignature {
                 return "Ljava/lang/Long;"
             // TODO: Unsigned types
             default:
-                return type.jni
+                return type.jni()
             }
         case .range:
             return "Ljava/lang/Object;"
@@ -474,7 +485,7 @@ extension TypeSignature {
         case .tuple(_, let types):
             return "Lskip/lib/Tuple" + types.count.description + ";"
         case .typealiased(_, let type):
-            return type.jni
+            return type.jni()
         case .uint:
             return "Ljava/lang/Object;"
         case .uint8:
@@ -488,7 +499,7 @@ extension TypeSignature {
         case .uint128:
             return "Ljava/lang/Object;"
         case .unwrappedOptional(let type):
-            return type.jni
+            return type.jni()
         case .void:
             return "V"
         }

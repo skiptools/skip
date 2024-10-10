@@ -129,10 +129,10 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         let capitalizedPropertyName = (propertyName.first?.uppercased() ?? "") + propertyName.dropFirst()
         let declarationType = variableDeclaration.role == .global ? "let " : "static let "
         let callMethodID = variableDeclaration.role == .global ? "getStaticMethodID" : "getMethodID"
-        let getMethodID = "private " + declarationType + getMethodIdentifier + " = " + classIdentifier + "." + callMethodID + "(name: \"get" + capitalizedPropertyName + "\", sig: \"()" + bridgable.qualifiedType.jni + "\")!"
+        let getMethodID = "private " + declarationType + getMethodIdentifier + " = " + classIdentifier + "." + callMethodID + "(name: \"get" + capitalizedPropertyName + "\", sig: \"()" + bridgable.qualifiedType.jni() + "\")!"
         swift.append(getMethodID)
         if hasSetter {
-            let setMethodID = "private " + declarationType + setMethodIdentifier + " = " + classIdentifier + "." + callMethodID + "(name: \"set" + capitalizedPropertyName + "\", sig: \"(" + bridgable.qualifiedType.jni + ")V\")!"
+            let setMethodID = "private " + declarationType + setMethodIdentifier + " = " + classIdentifier + "." + callMethodID + "(name: \"set" + capitalizedPropertyName + "\", sig: \"(" + bridgable.qualifiedType.jni() + ")V\")!"
             swift.append(setMethodID)
         }
         return swift
@@ -272,7 +272,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             qualifiedReturnType = bridgables.return.qualifiedType
         }
         let qualifiedType: TypeSignature = .function(qualifiedParameters, qualifiedReturnType, APIFlags(), nil)
-        let methodID = "private " + declarationType + methodIdentifier + " = " + classIdentifier + "." + getType + "(name: \"" + functionName + "\", sig: \"" + qualifiedType.jni + "\")!"
+        let methodID = "private " + declarationType + methodIdentifier + " = " + classIdentifier + "." + getType + "(name: \"" + functionName + "\", sig: \"" + qualifiedType.jni(isFunctionDeclaration: true) + "\")!"
         swift.append(methodID)
         return swift
     }
