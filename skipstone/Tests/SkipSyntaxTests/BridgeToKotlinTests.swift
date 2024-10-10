@@ -438,14 +438,14 @@ final class BridgeToKotlinTests: XCTestCase {
         internal var i: Int?
             get() {
                 val value_swift = Swift_i()
-                return value_swift?.toInt()
+                return value_swift
             }
             set(newValue) {
-                val newValue_swift = newValue?.toLong()
+                val newValue_swift = newValue
                 Swift_i_set(newValue_swift)
             }
-        private external fun Swift_i(): Long?
-        private external fun Swift_i_set(value: Long?)
+        private external fun Swift_i(): Int?
+        private external fun Swift_i_set(value: Int?)
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1i")
         func BridgeKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer? {

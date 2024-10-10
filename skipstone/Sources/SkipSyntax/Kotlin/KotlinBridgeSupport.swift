@@ -114,8 +114,13 @@ extension TypeSignature {
         case .int:
             return .int64
         case .optional(let type):
-            let converted = type.kotlinExternal(strategy: strategy)
-            return converted.asOptional(converted != .swiftObjectPointer(java: true))
+            switch type {
+            case .int:
+                return self // We want Int?, not Long?
+            default:
+                let converted = type.kotlinExternal(strategy: strategy)
+                return converted.asOptional(converted != .swiftObjectPointer(java: true))
+            }
         case .unwrappedOptional(let type):
             return type.kotlinExternal(strategy: strategy)
         default:
@@ -138,11 +143,7 @@ extension TypeSignature {
     func kotlinConvertToExternal(value: String, strategy: Bridgable.Strategy) -> String {
         switch self.asOptional(false) {
         case .int:
-            if isOptional {
-                return value + "?.toLong()"
-            } else {
-                return value + ".toLong()"
-            }
+            return isOptional ? value : value + ".toLong()"
         case .unwrappedOptional(let type):
             return type.kotlinConvertToExternal(value: value, strategy: strategy)
         default:
@@ -169,11 +170,7 @@ extension TypeSignature {
     func kotlinConvertFromExternal(value: String, strategy: Bridgable.Strategy) -> String {
         switch self.asOptional(false) {
         case .int:
-            if isOptional {
-                return value + "?.toInt()"
-            } else {
-                return value + ".toInt()"
-            }
+            return isOptional ? value : value + ".toInt()"
         case .unwrappedOptional(let type):
             return type.kotlinConvertFromExternal(value: value, strategy: strategy)
         default:
