@@ -601,6 +601,33 @@ final class BridgeToSwiftTests: XCTestCase {
         """)
     }
 
+    func testClosureTypeVar() async throws {
+        try await check(swift: """
+        // SKIP @bridgeToSwift
+        var c: (Int) -> String = { _ in "" }
+        """, kotlin: """
+        internal var c: (Int) -> String = { _ -> "" }
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        var c: (Int) -> String {
+            get {
+                return jniContext {
+                    let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
+                    return { let f = JavaFunction1<Int, String>(Java_ptr: value_java); return { p0 in f.invoke(p0) } }()
+                }
+            }
+            set {
+                jniContext {
+                    let value_java = JavaFunction1<Int, String>.javaObject(for: newValue).toJavaParameter()
+                    try! Java_SourceKt.callStatic(method: Java_set_c_methodID, args: [value_java])
+                }
+            }
+        }
+        private let Java_get_c_methodID = Java_SourceKt.getStaticMethodID(name: "getC", sig: "()kotlin/jvm/functions/Function2")!
+        private let Java_set_c_methodID = Java_SourceKt.getStaticMethodID(name: "setC", sig: "(kotlin/jvm/functions/Function2)V")!
+        """)
+    }
+
     func testFunction() async throws {
         try await check(swift: """
         // SKIP @bridgeToSwift
