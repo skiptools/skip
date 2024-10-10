@@ -144,7 +144,7 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
         }
         var attrs: [Attribute] = []
         for directive in extras.directives {
-            guard case .attributes(var tokens) = directive else {
+            guard case .attributes(let tokens) = directive else {
                 continue
             }
             attrs.append(Attribute(signature: .named("directive", []), tokens: tokens))

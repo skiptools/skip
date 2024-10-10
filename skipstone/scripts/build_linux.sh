@@ -1,20 +1,14 @@
-#!/bin/sh -e
-# Note: requires `limactl start default` with Ubuntu 22 and
-# swift 5.8 installed in the PATH
-rsync -a  --exclude '.build' ${PWD} /tmp/lima/
+#!/bin/sh -ex
+# need to first install OSS Swift toolchain from:
+# https://www.swift.org/download/#releases
+# and install Linux Static SDK toolchain with:
+# swift sdk install https://download.swift.org/swift-6.0.1-release/static-sdk/swift-6.0.1-RELEASE/swift-6.0.1-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz --checksum d4f46ba40e11e697387468e18987ee622908bc350310d8af54eb5e17c2ff5481
 
-# unfortunately we can't run it directly from here because the sshfs
-# doesn't support some operation the swift comiler tries:
-# <unknown>:0: error: unable to open output file '/tmp/lima/skipstone/.build/aarch64-unknown-linux-gnu/debug/ModuleCache/1ZI34EX383YFP/SwiftGlibc-20WEFW7YC1Q3T.pcm': 'Operation not permitted'
-# lima swift test --package-path /tmp/lima/skipstone
+# e.g., swift.build.x86_64-swift-linux-musl will use "x86_64-swift-linux-musl"
+SDK="x86_64-swift-linux-musl"
+TOOLCHAIN="${HOME}/Library/Developer/Toolchains/swift-6.0.1-RELEASE.xctoolchain/usr"
+CONFIGURATION=${CONFIGURATION:-"release"}
+${TOOLCHAIN}/bin/swift build --swift-sdk "${SDK}" --configuration "${CONFIGURATION}" --product ${1:-"SkipKey"}
 
-lima rsync -a --exclude '.build' /tmp/lima/skipstone /opt/skiptools/
-#lima swift test --package-path /opt/skiptools/skipstone
-lima swift build -c release --product SkipRunner --package-path /opt/skiptools/skipstone
-
-lima /opt/skiptools/skipstone/.build/aarch64-unknown-linux-gnu/release/SkipRunner welcome
-lima cp /opt/skiptools/skipstone/.build/aarch64-unknown-linux-gnu/release/SkipRunner /tmp/lima/skip-aarch64-unknown-linux-gnu
-
-cp -a /tmp/lima/skip-aarch64-unknown-linux-gnu .build/
-ls -lah .build/skip-aarch64-unknown-linux-gnu
-
+# finally copy up the binary to www.skip.tools with:
+echo scp .build/${SDK}/${CONFIGURATION}/SkipKey www.skip.tools:~/lib/SkipKey

@@ -74,6 +74,8 @@ public struct Source : Encodable {
     /// - Note: `Codable` for use in `CodebaseInfo`.
     public struct FilePath: Hashable, Codable {
         public private(set) var path: String
+        /// The suffix of a file that indicates it is a bridging file
+        private static let bridgeFileSuffix = "_Bridge.swift"
 
         public init(path: String) {
             self.path = path
@@ -119,12 +121,20 @@ public struct Source : Encodable {
             guard self.extension == "swift" else {
                 return nil
             }
-            return Source.FilePath(path: self.path.dropLast(".swift".count) + "_Bridge.swift")
+            return Source.FilePath(path: self.path.dropLast(".swift".count) + Self.bridgeFileSuffix)
+        }
+
+        /// The source Swift file that corresponds to this bridge file, if it is a bridge.
+        public var bridgelessOutputFile: Source.FilePath? {
+            if !isBridgeOutputFile {
+                return nil
+            }
+            return Source.FilePath(path: self.path.dropLast(Self.bridgeFileSuffix.count) + ".swift")
         }
 
         /// Whether this is a bridging output file.
         public var isBridgeOutputFile: Bool {
-            return path.hasSuffix("_Bridge.swift")
+            return path.hasSuffix(Self.bridgeFileSuffix)
         }
     }
 

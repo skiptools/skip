@@ -39,7 +39,7 @@ struct SkippyCommand: TranspilerInputOptionsCommand {
             transformers.forEach { $0.prepareForUse(codebaseInfo: nil) }
             let translator = KotlinTranslator(syntaxTree: syntaxTree)
             let kotlinTree = translator.translateSyntaxTree()
-            transformers.forEach { $0.apply(to: kotlinTree, translator: translator) }
+            transformers.forEach { _ = $0.apply(to: kotlinTree, translator: translator) }
 
             let messages = kotlinTree.messages + transformers.flatMap { $0.messages(for: sourceFile) }
             messages.forEach { print($0) }

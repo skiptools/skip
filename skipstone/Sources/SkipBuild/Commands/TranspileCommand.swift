@@ -49,6 +49,13 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         })
     }
 
+    var dependencyIdPaths: [(id: String, path: String)] {
+        transpileOptions.dependencies.map({
+            let parts = $0.split(separator: ":")
+            return (id: parts.first?.description ?? "", path: parts.last?.description ?? "")
+        })
+    }
+
     func performCommand(with out: MessageQueue) async throws {
         #if DEBUG
         let v = skipVersion + "*" // * indicates debug version
@@ -282,14 +289,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             try addLink(extLink, pointingAt: projectFolderPath, relative: false)
         }
 
-        if isNativeSwiftProject || fs.exists(swiftSourceFolder) {
-            // Link src/main/swift/ to the relative Swift project folder
-            // TODO: create links each file/dir in the directory *except* Package.swift, which we should copy and augment
-            let swiftLinkFolder = try AbsolutePath(outputFolderPath, validating: "swift")
-            try fs.createDirectory(swiftLinkFolder.parentDirectory, recursive: true)
-            try addLink(swiftLinkFolder, pointingAt: rootPath, relative: false)
-        }
-
         // the standard base name for Gradle Kotlin and Java source files
         let kotlinOutputFolder = try AbsolutePath(outputFolderPath, validating: "kotlin")
         let javaOutputFolder = try AbsolutePath(outputFolderPath, validating: "java")
@@ -355,7 +354,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         try await transpiler.transpile(handler: handleTranspilation)
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json
-        try saveSkipBridgeCode()
+        if isNativeSwiftProject || fs.exists(swiftSourceFolder) {
+            try saveSkipBridgeCode(swiftSourceFolder: swiftSourceFolder)
+        }
 
         let sourceModules = try linkDependentModuleSources()
         try linkResources()
@@ -442,15 +443,34 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             try writeChanges(tag: "codebase", to: outputFilePath, contents: encoder.encode(moduleExport), readOnly: true)
         }
 
-        func saveSkipBridgeCode() throws {
-            // for now we just glom all bridging code together
-            let skipBridgeContents = skipBridgeTranspilations
-                .sorted { $0.output.file.path < $1.output.file.path }
-                .map(\.output.content)
-                .joined(separator: "\n\n")
-            // we always write out to the ModuleNameSwiftBridge.swift file, even when there is no bridging code, because the transpiler plugin expect it as an output file and will fail if it doesn't exist
-            if let skipbridgePath = transpileOptions.skipbridge {
-                try writeChanges(tag: "skipbridge", to: AbsolutePath(validating: skipbridgePath), contents: skipBridgeContents.utf8Data, readOnly: true)
+        func saveSkipBridgeCode(swiftSourceFolder: AbsolutePath) throws {
+            // Link src/main/swift/ to the relative Swift project folder
+            let swiftLinkFolder = try AbsolutePath(outputFolderPath, validating: "swift")
+            try fs.createDirectory(swiftLinkFolder.parentDirectory, recursive: true)
+
+            try createMirroredLinkTree(from: rootPath, to: swiftLinkFolder) { path in
+                info("createMirroredLinkTree for \(path.pathString)")
+                if let matchingBridge = skipBridgeTranspilations.first(where: { t in
+                    info("skipBridgeTranspilations: \(t.outputFileBaseName) vs. \(path.sourceFile.path)")
+                    return t.output.file.bridgelessOutputFile == path.sourceFile
+                }) {
+                    let basename = try AbsolutePath(validating: matchingBridge.output.file.path).basename
+                    let isBridgeToSwift = matchingBridge.outputType == .bridgeToSwift
+                    info("bridge \(isBridgeToSwift ? "replace" : "add") content with \(matchingBridge.output.file.path) (kotlin: \(matchingBridge.kotlinFileName)) to \(basename)")
+                    return (tag: "skipbridge", basename: isBridgeToSwift ? nil : basename, content: matchingBridge.output.content.utf8Data)
+                }
+                return nil
+            }
+
+            // create Packages/swift-package-name links for all the project's package dependencies so we use the local versions in our swift build rather than downloading the remote dependencies
+            // this will sync with Xcode's workspace, which will enable local package development of dependencies to work the same with this derived package as it does in Xcode
+            let packagesLinkFolder = try AbsolutePath(swiftLinkFolder, validating: "Packages")
+            try fs.createDirectory(packagesLinkFolder, recursive: false)
+            for (id, path) in self.dependencyIdPaths {
+                info("creating dependency link: \(id)->\(path)")
+                let dependencyPackageLink = try AbsolutePath(packagesLinkFolder, validating: id)
+                let destinationPath = try AbsolutePath(validating: path)
+                try addLink(dependencyPackageLink, pointingAt: destinationPath, relative: false)
             }
         }
 
@@ -735,6 +755,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
             guard !transpilation.output.file.isBridgeOutputFile else {
                 skipBridgeTranspilations.append(transpilation)
+                info("bridge transpilation: \(transpilation.output.file.path) source: \(transpilation.output.content.count.byteCount)")
                 return
             }
 
@@ -948,7 +969,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
 
         /// Create a mirror hierarchy of the directory structure at `from` in the folder specified by `to`, and link each individual file in the hierarchy
-        func createMirroredLinkTree(from fromPath: AbsolutePath, to destPath: AbsolutePath) throws {
+        func createMirroredLinkTree(from fromPath: AbsolutePath, to destPath: AbsolutePath, contentHandler: ((AbsolutePath) throws -> (tag: String, basename: String?, content: Data)?)? = nil) throws {
             trace("creating absolute merged link tree from: \(fromPath) to: \(destPath)")
             // the folder is a directory; recurse into the destination paths in order to link to the local paths
             if fs.isDirectory(fromPath) {
@@ -960,12 +981,27 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                     }
                     let rel = try RelativePath(validating: fsEntry)
                     let destDir = destPath.appending(rel)
-                    try createMirroredLinkTree(from: fromPath.appending(rel), to: destDir)
+                    try createMirroredLinkTree(from: fromPath.appending(rel), to: destDir, contentHandler: contentHandler)
                 }
             } else if fs.isFile(fromPath) {
-                try addLink(destPath, pointingAt: fromPath, relative: false)
+                // check whether the contentHandler wants to write out additional data, either as a separate sidecar or overriding the link
+                if let (tag, basename, content) = try contentHandler?(fromPath) {
+                    if let basename = basename {
+                        // link the file as expected, but then add the contents to the basename as a sidecar for the file
+                        try addLink(destPath, pointingAt: fromPath, relative: false)
+                        let destPathPeer = try destPath.parentDirectory.appending(RelativePath(validating: basename))
+                        info("writing bridge sidecare contents (\(content.count.byteCount)) to \(destPathPeer)")
+                        try writeChanges(tag: tag, to: destPathPeer, contents: content, readOnly: true)
+                    } else {
+                        // with no basename specified, we override the link with the contents from the handler
+                        info("override bridge link tag \(tag) content (\(content.count.byteCount)) for: \(fromPath)")
+                        try writeChanges(tag: tag, to: destPath, contents: content, readOnly: true)
+                    }
+                } else {
+                    try addLink(destPath, pointingAt: fromPath, relative: false)
+                }
             } else {
-                warn("unknown file type encountered when creating lines: \(fromPath)")
+                warn("unknown file type encountered when creating links: \(fromPath)")
             }
         }
     }
@@ -990,9 +1026,6 @@ struct TranspileCommandOptions: ParsableArguments {
     @Option(name: [.long], help: ArgumentHelp("The path to the source hash file to output", valueName: "path"))
     var sourcehash: String // --sourcehash
 
-    @Option(name: [.long], help: ArgumentHelp("The path to the skip bridge output", valueName: "path"))
-    var skipbridge: String? // --skipbridge
-
     @Option(help: ArgumentHelp("Condition for transpile phase", valueName: "force/no"))
     var transpile: PhaseGuard = .onDemand // --transpile
 
@@ -1013,6 +1046,9 @@ struct TranspileCommandOptions: ParsableArguments {
 
     @Option(name: [.long], help: ArgumentHelp("Output directory", valueName: "dir"))
     var outputFolder: String? = nil
+
+    @Option(name: [.customLong("dependency")], help: ArgumentHelp("id:path", valueName: "dependency"))
+    var dependencies: [String] = [] // --dependency id:path
 }
 
 struct TranspileResult {
