@@ -212,7 +212,7 @@ import PackagePlugin
         var deps = dependencies(for: target.dependencies, in: context.package)
         deps = makeUniqueById(deps)
 
-        var outputFiles: [Path] = [sourcehashOutputPath]
+        let outputFiles: [Path] = [sourcehashOutputPath]
 
         // input files consist of the source files, as well as all the dependent module output source hash directory files, which will be modified whenever a transpiled module changes
         // note that using the directory as the input will cause the transpile to re-run for any sub-folder change, although this behavior is not explicitly documented
@@ -271,12 +271,11 @@ import PackagePlugin
             "--module-root", outputBase.path,
             ]
 
-        // only add the generated skip bridge if there are any .swift input files; we must not add them for C projects, since they will prevent the .c files from being built
-        if target.sourceFiles.contains(where: { $0.path.extension == "swift" }) {
-            let skipBridgeOutputPath = Path(outputURL.appendingPathComponent(peerTarget.name + "SwiftBridge.swift", isDirectory: false).path)
-            //Diagnostics.warning("add skip extensions output for \(target.name): \(skipBridgeOutputPath)", file: skipBridgeOutputPath.string)
-            buildArguments += [ "--skipbridge", skipBridgeOutputPath.string ]
-            outputFiles += [skipBridgeOutputPath]
+        // pass dependencies ids to local paths through to skipstone so that it can set up local links for native swift builds
+        for depencency in recursivePackageDependencies(for: context.package) {
+            //Diagnostics.remark("dependency: \(depencency.package.id) \(depencency.package.directory)")
+            buildArguments += ["--dependency", "\(depencency.package.id):\(depencency.package.directory)"]
+
         }
 
         buildArguments += buildModuleArgs
