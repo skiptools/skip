@@ -469,6 +469,54 @@ final class BridgeToSwiftTests: XCTestCase {
         """)
     }
 
+    func testOptionalTranspiledBridgedTypeVar() async throws {
+        try await check(swift: """
+        // SKIP @bridgeToSwift
+        class C {
+        }
+        // SKIP @bridgeToSwift
+        var c: C? = C()
+        """, kotlin: """
+        internal open class C {
+        }
+        internal var c: C? = C()
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        class C {
+            private static let Java_class = try! JClass(name: "C")
+            let Java_peer: JObject
+
+            init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+
+            init() {
+                Java_peer = jniContext {
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    return JObject(ptr)
+                }
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+        }
+        var c: C? {
+            get {
+                return jniContext {
+                    let value_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
+                    return value_java == nil ? nil : C(Java_ptr: value_java!)
+                }
+            }
+            set {
+                jniContext {
+                    let value_java = (newValue?.Java_peer.safePointer()).toJavaParameter()
+                    try! Java_SourceKt.callStatic(method: Java_set_c_methodID, args: [value_java])
+                }
+            }
+        }
+        private let Java_get_c_methodID = Java_SourceKt.getStaticMethodID(name: "getC", sig: "()LC;")!
+        private let Java_set_c_methodID = Java_SourceKt.getStaticMethodID(name: "setC", sig: "(LC;)V")!
+        """)
+    }
+
     func testCompiledBridgedTypeVar() async throws {
         try await check(swift: """
         // SKIP @bridgeToSwift
