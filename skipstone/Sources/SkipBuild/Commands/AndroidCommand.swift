@@ -359,10 +359,13 @@ fileprivate extension AndroidOperationCommand {
                 throw CrossCompilerError(errorDescription: "The Skip SDKs folder does not exist: \(skipSDKHome)")
             }
 
-            var sdks = try dirs(at: URL(fileURLWithPath: skipSDKHome))
-            if let swiftVersion = toolchainOptions.swiftVersion {
-                sdks = sdks.filter({ $0.lastPathComponent.hasPrefix("swift-\(swiftVersion)") })
-            }
+            let sdks = try dirs(at: URL(fileURLWithPath: skipSDKHome))
+                .filter({ $0.lastPathComponent.hasPrefix("swift-\(toolchainOptions.swiftVersion ?? "")") })
+                .sorted { u1, u2 in
+                    // localizedStandardCompare will handle sorting semantic versions like:
+                    // swift-1.10.0-RELEASE > swift-1.2.0-RELEASE
+                    u1.lastPathComponent.localizedStandardCompare(u2.lastPathComponent) == .orderedAscending
+                }
 
             guard let sdkPath = sdks.last else {
                 throw CrossCompilerError(errorDescription: "No Swift Android SDKs matching version \(toolchainOptions.swiftVersion ?? "latest") were found in: \(skipSDKHome)")

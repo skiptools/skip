@@ -182,8 +182,7 @@ extension ToolOptionsCommand {
             "archive",
             "CODE_SIGNING_ALLOWED=NO",
             "ZERO_AR_DATE=1", // excludes timestamps from archives for build reproducibility
-        ], additionalEnvironment: ["SKIP_ZERO": "1"]) // SKIP_ZERO builds without Skip dependency libraries
-        
+        ], additionalEnvironment: ["SKIP_ZERO": "1", "SKIP_PLUGIN_DISABLED": "1"]) // SKIP_ZERO builds without Skip dependency libraries
         
         let archiveAppPath = archivePath + "/Products/Applications/" + primaryModuleName + ".app"
         let archiveAppURL = projectURL.appendingPathComponent(archiveAppPath, isDirectory: true)
