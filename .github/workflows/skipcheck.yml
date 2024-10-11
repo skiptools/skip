@@ -12,7 +12,7 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_15.4.app/Contents/Developer
     steps:
       # cache gradle/maven dependencies which speeds up skip checkup
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: current
           generate-job-summary: false
