@@ -362,7 +362,9 @@ extension TypeSignature {
         switch self {
         case .function(let parameters, let returnType, _, _):
             let parametersString = (0..<parameters.count).map { "p\($0)" }.joined(separator: ", ")
-            return "{ let closure_swift = JavaBackedClosure" + parameters.count.description + "<" + returnType.description + ">(" + value + "); return { " + parametersString + " in try! closure_swift.invoke(" + parametersString + ") } }()"
+            let parametersInString = parametersString.isEmpty ? parametersString : parametersString + " in "
+            let closureType = returnType == .void ? "JavaBackedVoidClosure" : "JavaBackedClosure<" + returnType.description + ">"
+            return "{ let closure_swift = " + closureType + "(" + value + "); return { " + parametersInString + "try! closure_swift.invoke(" + parametersString + ") } }()"
         case .int:
             return "Int(" + value + ")"
         case .optional:

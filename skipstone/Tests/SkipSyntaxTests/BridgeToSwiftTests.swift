@@ -631,7 +631,7 @@ final class BridgeToSwiftTests: XCTestCase {
             get {
                 return jniContext {
                     let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
-                    return { let closure_swift = JavaBackedClosure1<String>(value_java); return { p0 in try! closure_swift.invoke(p0) } }()
+                    return { let closure_swift = JavaBackedClosure<String>(value_java); return { p0 in try! closure_swift.invoke(p0) } }()
                 }
             }
             set {
@@ -643,6 +643,33 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         private let Java_get_c_methodID = Java_SourceKt.getStaticMethodID(name: "getC", sig: "()Lkotlin/jvm/functions/Function1;")!
         private let Java_set_c_methodID = Java_SourceKt.getStaticMethodID(name: "setC", sig: "(Lkotlin/jvm/functions/Function1;)V")!
+        """)
+    }
+
+    func testVoidClosureTypeVar() async throws {
+        try await check(swift: """
+        // SKIP @bridgeToSwift
+        var c: () -> Void = { }
+        """, kotlin: """
+        internal var c: () -> Unit = { ->  }
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        var c: () -> Void {
+            get {
+                return jniContext {
+                    let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
+                    return { let closure_swift = JavaBackedVoidClosure(value_java); return { try! closure_swift.invoke() } }()
+                }
+            }
+            set {
+                jniContext {
+                    let value_java = SwiftClosure0.javaObject(for: newValue).toJavaParameter()
+                    try! Java_SourceKt.callStatic(method: Java_set_c_methodID, args: [value_java])
+                }
+            }
+        }
+        private let Java_get_c_methodID = Java_SourceKt.getStaticMethodID(name: "getC", sig: "()Lkotlin/jvm/functions/Function0;")!
+        private let Java_set_c_methodID = Java_SourceKt.getStaticMethodID(name: "setC", sig: "(Lkotlin/jvm/functions/Function0;)V")!
         """)
     }
 
