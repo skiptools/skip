@@ -174,7 +174,7 @@ extension XCTestCase {
             if $0.isEmpty {
                 return $0
             } else {
-                return "#if canImport(SkipBridge)\nimport SkipBridge\n\n" + $0 + "\n\n#endif"
+                return "import SkipBridge\n\n" + $0
             }
         }
         var generatedSwiftBridgeSupport = swiftBridgeTranspilations

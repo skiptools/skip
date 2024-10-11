@@ -1,8 +1,5 @@
 /// Used in Swift code generation.
 struct SwiftDefinition: OutputNode {
-    static let leadingContent = "#if canImport(SkipBridge)\nimport SkipBridge\n\n"
-    static let trailingContent = "\n#endif\n"
-
     let sourceFile: Source.FilePath?
     let sourceRange: Source.Range?
     var children: [SwiftDefinition] = []
