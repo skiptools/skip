@@ -308,7 +308,7 @@ class SkipCommandTests : XCTestCase {
     func testSkipExportApp() async throws {
         let tempDir = try mktmp()
         let name = "demo-app"
-        let out = try await skip("init", "-jA", "--show-tree", "-v", "-d", tempDir, "--appid", "demo.app.App", name, "Demo")
+        let out = try await skip("init", "-jA", "--show-tree", "--zero", "--free", "-v", "-d", tempDir, "--appid", "demo.app.App", name, "Demo")
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip application \(name)", msgs.first)
