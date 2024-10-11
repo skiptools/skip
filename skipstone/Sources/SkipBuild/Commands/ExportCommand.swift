@@ -91,14 +91,14 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
                     return sdkPath
                 }
 
-                return try? await run(with: out, "Getting SDK Path", "xcrun --sdk iphoneos --show-sdk-path".split(separator: " ").map(\.description), watch: false).get().stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+                return try await run(with: out, "Getting SDK Path", "xcrun --sdk iphoneos --show-sdk-path".split(separator: " ").map(\.description), watch: false).get().stdout.trimmingCharacters(in: .whitespacesAndNewlines)
             }
 
             if let sdk = try? await fetchSDKPath(), sdk != "legacy" {
                 await run(with: out, "Build project \(packageName)", ["xcrun", "swift", "build", "-v", "--package-path", project, "--triple", "arm64-apple-ios", "--sdk", sdk])
             } else {
                 // fallback to plain "swift build" for legacy build, which has the down-side that it will build against macOS (and thereby fail when there are iOS-only API calls): "Basics/Triple+Basics.swift:149: Fatal error: Cannot create dynamic libraries for os "ios".", also @availability annotations are required for everything
-                // however, it permits us to build and export against Xcode 15.2, which has bugs that prevent the iOS export build from working
+                // however, it permits us to build and export against macOS-13/Xcode 15.2 (which is the OS version needed for GitHub CI to be able to run tests against the Android Emulator using the reactivecircus/android-emulator-runner action),
                 await run(with: out, "Build project \(packageName)", ["swift", "build", "-v", "--package-path", project])
             }
         } else {
