@@ -658,7 +658,7 @@ final class BridgeToSwiftTests: XCTestCase {
             get {
                 return jniContext {
                     let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
-                    return { let closure_swift = JavaBackedVoidClosure(value_java); return { try! closure_swift.invoke() } }()
+                    return { let closure_swift = JavaBackedClosure<Void>(value_java); return { try! closure_swift.invoke() } }()
                 }
             }
             set {

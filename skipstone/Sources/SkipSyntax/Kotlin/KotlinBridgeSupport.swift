@@ -197,6 +197,8 @@ extension TypeSignature {
     /// Return the `@_cdecl` function equivalent of this type.
     func cdecl(strategy: Bridgable.Strategy) -> TypeSignature {
         switch self {
+        case .function:
+            return .javaObjectPointer
         case .int:
             return .int64
         case .optional(let type):
@@ -229,6 +231,12 @@ extension TypeSignature {
     /// Return code that converst the given value of this type to its `@_cdecl` function form.
     func convertToCDecl(value: String, strategy: Bridgable.Strategy) -> String {
         switch self.asOptional(false) {
+        case .function(let parameters, _, _, _):
+            if isOptional {
+                return value + " == nil ? nil : SwiftClosure" + parameters.count.description + ".javaObject(for: " + value + "!)"
+            } else {
+                return "SwiftClosure" + parameters.count.description + ".javaObject(for: " + value + ")"
+            }
         case .int:
             if isOptional {
                 return value + ".toJavaObject()"
@@ -268,6 +276,12 @@ extension TypeSignature {
     /// Return code that converts the given value of our `@_cdecl` function type back to this type.
     func convertFromCDecl(value: String, strategy: Bridgable.Strategy) -> String {
         switch self.asOptional(false) {
+        case .function(let parameters, _, _, _):
+            if isOptional {
+                return value + " == nil ? nil : SwiftClosure" + parameters.count.description + ".closure(forJavaObject: " + value + "!)"
+            } else {
+                return "SwiftClosure" + parameters.count.description + ".closure(forJavaObject: " + value + ")"
+            }
         case .int:
             if isOptional {
                 return "try! " + description + ".fromJavaObject(" + value + ")"
@@ -288,9 +302,9 @@ extension TypeSignature {
                 }
             case .swiftPeer:
                 if isOptional {
-                    return value + ".pointee() as " + description
+                    return value + ".pointee()"
                 } else {
-                    return value + ".pointee()! as " + description
+                    return value + ".pointee()!"
                 }
             case .custom:
                 return value // TODO
@@ -363,8 +377,7 @@ extension TypeSignature {
         case .function(let parameters, let returnType, _, _):
             let parametersString = (0..<parameters.count).map { "p\($0)" }.joined(separator: ", ")
             let parametersInString = parametersString.isEmpty ? parametersString : parametersString + " in "
-            let closureType = returnType == .void ? "JavaBackedVoidClosure" : "JavaBackedClosure<" + returnType.description + ">"
-            return "{ let closure_swift = " + closureType + "(" + value + "); return { " + parametersInString + "try! closure_swift.invoke(" + parametersString + ") } }()"
+            return "{ let closure_swift = JavaBackedClosure<" + returnType.description + ">(" + value + "); return { " + parametersInString + "try! closure_swift.invoke(" + parametersString + ") } }()"
         case .int:
             return "Int(" + value + ")"
         case .optional:
