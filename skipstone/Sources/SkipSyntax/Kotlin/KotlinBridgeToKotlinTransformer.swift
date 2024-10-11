@@ -128,7 +128,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             variableDeclaration.setter = Accessor(parameterName: "newValue", body: KotlinCodeBlock(statements: setterBody.map { KotlinRawStatement(sourceCode: $0) }))
             externalFunctionDeclarations.append("private external fun " + externalName + "_set(" + setterInstanceParameter + "value: " + externalType.kotlin + ")")
 
-            var cdeclSetterBody = ["let value_swift = " + type.convertFromCDecl(value: "value", strategy: bridgable.strategy)]
+            var cdeclSetterBody = ["let value_swift: " + type.description + " = " + type.convertFromCDecl(value: "value", strategy: bridgable.strategy)]
             if let classDeclaration {
                 cdeclSetterBody += [
                     "let peer_swift: " + classDeclaration.signature.description + " = Swift_peer.pointee()!",

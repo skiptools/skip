@@ -220,7 +220,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_BridgeKt_Swift_1i_1set")
         func BridgeKt_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: Int64) {
-            let value_swift = Int(value)
+            let value_swift: Int = Int(value)
             i = value_swift
         }
         """)
@@ -248,7 +248,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_BridgeKt_Swift_1s_1set")
         func BridgeKt_Swift_s_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaString) {
-            let value_swift = try! String.fromJavaObject(value)
+            let value_swift: String = try! String.fromJavaObject(value)
             s = value_swift
         }
         """)
@@ -278,7 +278,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_BridgeKt_Swift_1i_1set")
         func BridgeKt_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: Int64) {
-            let value_swift = Int(value)
+            let value_swift: Int = Int(value)
             i = value_swift
         }
         """)
@@ -376,7 +376,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_BridgeKt_Swift_1s_1set")
         func BridgeKt_Swift_s_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaString) {
-            let value_swift = try! String.fromJavaObject(value)
+            let value_swift: String = try! String.fromJavaObject(value)
             s = value_swift
         }
         """)
@@ -412,7 +412,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_BridgeKt_Swift_1i_1set")
         func BridgeKt_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: Int64) {
-            let value_swift = value
+            let value_swift: Int64 = value
             i = value_swift
         }
         """)
@@ -454,7 +454,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_BridgeKt_Swift_1i_1set")
         func BridgeKt_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer?) {
-            let value_swift = try! Int?.fromJavaObject(value)
+            let value_swift: Int? = try! Int?.fromJavaObject(value)
             i = value_swift
         }
         """)
@@ -499,7 +499,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_BridgeKt_Swift_1c_1set")
         func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
-            let value_swift = C(Java_ptr: value)
+            let value_swift: C = C(Java_ptr: value)
             c = value_swift
         }
         """, """
@@ -553,7 +553,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_BridgeKt_Swift_1c_1set")
         func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer?) {
-            let value_swift = value == nil ? nil : C(Java_ptr: value!)
+            let value_swift: C? = value == nil ? nil : C(Java_ptr: value!)
             c = value_swift
         }
         """, """
@@ -640,7 +640,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_BridgeKt_Swift_1c_1set")
         func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: SwiftObjectPointer) {
-            let value_swift = value.pointee()! as C
+            let value_swift: C = value.pointee()!
             c = value_swift
         }
         """)
@@ -710,7 +710,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_BridgeKt_Swift_1c_1set")
         func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: SwiftObjectPointer) {
-            let value_swift = value.pointee() as C?
+            let value_swift: C? = value.pointee()
             c = value_swift
         }
         """)
@@ -718,6 +718,66 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testUnbridgableTypeVar() async throws {
         // TODO
+    }
+
+    func testClosureTypeVar() async throws {
+        try await check(swiftBridge: """
+        // SKIP @bridgeToKotlin
+        var c: (Int) -> String = { _ in "" }
+        """, kotlin: """
+        internal var c: (Int) -> String
+            get() {
+                val value_swift = Swift_c()
+                return value_swift
+            }
+            set(newValue) {
+                val newValue_swift = newValue
+                Swift_c_set(newValue_swift)
+            }
+        private external fun Swift_c(): (Int) -> String
+        private external fun Swift_c_set(value: (Int) -> String)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1c")
+        func BridgeKt_Swift_c(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
+            let value_swift = c
+            return SwiftClosure1.javaObject(for: value_swift)
+        }
+        @_cdecl("Java_BridgeKt_Swift_1c_1set")
+        func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
+            let value_swift: (Int) -> String = SwiftClosure1.closure(forJavaObject: value)
+            c = value_swift
+        }
+        """)
+    }
+
+    func testVoidClosureTypeVar() async throws {
+        try await check(swiftBridge: """
+        // SKIP @bridgeToKotlin
+        var c: () -> Void = { }
+        """, kotlin: """
+        internal var c: () -> Unit
+            get() {
+                val value_swift = Swift_c()
+                return value_swift
+            }
+            set(newValue) {
+                val newValue_swift = newValue
+                Swift_c_set(newValue_swift)
+            }
+        private external fun Swift_c(): () -> Unit
+        private external fun Swift_c_set(value: () -> Unit)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1c")
+        func BridgeKt_Swift_c(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
+            let value_swift = c
+            return SwiftClosure0.javaObject(for: value_swift)
+        }
+        @_cdecl("Java_BridgeKt_Swift_1c_1set")
+        func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
+            let value_swift: () -> Void = SwiftClosure0.closure(forJavaObject: value)
+            c = value_swift
+        }
+        """)
     }
 
     func testFunction() async throws {
@@ -883,7 +943,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_C_Swift_1i_1set")
         func C_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: Int64) {
-            let value_swift = Int(value)
+            let value_swift: Int = Int(value)
             let peer_swift: C = Swift_peer.pointee()!
             peer_swift.i = value_swift
         }
