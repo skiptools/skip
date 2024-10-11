@@ -35,14 +35,13 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
 
         let importDeclarations = translator.syntaxTree.root.statements.compactMap { $0 as? ImportDeclaration }
         let outputNode = SwiftDefinition { output, indentation, _ in
-            output.append("#if canImport(SkipBridge)\nimport SkipBridge\n\n")
+            output.append("import SkipBridge\n\n")
             for importDeclaration in importDeclarations {
                 let path = importDeclaration.modulePath.joined(separator: ".")
                 output.append(indentation).append("import ").append(path).append("\n")
             }
             swiftDefinitions.forEach { $0.append(to: output, indentation: indentation) }
             cdeclFunctions.forEach { $0.append(to: output, indentation: indentation) }
-            output.append("\n#endif")
         }
         let output = KotlinTransformerOutput(file: outputFile, node: outputNode, type: .bridgeToKotlin)
         return [output]

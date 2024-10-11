@@ -43,7 +43,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             .compactMap { $0 as? KotlinImportDeclaration }
             .filter { !$0.isKotlinImport }
         let outputNode = SwiftDefinition { output, indentation, _ in
-            output.append("#if canImport(SkipBridge)\nimport SkipBridge\n\n")
+            output.append("import SkipBridge\n\n")
             for importDeclaration in importDeclarations {
                 let path = importDeclaration.modulePath.joined(separator: ".")
                 output.append(indentation).append("import ").append(path).append("\n")
@@ -52,7 +52,6 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
                 output.append(indentation).append(globalsClassRef.declaration).append("\n")
             }
             swiftDefinitions.forEach { output.append($0, indentation: indentation) }
-            output.append("\n#endif")
         }
         let output = KotlinTransformerOutput(file: outputFile, node: outputNode, type: .bridgeToSwift)
         return [output]
