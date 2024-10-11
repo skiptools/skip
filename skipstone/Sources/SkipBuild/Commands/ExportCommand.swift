@@ -57,6 +57,9 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Output folders to variant sub-folders", valueName: "nest"))
     var nested: Bool = false
 
+    @Option(help: ArgumentHelp("SDK path for export build", valueName: "sdk dir"))
+    var sdkPath: String? = nil
+
     func performCommand(with out: MessageQueue) async {
         await withLogStream(with: out) {
             try await runExport(with: out)
@@ -82,10 +85,20 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
             // to build for iOS, we need to do something like this:
             //swift build  --package-path . -Xswiftc -sdk -Xswiftc `xcrun --sdk iphonesimulator --show-sdk-path` -Xswiftc -target -Xswiftc arm64-apple-ios`xcrun --sdk iphonesimulator --show-sdk-version`-simulator
 
-            if let sdkPath = try? await run(with: out, "Getting SDK Path", "xcrun --sdk iphoneos --show-sdk-path".split(separator: " ").map(\.description), watch: false).get().stdout.trimmingCharacters(in: .whitespacesAndNewlines) {
-                await run(with: out, "Build project \(packageName)", ["xcrun", "swift", "build", "-v", "--package-path", project, "--triple", "arm64-apple-ios", "--sdk", sdkPath])
+            func fetchSDKPath() async throws -> String? {
+                // the "--sdk-path" argument
+                if let sdkPath = self.sdkPath {
+                    return sdkPath
+                }
+
+                return try? await run(with: out, "Getting SDK Path", "xcrun --sdk iphoneos --show-sdk-path".split(separator: " ").map(\.description), watch: false).get().stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+
+            if let sdk = try? await fetchSDKPath(), sdk != "legacy" {
+                await run(with: out, "Build project \(packageName)", ["xcrun", "swift", "build", "-v", "--package-path", project, "--triple", "arm64-apple-ios", "--sdk", sdk])
             } else {
-                // fallback to plain "swift build", which has the down-side that it will build against macOS (and thereby fail when there are iOS-only API calls)
+                // fallback to plain "swift build" for legacy build, which has the down-side that it will build against macOS (and thereby fail when there are iOS-only API calls): "Basics/Triple+Basics.swift:149: Fatal error: Cannot create dynamic libraries for os "ios".", also @availability annotations are required for everything
+                // however, it permits us to build and export against Xcode 15.2, which has bugs that prevent the iOS export build from working
                 await run(with: out, "Build project \(packageName)", ["swift", "build", "-v", "--package-path", project])
             }
         } else {
