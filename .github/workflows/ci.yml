@@ -14,7 +14,7 @@ jobs:
   skip-init:
     runs-on: macos-14
     steps:
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: current
           generate-job-summary: false
