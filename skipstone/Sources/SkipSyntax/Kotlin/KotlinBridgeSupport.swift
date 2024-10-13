@@ -105,123 +105,21 @@ extension TypeSignature {
         return java ? .named("skip.bridge.SwiftObjectPointer", []) : .named("SwiftObjectPointer", [])
     }
 
-    /// Return the external function equivalent of this type.
-    func kotlinExternal(strategy: Bridgable.Strategy) -> TypeSignature {
-        switch self {
-        case .int:
-            return .int64
-        case .optional(let type):
-            switch type {
-            case .int:
-                return self // We want Int?, not Long?
-            default:
-                let converted = type.kotlinExternal(strategy: strategy)
-                return converted.asOptional(converted != .swiftObjectPointer(java: true))
-            }
-        case .unwrappedOptional(let type):
-            return type.kotlinExternal(strategy: strategy)
-        default:
-            switch strategy {
-            case .javaPeer:
-                return self
-            case .swiftPeer:
-                return .swiftObjectPointer(java: true)
-            case .custom:
-                return self // TODO
-            case .direct:
-                return self
-            case .unknown:
-                return self // TODO
-            }
-        }
-    }
-
-    /// Return code that converts the given value of this type to its external form.
-    func kotlinConvertToExternal(value: String, strategy: Bridgable.Strategy) -> String {
-        switch self.asOptional(false) {
-        case .int:
-            return isOptional ? value : value + ".toLong()"
-        case .unwrappedOptional(let type):
-            return type.kotlinConvertToExternal(value: value, strategy: strategy)
-        default:
-            switch strategy {
-            case .javaPeer:
-                return value
-            case .swiftPeer:
-                if isOptional {
-                    return value + "?.Swift_peer ?: skip.bridge.SwiftObjectNil"
-                } else {
-                    return value + ".Swift_peer"
-                }
-            case .custom:
-                return value // TODO
-            case .direct:
-                return value
-            case .unknown:
-                return value // TODO
-            }
-        }
-    }
-
-    /// Return code that converts the given value of our external type back to this type.
-    func kotlinConvertFromExternal(value: String, strategy: Bridgable.Strategy) -> String {
-        switch self.asOptional(false) {
-        case .int:
-            return isOptional ? value : value + ".toInt()"
-        case .unwrappedOptional(let type):
-            return type.kotlinConvertFromExternal(value: value, strategy: strategy)
-        default:
-            switch strategy {
-            case .javaPeer:
-                return value
-            case .swiftPeer:
-                let converted = asOptional(false).description + "(Swift_peer = " + value + ", marker = null)"
-                if isOptional {
-                    return "if (" + value + " == skip.bridge.SwiftObjectNil) null else " + converted
-                } else {
-                    return converted
-                }
-            case .custom:
-                return value // TODO
-            case .direct:
-                return value
-            case .unknown:
-                return value // TODO
-            }
-        }
-    }
-
     /// Return the `@_cdecl` function equivalent of this type.
     func cdecl(strategy: Bridgable.Strategy) -> TypeSignature {
         switch self {
         case .function:
             return .javaObjectPointer
         case .int:
-            return .int64
+            return .int32
         case .optional(let type):
-            switch type {
-            case .string:
-                return .optional(.javaString)
-            default:
-                return strategy == .swiftPeer ? .swiftObjectPointer(java: false) : .optional(.javaObjectPointer)
-            }
+            return type == .string ? .optional(.javaString) : .optional(.javaObjectPointer)
         case .string:
             return .javaString
         case .unwrappedOptional(let type):
             return type.cdecl(strategy: strategy)
         default:
-            switch strategy {
-            case .javaPeer:
-                return .javaObjectPointer
-            case .swiftPeer:
-                return .swiftObjectPointer(java: false)
-            case .custom:
-                return self // TODO
-            case .direct:
-                return self
-            case .unknown:
-                return self // TODO
-            }
+            return strategy == .direct ? self : .javaObjectPointer
         }
     }
 
@@ -229,16 +127,13 @@ extension TypeSignature {
     func convertToCDecl(value: String, strategy: Bridgable.Strategy) -> String {
         switch self.asOptional(false) {
         case .function(let parameters, _, _, _):
-            if isOptional {
-                return value + " == nil ? nil : SwiftClosure" + parameters.count.description + ".javaObject(for: " + value + "!)"
-            } else {
-                return "SwiftClosure" + parameters.count.description + ".javaObject(for: " + value + ")"
-            }
+            let converted = "SwiftClosure" + parameters.count.description + ".javaObject(for: " + value + ")"
+            return isOptional ? converted : converted + "!"
         case .int:
             if isOptional {
                 return value + ".toJavaObject()"
             } else {
-                return "Int64(" + value + ")"
+                return "Int32(" + value + ")"
             }
         case .string:
             let converted = value + ".toJavaObject()"
@@ -246,26 +141,11 @@ extension TypeSignature {
         case .unwrappedOptional(let type):
             return type.convertToCDecl(value: value, strategy: strategy)
         default:
-            switch strategy {
-            case .javaPeer:
-                if isOptional {
-                    // Parenthesized because the transpiler tacks on a .toJavaParameter() that should apply to nil too
-                    return value + "?.Java_peer.safePointer()"
-                } else {
-                    return value + ".Java_peer.safePointer()"
-                }
-            case .swiftPeer:
-                return "SwiftObjectPointer.pointer(to: " + value + ", retain: true)"
-            case .custom:
-                return value // TODO
-            case .direct:
-                if isOptional {
-                    return value + ".toJavaObject()"
-                } else {
-                    return value
-                }
-            case .unknown:
-                return value // TODO
+            if strategy == .direct && !isOptional {
+                return value
+            } else {
+                let converted = value + ".toJavaObject()"
+                return isOptional ? converted : converted + "!"
             }
         }
     }
@@ -274,45 +154,23 @@ extension TypeSignature {
     func convertFromCDecl(value: String, strategy: Bridgable.Strategy) -> String {
         switch self.asOptional(false) {
         case .function(let parameters, _, _, _):
-            if isOptional {
-                return value + " == nil ? nil : SwiftClosure" + parameters.count.description + ".closure(forJavaObject: " + value + "!)"
-            } else {
-                return "SwiftClosure" + parameters.count.description + ".closure(forJavaObject: " + value + ")"
-            }
+            let converted = "SwiftClosure" + parameters.count.description + ".closure(forJavaObject: " + value + ")"
+            return isOptional ? converted : converted + "!"
         case .int:
             if isOptional {
-                return "try! " + description + ".fromJavaObject(" + value + ")"
+                return description + ".fromJavaObject(" + value + ")"
             } else {
                 return "Int(" + value + ")"
             }
         case .string:
-            return "try! " + description + ".fromJavaObject(" + value + ")"
+            return description + ".fromJavaObject(" + value + ")"
         case .unwrappedOptional(let type):
             return type.convertFromCDecl(value: value, strategy: strategy)
         default:
-            switch strategy {
-            case .javaPeer:
-                if isOptional {
-                    return value + " == nil ? nil : " + asOptional(false).description + "(Java_ptr: " + value + "!)"
-                } else {
-                    return description + "(Java_ptr: " + value + ")"
-                }
-            case .swiftPeer:
-                if isOptional {
-                    return value + ".pointee()"
-                } else {
-                    return value + ".pointee()!"
-                }
-            case .custom:
-                return value // TODO
-            case .direct:
-                if isOptional {
-                    return "try! " + description + ".fromJavaObject(" + value + ")"
-                } else {
-                    return value
-                }
-            case .unknown:
-                return value // TODO
+            if strategy == .direct && !isOptional {
+                return value
+            } else {
+                return description + ".fromJavaObject(" + value + ")"
             }
         }
     }
@@ -329,7 +187,7 @@ extension TypeSignature {
         case .unwrappedOptional(let type):
             return type.java
         default:
-            return isNamedType ? .javaObjectPointer : self // TODO: All other types
+            return isNamedType ? .javaObjectPointer : self
         }
     }
 
@@ -343,27 +201,11 @@ extension TypeSignature {
         case .unwrappedOptional(let type):
             return type.convertToJava(value: value, strategy: strategy)
         default:
-            switch strategy {
-            case .javaPeer:
-                if isOptional {
-                    // Parenthesize to allow calls to nil.toJavaParameter()
-                    return "(" + value + "?.Java_peer.safePointer())"
-                } else {
-                    return value + ".Java_peer.safePointer()"
-                }
-            case .swiftPeer:
-                if isOptional {
-                    // Parenthesize to allow calls to nil.toJavaParameter()
-                    return "(" + value + "?.Java_swiftPeerBridged())"
-                } else {
-                    return value + ".Java_swiftPeerBridged()"
-                }
-            case .custom:
-                return value // TODO
-            case .direct:
+            if strategy == .direct {
                 return value
-            case .unknown:
-                return value // TODO
+            } else {
+                let converted = value + ".toJavaObject()"
+                return isOptional ? converted : converted + "!"
             }
         }
     }
@@ -378,29 +220,11 @@ extension TypeSignature {
         case .int:
             return "Int(" + value + ")"
         case .optional:
-            switch strategy {
-            case .javaPeer:
-                return value + " == nil ? nil : " + asOptional(false).description + "(Java_ptr: " + value + "!)"
-            case .swiftPeer:
-                return value + " == nil ? nil : SwiftObjectPointer.peer(of: " + value + "!).pointee()"
-            default:
-                return "try! " + description + ".fromJavaObject(" + value + ")"
-            }
+            return description + ".fromJavaObject(" + value + ")"
         case .unwrappedOptional(let type):
             return type.convertFromJava(value: value, strategy: strategy)
         default:
-            switch strategy {
-            case .javaPeer:
-                return description + "(Java_ptr: " + value + ")"
-            case .swiftPeer:
-                return "SwiftObjectPointer.peer(of: " + value + ").pointee()!"
-            case .custom:
-                return value // TODO
-            case .direct:
-                return value
-            case .unknown:
-                return value
-            }
+            return strategy == .direct ? value : description + ".fromJavaObject(" + value + ")"
         }
     }
 

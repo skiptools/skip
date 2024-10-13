@@ -86,7 +86,6 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
 
         let propertyName = variableDeclaration.propertyName
         let externalName = "Swift_" + propertyName
-        let externalType = type.kotlinExternal(strategy: bridgable.strategy)
         var externalFunctionDeclarations: [String] = []
         let (cdecl, cdeclName) = cdecl(for: variableDeclaration, name: externalName, translator: translator)
 
@@ -94,47 +93,44 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         let getterArguments = classDeclaration == nil ? "()" : "(Swift_peer)"
         let getterParameters = classDeclaration == nil ? "()" : "(Swift_peer: skip.bridge.SwiftObjectPointer)"
         let getterBody = [
-            "val value_swift = " + externalName + getterArguments,
-            "return " + type.kotlinConvertFromExternal(value: "value_swift", strategy: bridgable.strategy)
+            "return " + externalName + getterArguments
         ]
         variableDeclaration.getter = Accessor(body: KotlinCodeBlock(statements: getterBody.map { KotlinRawStatement(sourceCode: $0) }))
-        externalFunctionDeclarations.append("private external fun " + externalName + getterParameters + ": " + externalType.kotlin)
+        externalFunctionDeclarations.append("private external fun " + externalName + getterParameters + ": " + type.kotlin)
 
-        var cdeclGetterBody: [String]
         let cdeclInstanceParameters: [TypeSignature.Parameter]
+        let cdeclGetterBody: [String]
         if let classDeclaration {
             cdeclGetterBody = [
                 "let peer_swift: " + classDeclaration.signature.description + " = Swift_peer.pointee()!",
-                "let value_swift = peer_swift." + propertyName
+                "return " + type.convertToCDecl(value: "peer_swift." + propertyName, strategy: bridgable.strategy)
             ]
             cdeclInstanceParameters = [cdeclInstanceParameter]
         } else {
-            cdeclGetterBody = ["let value_swift = " + propertyName]
+            cdeclGetterBody = ["return " + type.convertToCDecl(value: propertyName, strategy: bridgable.strategy)]
             cdeclInstanceParameters = []
         }
-        cdeclGetterBody.append("return " + type.convertToCDecl(value: "value_swift", strategy: bridgable.strategy))
         let cdeclGetter = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: .function(cdeclInstanceParameters, type.cdecl(strategy: bridgable.strategy), APIFlags(), nil), body: cdeclGetterBody)
         cdeclFunctions.append(cdeclGetter)
 
         // Setter
         if variableDeclaration.apiFlags.options.contains(.writeable) {
-            let setterArguments = classDeclaration == nil ? "newValue_swift" : "Swift_peer, newValue_swift"
+            let setterArguments = classDeclaration == nil ? "newValue" : "Swift_peer, newValue"
             let setterInstanceParameter = classDeclaration == nil ? "" : "Swift_peer: skip.bridge.SwiftObjectPointer, "
             let setterBody = [
-                "val newValue_swift = " + type.kotlinConvertToExternal(value: "newValue", strategy: bridgable.strategy),
                 externalName + "_set(" + setterArguments + ")"
             ]
             variableDeclaration.setter = Accessor(parameterName: "newValue", body: KotlinCodeBlock(statements: setterBody.map { KotlinRawStatement(sourceCode: $0) }))
-            externalFunctionDeclarations.append("private external fun " + externalName + "_set(" + setterInstanceParameter + "value: " + externalType.kotlin + ")")
+            externalFunctionDeclarations.append("private external fun " + externalName + "_set(" + setterInstanceParameter + "value: " + type.kotlin + ")")
 
-            var cdeclSetterBody = ["let value_swift: " + type.description + " = " + type.convertFromCDecl(value: "value", strategy: bridgable.strategy)]
+            let cdeclSetterBody: [String]
             if let classDeclaration {
-                cdeclSetterBody += [
+                cdeclSetterBody = [
                     "let peer_swift: " + classDeclaration.signature.description + " = Swift_peer.pointee()!",
-                    "peer_swift." + propertyName + " = value_swift"
+                    "peer_swift." + propertyName + " = " + type.convertFromCDecl(value: "value", strategy: bridgable.strategy)
                 ]
             } else {
-                cdeclSetterBody.append(propertyName + " = value_swift")
+                cdeclSetterBody = [propertyName + " = " + type.convertFromCDecl(value: "value", strategy: bridgable.strategy)]
             }
             let cdeclSetter = CDeclFunction(name: cdeclName + "_set", cdecl: cdecl + "_1set", signature: .function(cdeclInstanceParameters + [TypeSignature.Parameter(label: "value", type: type.cdecl(strategy: bridgable.strategy))], .void, APIFlags(), nil), body: cdeclSetterBody)
             cdeclFunctions.append(cdeclSetter)
@@ -185,15 +181,10 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         let functionName = functionDeclaration.name
         let externalName = "Swift_" + functionName
 
-        var body: [String] = []
         var cdeclBody: [String] = []
-        var externalParameterNames: [String] = []
         for (index, parameter) in functionDeclaration.parameters.enumerated() {
-            let externalParameterName = parameter.internalLabel + "_swift"
             let strategy = bridgables.parameters[index].strategy
-            body.append("val " + externalParameterName + " = " + parameter.declaredType.kotlinConvertToExternal(value: parameter.internalLabel, strategy: strategy))
-            cdeclBody.append("let " + externalParameterName + " = " + parameter.declaredType.convertFromCDecl(value: parameter.internalLabel, strategy: strategy))
-            externalParameterNames.append(externalParameterName)
+            cdeclBody.append("let " + parameter.internalLabel + "_swift = " + parameter.declaredType.convertFromCDecl(value: parameter.internalLabel, strategy: strategy))
         }
 
         let swiftCallTarget: String
@@ -203,21 +194,23 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             swiftCallTarget = "peer_swift."
 
             externalArgumentsString += "Swift_peer"
-            if !externalParameterNames.isEmpty {
+            if !functionDeclaration.parameters.isEmpty {
                 externalArgumentsString += ", "
             }
         } else {
             swiftCallTarget = ""
         }
-        externalArgumentsString += externalParameterNames.joined(separator: ", ")
-        let swiftArgumentsString = functionDeclaration.parameters.enumerated().map { index, p in
-            if let externalLabel = p.externalLabel {
-                return externalLabel + ": " + externalParameterNames[index]
+        externalArgumentsString += functionDeclaration.parameters.map(\.internalLabel).joined(separator: ", ")
+        let swiftArgumentsString = functionDeclaration.parameters.map { parameter in
+            let swiftArgument = parameter.internalLabel + "_swift"
+            if let externalLabel = parameter.externalLabel {
+                return externalLabel + ": " + swiftArgument
             } else {
-                return externalParameterNames[index]
+                return swiftArgument
             }
         }.joined(separator: ", ")
         
+        var body: [String] = []
         if let classDeclaration, functionDeclaration.type == .constructorDeclaration {
             body.append("Swift_peer = " + externalName + "(" + externalArgumentsString + ")")
             cdeclBody.append("let f_return_swift = " + classDeclaration.signature.description + "(" + swiftArgumentsString + ")")
@@ -226,9 +219,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             body.append(externalName + "(" + externalArgumentsString + ")")
             cdeclBody.append(swiftCallTarget + functionName + "(" + swiftArgumentsString + ")")
         } else {
-            body.append("val f_return_swift = " + externalName + "(" + externalArgumentsString + ")")
-            body.append("return " + functionDeclaration.returnType.kotlinConvertFromExternal(value: "f_return_swift", strategy: bridgables.return.strategy))
-
+            body.append("return " + externalName + "(" + externalArgumentsString + ")")
             cdeclBody.append("let f_return_swift = " + swiftCallTarget + functionName + "(" + swiftArgumentsString + ")")
             cdeclBody.append("return " + functionDeclaration.returnType.convertToCDecl(value: "f_return_swift", strategy: bridgables.return.strategy))
         }
@@ -241,25 +232,24 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
                 externalFunctionDeclaration += ", "
             }
         }
-        externalFunctionDeclaration += functionDeclaration.parameters.enumerated().map { (index, parameter) in
-            let strategy = bridgables.parameters[index].strategy
-            return parameter.internalLabel + ": " + parameter.declaredType.kotlinExternal(strategy: strategy).kotlin
+        externalFunctionDeclaration += functionDeclaration.parameters.map { parameter in
+            return parameter.internalLabel + ": " + parameter.declaredType.kotlin
         }.joined(separator: ", ")
         externalFunctionDeclaration += ")"
         if functionDeclaration.type == .constructorDeclaration {
             externalFunctionDeclaration += ": skip.bridge.SwiftObjectPointer"
         } else if functionDeclaration.returnType != .void {
-            externalFunctionDeclaration += ": " + functionDeclaration.returnType.kotlinExternal(strategy: bridgables.return.strategy).kotlin
+            externalFunctionDeclaration += ": " + functionDeclaration.returnType.kotlin
         }
         (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [KotlinRawStatement(sourceCode: externalFunctionDeclaration)], after: functionDeclaration)
 
         let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: externalName, translator: translator)
         let instanceParameter = classDeclaration != nil && functionDeclaration.type != .constructorDeclaration ? [cdeclInstanceParameter] : []
-        let returnType: TypeSignature = functionDeclaration.type == .constructorDeclaration ? .swiftObjectPointer(java: false) : functionType.returnType
+        let returnType: TypeSignature = functionDeclaration.type == .constructorDeclaration ? .swiftObjectPointer(java: false) : functionType.returnType.cdecl(strategy: bridgables.return.strategy)
         let cdeclType: TypeSignature = .function(instanceParameter + functionType.parameters.enumerated().map { (index, parameter) in
             let strategy = bridgables.parameters[index].strategy
             return TypeSignature.Parameter(label: parameter.label, type: parameter.type.cdecl(strategy: strategy))
-        }, returnType.cdecl(strategy: bridgables.return.strategy), APIFlags(), nil)
+        }, returnType, APIFlags(), nil)
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
         cdeclFunctions.append(cdeclFunction)
     }
@@ -351,16 +341,24 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         (classDeclaration.children.first as? KotlinStatement)?.ensureLeadingNewlines(1)
         classDeclaration.insert(statements: insertStatements, after: nil)
 
-        // Add utility function to create a Java object from a Swift instance
+        // Conform to `BridgedToKotlin`
         let classRef = JavaClassRef(for: classDeclaration, translator: translator)
         var swift: [String] = []
-        swift.append("extension " + classDeclaration.signature.description + " {")
+        swift.append("extension " + classDeclaration.signature.description + ": BridgedToKotlin {")
         swift.append(1, classRef.declaration)
-        swift.append(1, classDeclaration.modifiers.visibility.swift(suffix: " ") + "func Java_swiftPeerBridged() -> JavaObjectPointer {")
-        swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)")
-        swift.append(2, "return try! Self.Java_class.create(ctor: Self.Java_swiftPeerBridged_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])")
+        swift.append(1, classDeclaration.modifiers.visibility.swift(suffix: " ") + "static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {")
+        swift.append(2, [
+            "let ptr = SwiftObjectPointer.peer(of: obj!)",
+            "return ptr.pointee()!"
+        ])
         swift.append(1, "}")
-        swift.append(1, "private static let Java_swiftPeerBridged_methodID = Java_class.getMethodID(name: \"<init>\", sig: \"(JLskip/bridge/SwiftPeerMarker;)V\")!")
+        swift.append(1, classDeclaration.modifiers.visibility.swift(suffix: " ") + "func toJavaObject() -> JavaObjectPointer? {")
+        swift.append(2, [
+            "let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)",
+            "return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])"
+        ])
+        swift.append(1, "}")
+        swift.append(1, "private static let Java_constructor_methodID = Java_class.getMethodID(name: \"<init>\", sig: \"(JLskip/bridge/SwiftPeerMarker;)V\")!")
         swift.append("}")
 
         let swiftDefinition = SwiftDefinition(swift: swift)

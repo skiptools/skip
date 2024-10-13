@@ -284,19 +284,15 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
 
         let visibility = classDeclaration.modifiers.visibility.swift(suffix: " ")
         var swift: [String] = []
-        swift.append(visibility + "class " + classDeclaration.name + " {")
+        swift.append(visibility + "class " + classDeclaration.name + ": BridgedFromKotlin {")
 
         swift.append(1, classRef.declaration)
         swift.append(1, visibility + "let Java_peer: JObject")
-        swift.append("")
-        swift.append(1, [
-            "init(Java_ptr: JavaObjectPointer) {",
-            "    Java_peer = JObject(Java_ptr)",
-            "}"
-        ])
+        swift.append(1, "required init(Java_ptr: JavaObjectPointer) {")
+        swift.append(2, "Java_peer = JObject(Java_ptr)")
+        swift.append(1, "}")
 
         if !classDeclaration.members.contains(where: { $0.type == .constructorDeclaration }) {
-            swift.append("")
             swift.append(1, visibility + "init() {")
             swift.append(2, "Java_peer = jniContext {")
             swift.append(3, [
@@ -318,6 +314,13 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
                 addSwiftDefinitions(for: functionDeclaration, to: &memberDefinitions, translator: translator)
             }
         }
+
+        swift.append(1, visibility + "static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {")
+        swift.append(2, "return .init(Java_ptr: obj!)")
+        swift.append(1, "}")
+        swift.append(1, visibility + "func toJavaObject() -> JavaObjectPointer? {")
+        swift.append(2, "return Java_peer.safePointer()")
+        swift.append(1, "}")
 
         let definition = SwiftDefinition(statement: classDeclaration, children: memberDefinitions) { output, indentation, children in
             swift.forEach { output.append(indentation).append($0).append("\n") }
