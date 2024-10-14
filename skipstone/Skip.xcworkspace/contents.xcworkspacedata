@@ -52,4 +52,7 @@
    <FileRef
       location = "group:../skipapp-fireside/Darwin/FireSide.xcodeproj">
    </FileRef>
+   <FileRef
+      location = "group:../skipapp-appdroid/Darwin/AppDroid.xcodeproj">
+   </FileRef>
 </Workspace>
