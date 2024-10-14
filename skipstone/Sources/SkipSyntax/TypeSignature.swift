@@ -246,26 +246,6 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
-    /// Add module qualification to this type.
-    func moduleQualfied(codebaseInfo: CodebaseInfo.Context, handler: ((TypeSignature, CodebaseInfo.TypeInfo?) -> Void)? = nil) -> TypeSignature {
-        return mappingTypes { type in
-            switch type {
-            case .member(let parent, let type):
-                return .member(parent.moduleQualfied(codebaseInfo: codebaseInfo, handler: handler), type)
-            case .named(let name, let generics):
-                let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: type)
-                handler?(type, typeInfo)
-                let qualifiedGenerics = generics.map { $0.moduleQualfied(codebaseInfo: codebaseInfo, handler: handler) }
-                guard let moduleName = typeInfo?.moduleName else {
-                    return .named(name, qualifiedGenerics)
-                }
-                return .module(moduleName, .named(name, qualifiedGenerics))
-            default:
-                return nil
-            }
-        }
-    }
-
     /// The base type of this member, if any.
     var baseType: TypeSignature {
         switch self {

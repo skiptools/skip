@@ -98,7 +98,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         swift.append(1, "get {")
         swift.append(2, "return jniContext {")
         swift.append(3, [
-            "let value_java: " + type.java.description + " = try! " + targetIdentifier + "." + callType + "(method: " + callGet  + ", args: [])",
+            "let value_java: " + type.java(strategy: bridgable.strategy).description + " = try! " + targetIdentifier + "." + callType + "(method: " + callGet  + ", args: [])",
             "return " + type.convertFromJava(value: "value_java", strategy: bridgable.strategy)
         ])
         swift.append(2, "}")
@@ -251,7 +251,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             if functionType.returnType == .void {
                 swift.append(1, call)
             } else {
-                swift.append(2, "let f_return_java: " + functionType.returnType.java.description + " = " + call)
+                swift.append(2, "let f_return_java: " + functionType.returnType.java(strategy: bridgables.return.strategy).description + " = " + call)
                 swift.append(2, "return " + functionType.returnType.convertFromJava(value: "f_return_java", strategy: bridgables.return.strategy))
             }
         }
