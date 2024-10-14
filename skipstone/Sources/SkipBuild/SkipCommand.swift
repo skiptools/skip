@@ -95,12 +95,6 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
         ]
     )
 
-    //@OptionGroup public var output: OutputOptions
-
-    /// This is needed to handle execution of the tool from as a sandboxed command plugin; hide from display for normal CLI usage
-    @Option(name: [.long], help: ArgumentHelp("List of targets to apply", valueName: "target", visibility: .private))
-    public var target: Array<String> = []
-
     public init() {
     }
 }

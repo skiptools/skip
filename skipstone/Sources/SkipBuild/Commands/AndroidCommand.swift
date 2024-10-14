@@ -98,6 +98,9 @@ fileprivate extension AndroidOperationCommand {
             // Se we manually clear the SDKROOT environment variable in case it is set.
             env["SDKROOT"] = nil
 
+            // manually disable the skipstone plugin from being run again in the derived build; we don't need to transpile and bridge the code a second time, we only need to build the native libraries with the Android toolchain
+            env["SKIP_PLUGIN_DISABLED"] = "1"
+
             let swiftCmd = toolchainBin.appendingPathComponent("swift").path
             if !FileManager.default.fileExists(atPath: swiftCmd) {
                 throw CrossCompilerError(errorDescription: "Could not locate swift command at: \(swiftCmd)")
@@ -134,6 +137,7 @@ fileprivate extension AndroidOperationCommand {
             if executable == nil {
                 cmd += args
             }
+
             try await runCommand(command: cmd, env: env, with: out)
 
             let buildOutputFolder = [
@@ -208,7 +212,7 @@ fileprivate extension AndroidOperationCommand {
             // create the staging folder
             await run(with: out, "Connecting to Android", [adb, "shell", "mkdir", "-p", stagingDir], additionalEnvironment: env)
 
-            // Note: one shortcoming of `adb push` is that it doesn't copy symbolic links as links, but instead pushes the underlying file; so, for example, the link libxml2.so -> libxml2.so.2.13.3 will be copied as two separate yet identical files, which increases the size of the transfer unnecessarily. In practice, this isn't a proble, since the linker will work, but it means that the directory of dependent shared objects will be bigger than it needs to be. One workaround to this might be to first archive all the files together (e.g., with tar), transfer the archive, and then unarchive them on the device, but this adds complexity to the process.
+            // Note: one shortcoming of `adb push` is that it doesn't copy symbolic links as links, but instead pushes the underlying file; so, for example, the link libxml2.so -> libxml2.so.2.13.3 will be copied as two separate yet identical files, which increases the size of the transfer unnecessarily. In practice, this isn't a problem, since the linker will work, but it means that the directory of dependent shared objects will be bigger than it needs to be. One workaround to this might be to first archive all the files together (e.g., with tar), transfer the archive, and then unarchive them on the device, but this adds complexity to the process.
             await run(with: out, "Copying \(runTests ? "test" : "executable") files", [adb, "push"] + transferFiles.map(\.path) + copy + [stagingDir], additionalEnvironment: env)
 
             var runFailure: Error?
