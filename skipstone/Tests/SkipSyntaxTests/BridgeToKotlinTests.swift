@@ -745,6 +745,21 @@ final class BridgeToKotlinTests: XCTestCase {
     }
 
     func testFunctionParameterLabel() async throws {
+        try await check(swiftBridge: """
+        // SKIP @bridgeToKotlin
+        func f(_ i: Int) {
+        }
+        """, kotlin: """
+        internal fun f(i: Int): Unit = Swift_f(i)
+        private external fun Swift_f(i: Int)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1f")
+        func BridgeKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ i: Int32) {
+            let i_swift = Int(i)
+            f(i_swift)
+        }
+        """)
+
         // TODO: Combos of internal and external labels
     }
 

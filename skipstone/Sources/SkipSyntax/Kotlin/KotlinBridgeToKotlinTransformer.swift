@@ -248,7 +248,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         let returnType: TypeSignature = functionDeclaration.type == .constructorDeclaration ? .swiftObjectPointer(java: false) : functionType.returnType.cdecl(strategy: bridgables.return.strategy)
         let cdeclType: TypeSignature = .function(instanceParameter + functionType.parameters.enumerated().map { (index, parameter) in
             let strategy = bridgables.parameters[index].strategy
-            return TypeSignature.Parameter(label: parameter.label, type: parameter.type.cdecl(strategy: strategy))
+            return TypeSignature.Parameter(label: functionDeclaration.parameters[index].internalLabel, type: parameter.type.cdecl(strategy: strategy))
         }, returnType, APIFlags(), nil)
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
         cdeclFunctions.append(cdeclFunction)

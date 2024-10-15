@@ -417,8 +417,14 @@ extension KotlinFunctionDeclaration {
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
             return nil
         }
-        guard let returnBridgable = returnType.checkBridgable(self, translator: translator) else {
-            return nil
+        let returnBridgable: Bridgable
+        if returnType == .void {
+            returnBridgable = Bridgable(type: .void, qualifiedType: .void, strategy: .direct)
+        } else {
+            guard let bridgable = returnType.checkBridgable(self, translator: translator) else {
+                return nil
+            }
+            returnBridgable = bridgable
         }
         var parameterBridgables: [Bridgable] = []
         for parameter in parameters {

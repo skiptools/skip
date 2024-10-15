@@ -249,7 +249,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             let callMethod = functionDeclaration.role == .global ? methodIdentifier : "Self." + methodIdentifier
             let call = "try! " + targetIdentifier + "." + callType + "(method: " + callMethod + ", args: [" + javaParameterNames.joined(separator: ", ") + "])"
             if functionType.returnType == .void {
-                swift.append(1, call)
+                swift.append(2, call)
             } else {
                 swift.append(2, "let f_return_java: " + functionType.returnType.java(strategy: bridgables.return.strategy).description + " = " + call)
                 swift.append(2, "return " + functionType.returnType.convertFromJava(value: "f_return_java", strategy: bridgables.return.strategy))

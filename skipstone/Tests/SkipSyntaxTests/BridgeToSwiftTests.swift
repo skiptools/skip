@@ -742,6 +742,23 @@ final class BridgeToSwiftTests: XCTestCase {
     }
 
     func testFunctionParameterLabel() async throws {
+        try await check(swift: """
+        // SKIP @bridgeToSwift
+        func nolabel(_ i: Int) {
+        }
+        """, kotlin: """
+        internal fun nolabel(i: Int) = Unit
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        func nolabel(_ i: Int) {
+            jniContext {
+                let i_java = Int32(i).toJavaParameter()
+                try! Java_SourceKt.callStatic(method: Java_nolabel_methodID, args: [i_java])
+            }
+        }
+        private let Java_nolabel_methodID = Java_SourceKt.getStaticMethodID(name: "nolabel", sig: "(I)V")!
+        """)
+
         // TODO: Combos of internal and external labels
     }
 
