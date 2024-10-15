@@ -19,6 +19,10 @@ final class KotlinUnitTestTransformer: KotlinTransformer {
             } else {
                 functionDeclaration.annotations += ["@Test"]
             }
+            let testRunner = "@org.junit.runner.RunWith(androidx.test.ext.junit.runners.AndroidJUnit4::class)"
+            if !owningClass.annotations.contains(testRunner) {
+                owningClass.annotations += [testRunner]
+            }
             return .skip
         }
         return .recurse(nil)
