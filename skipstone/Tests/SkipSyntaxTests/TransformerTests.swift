@@ -18,6 +18,7 @@ final class TransformerTests: XCTestCase {
         """, kotlin: """
         import skip.unit.*
 
+        @org.junit.runner.RunWith(androidx.test.ext.junit.runners.AndroidJUnit4::class)
         internal open class TestCase: XCTestCase {
             @Test
             internal open fun testSomeTest() = Unit
@@ -48,6 +49,7 @@ final class TransformerTests: XCTestCase {
 
         import skip.unit.*
 
+        @org.junit.runner.RunWith(androidx.test.ext.junit.runners.AndroidJUnit4::class)
         internal open class TestCase: XCTestCase {
 
             @OptIn(ExperimentalCoroutinesApi::class)
