@@ -51,7 +51,7 @@ extension Message {
     }
 
     static func kotlinBridgeKotlinToKotlin(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "This entity will already be transpiled to Kotlin; it cannot be bridged to Kotlin too. Did you mean to use @bridgedToSwift?", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "This entity will already be transpiled to Kotlin; it cannot be bridged to Kotlin too. Did you mean to use @BridgeToSwift?", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinBridgePrivate(_ sourceDerived: SourceDerived, source: Source) -> Message {
@@ -63,7 +63,7 @@ extension Message {
     }
 
     static func kotlinBridgeSwiftToSwift(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "This entity will already be compiled to native Swift; it cannot be bridged to Swift too. Did you mean to use @bridgeToKotlin?", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "This entity will already be compiled to native Swift; it cannot be bridged to Swift too. Did you mean to use @BridgeToKotlin?", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinBridgeUnbridgedType(_ sourceDerived: SourceDerived, type: String, source: Source) -> Message {

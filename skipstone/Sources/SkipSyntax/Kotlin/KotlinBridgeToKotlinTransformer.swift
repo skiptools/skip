@@ -64,7 +64,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
     }
 
     private func updateVariableDeclaration(_ variableDeclaration: KotlinVariableDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
-        guard classDeclaration != nil || !variableDeclaration.attributes.contains(directive: Directive.bridgeToSwift) else {
+        guard classDeclaration != nil || !variableDeclaration.attributes.isBridgeToSwift else {
             variableDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(variableDeclaration, source: translator.syntaxTree.source))
             return
         }
@@ -167,7 +167,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
     }
 
     private func updateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
-        guard classDeclaration != nil || !functionDeclaration.attributes.contains(directive: Directive.bridgeToSwift) else {
+        guard classDeclaration != nil || !functionDeclaration.attributes.isBridgeToSwift else {
             functionDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(functionDeclaration, source: translator.syntaxTree.source))
             return
         }
@@ -255,7 +255,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
     }
 
     private func updateClassDeclaration(_ classDeclaration: KotlinClassDeclaration, swiftDefinitions: inout [SwiftDefinition], cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
-        guard !classDeclaration.attributes.contains(directive: Directive.bridgeToSwift) else {
+        guard !classDeclaration.attributes.isBridgeToSwift else {
             classDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(classDeclaration, source: translator.syntaxTree.source))
             return
         }

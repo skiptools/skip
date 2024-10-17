@@ -41,7 +41,7 @@ public struct Transpiler {
                 group.addTask {
                     let bridgeSource = try Source(file: bridgeFile)
                     // Most compiled files do not contain bridging code
-                    guard bridgeSource.content.contains("@bridgeTo") else {
+                    guard bridgeSource.content.contains("@BridgeTo") || bridgeSource.content.contains("@bridgeTo") else {
                         return nil
                     }
                     return SyntaxTree(source: bridgeSource, isBridgeFile: true, preprocessorSymbols: preprocessorSymbols)

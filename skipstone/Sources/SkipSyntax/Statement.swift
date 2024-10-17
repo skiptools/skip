@@ -30,12 +30,12 @@ class Statement: SyntaxNode {
     /// Whether a declaration with the given attributes and visibility is bridging.
     static func isBridge(attributes: Attributes, visibility: Modifiers.Visibility, asMember: Bool) -> Bool {
         if asMember {
-            guard !attributes.contains(directive: Directive.nobridge) else {
+            guard !attributes.isBridgeIgnored else {
                 return false
             }
             return visibility != .private && visibility != .fileprivate
         } else {
-            return attributes.contains(directive: Directive.bridgeToKotlin) || attributes.contains(directive: Directive.bridgeToSwift)
+            return attributes.isBridgeToKotlin || attributes.isBridgeToSwift
         }
     }
 }

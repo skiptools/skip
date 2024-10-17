@@ -1,6 +1,9 @@
 /// Adapts `@Observable` and `ObservableObject` types for use in Combine and SwiftUI.
 final class KotlinObservationTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
+        guard !translator.syntaxTree.isBridgeFile else {
+            return []
+        }
         syntaxTree.root.visit { node in
             if let importDeclaration = node as? KotlinImportDeclaration {
                 addObservationImportDependencies(statement: importDeclaration, in: syntaxTree)
