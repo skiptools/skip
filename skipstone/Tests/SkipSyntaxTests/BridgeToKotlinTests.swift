@@ -8,11 +8,6 @@ final class BridgeToKotlinTests: XCTestCase {
         """, isSwiftBridge: true)
 
         try await checkProducesMessage(swift: """
-        // SKIP @bridgeToSwift
-        var i = 1
-        """, isSwiftBridge: true)
-
-        try await checkProducesMessage(swift: """
         // SKIP @BridgeToSwift
         var i = 1
         """, isSwiftBridge: true)

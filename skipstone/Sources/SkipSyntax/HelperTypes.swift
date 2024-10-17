@@ -222,17 +222,17 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
 
     /// Convenience to check whether this type is bridged to Kotlin.
     var isBridgeToKotlin: Bool {
-        return contains(directive: "bridgeToKotlin") || contains(directive: "BridgeToKotlin") || contains(.bridgeToKotlin) || contains(.bridgeToKotlinObservable)
+        return contains(directive: "BridgeToKotlin") || contains(.bridgeToKotlin) || contains(.bridgeToKotlinObservable)
     }
 
     /// Convenience to check whether this type is bridged to Swift.
     var isBridgeToSwift: Bool {
-        return contains(directive: "bridgeToSwift") || contains(directive: "BridgeToSwift") || contains(.bridgeToSwift)
+        return contains(directive: "BridgeToSwift") || contains(.bridgeToSwift)
     }
 
     /// Convenience to check whether this member is marked to ignore bridging.
     var isBridgeIgnored: Bool {
-        return contains(directive: "nobridge") || contains(directive: "BridgeIgnored") || contains(.bridgeIgnored)
+        return contains(directive: "BridgeIgnored") || contains(.bridgeIgnored)
     }
 
     func resolved(in node: SyntaxNode? = nil, context: TypeResolutionContext) -> Attributes {
