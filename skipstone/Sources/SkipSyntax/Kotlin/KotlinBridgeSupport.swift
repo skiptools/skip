@@ -548,9 +548,9 @@ extension TypeSignature {
             return nil
         }
         let strategy: Bridgable.Strategy
-        if typeInfo.attributes.contains(directive: Directive.bridgeToSwift) {
+        if typeInfo.attributes.isBridgeToSwift {
             strategy = .javaPeer
-        } else if typeInfo.attributes.contains(directive: Directive.bridgeToKotlin) {
+        } else if typeInfo.attributes.isBridgeToKotlin {
             strategy = .swiftPeer
         } else if codebaseInfo.global.protocolSignatures(forNamed: self).contains(where: { $0.isNamed("JConvertible", moduleName: "SkipBridge") }) {
             strategy = .convertible

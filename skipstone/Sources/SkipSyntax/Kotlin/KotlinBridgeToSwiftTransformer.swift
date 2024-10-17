@@ -11,23 +11,23 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         var needsGlobalsJavaClass = false
         syntaxTree.root.visit { node in
             if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global {
-                if variableDeclaration.attributes.contains(directive: Directive.bridgeToSwift) {
+                if variableDeclaration.attributes.isBridgeToSwift {
                     needsGlobalsJavaClass = addSwiftDefinitions(forGlobal: variableDeclaration, to: &swiftDefinitions, globalsClassRef: globalsClassRef, translator: translator) || needsGlobalsJavaClass
-                } else if variableDeclaration.attributes.contains(directive: Directive.bridgeToKotlin) {
+                } else if variableDeclaration.attributes.isBridgeToKotlin {
                     variableDeclaration.messages.append(Message.kotlinBridgeKotlinToKotlin(variableDeclaration, source: translator.syntaxTree.source))
                 }
                 return .skip
             } else if let functionDeclaration = node as? KotlinFunctionDeclaration, functionDeclaration.role == .global {
-                if functionDeclaration.attributes.contains(directive: Directive.bridgeToSwift) {
+                if functionDeclaration.attributes.isBridgeToSwift {
                     needsGlobalsJavaClass = addSwiftDefinitions(forGlobal: functionDeclaration, to: &swiftDefinitions, globalsClassRef: globalsClassRef, translator: translator) || needsGlobalsJavaClass
-                } else if functionDeclaration.attributes.contains(directive: Directive.bridgeToKotlin) {
+                } else if functionDeclaration.attributes.isBridgeToKotlin {
                     functionDeclaration.messages.append(Message.kotlinBridgeKotlinToKotlin(functionDeclaration, source: translator.syntaxTree.source))
                 }
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
-                if classDeclaration.attributes.contains(directive: Directive.bridgeToSwift) {
+                if classDeclaration.attributes.isBridgeToSwift {
                     addSwiftDefinitions(for: classDeclaration, to: &swiftDefinitions, translator: translator)
-                } else if classDeclaration.attributes.contains(directive: Directive.bridgeToKotlin) {
+                } else if classDeclaration.attributes.isBridgeToKotlin {
                     classDeclaration.messages.append(Message.kotlinBridgeKotlinToKotlin(classDeclaration, source: translator.syntaxTree.source))
                 }
                 return .recurse(nil)
@@ -70,7 +70,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
     }
 
     private func addSwiftDefinitions(for variableDeclaration: KotlinVariableDeclaration, to swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) {
-        guard variableDeclaration.modifiers.visibility != .private && variableDeclaration.modifiers.visibility != .fileprivate && !variableDeclaration.attributes.contains(directive: Directive.nobridge) else {
+        guard variableDeclaration.modifiers.visibility != .private && variableDeclaration.modifiers.visibility != .fileprivate && !variableDeclaration.attributes.isBridgeIgnored else {
             return
         }
         guard let bridgable = variableDeclaration.checkBridgable(translator: translator) else {
@@ -201,7 +201,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
     }
 
     private func addSwiftDefinitions(for functionDeclaration: KotlinFunctionDeclaration, to swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) {
-        guard functionDeclaration.modifiers.visibility != .private && functionDeclaration.modifiers.visibility != .fileprivate && !functionDeclaration.attributes.contains(directive: Directive.nobridge) else {
+        guard functionDeclaration.modifiers.visibility != .private && functionDeclaration.modifiers.visibility != .fileprivate && !functionDeclaration.attributes.isBridgeIgnored else {
             return
         }
         guard let bridgables = functionDeclaration.checkBridgable(translator: translator) else {

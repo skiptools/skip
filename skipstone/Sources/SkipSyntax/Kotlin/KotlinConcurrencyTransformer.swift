@@ -1,6 +1,9 @@
 /// Update uses of `Task` and main actor information used in `async` calls.
 final class KotlinConcurrencyTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
+        guard !translator.syntaxTree.isBridgeFile else {
+            return []
+        }
         let codebaseInfo = translator.codebaseInfo
         var taskClosureIdentifiers: Set<ObjectIdentifier> = []
         syntaxTree.root.visit { node in

@@ -220,6 +220,21 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
         return attributes.first(where: { $0.kind == .state || $0.kind == .stateObject })
     }
 
+    /// Convenience to check whether this type is bridged to Kotlin.
+    var isBridgeToKotlin: Bool {
+        return contains(directive: "BridgeToKotlin") || contains(.bridgeToKotlin) || contains(.bridgeToKotlinObservable)
+    }
+
+    /// Convenience to check whether this type is bridged to Swift.
+    var isBridgeToSwift: Bool {
+        return contains(directive: "BridgeToSwift") || contains(.bridgeToSwift)
+    }
+
+    /// Convenience to check whether this member is marked to ignore bridging.
+    var isBridgeIgnored: Bool {
+        return contains(directive: "BridgeIgnored") || contains(.bridgeIgnored)
+    }
+
     func resolved(in node: SyntaxNode? = nil, context: TypeResolutionContext) -> Attributes {
         return Attributes(attributes: attributes.map { $0.resolved(in: node, context: context) })
     }
@@ -276,6 +291,10 @@ struct Attribute: Hashable, Codable {
         case available
         case bindable
         case binding
+        case bridgeIgnored
+        case bridgeToKotlin
+        case bridgeToKotlinObservable
+        case bridgeToSwift
         case deprecated
         case discardableResult
         /// Recorded from `StatementExtras.attributes`.
@@ -324,6 +343,14 @@ struct Attribute: Hashable, Codable {
             return .bindable
         case "Binding":
             return .binding
+        case "BridgeIgnored":
+            return .bridgeIgnored
+        case "BridgeToKotlin":
+            return .bridgeToKotlin
+        case "BridgeToKotlinObservable":
+            return .bridgeToKotlinObservable
+        case "BridgeToSwift":
+            return.bridgeToSwift
         case "discardableResult":
             return .discardableResult
         case "directive":
