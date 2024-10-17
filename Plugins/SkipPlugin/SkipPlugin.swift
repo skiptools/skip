@@ -188,7 +188,8 @@ import PackagePlugin
                 switch dep {
                 case .product(let product):
                     guard let productPackage = productIDPackages[product.id] else {
-                        fatalError("could not find product package for \(product.id)")
+                        // product may have been unrecognized, like a macro
+                        return [] as [Dep]
                     }
 
                     return product.targets.flatMap { target in
@@ -204,7 +205,7 @@ import PackagePlugin
                     }
                     return [Dep(package: package, target: target)] + dependencies(for: target.dependencies, in: package)
                 @unknown default:
-                    fatalError("unhanded target casecheckDependencies(target")
+                    return [] as [Dep]
                 }
             }
         }
