@@ -800,6 +800,62 @@ final class BridgeToKotlinTests: XCTestCase {
         // TODO
     }
 
+    func testAsyncFunction() async throws {
+        try await check(swiftBridge: """
+        @BridgeToKotlin
+        func f(i: Int) async -> Int {
+            return i
+        }
+        """, kotlin: """
+        internal suspend fun f(i: Int): Int = Async.run {
+            kotlin.coroutines.suspendCoroutine { f_continuation ->
+                Swift_f(i) { f_return -> 
+                    f_continuation.resumeWith(kotlin.Result.success(f_return))
+                }
+            }
+        }
+        private external fun Swift_f(i: Int, f_callback: (Int) -> Unit)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1f")
+        func BridgeKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ i: Int32, _ f_callback: JavaObjectPointer) {
+            let i_swift = Int(i)
+            let f_callback_swift = SwiftClosure1.closure(forJavaObject: f_callback)! as (Int) -> Void
+            Task {
+                let f_return_swift = await f(i: i_swift)
+                f_callback_swift(f_return_swift)
+            }
+        }
+        """)
+        // TODO: @MainActor, custom actors
+    }
+
+    func testAsyncVoidFunction() async throws {
+        try await check(swiftBridge: """
+        @BridgeToKotlin
+        func f() async {
+        }
+        """, kotlin: """
+        internal suspend fun f(): Unit = Async.run {
+            kotlin.coroutines.suspendCoroutine { f_continuation ->
+                Swift_f() {
+                    f_continuation.resumeWith(kotlin.Result.success(Unit))
+                }
+            }
+        }
+        private external fun Swift_f(f_callback: () -> Unit)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1f")
+        func BridgeKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ f_callback: JavaObjectPointer) {
+            let f_callback_swift = SwiftClosure0.closure(forJavaObject: f_callback)! as () -> Void
+            Task {
+                await f()
+                f_callback_swift()
+            }
+        }
+        """)
+        // TODO: @MainActor, custom actors
+    }
+
     func testClass() async throws {
         try await check(swiftBridge: """
         @BridgeToKotlin
