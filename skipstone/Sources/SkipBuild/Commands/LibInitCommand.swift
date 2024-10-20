@@ -157,9 +157,9 @@ extension ToolOptionsCommand {
         }
         return await run(with: out, msg, ["zip", "-\(compressionLevel)", "-r", zipFile.path, folder.lastPathComponent], in: folder.deletingLastPathComponent(), resultHandler: returnFileSize)
     }
-    
+
     func createIPA(configuration: BuildConfiguration, primaryModuleName: String, sdk: String = "iphoneos", cfgSuffix: String, projectURL: URL, out: MessageQueue, prefix re: String, xcodeProjectURL: URL, ipaURL ipaOutputURL: URL? = nil, xcarchiveURL: URL? = nil, teamID: String? = nil, verifyFile: Bool = true, returnHashes: Bool) async throws -> [URL : String?] {
-        // xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
+        // xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -skipMacroValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
         let cfg = configuration.rawValue.capitalized
         let archiveBasePath = darwinBuildFolder + "/Archives/" + cfg
 
@@ -174,6 +174,7 @@ extension ToolOptionsCommand {
             "-project", xcodeProjectURL.path,
             "-derivedDataPath", fullDerivedDataPath,
             "-skipPackagePluginValidation",
+            "-skipMacroValidation",
             "-archivePath", fullArchivePath,
             "-configuration", cfg,
             "-scheme", primaryModuleName,
