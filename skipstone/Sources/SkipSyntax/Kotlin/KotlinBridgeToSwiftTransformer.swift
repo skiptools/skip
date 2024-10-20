@@ -12,21 +12,21 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         syntaxTree.root.visit { node in
             if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global {
                 if variableDeclaration.attributes.isBridgeToSwift {
-                    needsGlobalsJavaClass = addSwiftDefinitions(forGlobal: variableDeclaration, to: &swiftDefinitions, globalsClassRef: globalsClassRef, translator: translator) || needsGlobalsJavaClass
+                    needsGlobalsJavaClass = update(global: variableDeclaration, swiftDefinitions: &swiftDefinitions, globalsClassRef: globalsClassRef, translator: translator) || needsGlobalsJavaClass
                 } else if variableDeclaration.attributes.isBridgeToKotlin {
                     variableDeclaration.messages.append(Message.kotlinBridgeKotlinToKotlin(variableDeclaration, source: translator.syntaxTree.source))
                 }
                 return .skip
             } else if let functionDeclaration = node as? KotlinFunctionDeclaration, functionDeclaration.role == .global {
                 if functionDeclaration.attributes.isBridgeToSwift {
-                    needsGlobalsJavaClass = addSwiftDefinitions(forGlobal: functionDeclaration, to: &swiftDefinitions, globalsClassRef: globalsClassRef, translator: translator) || needsGlobalsJavaClass
+                    needsGlobalsJavaClass = update(global: functionDeclaration, swiftDefinitions: &swiftDefinitions, globalsClassRef: globalsClassRef, translator: translator) || needsGlobalsJavaClass
                 } else if functionDeclaration.attributes.isBridgeToKotlin {
                     functionDeclaration.messages.append(Message.kotlinBridgeKotlinToKotlin(functionDeclaration, source: translator.syntaxTree.source))
                 }
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
                 if classDeclaration.attributes.isBridgeToSwift {
-                    addSwiftDefinitions(for: classDeclaration, to: &swiftDefinitions, translator: translator)
+                    update(classDeclaration, swiftDefinitions: &swiftDefinitions, translator: translator)
                 } else if classDeclaration.attributes.isBridgeToKotlin {
                     classDeclaration.messages.append(Message.kotlinBridgeKotlinToKotlin(classDeclaration, source: translator.syntaxTree.source))
                 }
@@ -57,7 +57,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         return [output]
     }
 
-    private func addSwiftDefinitions(forGlobal variableDeclaration: KotlinVariableDeclaration, to swiftDefinitions: inout [SwiftDefinition], globalsClassRef: JavaClassRef, translator: KotlinTranslator) -> Bool {
+    private func update(global variableDeclaration: KotlinVariableDeclaration, swiftDefinitions: inout [SwiftDefinition], globalsClassRef: JavaClassRef, translator: KotlinTranslator) -> Bool {
         guard let bridgable = variableDeclaration.checkBridgable(translator: translator) else {
             return false
         }
@@ -69,7 +69,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         return true
     }
 
-    private func addSwiftDefinitions(for variableDeclaration: KotlinVariableDeclaration, to swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) {
+    private func update(_ variableDeclaration: KotlinVariableDeclaration, swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) {
         guard variableDeclaration.modifiers.visibility != .private && variableDeclaration.modifiers.visibility != .fileprivate && !variableDeclaration.attributes.isBridgeIgnored else {
             return
         }
@@ -190,17 +190,18 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         return TypeSignature.for(name: functionName, genericTypes: []).isNumeric ? numberLiteral : nil
     }
 
-    private func addSwiftDefinitions(forGlobal functionDeclaration: KotlinFunctionDeclaration, to swiftDefinitions: inout [SwiftDefinition], globalsClassRef: JavaClassRef, translator: KotlinTranslator) -> Bool {
+    private func update(global functionDeclaration: KotlinFunctionDeclaration, swiftDefinitions: inout [SwiftDefinition], globalsClassRef: JavaClassRef, translator: KotlinTranslator) -> Bool {
         guard let bridgables = functionDeclaration.checkBridgable(translator: translator) else {
             return false
         }
 
         let swift = swift(for: functionDeclaration, bridgables: bridgables, targetIdentifier: globalsClassRef.identifier, classIdentifier: globalsClassRef.identifier, methodIdentifier: "Java_" + functionDeclaration.name + "_methodID", translator: translator)
         swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: swift))
+        appendCallbackFunction(for: functionDeclaration)
         return true
     }
 
-    private func addSwiftDefinitions(for functionDeclaration: KotlinFunctionDeclaration, to swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) {
+    private func update(_ functionDeclaration: KotlinFunctionDeclaration, swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) {
         guard functionDeclaration.modifiers.visibility != .private && functionDeclaration.modifiers.visibility != .fileprivate && !functionDeclaration.attributes.isBridgeIgnored else {
             return
         }
@@ -210,28 +211,48 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
 
         let swift = swift(for: functionDeclaration, bridgables: bridgables, targetIdentifier: "Java_peer", classIdentifier: "Java_class", methodIdentifier: "Java_" + functionDeclaration.name + "_methodID", translator: translator)
         swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: swift))
+        appendCallbackFunction(for: functionDeclaration)
     }
 
     private func swift(for functionDeclaration: KotlinFunctionDeclaration, bridgables: (parameters: [Bridgable], return: Bridgable), targetIdentifier: String, classIdentifier: String, methodIdentifier: String, translator: KotlinTranslator) -> [String] {
         var swift: [String] = []
 
+        let isAsync = functionDeclaration.apiFlags.options.contains(.async)
         var functionType = functionDeclaration.functionType
         if functionDeclaration.type == .constructorDeclaration {
             functionType = functionType.withReturnType(.void)
         }
         let visibility = functionDeclaration.modifiers.visibility.swift(suffix: " ")
         let parameterString = functionDeclaration.parameters.map(\.swift).joined(separator: ", ")
+        let optionsString = isAsync ? " async" : ""
         let returnString = functionType.returnType == .void ? "" : " -> " + functionType.returnType.description
-        swift.append(visibility + (functionDeclaration.type == .constructorDeclaration ? "init" : "func " + functionDeclaration.name) + "(" + parameterString + ")" + returnString + " {")
+        swift.append(visibility + (functionDeclaration.type == .constructorDeclaration ? "init" : "func " + functionDeclaration.name) + "(" + parameterString + ")" + optionsString + returnString + " {")
 
-        var jniReturnType = functionDeclaration.type == .constructorDeclaration ? "Java_peer = " : ""
+        var returnCallString = functionDeclaration.type == .constructorDeclaration ? "Java_peer = " : ""
         if functionType.returnType != .void {
-            jniReturnType += "return "
+            returnCallString += "return "
         }
         if functionDeclaration.apiFlags.options.contains(.throws) {
-            jniReturnType += "try "
+            returnCallString += "try "
         }
-        swift.append(1, jniReturnType + "jniContext {")
+        var jniIndentation = 2
+        if isAsync {
+            swift.append(1, returnCallString + "await withCheckedContinuation { f_continuation in")
+            let callbackType = functionDeclaration.callbackClosureType
+            if callbackType.parameters.isEmpty {
+                swift.append(2, "let f_return_callback: " + callbackType.description + " = {")
+                swift.append(3, "f_continuation.resume()")
+            } else {
+                swift.append(2, "let f_return_callback: " + callbackType.description + " = { f_return in")
+                swift.append(3, "f_continuation.resumeWith(f_return)")
+            }
+            swift.append(2, "}")
+            swift.append(2, "jniContext {")
+            swift.append(3, "let f_return_callback_java = SwiftClosure" + callbackType.parameters.count.description + ".javaObject(for: f_return_callback).toJavaParameter()")
+            jniIndentation = 3
+        } else {
+            swift.append(1, returnCallString + "jniContext {")
+        }
 
         var javaParameterNames: [String] = []
         for (index, parameter) in functionDeclaration.parameters.enumerated() {
@@ -276,7 +297,33 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         return swift
     }
 
-    private func addSwiftDefinitions(for classDeclaration: KotlinClassDeclaration, to swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) {
+    private func appendCallbackFunction(for functionDeclaration: KotlinFunctionDeclaration) {
+        guard functionDeclaration.apiFlags.options.contains(.async) else {
+            return
+        }
+        let callbackFunction = KotlinFunctionDeclaration(name: "Swift_callback_" + functionDeclaration.name)
+        callbackFunction.parameters = functionDeclaration.parameters.map { Parameter<KotlinExpression>(externalLabel: $0.externalLabel, internalLabel: $0.internalLabel, declaredType: $0.declaredType, isInOut: $0.isInOut, isVariadic: $0.isVariadic, attributes: $0.attributes, defaultValue: nil, defaultValueSwift: nil) }
+        let callbackType = functionDeclaration.callbackClosureType
+        callbackFunction.parameters.append(Parameter<KotlinExpression>(externalLabel: "f_return_callback", declaredType: callbackType))
+        callbackFunction.modifiers = functionDeclaration.modifiers
+        callbackFunction.generics = functionDeclaration.generics
+        callbackFunction.role = functionDeclaration.role
+        callbackFunction.disambiguatingParameterCount = functionDeclaration.disambiguatingParameterCount
+        callbackFunction.isGenerated = true
+        let invokeCallbackSourceCode = "Task { f_return_callback(" + invocationSourceCode(for: functionDeclaration) + ") }"
+        callbackFunction.body = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: invokeCallbackSourceCode)])
+        (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [callbackFunction], after: functionDeclaration)
+    }
+
+    private func invocationSourceCode(for functionDeclaration: KotlinFunctionDeclaration) -> String {
+        let argumentsString = functionDeclaration.parameters.map {
+            let label = $0.externalLabel ?? $0.internalLabel
+            return label + " = " + label
+        }.joined(separator: ", ")
+        return functionDeclaration.name + "(" + argumentsString + ")"
+    }
+
+    private func update(_ classDeclaration: KotlinClassDeclaration, swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) {
         guard classDeclaration.checkBridgable(translator: translator) else {
             return
         }
@@ -309,9 +356,9 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         var memberDefinitions: [SwiftDefinition] = []
         for member in classDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
-                addSwiftDefinitions(for: variableDeclaration, to: &memberDefinitions, translator: translator)
+                update(variableDeclaration, swiftDefinitions: &memberDefinitions, translator: translator)
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
-                addSwiftDefinitions(for: functionDeclaration, to: &memberDefinitions, translator: translator)
+                update(functionDeclaration, swiftDefinitions: &memberDefinitions, translator: translator)
             }
         }
 

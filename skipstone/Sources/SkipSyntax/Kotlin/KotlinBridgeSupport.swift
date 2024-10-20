@@ -435,6 +435,15 @@ extension KotlinFunctionDeclaration {
         }
         return (parameterBridgables, returnBridgable)
     }
+
+    var callbackClosureType: TypeSignature {
+        let apiFlags = apiFlags.throwsType == .none ? APIFlags() : APIFlags(throwsType: .any)
+        if returnType == .void {
+            return .function([], .void, apiFlags, nil)
+        } else {
+            return .function([TypeSignature.Parameter(type: returnType)], .void, apiFlags, nil)
+        }
+    }
 }
 
 extension KotlinClassDeclaration {

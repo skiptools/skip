@@ -188,12 +188,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             cdeclBody.append("let " + parameter.internalLabel + "_swift = " + parameter.declaredType.convertFromCDecl(value: parameter.internalLabel, strategy: strategy))
         }
 
-        let callbackType: TypeSignature
-        if functionDeclaration.returnType == .void {
-            callbackType = .function([], .void, APIFlags(), nil)
-        } else {
-            callbackType = .function([TypeSignature.Parameter(type: functionDeclaration.returnType)], .void, APIFlags(), nil)
-        }
+        let callbackType = functionDeclaration.callbackClosureType
         if isAsync {
             cdeclBody.append("let f_callback_swift = " + callbackType.convertFromCDecl(value: "f_callback", strategy: .direct) + " as " + callbackType.description)
         }
@@ -232,7 +227,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
                 body.append(1, externalName + "(" + externalArgumentsString + ") {")
                 body.append(2, "f_continuation.resumeWith(kotlin.Result.success(Unit))")
             } else {
-                body.append(1, externalName + "(" + externalArgumentsString + ") { f_return -> ")
+                body.append(1, externalName + "(" + externalArgumentsString + ") { f_return ->")
                 body.append(2, "f_continuation.resumeWith(kotlin.Result.success(f_return))")
             }
             body.append(1, "}")

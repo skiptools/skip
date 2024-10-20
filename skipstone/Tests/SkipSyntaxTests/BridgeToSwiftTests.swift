@@ -804,7 +804,7 @@ final class BridgeToSwiftTests: XCTestCase {
         internal suspend fun f(i: Int): Int = Async.run l@{
             return@l i
         }
-        internal suspend fun Swift_callback_f(i: Int, f_return: (Int) -> Unit): Unit = Task { f_return(f(i = i)) }
+        internal fun Swift_callback_f(i: Int, f_return_callback: (Int) -> Unit): Unit = Task { f_return_callback(f(i = i)) }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         func f(i: Int) async -> Int {
@@ -813,8 +813,8 @@ final class BridgeToSwiftTests: XCTestCase {
                     f_continuation.resume(with: Int(f_return))
                 }
                 jniContext {
-                    let i_java = Int32(i).toJavaParameter()
                     let f_return_callback_java = SwiftClosure1.javaObject(for: f_return_callback).toJavaParameter()
+                    let i_java = Int32(i).toJavaParameter()
                     try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [i_java, f_return_callback_java])
                 }
             }

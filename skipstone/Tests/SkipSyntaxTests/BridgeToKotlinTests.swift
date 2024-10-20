@@ -809,7 +809,7 @@ final class BridgeToKotlinTests: XCTestCase {
         """, kotlin: """
         internal suspend fun f(i: Int): Int = Async.run {
             kotlin.coroutines.suspendCoroutine { f_continuation ->
-                Swift_f(i) { f_return -> 
+                Swift_f(i) { f_return ->
                     f_continuation.resumeWith(kotlin.Result.success(f_return))
                 }
             }
