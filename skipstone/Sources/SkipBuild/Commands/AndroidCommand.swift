@@ -100,6 +100,8 @@ fileprivate extension AndroidOperationCommand {
 
             // manually disable the skipstone plugin from being run again in the derived build; we don't need to transpile and bridge the code a second time, we only need to build the native libraries with the Android toolchain
             env["SKIP_PLUGIN_DISABLED"] = "1"
+            // set the SKIP_JNI_MODE flag, which is transferred through to a build #define in SkipBridge and can be used to check whether the current build mode is targetting JNI
+            env["SKIP_JNI_MODE"] = "1"
 
             let swiftCmd = toolchainBin.appendingPathComponent("swift").path
             if !FileManager.default.fileExists(atPath: swiftCmd) {
