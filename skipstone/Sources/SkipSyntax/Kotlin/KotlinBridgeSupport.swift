@@ -73,7 +73,7 @@ struct JavaClassRef {
     }
 
     var declaration: String {
-        return (isFileClass ? "private let " : "private static let ") + identifier + " = try! JClass(name: \"" + className + "\")"
+        return (isFileClass ? "private let " : "private static let ") + identifier + " = try! JClass(name: \"\(className)\")"
     }
 }
 
@@ -127,13 +127,13 @@ extension TypeSignature {
     func convertToCDecl(value: String, strategy: Bridgable.Strategy) -> String {
         switch self.asOptional(false) {
         case .function(let parameters, _, _, _):
-            let converted = "SwiftClosure" + parameters.count.description + ".javaObject(for: " + value + ")"
+            let converted = "SwiftClosure\(parameters.count).javaObject(for: \(value))"
             return isOptional ? converted : converted + "!"
         case .int:
             if isOptional {
                 return value + ".toJavaObject()"
             } else {
-                return "Int32(" + value + ")"
+                return "Int32(\(value))"
             }
         case .string:
             let converted = value + ".toJavaObject()"
@@ -154,23 +154,23 @@ extension TypeSignature {
     func convertFromCDecl(value: String, strategy: Bridgable.Strategy) -> String {
         switch self.asOptional(false) {
         case .function(let parameters, _, _, _):
-            let converted = "SwiftClosure" + parameters.count.description + ".closure(forJavaObject: " + value + ")"
+            let converted = "SwiftClosure\(parameters.count).closure(forJavaObject: \(value))"
             return isOptional ? converted : converted + "!"
         case .int:
             if isOptional {
-                return description + ".fromJavaObject(" + value + ")"
+                return description + ".fromJavaObject(\(value))"
             } else {
-                return "Int(" + value + ")"
+                return "Int(\(value))"
             }
         case .string:
-            return description + ".fromJavaObject(" + value + ")"
+            return description + ".fromJavaObject(\(value))"
         case .unwrappedOptional(let type):
             return type.convertFromCDecl(value: value, strategy: strategy)
         default:
             if strategy == .direct && !isOptional {
                 return value
             } else {
-                return description + ".fromJavaObject(" + value + ")"
+                return description + ".fromJavaObject(\(value))"
             }
         }
     }
@@ -195,9 +195,9 @@ extension TypeSignature {
     func convertToJava(value: String, strategy: Bridgable.Strategy) -> String {
         switch self.asOptional(false) {
         case .function(let parameters, _, _, _):
-            return "SwiftClosure" + parameters.count.description + ".javaObject(for: " + value + ")"
+            return "SwiftClosure\(parameters.count).javaObject(for: \(value))"
         case .int:
-            return isOptional ? value : "Int32(" + value + ")"
+            return isOptional ? value : "Int32(\(value))"
         case .unwrappedOptional(let type):
             return type.convertToJava(value: value, strategy: strategy)
         default:
@@ -216,15 +216,15 @@ extension TypeSignature {
         case .function(let parameters, let returnType, _, _):
             let parametersString = (0..<parameters.count).map { "p\($0)" }.joined(separator: ", ")
             let parametersInString = parametersString.isEmpty ? parametersString : parametersString + " in "
-            return "{ let closure_swift = JavaBackedClosure<" + returnType.description + ">(" + value + "); return { " + parametersInString + "try! closure_swift.invoke(" + parametersString + ") } }()"
+            return "{ let closure_swift = JavaBackedClosure<\(returnType)>(\(value)); return { \(parametersInString)try! closure_swift.invoke(\(parametersString)) } }()"
         case .int:
-            return "Int(" + value + ")"
+            return "Int(\(value))"
         case .optional:
-            return description + ".fromJavaObject(" + value + ")"
+            return description + ".fromJavaObject(\(value))"
         case .unwrappedOptional(let type):
             return type.convertFromJava(value: value, strategy: strategy)
         default:
-            return strategy == .direct ? value : description + ".fromJavaObject(" + value + ")"
+            return strategy == .direct ? value : description + ".fromJavaObject(\(value))"
         }
     }
 
@@ -254,7 +254,7 @@ extension TypeSignature {
                 let parametersJNI = parameters.map { $0.type.jni() }.joined(separator: "")
                 return "(" + parametersJNI + ")" + returnType.jni()
             } else {
-                return "Lkotlin/jvm/functions/Function" + parameters.count.description + ";"
+                return "Lkotlin/jvm/functions/Function\(parameters.count);"
             }
         case .int:
             return "I"
