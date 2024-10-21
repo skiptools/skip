@@ -745,6 +745,30 @@ final class BridgeToSwiftTests: XCTestCase {
         """)
     }
 
+    func testThrowsFunction() async throws {
+        try await check(swift: """
+        @BridgeToSwift
+        func f() throws {
+        }
+        """, kotlin: """
+        internal fun f() = Unit
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        func f() throws {
+            try jniContext {
+                do {
+                    try Java_SourceKt.callStatic(method: Java_f_methodID, args: [])
+                } catch let error as ThrowableError {
+                    throw error
+                } catch {
+                    fatalError(String(describing: error))
+                }
+            }
+        }
+        private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "()V")!
+        """)
+    }
+
     func testFunctionParameterLabel() async throws {
         try await check(swift: """
         @BridgeToSwift
@@ -804,7 +828,7 @@ final class BridgeToSwiftTests: XCTestCase {
         internal suspend fun f(i: Int): Int = Async.run l@{
             return@l i
         }
-        internal fun Swift_callback_f(i: Int, f_return_callback: (Int) -> Unit) {
+        internal fun callback_f(i: Int, f_return_callback: (Int) -> Unit) {
             Task { f_return_callback(f(i = i)) }
         }
         """, swiftBridgeSupport: """
@@ -821,7 +845,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
         }
-        private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "Swift_callback_f", sig: "(ILkotlin/jvm/functions/Function1;)V")!
+        private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "callback_f", sig: "(ILkotlin/jvm/functions/Function1;)V")!
         """)
 
         // TODO: @MainActor, custom actors
@@ -834,7 +858,7 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         """, kotlin: """
         internal suspend fun f(): Unit = Unit
-        internal fun Swift_callback_f(f_return_callback: () -> Unit) {
+        internal fun callback_f(f_return_callback: () -> Unit) {
             Task { f(); f_return_callback() }
         }
         """, swiftBridgeSupport: """
@@ -850,10 +874,48 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
         }
-        private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "Swift_callback_f", sig: "(Lkotlin/jvm/functions/Function0;)V")!
+        private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "callback_f", sig: "(Lkotlin/jvm/functions/Function0;)V")!
         """)
+    }
 
-        // TODO: @MainActor, custom actors
+    func testAsyncThrowsFunction() async throws {
+        try await check(swift: """
+        @BridgeToSwift
+        func f() async -> Int {
+            return 1
+        }
+        """, kotlin: """
+        internal suspend fun f(): Int = Async.run l@{
+            return@l 1
+        }
+        internal fun callback_f(f_return_callback: (Int?, Throwable?) -> Unit) {
+            Task {
+                try {
+                    f_return_callback(f(), null)
+                } catch(t: Throwable) {
+                    f_return_callback(null, t)
+                }
+            }
+        }
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        func f() async throws -> Int {
+            return await withCheckedThrowingContinuation { f_continuation in
+                let f_return_callback: (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
+                    if let f_error {
+                        f_continuation.resume(throwing: ThrowableError(throwable: f_error))
+                    } else {
+                        f_continuation.resume(returning: f_return!)
+                    }
+                }
+                jniContext {
+                    let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback).toJavaParameter()
+                    try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [f_return_callback_java])
+                }
+            }
+        }
+        private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "callback_f", sig: "(Lkotlin/jvm/functions/Function2;)V")!
+        """)
     }
 
     func testClass() async throws {
@@ -961,6 +1023,10 @@ final class BridgeToSwiftTests: XCTestCase {
         """)
     }
 
+    func testThrowsConstructor() async throws {
+        // TODO
+    }
+
     func testDestructor() async throws {
         // TODO
     }
@@ -990,7 +1056,7 @@ final class BridgeToSwiftTests: XCTestCase {
             internal open suspend fun add(): Int = Async.run l@{
                 return@l 1
             }
-            internal fun Swift_callback_add(f_return_callback: (Int) -> Unit) {
+            internal fun callback_add(f_return_callback: (Int) -> Unit) {
                 Task { f_return_callback(add()) }
             }
         }
@@ -1026,7 +1092,7 @@ final class BridgeToSwiftTests: XCTestCase {
                     }
                 }
             }
-            private static let Java_add_methodID = Java_class.getMethodID(name: "Swift_callback_add", sig: "(Lkotlin/jvm/functions/Function1;)V")!
+            private static let Java_add_methodID = Java_class.getMethodID(name: "callback_add", sig: "(Lkotlin/jvm/functions/Function1;)V")!
         }
         """)
     }

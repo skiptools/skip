@@ -749,6 +749,50 @@ final class BridgeToKotlinTests: XCTestCase {
         """, isSwiftBridge: true)
     }
 
+    func testThrowsFunction() async throws {
+        try await check(swiftBridge: """
+        @BridgeToKotlin
+        func f() throws -> Int {
+            return 1
+        }
+        """, kotlin: """
+        internal fun f(): Int = Swift_f()!!
+        private external fun Swift_f(): Int?
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1f")
+        func BridgeKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer? {
+            do {
+                let f_return_swift = try f()
+                return f_return_swift.toJavaObject()
+            } catch {
+                JavaThrowError(error, env: Java_env)
+                return nil
+            }
+        }
+        """)
+    }
+
+    func testThrowsVoidFunction() async throws {
+        try await check(swiftBridge: """
+        @BridgeToKotlin
+        func f(i: Int) throws {
+        }
+        """, kotlin: """
+        internal fun f(i: Int): Unit = Swift_f(i)
+        private external fun Swift_f(i: Int)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1f")
+        func BridgeKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ i: Int32) {
+            let i_swift = Int(i)
+            do {
+                try f(i: i_swift)
+            } catch {
+                JavaThrowError(error, env: Java_env)
+            }
+        }
+        """)
+    }
+
     func testFunctionParameterLabel() async throws {
         try await check(swiftBridge: """
         @BridgeToKotlin
@@ -809,15 +853,15 @@ final class BridgeToKotlinTests: XCTestCase {
         """, kotlin: """
         internal suspend fun f(i: Int): Int = Async.run {
             kotlin.coroutines.suspendCoroutine { f_continuation ->
-                Swift_f(i) { f_return ->
+                Swift_callback_f(i) { f_return ->
                     f_continuation.resumeWith(kotlin.Result.success(f_return))
                 }
             }
         }
-        private external fun Swift_f(i: Int, f_callback: (Int) -> Unit)
+        private external fun Swift_callback_f(i: Int, f_callback: (Int) -> Unit)
         """, swiftBridgeSupport: """
-        @_cdecl("Java_BridgeKt_Swift_1f")
-        func BridgeKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ i: Int32, _ f_callback: JavaObjectPointer) {
+        @_cdecl("Java_BridgeKt_Swift_1callback_1f")
+        func BridgeKt_Swift_callback_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ i: Int32, _ f_callback: JavaObjectPointer) {
             let i_swift = Int(i)
             let f_callback_swift = SwiftClosure1.closure(forJavaObject: f_callback)! as (Int) -> Void
             Task {
@@ -837,15 +881,15 @@ final class BridgeToKotlinTests: XCTestCase {
         """, kotlin: """
         internal suspend fun f(): Unit = Async.run {
             kotlin.coroutines.suspendCoroutine { f_continuation ->
-                Swift_f() {
+                Swift_callback_f() {
                     f_continuation.resumeWith(kotlin.Result.success(Unit))
                 }
             }
         }
-        private external fun Swift_f(f_callback: () -> Unit)
+        private external fun Swift_callback_f(f_callback: () -> Unit)
         """, swiftBridgeSupport: """
-        @_cdecl("Java_BridgeKt_Swift_1f")
-        func BridgeKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ f_callback: JavaObjectPointer) {
+        @_cdecl("Java_BridgeKt_Swift_1callback_1f")
+        func BridgeKt_Swift_callback_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ f_callback: JavaObjectPointer) {
             let f_callback_swift = SwiftClosure0.closure(forJavaObject: f_callback)! as () -> Void
             Task {
                 await f()
@@ -854,6 +898,41 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         """)
         // TODO: @MainActor, custom actors
+    }
+
+    func testAsyncThrowsFunction() async throws {
+        try await check(swiftBridge: """
+        @BridgeToKotlin
+        func f() async throws -> Int {
+            return 1
+        }
+        """, kotlin: """
+        internal suspend fun f(): Int = Async.run {
+            kotlin.coroutines.suspendCoroutine { f_continuation ->
+                Swift_callback_f(i) { f_return, f_error ->
+                    if (f_error != null) {
+                        f_continuation.resumeWith(kotlin.Result.failure(f_error))
+                    } else {
+                        f_continuation.resumeWith(kotlin.Result.success(f_return!))
+                    }
+                }
+            }
+        }
+        private external fun Swift_callback_f(i: Int, f_callback: (Int?, Throwable?) -> Unit)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1callback_1f")
+        func BridgeKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ f_callback: JavaObjectPointer) {
+            let f_callback_swift = SwiftClosure2.closure(forJavaObject: f_callback)! as (Int?, JavaObjectPointer?) -> Void
+            Task {
+                do {
+                    let f_return_swift = try await f()
+                    f_callback_swift(f_return_swift, nil)
+                } catch {
+                    f_callback_swift(nil, JavaErrorThrowable(error, env: Java_env))
+                }
+            }
+        }
+        """)
     }
 
     func testClass() async throws {
@@ -996,6 +1075,10 @@ final class BridgeToKotlinTests: XCTestCase {
         """)
     }
 
+    func testThrowsConstructor() async throws {
+        // TODO
+    }
+
     func testDestructor() async throws {
         // TODO
     }
@@ -1104,12 +1187,12 @@ final class BridgeToKotlinTests: XCTestCase {
 
             internal open suspend fun add(): Int = Async.run {
                 kotlin.coroutines.suspendCoroutine { f_continuation ->
-                    Swift_add(Swift_peer) { f_return ->
+                    Swift_callback_add(Swift_peer) { f_return ->
                         f_continuation.resumeWith(kotlin.Result.success(f_return))
                     }
                 }
             }
-            private external fun Swift_add(Swift_peer: skip.bridge.SwiftObjectPointer, f_callback: (Int) -> Unit)
+            private external fun Swift_callback_add(Swift_peer: skip.bridge.SwiftObjectPointer, f_callback: (Int) -> Unit)
         }
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
@@ -1133,8 +1216,8 @@ final class BridgeToKotlinTests: XCTestCase {
         func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
             Swift_peer.release(as: C.self)
         }
-        @_cdecl("Java_C_Swift_1add")
-        func C_Swift_add(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ f_callback: JavaObjectPointer) {
+        @_cdecl("Java_C_Swift_1callback_1add")
+        func C_Swift_callback_add(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ f_callback: JavaObjectPointer) {
             let f_callback_swift = SwiftClosure1.closure(forJavaObject: f_callback)! as (Int) -> Void
             let peer_swift: C = Swift_peer.pointee()!
             Task {

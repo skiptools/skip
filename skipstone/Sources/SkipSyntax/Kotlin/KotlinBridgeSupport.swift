@@ -401,6 +401,9 @@ extension KotlinVariableDeclaration {
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
             return nil
         }
+        guard checkNonTypedThrows(self, apiFlags: apiFlags, translator: translator) else {
+            return nil
+        }
         let type = declaredType.or(propertyType)
         return type.checkBridgable(self, translator: translator)
     }
@@ -415,6 +418,9 @@ extension KotlinFunctionDeclaration {
             return nil
         }
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
+            return nil
+        }
+        guard checkNonTypedThrows(self, apiFlags: apiFlags, translator: translator) else {
             return nil
         }
         let returnBridgable: Bridgable
@@ -490,7 +496,10 @@ extension TypeSignature {
             return Bridgable(type: self, qualifiedType: self, strategy: .convertible)
         case .double, .float:
             return Bridgable(type: self, qualifiedType: self, strategy: .direct)
-        case .function(let parameters, let returnType, _, _):
+        case .function(let parameters, let returnType, let apiFlags, _):
+            guard checkNonTypedThrows(sourceDerived, apiFlags: apiFlags, translator: translator) else {
+                return nil
+            }
             if returnType != .void && returnType.checkBridgable(sourceDerived, translator: translator) == nil {
                 return nil
             }
@@ -582,5 +591,13 @@ private func checkNonPrivate(_ sourceDerived: SourceDerived, modifiers: Modifier
         return true
     }
     sourceDerived.messages.append(Message.kotlinBridgePrivate(sourceDerived, source: translator.syntaxTree.source))
+    return false
+}
+
+private func checkNonTypedThrows(_ sourceDerived: SourceDerived, apiFlags: APIFlags, translator: KotlinTranslator) -> Bool {
+    guard apiFlags.throwsType != .none && apiFlags.throwsType != .any else {
+        return true
+    }
+    sourceDerived.messages.append(Message.kotlinBridgeTypedThrows(sourceDerived, source: translator.syntaxTree.source))
     return false
 }

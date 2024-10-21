@@ -201,8 +201,9 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
 
         let classDeclaration = functionDeclaration.parent as? KotlinClassDeclaration
         let functionName = functionDeclaration.name
-        let externalName = "Swift_" + functionName
         let isAsync = functionDeclaration.apiFlags.options.contains(.async)
+        let isThrows = functionDeclaration.apiFlags.throwsType != .none
+        let externalName = (isAsync ? "Swift_callback_" : "Swift_") + functionName
 
         var cdeclBody: [String] = []
         for (index, parameter) in functionDeclaration.parameters.enumerated() {
@@ -241,10 +242,12 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         }.joined(separator: ", ")
 
         var body: [String] = []
+        let cdeclReturnType: TypeSignature
         if let classDeclaration, functionDeclaration.type == .constructorDeclaration {
             body.append("Swift_peer = \(externalName)(\(externalArgumentsString))")
             cdeclBody.append("let f_return_swift = \(classDeclaration.signature)(\(swiftArgumentsString))")
             cdeclBody.append("return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)")
+            cdeclReturnType = .swiftObjectPointer(java: false)
         } else if isAsync {
             body.append("kotlin.coroutines.suspendCoroutine { f_continuation ->")
             if functionDeclaration.returnType == .void {
@@ -266,13 +269,38 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
                 cdeclBody.append(1, "f_callback_swift(f_return_swift)")
             }
             cdeclBody.append("}")
+            cdeclReturnType = .void
         } else if functionDeclaration.returnType == .void {
             body.append(externalName + "(\(externalArgumentsString))")
-            cdeclBody.append(swiftCallTarget + functionName + "(\(swiftArgumentsString))")
+            if isThrows {
+                cdeclBody.append("do {")
+                cdeclBody.append(1, "try \(swiftCallTarget)\(functionName)(\(swiftArgumentsString))")
+                cdeclBody.append("} catch {")
+                cdeclBody.append(1, "JavaThrowError(error, env: Java_env)")
+                cdeclBody.append("}")
+            } else {
+                cdeclBody.append(swiftCallTarget + functionName + "(\(swiftArgumentsString))")
+            }
+            cdeclReturnType = .void
         } else {
-            body.append("return \(externalName)(\(externalArgumentsString))")
-            cdeclBody.append("let f_return_swift = \(swiftCallTarget)\(functionName)(\(swiftArgumentsString))")
-            cdeclBody.append("return " + functionDeclaration.returnType.convertToCDecl(value: "f_return_swift", strategy: bridgables.return.strategy))
+            let forceUnwrapString: String
+            if isThrows {
+                forceUnwrapString = functionDeclaration.returnType.isOptional ? "" : "!!"
+                cdeclBody.append("do {")
+                cdeclBody.append(1, "let f_return_swift = try \(swiftCallTarget)\(functionName)(\(swiftArgumentsString))")
+                cdeclBody.append(1, "return " + functionDeclaration.returnType.asOptional(true).convertToCDecl(value: "f_return_swift", strategy: bridgables.return.strategy))
+                cdeclBody.append("} catch {")
+                cdeclBody.append(1, "JavaThrowError(error, env: Java_env)")
+                cdeclBody.append(1, "return nil")
+                cdeclBody.append("}")
+                cdeclReturnType = functionDeclaration.returnType.asOptional(true).cdecl(strategy: bridgables.return.strategy)
+            } else {
+                forceUnwrapString = ""
+                cdeclBody.append("let f_return_swift = \(swiftCallTarget)\(functionName)(\(swiftArgumentsString))")
+                cdeclBody.append("return " + functionDeclaration.returnType.convertToCDecl(value: "f_return_swift", strategy: bridgables.return.strategy))
+                cdeclReturnType = functionDeclaration.returnType.cdecl(strategy: bridgables.return.strategy)
+            }
+            body.append("return \(externalName)(\(externalArgumentsString))\(forceUnwrapString)")
         }
         functionDeclaration.body = KotlinCodeBlock(statements: body.map { KotlinRawStatement(sourceCode: $0) })
 
@@ -302,25 +330,21 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         if functionDeclaration.type == .constructorDeclaration {
             externalFunctionDeclaration += ": skip.bridge.SwiftObjectPointer"
         } else if functionDeclaration.returnType != .void && !isAsync {
-            externalFunctionDeclaration += ": " + functionDeclaration.returnType.kotlin
+            var returnType = functionDeclaration.returnType
+            if functionDeclaration.apiFlags.throwsType != .none {
+                returnType = returnType.asOptional(true)
+            }
+            externalFunctionDeclaration += ": " + returnType.kotlin
         }
         (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [KotlinRawStatement(sourceCode: externalFunctionDeclaration)], after: functionDeclaration)
 
         let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: externalName, translator: translator)
         let instanceParameter = classDeclaration != nil && functionDeclaration.type != .constructorDeclaration ? [cdeclInstanceParameter] : []
         let callbackParameter = isAsync ? [TypeSignature.Parameter(label: "f_callback", type: .javaObjectPointer)] : []
-        let returnType: TypeSignature
-        if functionDeclaration.type == .constructorDeclaration {
-            returnType = .swiftObjectPointer(java: false)
-        } else if isAsync {
-            returnType = .void
-        } else {
-            returnType = functionType.returnType.cdecl(strategy: bridgables.return.strategy)
-        }
         let cdeclType: TypeSignature = .function(instanceParameter + functionType.parameters.enumerated().map { (index, parameter) in
             let strategy = bridgables.parameters[index].strategy
             return TypeSignature.Parameter(label: functionDeclaration.parameters[index].internalLabel, type: parameter.type.cdecl(strategy: strategy))
-        } + callbackParameter, returnType, APIFlags(), nil)
+        } + callbackParameter, cdeclReturnType, APIFlags(), nil)
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
         cdeclFunctions.append(cdeclFunction)
     }
