@@ -6,4 +6,6 @@ public enum OutputType : Encodable { // Encodable for use in Transpilation
     case bridgeToSwift
     /// Swift generated to bridge a native Swift type to Kotlin.
     case bridgeToKotlin
+    /// Content to append to original Swift file before compilation.
+    case appendToSource
 }

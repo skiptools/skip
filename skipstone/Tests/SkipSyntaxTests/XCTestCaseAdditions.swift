@@ -20,14 +20,17 @@ extension XCTestCase {
     ///   - supportingSwift: additional swift to add to the block but not include in the expected output
     ///   - swift: raw static swift code for verification
     ///   - swiftCode: a Swift block, whose string contents will be used as the source of transpilation and which can return a validation string
-    ///   - isSwiftBridge: whether the given Swift code is only for bridging, not for transpilation
+    ///   - swiftBridge: process as swift to compile rather than transpile
     ///   - kotlin: the expected kotlin
+    ///   - kotlins: multiple expected kotlin outputs
     ///   - kotlinPackageSupport: the expected kotlin in the generated package support source file
-    ///   - swiftBridgeSupport: the expected swift in the generated bridge file
+    ///   - swiftBridgeSupport: the expected bridging swift
+    ///   - swiftBridgeSupports: multiple expected bridging swift outputs
+    ///   - appendToSource: the expected `.appendToSource`-type transformer output
     ///   - file: the file of the call site, expected to be `#file`
     ///   - line: the line of the call site, expected to be `#line`
-    public func check(expectFailure: Bool = false, expectMessages: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], dependentModules: [CodebaseInfo.ModuleExport] = [], supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, swiftBridge: String? = nil, kotlin: String? = nil, kotlins: [String] = [], fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, kotlinPackageSupport: String? = nil, swiftBridgeSupport: String? = nil, swiftBridgeSupports: [String] = [], transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
-        
+    public func check(expectFailure: Bool = false, expectMessages: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], dependentModules: [CodebaseInfo.ModuleExport] = [], supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, swiftBridge: String? = nil, kotlin: String? = nil, kotlins: [String] = [], fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, kotlinPackageSupport: String? = nil, swiftBridgeSupport: String? = nil, swiftBridgeSupports: [String] = [], appendToSource: String? = nil, transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
+
         func fixup(code: String) -> String {
             var code = fixupKotlinBlock(code)
             if swiftCode != nil {
@@ -114,25 +117,36 @@ extension XCTestCase {
             if !transpilation.messages.isEmpty && !expectMessages && !expectFailure {
                 XCTFail("Transpilation produced unexpected messages: \(messagesString)", file: file, line: line)
             }
-            if transpilation.output.file.isBridgeOutputFile {
+            switch transpilation.outputType {
+            case .default:
+                if transpilation.input.file == (srcFiles.first ?? bridgeFiles.first)?.kotlinPackageSupport(tests: false) {
+                    if let kotlinPackageSupport {
+                        let content = fixup(code: trimmedContent(transpilation: transpilation))
+                        let expectedKotlin = kotlinPackageSupport.trimmingCharacters(in: .whitespacesAndNewlines)
+                        XCTAssertEqual(expectedKotlin, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
+                    } else {
+                        XCTFail("Transpilation produced unexpected package support content: \(transpilation.output.content)", file: file, line: line)
+                    }
+                } else if transpilation.input.file == srcFiles.first || transpilation.input.file == bridgeFiles.first {
+                    kotlinTranspilations.append(transpilation)
+                    if !kotlinMessagesString.isEmpty {
+                        kotlinMessagesString += "\n"
+                    }
+                    kotlinMessagesString += messagesString
+                }
+            case .bridgeToSwift, .bridgeToKotlin:
                 swiftBridgeTranspilations.append(transpilation)
                 if !swiftBridgeMessagesString.isEmpty {
                     swiftBridgeMessagesString += "\n"
                 }
                 swiftBridgeMessagesString += messagesString
-            } else if transpilation.input.file == srcFiles.first || transpilation.input.file == bridgeFiles.first {
-                kotlinTranspilations.append(transpilation)
-                if !kotlinMessagesString.isEmpty {
-                    kotlinMessagesString += "\n"
-                }
-                kotlinMessagesString += messagesString
-            } else if transpilation.input.file == (srcFiles.first ?? bridgeFiles.first)?.kotlinPackageSupport(tests: false) {
-                if let kotlinPackageSupport {
+            case .appendToSource:
+                if let appendToSource {
                     let content = fixup(code: trimmedContent(transpilation: transpilation))
-                    let expectedKotlin = kotlinPackageSupport.trimmingCharacters(in: .whitespacesAndNewlines)
-                    XCTAssertEqual(expectedKotlin, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
+                    let expectedSwift = appendToSource.trimmingCharacters(in: .whitespacesAndNewlines)
+                    XCTAssertEqual(expectedSwift, content.trimmingCharacters(in: .whitespacesAndNewlines), messagesString, file: file, line: line)
                 } else {
-                    XCTFail("Transpilation produced unexpected package support content: \(transpilation.output.content)", file: file, line: line)
+                    XCTFail("Transpilation produced unexpected append to source content: \(transpilation.output.content)", file: file, line: line)
                 }
             }
         }
