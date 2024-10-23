@@ -977,6 +977,60 @@ final class BridgeToSwiftTests: XCTestCase {
         // TODO
     }
 
+    func testAsyncMemberFunction() async throws {
+        try await check(swift: """
+        @BridgeToSwift
+        class C {
+            func add() async -> Int {
+                return 1
+            }
+        }
+        """, kotlin: """
+        internal open class C {
+            internal open suspend fun add(): Int = Async.run l@{
+                return@l 1
+            }
+            internal fun Swift_callback_add(f_return_callback: (Int) -> Unit) {
+                Task { f_return_callback(add()) }
+            }
+        }
+        """, swiftBridgeSupport: """
+        class C: BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "C")
+            let Java_peer: JObject
+            required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            init() {
+                Java_peer = jniContext {
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    return JObject(ptr)
+                }
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            func toJavaObject() -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+
+            func add() async -> Int {
+                return await withCheckedContinuation { f_continuation in
+                    let f_return_callback: (Int) -> Void = { f_return in
+                        f_continuation.resume(returning: f_return)
+                    }
+                    jniContext {
+                        let f_return_callback_java = SwiftClosure1.javaObject(for: f_return_callback).toJavaParameter()
+                        try! Java_peer.call(method: Self.Java_add_methodID, args: [f_return_callback_java])
+                    }
+                }
+            }
+            private static let Java_add_methodID = Java_class.getMethodID(name: "Swift_callback_add", sig: "(Lkotlin/jvm/functions/Function1;)V")!
+        }
+        """)
+    }
+
     func testStaticVar() async throws {
         // TODO
     }

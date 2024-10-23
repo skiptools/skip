@@ -216,19 +216,21 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         }
 
         let swiftCallTarget: String
-        var externalArgumentsString = ""
+        var externalArgumentsString: String
         if let classDeclaration, functionDeclaration.type != .constructorDeclaration {
             cdeclBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
             swiftCallTarget = "peer_swift."
-
-            externalArgumentsString += "Swift_peer"
-            if !functionDeclaration.parameters.isEmpty {
-                externalArgumentsString += ", "
-            }
+            externalArgumentsString = "Swift_peer"
         } else {
             swiftCallTarget = ""
+            externalArgumentsString = ""
         }
-        externalArgumentsString += functionDeclaration.parameters.map(\.internalLabel).joined(separator: ", ")
+        if !functionDeclaration.parameters.isEmpty {
+            if !externalArgumentsString.isEmpty {
+                externalArgumentsString += ", "
+            }
+            externalArgumentsString += functionDeclaration.parameters.map(\.internalLabel).joined(separator: ", ")
+        }
         let swiftArgumentsString = functionDeclaration.parameters.map { parameter in
             let swiftArgument = parameter.internalLabel + "_swift"
             if let externalLabel = parameter.externalLabel {
@@ -275,15 +277,20 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         functionDeclaration.body = KotlinCodeBlock(statements: body.map { KotlinRawStatement(sourceCode: $0) })
 
         var externalFunctionDeclaration = "private external fun \(externalName)("
+        var externalParametersString: String
         if classDeclaration != nil, functionDeclaration.type != .constructorDeclaration {
-            externalFunctionDeclaration += "Swift_peer: skip.bridge.SwiftObjectPointer"
-            if !functionDeclaration.parameters.isEmpty {
-                externalFunctionDeclaration += ", "
-            }
+            externalParametersString = "Swift_peer: skip.bridge.SwiftObjectPointer"
+        } else {
+            externalParametersString = ""
         }
-        var externalParametersString = functionDeclaration.parameters.map { parameter in
-            return parameter.internalLabel + ": " + parameter.declaredType.kotlin
-        }.joined(separator: ", ")
+        if !functionDeclaration.parameters.isEmpty {
+            if !externalParametersString.isEmpty {
+                externalParametersString += ", "
+            }
+            externalParametersString += functionDeclaration.parameters.map { parameter in
+                return parameter.internalLabel + ": " + parameter.declaredType.kotlin
+            }.joined(separator: ", ")
+        }
         if isAsync {
             if !externalParametersString.isEmpty {
                 externalParametersString += ", "
@@ -291,7 +298,6 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             externalParametersString += "f_callback: " + callbackType.kotlin
         }
         externalFunctionDeclaration += externalParametersString
-        externalArgumentsString += functionDeclaration.parameters.map(\.internalLabel).joined(separator: ", ")
         externalFunctionDeclaration += ")"
         if functionDeclaration.type == .constructorDeclaration {
             externalFunctionDeclaration += ": skip.bridge.SwiftObjectPointer"
