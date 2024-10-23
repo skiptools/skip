@@ -1,13 +1,14 @@
 /// Generate compiled Swift to Kotlin bridging code.
 final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
-        guard syntaxTree.isBridgeFile, let codebaseInfo = translator.codebaseInfo, let outputFile = syntaxTree.source.file.bridgeOutputFile else {
+        guard syntaxTree.isBridgeFile, let codebaseInfo = translator.codebaseInfo else {
             return []
         }
 
         var swiftDefinitions: [SwiftDefinition] = []
         var cdeclFunctions: [CDeclFunction] = []
         var nonKotlinImports: [KotlinStatement] = []
+        var hasBridgedObservables = false
         syntaxTree.root.visit { node in
             if let importDeclaration = node as? KotlinImportDeclaration {
                 // Filter compiled-only imports from the transpiled output
@@ -22,15 +23,32 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
                 updateFunctionDeclaration(functionDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
-                updateClassDeclaration(classDeclaration, swiftDefinitions: &swiftDefinitions, cdeclFunctions: &cdeclFunctions, translator: translator)
+                if updateClassDeclaration(classDeclaration, swiftDefinitions: &swiftDefinitions, cdeclFunctions: &cdeclFunctions, translator: translator) {
+                    hasBridgedObservables = hasBridgedObservables || classDeclaration.attributes.contains(.observable)
+                }
                 return .recurse(nil)
             } else {
                 return .recurse(nil)
             }
         }
         nonKotlinImports.forEach { syntaxTree.root.remove(statement: $0) }
+
+        var outputs: [KotlinTransformerOutput] = []
+        if let bridgeOutput = bridgeOuput(for: syntaxTree, swiftDefinitions: swiftDefinitions, cdeclFunctions: cdeclFunctions, translator: translator) {
+            outputs.append(bridgeOutput)
+        }
+        if hasBridgedObservables {
+            outputs.append(importObservationOutput(for: syntaxTree))
+        }
+        return outputs
+    }
+
+    private func bridgeOuput(for syntaxTree: KotlinSyntaxTree, swiftDefinitions: [SwiftDefinition], cdeclFunctions: [CDeclFunction], translator: KotlinTranslator) -> KotlinTransformerOutput? {
         guard !swiftDefinitions.isEmpty || !cdeclFunctions.isEmpty else {
-            return []
+            return nil
+        }
+        guard let outputFile = syntaxTree.source.file.bridgeOutputFile else {
+            return nil
         }
 
         let importDeclarations = translator.syntaxTree.root.statements.compactMap { $0 as? ImportDeclaration }
@@ -43,8 +61,12 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             swiftDefinitions.forEach { $0.append(to: output, indentation: indentation) }
             cdeclFunctions.forEach { $0.append(to: output, indentation: indentation) }
         }
-        let output = KotlinTransformerOutput(file: outputFile, node: outputNode, type: .bridgeToKotlin)
-        return [output]
+        return KotlinTransformerOutput(file: outputFile, node: outputNode, type: .bridgeToKotlin)
+    }
+
+    private func importObservationOutput(for syntaxTree: KotlinSyntaxTree) -> KotlinTransformerOutput {
+        let outputNode = SwiftDefinition(swift: ["import struct SkipBridge.Observation"])
+        return KotlinTransformerOutput(file: syntaxTree.source.file, node: outputNode, type: .appendToSource)
     }
 
     private func isKotlinImport(_ importDeclaration: KotlinImportDeclaration, codebaseInfo: CodebaseInfo.Context) -> Bool {
@@ -297,13 +319,13 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         cdeclFunctions.append(cdeclFunction)
     }
 
-    private func updateClassDeclaration(_ classDeclaration: KotlinClassDeclaration, swiftDefinitions: inout [SwiftDefinition], cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+    private func updateClassDeclaration(_ classDeclaration: KotlinClassDeclaration, swiftDefinitions: inout [SwiftDefinition], cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) -> Bool {
         guard !classDeclaration.attributes.isBridgeToSwift else {
             classDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(classDeclaration, source: translator.syntaxTree.source))
-            return
+            return false
         }
         guard classDeclaration.checkBridgable(translator: translator) else {
-            return
+            return false
         }
         classDeclaration.extras = nil
         classDeclaration.inherits.append(.named("skip.bridge.SwiftPeerBridged", []))
@@ -406,6 +428,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
 
         let swiftDefinition = SwiftDefinition(swift: swift)
         swiftDefinitions.append(swiftDefinition)
+        return true
     }
 
     private func cdecl(for statement: KotlinStatement, name: String, translator: KotlinTranslator) -> (cdecl: String, cdeclFunctionName: String) {
