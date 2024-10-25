@@ -116,7 +116,7 @@ public struct Source : Encodable {
             return output
         }
 
-        /// The corresponding Swift filt
+        /// The corresponding Swift file.
         public var swiftOutputFile: Source.FilePath? {
             guard self.extension == "swift" else {
                 return nil

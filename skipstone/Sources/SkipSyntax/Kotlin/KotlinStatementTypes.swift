@@ -1733,7 +1733,9 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
         return name == "<" && modifiers.isStatic && parameters.count == 2
     }
     var isNoDispatch: Bool {
-        return attributes.contains(directive: KotlinDirective.nodispatch)
+        // Do not dispatch inline funcs. Dispatching surrounds the function body in a closure, breaking the full
+        // inlining needed for e.g. reified types
+        return attributes.contains(directive: KotlinDirective.nodispatch) || attributes.contains(.inlineAlways)
     }
 
     enum Role {
