@@ -448,29 +448,89 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             let swiftLinkFolder = try AbsolutePath(outputFolderPath, validating: "swift")
             try fs.createDirectory(swiftLinkFolder.parentDirectory, recursive: true)
 
-            try createMirroredLinkTree(from: rootPath, to: swiftLinkFolder) { path in
-                info("createMirroredLinkTree for \(path.pathString)")
-                if let matchingBridge = skipBridgeTranspilations.first(where: { t in
-                    info("skipBridgeTranspilations: \(t.outputFileBaseName) vs. \(path.sourceFile.path)")
-                    return t.output.file.bridgelessOutputFile == path.sourceFile
-                }) {
-                    let basename = try AbsolutePath(validating: matchingBridge.output.file.path).basename
-                    let isBridgeToSwift = matchingBridge.outputType == .bridgeToSwift
-                    info("bridge \(isBridgeToSwift ? "replace" : "add") content with \(matchingBridge.output.file.path) (kotlin: \(matchingBridge.kotlinFileName)) to \(basename)")
-                    return (tag: "skipbridge", basename: isBridgeToSwift ? nil : basename, content: matchingBridge.output.content.utf8Data)
-                }
-                return nil
-            }
-
             // create Packages/swift-package-name links for all the project's package dependencies so we use the local versions in our swift build rather than downloading the remote dependencies
             // this will sync with Xcode's workspace, which will enable local package development of dependencies to work the same with this derived package as it does in Xcode
+
+            // to use the package, we could do the equivalent of `swift package edit --path /path/to/local/package-id package-id,
+            // but this would involve writing to the .build/workspace-state.json file with the "edited" property, which is
+            // not a stable or documented format, and would require a lot of other metadata about the package;
+            // so instead we tack on some code to the Package.swift file that we output
+            var packageAddendum = """
+
+            func useLocalPackage(named: String) {
+                package.dependencies = package.dependencies.filter {
+                    switch $0.kind {
+                    case let .sourceControl(name: name, location: location, requirement: _):
+                        return name != named && !location.hasSuffix(named) && !location.hasSuffix(named + ".git")
+                    default:
+                        return true
+                    }
+                }
+                // change the dependency to a link to the given package
+                package.dependencies += [.package(path: "Packages/" + named)]
+            }
+            
+            
+            """
+
             let packagesLinkFolder = try AbsolutePath(swiftLinkFolder, validating: "Packages")
-            try fs.createDirectory(packagesLinkFolder, recursive: false)
+            try fs.createDirectory(packagesLinkFolder, recursive: true)
+            var createdIds: Set<String> = []
             for (id, path) in self.dependencyIdPaths {
+                if !createdIds.insert(id).inserted {
+                    // only create the link once, even if specified multiple times
+                    continue
+                }
                 info("creating dependency link: \(id)->\(path)")
                 let dependencyPackageLink = try AbsolutePath(packagesLinkFolder, validating: id)
                 let destinationPath = try AbsolutePath(validating: path)
                 try addLink(dependencyPackageLink, pointingAt: destinationPath, relative: false)
+
+                packageAddendum += """
+                useLocalPackage(named: "\(id)")
+                
+                """
+            }
+
+            try createMirroredLinkTree(from: rootPath, to: swiftLinkFolder, excluding: ["Packages", "Package.resolved", ".build", ".swiftpm"]) { path, destPath in
+                trace("createMirroredLinkTree for \(path.pathString)->\(destPath)")
+
+                // manually add the packageAddendum the Package.swift
+                if path.basename == "Package.swift" && !self.dependencyIdPaths.isEmpty {
+                    let packageContents = try fs.readFileContents(path).withData { $0 + packageAddendum.utf8Data }
+                    try writeChanges(tag: "skippackage", to: destPath, contents: packageContents, readOnly: true)
+                    return false // override the linking of the file
+                }
+
+                var shouldLink = true
+
+                // check each of the bridge transpilations to see if we should be altering or appending to the file, or creating a "sidecar" file with the JNI @_cdecl functions
+                for matchingBridge in skipBridgeTranspilations.filter({ t in
+                    return t.output.file.bridgelessOutputFile == path.sourceFile || t.output.file.swiftOutputFile == path.sourceFile
+                }) {
+                    let content = matchingBridge.output.content.utf8Data
+                    let basename = try AbsolutePath(validating: matchingBridge.output.file.path).basename
+                    switch matchingBridge.outputType {
+                    case .default:
+                        continue // link as normal
+                    case .bridgeToKotlin:
+                        let destPathPeer = try destPath.parentDirectory.appending(RelativePath(validating: basename))
+                        info("writing bridge sidecar contents (\(content.count.byteCount)) to \(destPathPeer)")
+                        try writeChanges(tag: "skipbridgeadd", to: destPathPeer, contents: content, readOnly: true)
+                    case .bridgeToSwift:
+                        info("writing bridge swift contents (\(content.count.byteCount)) to \(destPath)")
+                        try writeChanges(tag: "skipbridge", to: destPath, contents: content, readOnly: true)
+                        shouldLink = false
+                    case .appendToSource:
+                        var generatedSwiftContent = try fs.readFileContents(path).withData { $0 }
+                        generatedSwiftContent += matchingBridge.output.content.utf8Data
+                        info("writing bridge appended swift contents (\(generatedSwiftContent.count.byteCount)) to \(destPath)")
+                        try writeChanges(tag: "skipbridgeappend", to: destPath, contents: generatedSwiftContent, readOnly: true)
+                        shouldLink = false // we are overriding the contents, so do not create a link
+                    }
+                }
+
+                return shouldLink
             }
         }
 
@@ -753,9 +813,10 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 await out.yield(message)
             }
 
-            guard !transpilation.output.file.isBridgeOutputFile else {
+            // bridging types are handled separately when we link the derived swift package in createMirroredLinkTree
+            if transpilation.output.file.isBridgeOutputFile || transpilation.outputType == .appendToSource {
                 skipBridgeTranspilations.append(transpilation)
-                info("bridge transpilation: \(transpilation.output.file.path) source: \(transpilation.output.content.count.byteCount)")
+                info("bridge transpilation \(transpilation.outputType): \(transpilation.output.file.path) source: \(transpilation.output.content.count.byteCount)")
                 return
             }
 
@@ -969,35 +1030,24 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
 
         /// Create a mirror hierarchy of the directory structure at `from` in the folder specified by `to`, and link each individual file in the hierarchy
-        func createMirroredLinkTree(from fromPath: AbsolutePath, to destPath: AbsolutePath, contentHandler: ((AbsolutePath) throws -> (tag: String, basename: String?, content: Data)?)? = nil) throws {
+        func createMirroredLinkTree(from fromPath: AbsolutePath, to destPath: AbsolutePath, excluding excludePaths: Set<String> = [], contentHandler: ((_ fromPath: AbsolutePath, _ destPath: AbsolutePath) throws -> Bool)? = nil) throws {
             trace("creating absolute merged link tree from: \(fromPath) to: \(destPath)")
             // the folder is a directory; recurse into the destination paths in order to link to the local paths
             if fs.isDirectory(fromPath) {
                 // we create output directories and link the contents, rather than just linking the folders themselves, since Gradle wants to be able to write to the output folders
                 try fs.createDirectory(destPath, recursive: true)
                 for fsEntry in try fs.getDirectoryContents(fromPath) {
-                    if fsEntry.hasPrefix(".") {
+                    if fsEntry.hasPrefix(".") || excludePaths.contains(fsEntry) {
                         continue
                     }
                     let rel = try RelativePath(validating: fsEntry)
                     let destDir = destPath.appending(rel)
-                    try createMirroredLinkTree(from: fromPath.appending(rel), to: destDir, contentHandler: contentHandler)
+                    let srcDir = fromPath.appending(rel)
+                    try createMirroredLinkTree(from: srcDir, to: destDir, contentHandler: contentHandler)
                 }
             } else if fs.isFile(fromPath) {
-                // check whether the contentHandler wants to write out additional data, either as a separate sidecar or overriding the link
-                if let (tag, basename, content) = try contentHandler?(fromPath) {
-                    if let basename = basename {
-                        // link the file as expected, but then add the contents to the basename as a sidecar for the file
-                        try addLink(destPath, pointingAt: fromPath, relative: false)
-                        let destPathPeer = try destPath.parentDirectory.appending(RelativePath(validating: basename))
-                        info("writing bridge sidecare contents (\(content.count.byteCount)) to \(destPathPeer)")
-                        try writeChanges(tag: tag, to: destPathPeer, contents: content, readOnly: true)
-                    } else {
-                        // with no basename specified, we override the link with the contents from the handler
-                        info("override bridge link tag \(tag) content (\(content.count.byteCount)) for: \(fromPath)")
-                        try writeChanges(tag: tag, to: destPath, contents: content, readOnly: true)
-                    }
-                } else {
+                // check whether the contentHandler want to override linking the file
+                if try contentHandler?(fromPath, destPath) != false {
                     try addLink(destPath, pointingAt: fromPath, relative: false)
                 }
             } else {

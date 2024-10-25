@@ -116,6 +116,14 @@ public struct Source : Encodable {
             return output
         }
 
+        /// The corresponding Swift filt
+        public var swiftOutputFile: Source.FilePath? {
+            guard self.extension == "swift" else {
+                return nil
+            }
+            return outputFile(withExtension: "swift")
+        }
+
         /// The corresponding Swift file for bridging output.
         public var bridgeOutputFile: Source.FilePath? {
             guard self.extension == "swift" else {

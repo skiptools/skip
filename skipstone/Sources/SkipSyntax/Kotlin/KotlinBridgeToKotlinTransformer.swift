@@ -34,7 +34,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         nonKotlinImports.forEach { syntaxTree.root.remove(statement: $0) }
 
         var outputs: [KotlinTransformerOutput] = []
-        if let bridgeOutput = bridgeOuput(for: syntaxTree, swiftDefinitions: swiftDefinitions, cdeclFunctions: cdeclFunctions, translator: translator) {
+        if let bridgeOutput = bridgeOutput(for: syntaxTree, swiftDefinitions: swiftDefinitions, cdeclFunctions: cdeclFunctions, translator: translator) {
             outputs.append(bridgeOutput)
         }
         if hasBridgedObservables {
@@ -43,7 +43,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         return outputs
     }
 
-    private func bridgeOuput(for syntaxTree: KotlinSyntaxTree, swiftDefinitions: [SwiftDefinition], cdeclFunctions: [CDeclFunction], translator: KotlinTranslator) -> KotlinTransformerOutput? {
+    private func bridgeOutput(for syntaxTree: KotlinSyntaxTree, swiftDefinitions: [SwiftDefinition], cdeclFunctions: [CDeclFunction], translator: KotlinTranslator) -> KotlinTransformerOutput? {
         guard !swiftDefinitions.isEmpty || !cdeclFunctions.isEmpty else {
             return nil
         }

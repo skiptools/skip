@@ -21,8 +21,7 @@ struct AndroidCommand: AsyncParsableCommand {
             AndroidBuildCommand.self,
             AndroidRunCommand.self,
             AndroidTestCommand.self,
-        ])
-
+        ], aliases: ["toolchain"])
 }
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
