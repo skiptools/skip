@@ -252,8 +252,8 @@ extension GradleHarness {
     ///
     /// If the error:, warning:, or note: string is present, Xcode adds your message to the build logs. If the issue occurs in a specific file, include the filename as an absolute path. If the issue occurs at a specific line in the file, include the line number as well. The filename and line number are optional.
     public func scanGradleOutput(line1: String, line2: String) {
-        if let kotlinIssue = parseGradleOutput(line1: line1, line2: line2) {
-            // check for match Swift source lines
+        if let kotlinIssue = parseKotlinIssue(line1: line1, line2: line2) {
+            // check for match Swift source lines; this will result in reporting two separate errors: one for the matched Swift source line, and one in the transpiled Kotlin
             if let swiftIssue = try? kotlinIssue.location?.findSourceMapLine() {
                 print(GradleIssue(kind: kotlinIssue.kind, message: kotlinIssue.message, location: swiftIssue).xcodeMessageString)
             }
@@ -263,7 +263,7 @@ extension GradleHarness {
 
 
     /// Parse a 2-line output buffer for the gradle command and look for error or warning pattern, optionally mapping back to the source Swift location when the location is found in a known .skipcode.json file.
-    public func parseGradleOutput(line1: String, line2: String) -> GradleIssue? {
+    public func parseKotlinIssue(line1: String, line2: String) -> GradleIssue? {
         // check against known Kotlin error patterns
         // e.g.: "e: file:///PATH/build.gradle.kts:102:17: Unresolved reference: option"
         if let issue = parseKotlinErrorOutput(line: line1) {
@@ -377,7 +377,7 @@ extension GradleHarness {
         }
     }
 
-    public func gradleExec(in projectFolder: URL?, moduleName: String?, packageName: String?, arguments: [String], outputPrefix: String? = "GRADLE>") async throws {
+    public func gradleExec(in projectFolder: URL?, moduleName: String?, packageName: String?, arguments: [String]) async throws {
         let driver = try await GradleDriver()
         let acts: [String] = [] // releaseBuild ? ["assembleRelease"] : ["assembleDebug"] // expected in the arguments to the command
 
@@ -390,9 +390,8 @@ extension GradleHarness {
         var lines: [String] = []
         for try await pout in output {
             let line = pout.line
-            if let outputPrefix = outputPrefix {
-                print(outputPrefix, line)
-            }
+            print(line)
+
             // check for errors and report them to the IDE with a 1-line buffer
             scanGradleOutput(line1: lines.last ?? line, line2: line)
             lines.append(line)

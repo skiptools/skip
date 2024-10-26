@@ -50,12 +50,11 @@ extension XCGradleHarness where Self : XCTestCase {
     /// - Parameters:
     ///   - actions: the actions to invoke, such as `test` or `assembleDebug`
     ///   - arguments: and additional arguments
-    ///   - outputPrefix: the prefix for funneling Gradle output messages to the console, or `nil` to mute the console
     ///   - deviceID: the optional device ID against which to run
     ///   - moduleSuffix: the expected module name for automatic test determination
     ///   - sourcePath: the full path to the test case call site, which is used to determine the package root
     @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
-    func invokeGradle(actions: [String], arguments: [String] = [], info: Bool = false, outputPrefix: String? = "GRADLE>", deviceID: String? = nil, testFilter: String? = nil, moduleName: String? = nil, maxMemory: UInt64? = ProcessInfo.processInfo.physicalMemory, fromSourceFileRelativeToPackageRoot sourcePath: StaticString? = #file) async throws {
+    func invokeGradle(actions: [String], arguments: [String] = [], info: Bool = false, deviceID: String? = nil, testFilter: String? = nil, moduleName: String? = nil, maxMemory: UInt64? = ProcessInfo.processInfo.physicalMemory, fromSourceFileRelativeToPackageRoot sourcePath: StaticString? = #file) async throws {
 
         // the filters should be passed through to the --tests argument, but they don't seem to work for Android unit tests, neighter for Robolectric nor connected tests
         precondition(testFilter == nil, "test filtering does not yet work")
@@ -121,9 +120,7 @@ extension XCGradleHarness where Self : XCTestCase {
                 var previousOutput: AsyncLineOutput.Element? = nil
                 for try await pout in output {
                     let line = pout.line
-                    if let outputPrefix = outputPrefix {
-                        print(outputPrefix, line)
-                    }
+                    print(outputPrefix, line)
                     // check for errors and report them to the IDE with a 1-line buffer
                     scanGradleOutput(line1: previousOutput?.line ?? line, line2: line)
                     previousOutput = pout
