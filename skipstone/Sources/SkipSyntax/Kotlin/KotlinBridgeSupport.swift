@@ -442,12 +442,21 @@ extension KotlinFunctionDeclaration {
         return (parameterBridgables, returnBridgable)
     }
 
-    var callbackClosureType: TypeSignature {
-        let apiFlags = apiFlags.throwsType == .none ? APIFlags() : APIFlags(throwsType: .any)
+    func callbackClosureType(java: Bool) -> TypeSignature {
+        let isThrows = apiFlags.throwsType != .none
+        let throwsParameterType: TypeSignature = java ? .named("Throwable", []).asOptional(true) : .javaObjectPointer.asOptional(true)
         if returnType == .void {
-            return .function([], .void, apiFlags, nil)
+            if isThrows {
+                return .function([TypeSignature.Parameter(type: throwsParameterType)], .void, APIFlags(), nil)
+            } else {
+                return .function([], .void, APIFlags(), nil)
+            }
         } else {
-            return .function([TypeSignature.Parameter(type: returnType)], .void, apiFlags, nil)
+            if isThrows {
+                return .function([TypeSignature.Parameter(type: returnType.asOptional(true)), TypeSignature.Parameter(type: throwsParameterType)], .void, APIFlags(), nil)
+            } else {
+                return .function([TypeSignature.Parameter(type: returnType)], .void, APIFlags(), nil)
+            }
         }
     }
 }

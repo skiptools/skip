@@ -909,26 +909,65 @@ final class BridgeToKotlinTests: XCTestCase {
         """, kotlin: """
         internal suspend fun f(): Int = Async.run {
             kotlin.coroutines.suspendCoroutine { f_continuation ->
-                Swift_callback_f(i) { f_return, f_error ->
+                Swift_callback_f() { f_return, f_error ->
                     if (f_error != null) {
                         f_continuation.resumeWith(kotlin.Result.failure(f_error))
                     } else {
-                        f_continuation.resumeWith(kotlin.Result.success(f_return!))
+                        f_continuation.resumeWith(kotlin.Result.success(f_return!!))
                     }
                 }
             }
         }
-        private external fun Swift_callback_f(i: Int, f_callback: (Int?, Throwable?) -> Unit)
+        private external fun Swift_callback_f(f_callback: (Int?, Throwable?) -> Unit)
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1callback_1f")
-        func BridgeKt_Swift_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ f_callback: JavaObjectPointer) {
+        func BridgeKt_Swift_callback_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ f_callback: JavaObjectPointer) {
             let f_callback_swift = SwiftClosure2.closure(forJavaObject: f_callback)! as (Int?, JavaObjectPointer?) -> Void
             Task {
                 do {
                     let f_return_swift = try await f()
                     f_callback_swift(f_return_swift, nil)
                 } catch {
-                    f_callback_swift(nil, JavaErrorThrowable(error, env: Java_env))
+                    jniContext {
+                        f_callback_swift(nil, JavaErrorThrowable(error, env: Java_env))
+                    }
+                }
+            }
+        }
+        """)
+    }
+
+    func testAsyncThrowsVoidFunction() async throws {
+        try await check(swiftBridge: """
+        @BridgeToKotlin
+        func f(i: Int) async throws {
+        }
+        """, kotlin: """
+        internal suspend fun f(i: Int): Unit = Async.run {
+            kotlin.coroutines.suspendCoroutine { f_continuation ->
+                Swift_callback_f(i) { f_error ->
+                    if (f_error != null) {
+                        f_continuation.resumeWith(kotlin.Result.failure(f_error))
+                    } else {
+                        f_continuation.resumeWith(kotlin.Result.success(Unit))
+                    }
+                }
+            }
+        }
+        private external fun Swift_callback_f(i: Int, f_callback: (Throwable?) -> Unit)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1callback_1f")
+        func BridgeKt_Swift_callback_f(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ i: Int32, _ f_callback: JavaObjectPointer) {
+            let i_swift = Int(i)
+            let f_callback_swift = SwiftClosure1.closure(forJavaObject: f_callback)! as (JavaObjectPointer?) -> Void
+            Task {
+                do {
+                    try await f(i: i_swift)
+                    f_callback_swift(nil)
+                } catch {
+                    jniContext {
+                        f_callback_swift(JavaErrorThrowable(error, env: Java_env))
+                    }
                 }
             }
         }

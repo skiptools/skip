@@ -211,7 +211,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             cdeclBody.append("let \(parameter.internalLabel)_swift = " + parameter.declaredType.convertFromCDecl(value: parameter.internalLabel, strategy: strategy))
         }
 
-        let callbackType = functionDeclaration.callbackClosureType
+        let callbackType = functionDeclaration.callbackClosureType(java: false)
         if isAsync {
             cdeclBody.append("let f_callback_swift = " + callbackType.convertFromCDecl(value: "f_callback", strategy: .direct) + " as " + callbackType.description)
         }
@@ -250,18 +250,54 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             cdeclReturnType = .swiftObjectPointer(java: false)
         } else if isAsync {
             body.append("kotlin.coroutines.suspendCoroutine { f_continuation ->")
-            if functionDeclaration.returnType == .void {
-                body.append(1, externalName + "(\(externalArgumentsString)) {")
-                body.append(2, "f_continuation.resumeWith(kotlin.Result.success(Unit))")
+            if isThrows {
+                if functionDeclaration.returnType == .void {
+                    body.append(1, externalName + "(\(externalArgumentsString)) { f_error ->")
+                } else {
+                    body.append(1, externalName + "(\(externalArgumentsString)) { f_return, f_error ->")
+                }
+                body.append(2, "if (f_error != null) {")
+                body.append(3, "f_continuation.resumeWith(kotlin.Result.failure(f_error))")
+                body.append(2, "} else {")
+                if functionDeclaration.returnType == .void {
+                    body.append(3, "f_continuation.resumeWith(kotlin.Result.success(Unit))")
+                } else {
+                    let forceUnwrapString = functionDeclaration.returnType.isOptional ? "" : "!!"
+                    body.append(3, "f_continuation.resumeWith(kotlin.Result.success(f_return\(forceUnwrapString)))")
+                }
+                body.append(2, "}")
             } else {
-                body.append(1, externalName + "(\(externalArgumentsString)) { f_return ->")
-                body.append(2, "f_continuation.resumeWith(kotlin.Result.success(f_return))")
+                if functionDeclaration.returnType == .void {
+                    body.append(1, externalName + "(\(externalArgumentsString)) {")
+                    body.append(2, "f_continuation.resumeWith(kotlin.Result.success(Unit))")
+                } else {
+                    body.append(1, externalName + "(\(externalArgumentsString)) { f_return ->")
+                    body.append(2, "f_continuation.resumeWith(kotlin.Result.success(f_return))")
+                }
             }
             body.append(1, "}")
             body.append("}")
 
             cdeclBody.append("Task {")
-            if functionDeclaration.returnType == .void {
+            if isThrows {
+                cdeclBody.append(1, "do {")
+                if functionDeclaration.returnType == .void {
+                    cdeclBody.append(2, "try await \(swiftCallTarget)\(functionName)(\(swiftArgumentsString))")
+                    cdeclBody.append(2, "f_callback_swift(nil)")
+                } else {
+                    cdeclBody.append(2, "let f_return_swift = try await \(swiftCallTarget)\(functionName)(\(swiftArgumentsString))")
+                    cdeclBody.append(2, "f_callback_swift(f_return_swift, nil)")
+                }
+                cdeclBody.append(1, "} catch {")
+                cdeclBody.append(2, "jniContext {")
+                if functionDeclaration.returnType == .void {
+                    cdeclBody.append(3, "f_callback_swift(JavaErrorThrowable(error, env: Java_env))")
+                } else {
+                    cdeclBody.append(3, "f_callback_swift(nil, JavaErrorThrowable(error, env: Java_env))")
+                }
+                cdeclBody.append(2, "}")
+                cdeclBody.append(1, "}")
+            } else if functionDeclaration.returnType == .void {
                 cdeclBody.append(1, "await \(swiftCallTarget)\(functionName)(\(swiftArgumentsString))")
                 cdeclBody.append(1, "f_callback_swift()")
             } else {
@@ -323,7 +359,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             if !externalParametersString.isEmpty {
                 externalParametersString += ", "
             }
-            externalParametersString += "f_callback: " + callbackType.kotlin
+            externalParametersString += "f_callback: " + functionDeclaration.callbackClosureType(java: true).kotlin
         }
         externalFunctionDeclaration += externalParametersString
         externalFunctionDeclaration += ")"

@@ -829,7 +829,9 @@ final class BridgeToSwiftTests: XCTestCase {
             return@l i
         }
         internal fun callback_f(i: Int, f_return_callback: (Int) -> Unit) {
-            Task { f_return_callback(f(i = i)) }
+            Task {
+                f_return_callback(f(i = i))
+            }
         }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
@@ -859,7 +861,10 @@ final class BridgeToSwiftTests: XCTestCase {
         """, kotlin: """
         internal suspend fun f(): Unit = Unit
         internal fun callback_f(f_return_callback: () -> Unit) {
-            Task { f(); f_return_callback() }
+            Task {
+                f()
+                f_return_callback()
+            }
         }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
@@ -881,7 +886,7 @@ final class BridgeToSwiftTests: XCTestCase {
     func testAsyncThrowsFunction() async throws {
         try await check(swift: """
         @BridgeToSwift
-        func f() async -> Int {
+        func f() async throws -> Int {
             return 1
         }
         """, kotlin: """
@@ -900,7 +905,7 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         func f() async throws -> Int {
-            return await withCheckedThrowingContinuation { f_continuation in
+            return try await withCheckedThrowingContinuation { f_continuation in
                 let f_return_callback: (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
                     if let f_error {
                         f_continuation.resume(throwing: ThrowableError(throwable: f_error))
@@ -915,6 +920,45 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "callback_f", sig: "(Lkotlin/jvm/functions/Function2;)V")!
+        """)
+    }
+
+    func testAsyncThrowsVoidFunction() async throws {
+        try await check(swift: """
+        @BridgeToSwift
+        func f(i: Int) async throws {
+        }
+        """, kotlin: """
+        internal suspend fun f(i: Int): Unit = Unit
+        internal fun callback_f(i: Int, f_return_callback: (Throwable?) -> Unit) {
+            Task {
+                try {
+                    f(i = i)
+                    f_return_callback(null)
+                } catch(t: Throwable) {
+                    f_return_callback(t)
+                }
+            }
+        }
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        func f(i: Int) async throws {
+            return try await withCheckedThrowingContinuation { f_continuation in
+                let f_return_callback: (JavaObjectPointer?) -> Void = { f_error in
+                    if let f_error {
+                        f_continuation.resume(throwing: ThrowableError(throwable: f_error))
+                    } else {
+                        f_continuation.resume()
+                    }
+                }
+                jniContext {
+                    let f_return_callback_java = SwiftClosure1.javaObject(for: f_return_callback).toJavaParameter()
+                    let i_java = Int32(i).toJavaParameter()
+                    try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [i_java, f_return_callback_java])
+                }
+            }
+        }
+        private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "callback_f", sig: "(ILkotlin/jvm/functions/Function1;)V")!
         """)
     }
 
@@ -1057,7 +1101,9 @@ final class BridgeToSwiftTests: XCTestCase {
                 return@l 1
             }
             internal fun callback_add(f_return_callback: (Int) -> Unit) {
-                Task { f_return_callback(add()) }
+                Task {
+                    f_return_callback(add())
+                }
             }
         }
         """, swiftBridgeSupport: """
