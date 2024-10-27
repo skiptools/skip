@@ -218,18 +218,21 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         var swift: [String] = []
 
         let isAsync = functionDeclaration.apiFlags.options.contains(.async)
+        let isThrows = functionDeclaration.apiFlags.throwsType != .none
         var functionType = functionDeclaration.functionType
         if functionDeclaration.type == .constructorDeclaration {
             functionType = functionType.withReturnType(.void)
         }
         let visibility = functionDeclaration.modifiers.visibility.swift(suffix: " ")
         let parameterString = functionDeclaration.parameters.map(\.swift).joined(separator: ", ")
-        let optionsString = isAsync ? " async" : ""
+        var optionsString = isAsync ? " async" : ""
+        optionsString += isThrows ? " throws" : ""
         let returnString = functionType.returnType == .void ? "" : " -> " + functionType.returnType.description
         swift.append(visibility + (functionDeclaration.type == .constructorDeclaration ? "init" : "func " + functionDeclaration.name) + "(\(parameterString))\(optionsString)\(returnString) {")
 
         var returnCallString = functionDeclaration.type == .constructorDeclaration ? "Java_peer = " : ""
-        if functionType.returnType != .void {
+        // withCheckedThrowingContinuation requires a 'return' even with void to compile correctly
+        if functionType.returnType != .void || (isAsync && isThrows) {
             returnCallString += "return "
         }
         if functionDeclaration.apiFlags.options.contains(.throws) {
@@ -237,14 +240,35 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         }
         var indentation: Indentation = 2
         if isAsync {
-            swift.append(1, returnCallString + "await withCheckedContinuation { f_continuation in")
-            let callbackType = functionDeclaration.callbackClosureType
+            if isThrows {
+                swift.append(1, returnCallString + "await withCheckedThrowingContinuation { f_continuation in")
+            } else {
+                swift.append(1, returnCallString + "await withCheckedContinuation { f_continuation in")
+            }
+            let callbackType = functionDeclaration.callbackClosureType(java: false)
             if callbackType.parameters.isEmpty {
                 swift.append(2, "let f_return_callback: \(callbackType) = {")
                 swift.append(3, "f_continuation.resume()")
-            } else {
+            } else if !isThrows {
                 swift.append(2, "let f_return_callback: \(callbackType) = { f_return in")
                 swift.append(3, "f_continuation.resume(returning: f_return)")
+            } else {
+                if callbackType.parameters.count == 1 {
+                    swift.append(2, "let f_return_callback: \(callbackType) = { f_error in")
+                } else {
+                    swift.append(2, "let f_return_callback: \(callbackType) = { f_return, f_error in")
+                }
+                swift.append(3, "if let f_error {")
+                swift.append(4, "f_continuation.resume(throwing: ThrowableError(throwable: f_error))")
+                swift.append(3, "} else {")
+                if callbackType.parameters.count == 1 {
+                    swift.append(4, "f_continuation.resume()")
+                } else if functionDeclaration.returnType.isOptional {
+                    swift.append(4, "f_continuation.resume(returning: f_return)")
+                } else {
+                    swift.append(4, "f_continuation.resume(returning: f_return!)")
+                }
+                swift.append(3, "}")
             }
             swift.append(2, "}")
             swift.append(2, "jniContext {")
@@ -262,8 +286,9 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             swift.append(indentation, "let \(name) = " + parameter.declaredType.convertToJava(value: parameter.internalLabel, strategy: strategy) + ".toJavaParameter()")
         }
 
+        let tryType = isThrows && !isAsync ? "try" : "try!"
         if functionDeclaration.type == .constructorDeclaration {
-            swift.append(indentation, "let ptr = try! Self.Java_class.create(ctor: Self.\(methodIdentifier), args: [" + javaParameterNames.joined(separator: ", ") + "])")
+            swift.append(indentation, "let ptr = \(tryType) Self.Java_class.create(ctor: Self.\(methodIdentifier), args: [" + javaParameterNames.joined(separator: ", ") + "])")
             swift.append(indentation, "return JObject(ptr)")
         } else if isAsync {
             let callType = functionDeclaration.role == .global ? "callStatic" : "call"
@@ -273,17 +298,29 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
                 argumentsString += ", "
             }
             argumentsString += "f_return_callback_java"
-            let call = "try! \(targetIdentifier).\(callType)(method: \(callMethod), args: [\(argumentsString)])"
+            let call = "\(tryType) \(targetIdentifier).\(callType)(method: \(callMethod), args: [\(argumentsString)])"
             swift.append(indentation, call)
         } else {
             let callType = functionDeclaration.role == .global ? "callStatic" : "call"
             let callMethod = functionDeclaration.role == .global ? methodIdentifier : "Self." + methodIdentifier
-            let call = "try! \(targetIdentifier).\(callType)(method: \(callMethod), args: [" + javaParameterNames.joined(separator: ", ") + "])"
+            let call = "\(tryType) \(targetIdentifier).\(callType)(method: \(callMethod), args: [" + javaParameterNames.joined(separator: ", ") + "])"
+            if isThrows {
+                swift.append(indentation, "do {")
+                indentation = indentation.inc()
+            }
             if functionType.returnType == .void {
                 swift.append(indentation, call)
             } else {
                 swift.append(indentation, "let f_return_java: " + functionType.returnType.java(strategy: bridgables.return.strategy).description + " = \(call)")
                 swift.append(indentation, "return " + functionType.returnType.convertFromJava(value: "f_return_java", strategy: bridgables.return.strategy))
+            }
+            if isThrows {
+                indentation = indentation.dec()
+                swift.append(indentation, "} catch let error as ThrowableError {")
+                swift.append(indentation.inc(), "throw error")
+                swift.append(indentation, "} catch {")
+                swift.append(indentation.inc(), "fatalError(String(describing: error))")
+                swift.append(indentation, "}")
             }
         }
         while indentation.level > 0 {
@@ -300,8 +337,8 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             functionName = "<init>"
             qualifiedReturnType = .void
         } else if isAsync {
-            functionName = "Swift_callback_" + functionDeclaration.name
-            qualifiedParameters.append(TypeSignature.Parameter(type: functionDeclaration.callbackClosureType))
+            functionName = "callback_" + functionDeclaration.name
+            qualifiedParameters.append(TypeSignature.Parameter(type: functionDeclaration.callbackClosureType(java: false)))
             qualifiedReturnType = .void
         } else {
             functionName = functionDeclaration.name
@@ -317,9 +354,9 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         guard functionDeclaration.apiFlags.options.contains(.async) else {
             return
         }
-        let callbackFunction = KotlinFunctionDeclaration(name: "Swift_callback_" + functionDeclaration.name)
+        let callbackFunction = KotlinFunctionDeclaration(name: "callback_" + functionDeclaration.name)
         callbackFunction.parameters = functionDeclaration.parameters.map { Parameter<KotlinExpression>(externalLabel: $0.externalLabel, internalLabel: $0.internalLabel, declaredType: $0.declaredType, isInOut: $0.isInOut, isVariadic: $0.isVariadic, attributes: $0.attributes, defaultValue: nil, defaultValueSwift: nil) }
-        let callbackType = functionDeclaration.callbackClosureType
+        let callbackType = functionDeclaration.callbackClosureType(java: true)
         callbackFunction.parameters.append(Parameter<KotlinExpression>(externalLabel: "f_return_callback", declaredType: callbackType))
         callbackFunction.returnType = .void
         callbackFunction.modifiers = functionDeclaration.modifiers
@@ -329,14 +366,33 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         callbackFunction.isGenerated = true
 
         let invocationSourceCode = invocationSourceCode(for: functionDeclaration)
-        let taskSourceCode: String
-        if functionDeclaration.returnType == .void {
-            taskSourceCode = "Task { \(invocationSourceCode); f_return_callback() }"
+        var taskSourceCode: [String] = []
+        taskSourceCode.append("Task {")
+        if functionDeclaration.apiFlags.throwsType == .none {
+            if callbackType.parameters.isEmpty {
+                taskSourceCode.append(1, invocationSourceCode)
+                taskSourceCode.append(1, "f_return_callback()")
+            } else {
+                taskSourceCode.append(1, "f_return_callback(\(invocationSourceCode))")
+            }
         } else {
-            taskSourceCode = "Task { f_return_callback(\(invocationSourceCode)) }"
+            taskSourceCode.append(1, "try {")
+            if callbackType.parameters.count == 1 {
+                taskSourceCode.append(2, invocationSourceCode)
+                taskSourceCode.append(2, "f_return_callback(null)")
+            } else {
+                taskSourceCode.append(2, "f_return_callback(\(invocationSourceCode), null)")
+            }
+            taskSourceCode.append(1, "} catch(t: Throwable) {")
+            if callbackType.parameters.count == 1 {
+                taskSourceCode.append(2, "f_return_callback(t)")
+            } else {
+                taskSourceCode.append(2, "f_return_callback(null, t)")
+            }
+            taskSourceCode.append(1, "}")
         }
-        callbackFunction.body = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: taskSourceCode)])
-        callbackFunction.body?.disallowSingleStatementAppend = true
+        taskSourceCode.append("}")
+        callbackFunction.body = KotlinCodeBlock(statements: taskSourceCode.map { KotlinRawStatement(sourceCode: $0) })
         (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [callbackFunction], after: functionDeclaration)
     }
 

@@ -66,6 +66,10 @@ extension Message {
         return Message(kind: .error, message: "This entity will already be compiled to native Swift; it cannot be bridged to Swift too. Did you mean to use @BridgeToKotlin?", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinBridgeTypedThrows(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Bridging does not supported typed throws. Specific error types are not bridged", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinBridgeUnbridgedType(_ sourceDerived: SourceDerived, type: String, source: Source) -> Message {
         return Message(kind: .error, message: "'\(type)' is not a bridged type", sourceDerived: sourceDerived, source: source)
     }
