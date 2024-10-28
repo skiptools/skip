@@ -2712,4 +2712,26 @@ final class SwiftUITests: XCTestCase {
         }
         """)
     }
+
+    func testGroupModifier() async throws {
+        try await checkProducesMessage(swift: baseSupportingSwift + """
+        struct List: View {
+            init(@ViewBuilder content: () -> some View) {
+            }
+        }
+        struct ForEach: View {
+            init(@ViewBuilder content: () -> some View) {
+            }
+        }
+        struct ListView: View {
+            var body: some View {
+                List {
+                    ForEach {
+                    }
+                    .mod()
+                }
+            }
+        }
+        """)
+    }
 }
