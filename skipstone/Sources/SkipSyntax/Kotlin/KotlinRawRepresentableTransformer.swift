@@ -36,13 +36,16 @@ final class KotlinRawRepresentableTransformer: KotlinTransformer {
     }
 
     private func addEnumRawValueFactory(to classDeclaration: KotlinClassDeclaration) {
-        let factory = KotlinFunctionDeclaration(name: classDeclaration.name)
-        factory.modifiers = classDeclaration.modifiers
-        factory.generics = classDeclaration.generics
-        factory.extras = .singleNewline
-        factory.isGenerated = true
-        factory.returnType = classDeclaration.signature.asOptional(true)
-        factory.parameters = [Parameter<KotlinExpression>(externalLabel: "rawValue", declaredType: classDeclaration.enumInheritedRawValueType)]
+        let staticInit = KotlinFunctionDeclaration(name: "init")
+        staticInit.modifiers.isStatic = true
+        staticInit.modifiers.visibility = .public
+        staticInit.generics = classDeclaration.generics
+        staticInit.isGenerated = true
+        staticInit.returnType = classDeclaration.signature.asOptional(true)
+        staticInit.parameters = [Parameter<KotlinExpression>(externalLabel: "rawValue", declaredType: classDeclaration.enumInheritedRawValueType)]
+        if classDeclaration.members.contains(where: { ($0 as? KotlinMemberDeclaration)?.isStatic == true }) {
+            staticInit.extras = .singleNewline
+        }
 
         // We create structured expressions rather than raw source because our enum case raw values are stored as expressions
         var cases = classDeclaration.members
@@ -64,7 +67,20 @@ final class KotlinRawRepresentableTransformer: KotlinTransformer {
         cases.append(KotlinCase(patterns: [KotlinRawExpression(sourceCode: "else")], body: KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: "null")])))
         let when = KotlinWhen(on: KotlinIdentifier(name: "rawValue"), cases: cases)
         let ret = KotlinReturn(expression: when)
-        factory.body = KotlinCodeBlock(statements: [ret])
+        staticInit.body = KotlinCodeBlock(statements: [ret])
+
+        classDeclaration.members.append(staticInit)
+        staticInit.parent = classDeclaration
+        staticInit.assignParentReferences()
+
+        let factory = KotlinFunctionDeclaration(name: classDeclaration.name)
+        factory.modifiers = classDeclaration.modifiers
+        factory.generics = classDeclaration.generics
+        factory.extras = .singleNewline
+        factory.isGenerated = true
+        factory.returnType = staticInit.returnType
+        factory.parameters = staticInit.parameters
+        factory.body = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: "\(classDeclaration.name).init(rawValue = rawValue)")])
 
         if let parentClassDeclaration = classDeclaration.parent as? KotlinClassDeclaration {
             factory.modifiers.isStatic = true

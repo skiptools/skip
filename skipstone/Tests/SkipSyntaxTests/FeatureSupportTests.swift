@@ -354,18 +354,22 @@ final class FeatureSupportTests: XCTestCase {
                             KeywordsEnum.case -> return 4
                         }
                     }
-            }
-            
-            fun KeywordsEnum(rawValue: Int): KeywordsEnum? {
-                return when (rawValue) {
-                    0 -> KeywordsEnum.null_
-                    1 -> KeywordsEnum.string
-                    2 -> KeywordsEnum.boolean
-                    3 -> KeywordsEnum.object_
-                    4 -> KeywordsEnum.case
-                    else -> null
+
+                companion object {
+                    fun init(rawValue: Int): KeywordsEnum? {
+                        return when (rawValue) {
+                            0 -> KeywordsEnum.null_
+                            1 -> KeywordsEnum.string
+                            2 -> KeywordsEnum.boolean
+                            3 -> KeywordsEnum.object_
+                            4 -> KeywordsEnum.case
+                            else -> null
+                        }
+                    }
                 }
             }
+
+            fun KeywordsEnum(rawValue: Int): KeywordsEnum? = KeywordsEnum.init(rawValue = rawValue)
             return ""
             """)
     }

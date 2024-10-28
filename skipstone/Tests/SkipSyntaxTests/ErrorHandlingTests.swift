@@ -497,6 +497,15 @@ final class ErrorHandlingTests: XCTestCase {
 
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i");
+
+                companion object {
+                    fun init(rawValue: String): CodingKeys? {
+                        return when (rawValue) {
+                            "i" -> CodingKeys.i
+                            else -> null
+                        }
+                    }
+                }
             }
 
             override fun encode(to: Encoder) {
@@ -512,12 +521,7 @@ final class ErrorHandlingTests: XCTestCase {
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
-                private fun CodingKeys(rawValue: String): CodingKeys? {
-                    return when (rawValue) {
-                        "i" -> CodingKeys.i
-                        else -> null
-                    }
-                }
+                private fun CodingKeys(rawValue: String): CodingKeys? = CodingKeys.init(rawValue = rawValue)
             }
         }
         """)
@@ -593,16 +597,18 @@ final class ErrorHandlingTests: XCTestCase {
                     get() = Error1Case()
                 val error2: E
                     get() = Error2Case()
+
+                fun init(rawValue: Int): E? {
+                    return when (rawValue) {
+                        2 -> E.error1
+                        3 -> E.error2
+                        else -> null
+                    }
+                }
             }
         }
 
-        internal fun E(rawValue: Int): E? {
-            return when (rawValue) {
-                2 -> E.error1
-                3 -> E.error2
-                else -> null
-            }
-        }
+        internal fun E(rawValue: Int): E? = E.init(rawValue = rawValue)
         """)
     }
 
@@ -653,16 +659,18 @@ final class ErrorHandlingTests: XCTestCase {
                     get() = Error1Case()
                 val error2: E
                     get() = Error2Case()
+
+                fun init(rawValue: Int): E? {
+                    return when (rawValue) {
+                        2 -> E.error1
+                        3 -> E.error2
+                        else -> null
+                    }
+                }
             }
         }
 
-        internal fun E(rawValue: Int): E? {
-            return when (rawValue) {
-                2 -> E.error1
-                3 -> E.error2
-                else -> null
-            }
-        }
+        internal fun E(rawValue: Int): E? = E.init(rawValue = rawValue)
         """)
     }
 

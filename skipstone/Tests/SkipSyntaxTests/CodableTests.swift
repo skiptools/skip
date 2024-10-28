@@ -26,6 +26,16 @@ final class CodableTests: XCTestCase {
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
+
+                companion object {
+                    fun init(rawValue: String): CodingKeys? {
+                        return when (rawValue) {
+                            "i" -> CodingKeys.i
+                            "s" -> CodingKeys.s
+                            else -> null
+                        }
+                    }
+                }
             }
 
             override fun encode(to: Encoder) {
@@ -43,13 +53,7 @@ final class CodableTests: XCTestCase {
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
-                private fun CodingKeys(rawValue: String): CodingKeys? {
-                    return when (rawValue) {
-                        "i" -> CodingKeys.i
-                        "s" -> CodingKeys.s
-                        else -> null
-                    }
-                }
+                private fun CodingKeys(rawValue: String): CodingKeys? = CodingKeys.init(rawValue = rawValue)
             }
         }
         """)
@@ -89,6 +93,16 @@ final class CodableTests: XCTestCase {
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
+
+                companion object {
+                    fun init(rawValue: String): CodingKeys? {
+                        return when (rawValue) {
+                            "i" -> CodingKeys.i
+                            "s" -> CodingKeys.s
+                            else -> null
+                        }
+                    }
+                }
             }
 
             override fun encode(to: Encoder) {
@@ -106,13 +120,7 @@ final class CodableTests: XCTestCase {
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
-                private fun CodingKeys(rawValue: String): CodingKeys? {
-                    return when (rawValue) {
-                        "i" -> CodingKeys.i
-                        "s" -> CodingKeys.s
-                        else -> null
-                    }
-                }
+                private fun CodingKeys(rawValue: String): CodingKeys? = CodingKeys.init(rawValue = rawValue)
             }
         }
         """)
@@ -139,6 +147,16 @@ final class CodableTests: XCTestCase {
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 d("dbl");
+
+                companion object {
+                    fun init(rawValue: String): S.CodingKeys? {
+                        return when (rawValue) {
+                            "i" -> CodingKeys.i
+                            "dbl" -> CodingKeys.d
+                            else -> null
+                        }
+                    }
+                }
             }
 
             constructor(i: Int, d: Double) {
@@ -161,13 +179,7 @@ final class CodableTests: XCTestCase {
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
-                private fun CodingKeys(rawValue: String): S.CodingKeys? {
-                    return when (rawValue) {
-                        "i" -> CodingKeys.i
-                        "dbl" -> CodingKeys.d
-                        else -> null
-                    }
-                }
+                private fun CodingKeys(rawValue: String): S.CodingKeys? = CodingKeys.init(rawValue = rawValue)
             }
         }
         """)
@@ -192,6 +204,16 @@ final class CodableTests: XCTestCase {
             private enum class CodingKeys(override val rawValue: Int, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<Int> {
                 i(100),
                 d(101);
+
+                companion object {
+                    fun init(rawValue: Int): S.CodingKeys? {
+                        return when (rawValue) {
+                            100 -> CodingKeys.i
+                            101 -> CodingKeys.d
+                            else -> null
+                        }
+                    }
+                }
             }
 
             constructor(i: Int, d: Double) {
@@ -214,13 +236,7 @@ final class CodableTests: XCTestCase {
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
-                private fun CodingKeys(rawValue: Int): S.CodingKeys? {
-                    return when (rawValue) {
-                        100 -> CodingKeys.i
-                        101 -> CodingKeys.d
-                        else -> null
-                    }
-                }
+                private fun CodingKeys(rawValue: Int): S.CodingKeys? = CodingKeys.init(rawValue = rawValue)
             }
         }
         """)
@@ -250,6 +266,16 @@ final class CodableTests: XCTestCase {
             private enum class CK(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
+
+                companion object {
+                    fun init(rawValue: String): S.CK? {
+                        return when (rawValue) {
+                            "i" -> CK.i
+                            "s" -> CK.s
+                            else -> null
+                        }
+                    }
+                }
             }
 
             override fun encode(to: Encoder) = Unit
@@ -265,13 +291,7 @@ final class CodableTests: XCTestCase {
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
-                private fun CK(rawValue: String): S.CK? {
-                    return when (rawValue) {
-                        "i" -> CK.i
-                        "s" -> CK.s
-                        else -> null
-                    }
-                }
+                private fun CK(rawValue: String): S.CK? = CK.init(rawValue = rawValue)
             }
         }
         """)
@@ -306,6 +326,18 @@ final class CodableTests: XCTestCase {
                 d("d"),
                 na("na"),
                 nd("nd");
+
+                companion object {
+                    fun init(rawValue: String): CodingKeys? {
+                        return when (rawValue) {
+                            "a" -> CodingKeys.a
+                            "d" -> CodingKeys.d
+                            "na" -> CodingKeys.na
+                            "nd" -> CodingKeys.nd
+                            else -> null
+                        }
+                    }
+                }
             }
 
             override fun encode(to: Encoder) {
@@ -327,15 +359,7 @@ final class CodableTests: XCTestCase {
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
-                private fun CodingKeys(rawValue: String): CodingKeys? {
-                    return when (rawValue) {
-                        "a" -> CodingKeys.a
-                        "d" -> CodingKeys.d
-                        "na" -> CodingKeys.na
-                        "nd" -> CodingKeys.nd
-                        else -> null
-                    }
-                }
+                private fun CodingKeys(rawValue: String): CodingKeys? = CodingKeys.init(rawValue = rawValue)
             }
         }
         """)
@@ -360,6 +384,16 @@ final class CodableTests: XCTestCase {
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
+
+                companion object {
+                    fun init(rawValue: String): CodingKeys? {
+                        return when (rawValue) {
+                            "i" -> CodingKeys.i
+                            "s" -> CodingKeys.s
+                            else -> null
+                        }
+                    }
+                }
             }
 
             override fun encode(to: Encoder) {
@@ -370,13 +404,7 @@ final class CodableTests: XCTestCase {
 
             companion object {
 
-                private fun CodingKeys(rawValue: String): CodingKeys? {
-                    return when (rawValue) {
-                        "i" -> CodingKeys.i
-                        "s" -> CodingKeys.s
-                        else -> null
-                    }
-                }
+                private fun CodingKeys(rawValue: String): CodingKeys? = CodingKeys.init(rawValue = rawValue)
             }
         }
         """)
@@ -403,6 +431,16 @@ final class CodableTests: XCTestCase {
             private enum class CK(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
+
+                companion object {
+                    fun init(rawValue: String): S.CK? {
+                        return when (rawValue) {
+                            "i" -> CK.i
+                            "s" -> CK.s
+                            else -> null
+                        }
+                    }
+                }
             }
 
             override fun encode(to: Encoder) = Unit
@@ -415,6 +453,16 @@ final class CodableTests: XCTestCase {
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
+
+                companion object {
+                    fun init(rawValue: String): CodingKeys? {
+                        return when (rawValue) {
+                            "i" -> CodingKeys.i
+                            "s" -> CodingKeys.s
+                            else -> null
+                        }
+                    }
+                }
             }
 
             constructor(from: Decoder) {
@@ -426,21 +474,9 @@ final class CodableTests: XCTestCase {
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
-                private fun CK(rawValue: String): S.CK? {
-                    return when (rawValue) {
-                        "i" -> CK.i
-                        "s" -> CK.s
-                        else -> null
-                    }
-                }
+                private fun CK(rawValue: String): S.CK? = CK.init(rawValue = rawValue)
 
-                private fun CodingKeys(rawValue: String): CodingKeys? {
-                    return when (rawValue) {
-                        "i" -> CodingKeys.i
-                        "s" -> CodingKeys.s
-                        else -> null
-                    }
-                }
+                private fun CodingKeys(rawValue: String): CodingKeys? = CodingKeys.init(rawValue = rawValue)
             }
         }
         """)
@@ -465,6 +501,16 @@ final class CodableTests: XCTestCase {
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
+
+                companion object {
+                    fun init(rawValue: String): CodingKeys? {
+                        return when (rawValue) {
+                            "i" -> CodingKeys.i
+                            "s" -> CodingKeys.s
+                            else -> null
+                        }
+                    }
+                }
             }
 
             constructor(from: Decoder) {
@@ -476,13 +522,7 @@ final class CodableTests: XCTestCase {
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
-                private fun CodingKeys(rawValue: String): CodingKeys? {
-                    return when (rawValue) {
-                        "i" -> CodingKeys.i
-                        "s" -> CodingKeys.s
-                        else -> null
-                    }
-                }
+                private fun CodingKeys(rawValue: String): CodingKeys? = CodingKeys.init(rawValue = rawValue)
             }
         }
         """)
@@ -509,6 +549,16 @@ final class CodableTests: XCTestCase {
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 s("s");
+
+                companion object {
+                    fun init(rawValue: String): S.CodingKeys? {
+                        return when (rawValue) {
+                            "i" -> CodingKeys.i
+                            "s" -> CodingKeys.s
+                            else -> null
+                        }
+                    }
+                }
             }
 
             constructor(from: Decoder) {
@@ -528,13 +578,7 @@ final class CodableTests: XCTestCase {
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
-                private fun CodingKeys(rawValue: String): S.CodingKeys? {
-                    return when (rawValue) {
-                        "i" -> CodingKeys.i
-                        "s" -> CodingKeys.s
-                        else -> null
-                    }
-                }
+                private fun CodingKeys(rawValue: String): S.CodingKeys? = CodingKeys.init(rawValue = rawValue)
             }
         }
         """)
@@ -582,6 +626,18 @@ final class CodableTests: XCTestCase {
                 d("d"),
                 na("na"),
                 nd("nd");
+
+                companion object {
+                    fun init(rawValue: String): S.CK? {
+                        return when (rawValue) {
+                            "a" -> CK.a
+                            "d" -> CK.d
+                            "na" -> CK.na
+                            "nd" -> CK.nd
+                            else -> null
+                        }
+                    }
+                }
             }
 
             override fun encode(to: Encoder) {
@@ -612,15 +668,7 @@ final class CodableTests: XCTestCase {
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
-                private fun CK(rawValue: String): S.CK? {
-                    return when (rawValue) {
-                        "a" -> CK.a
-                        "d" -> CK.d
-                        "na" -> CK.na
-                        "nd" -> CK.nd
-                        else -> null
-                    }
-                }
+                private fun CK(rawValue: String): S.CK? = CK.init(rawValue = rawValue)
             }
         }
         """)
@@ -651,6 +699,17 @@ final class CodableTests: XCTestCase {
                 i("i"),
                 s("s"),
                 a("a");
+
+                companion object {
+                    fun init(rawValue: String): CodingKeys? {
+                        return when (rawValue) {
+                            "i" -> CodingKeys.i
+                            "s" -> CodingKeys.s
+                            "a" -> CodingKeys.a
+                            else -> null
+                        }
+                    }
+                }
             }
 
             override fun encode(to: Encoder) {
@@ -670,14 +729,7 @@ final class CodableTests: XCTestCase {
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
-                private fun CodingKeys(rawValue: String): CodingKeys? {
-                    return when (rawValue) {
-                        "i" -> CodingKeys.i
-                        "s" -> CodingKeys.s
-                        "a" -> CodingKeys.a
-                        else -> null
-                    }
-                }
+                private fun CodingKeys(rawValue: String): CodingKeys? = CodingKeys.init(rawValue = rawValue)
             }
         }
         """)
@@ -703,6 +755,16 @@ final class CodableTests: XCTestCase {
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i"),
                 a("a");
+
+                companion object {
+                    fun init(rawValue: String): CodingKeys? {
+                        return when (rawValue) {
+                            "i" -> CodingKeys.i
+                            "a" -> CodingKeys.a
+                            else -> null
+                        }
+                    }
+                }
             }
 
             override fun encode(to: Encoder) {
@@ -719,13 +781,7 @@ final class CodableTests: XCTestCase {
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
-                private fun CodingKeys(rawValue: String): CodingKeys? {
-                    return when (rawValue) {
-                        "i" -> CodingKeys.i
-                        "a" -> CodingKeys.a
-                        else -> null
-                    }
-                }
+                private fun CodingKeys(rawValue: String): CodingKeys? = CodingKeys.init(rawValue = rawValue)
             }
         }
         """)
@@ -764,6 +820,16 @@ final class CodableTests: XCTestCase {
             internal enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 j("j"),
                 t("t");
+
+                companion object {
+                    fun init(rawValue: String): S.CodingKeys? {
+                        return when (rawValue) {
+                            "j" -> CodingKeys.j
+                            "t" -> CodingKeys.t
+                            else -> null
+                        }
+                    }
+                }
             }
 
             constructor(s: String = "str", t: String = "string") {
@@ -802,13 +868,7 @@ final class CodableTests: XCTestCase {
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
-                internal fun CodingKeys(rawValue: String): S.CodingKeys? {
-                    return when (rawValue) {
-                        "j" -> CodingKeys.j
-                        "t" -> CodingKeys.t
-                        else -> null
-                    }
-                }
+                internal fun CodingKeys(rawValue: String): S.CodingKeys? = CodingKeys.init(rawValue = rawValue)
             }
         }
         """)
@@ -829,6 +889,15 @@ final class CodableTests: XCTestCase {
 
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 s("s");
+
+                companion object {
+                    fun init(rawValue: String): CodingKeys? {
+                        return when (rawValue) {
+                            "s" -> CodingKeys.s
+                            else -> null
+                        }
+                    }
+                }
             }
 
             override fun encode(to: Encoder) {
@@ -844,12 +913,7 @@ final class CodableTests: XCTestCase {
             companion object: DecodableCompanion<Sub> {
                 override fun init(from: Decoder): Sub = Sub(from = from)
 
-                private fun CodingKeys(rawValue: String): CodingKeys? {
-                    return when (rawValue) {
-                        "s" -> CodingKeys.s
-                        else -> null
-                    }
-                }
+                private fun CodingKeys(rawValue: String): CodingKeys? = CodingKeys.init(rawValue = rawValue)
             }
         }
         """)
@@ -872,16 +936,18 @@ final class CodableTests: XCTestCase {
 
             companion object: DecodableCompanion<E> {
                 override fun init(from: Decoder): E = E(from = from)
+
+                fun init(rawValue: Int): E? {
+                    return when (rawValue) {
+                        0 -> E.a
+                        1 -> E.b
+                        else -> null
+                    }
+                }
             }
         }
 
-        internal fun E(rawValue: Int): E? {
-            return when (rawValue) {
-                0 -> E.a
-                1 -> E.b
-                else -> null
-            }
-        }
+        internal fun E(rawValue: Int): E? = E.init(rawValue = rawValue)
 
         internal fun E(from: Decoder): E {
             val container = from.singleValueContainer()
@@ -909,19 +975,20 @@ final class CodableTests: XCTestCase {
             override fun encode(to: Encoder) = Unit
 
             companion object: DecodableCompanion<E> {
-                override fun init(from: Decoder): E = E(from = from)
+                fun init(rawValue: Int): E? {
+                    return when (rawValue) {
+                        0 -> E.a
+                        1 -> E.b
+                        else -> null
+                    }
+                }
+
+                override fun init(from: Decoder): E = E.a
             }
         }
+        internal fun E(from: Decoder): E = E.init(from = from)
 
-        internal fun E(from: Decoder): E = E.a
-
-        internal fun E(rawValue: Int): E? {
-            return when (rawValue) {
-                0 -> E.a
-                1 -> E.b
-                else -> null
-            }
-        }
+        internal fun E(rawValue: Int): E? = E.init(rawValue = rawValue)
         """)
     }
 
@@ -951,11 +1018,11 @@ final class CodableTests: XCTestCase {
             override fun encode(to: Encoder) = Unit
 
             companion object: DecodableCompanion<E> {
-                override fun init(from: Decoder): E = E(from = from)
+
+                override fun init(from: Decoder): E = E.a
             }
         }
-
-        internal fun E(from: Decoder): E = E.a
+        internal fun E(from: Decoder): E = E.init(from = from)
         """)
     }
 
@@ -992,11 +1059,11 @@ final class CodableTests: XCTestCase {
                 fun a(associated0: Int): E = ACase(associated0)
                 val b: E = BCase()
 
-                override fun init(from: Decoder): E = E(from = from)
+
+                override fun init(from: Decoder): E = E.a(100)
             }
         }
-
-        internal fun E(from: Decoder): E = E.a(100)
+        internal fun E(from: Decoder): E = E.init(from = from)
         """)
     }
 
@@ -1019,6 +1086,16 @@ final class CodableTests: XCTestCase {
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 name_("name"),
                 package_("package");
+
+                companion object {
+                    fun init(rawValue: String): CodingKeys? {
+                        return when (rawValue) {
+                            "name" -> CodingKeys.name_
+                            "package" -> CodingKeys.package_
+                            else -> null
+                        }
+                    }
+                }
             }
 
             override fun encode(to: Encoder) {
@@ -1036,13 +1113,7 @@ final class CodableTests: XCTestCase {
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
-                private fun CodingKeys(rawValue: String): CodingKeys? {
-                    return when (rawValue) {
-                        "name" -> CodingKeys.name_
-                        "package" -> CodingKeys.package_
-                        else -> null
-                    }
-                }
+                private fun CodingKeys(rawValue: String): CodingKeys? = CodingKeys.init(rawValue = rawValue)
             }
         }
         """)
@@ -1057,6 +1128,14 @@ final class CodableTests: XCTestCase {
 
             private enum class CodingKeys(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 ;
+
+                companion object {
+                    fun init(rawValue: String): CodingKeys? {
+                        return when (rawValue) {
+                            else -> null
+                        }
+                    }
+                }
             }
 
             override fun encode(to: Encoder) {
@@ -1072,11 +1151,7 @@ final class CodableTests: XCTestCase {
             companion object: DecodableCompanion<S> {
                 override fun init(from: Decoder): S = S(from = from)
 
-                private fun CodingKeys(rawValue: String): CodingKeys? {
-                    return when (rawValue) {
-                        else -> null
-                    }
-                }
+                private fun CodingKeys(rawValue: String): CodingKeys? = CodingKeys.init(rawValue = rawValue)
             }
         }
         """)

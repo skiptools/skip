@@ -45,17 +45,21 @@ final class EnumTests: XCTestCase {
             b(1),
             c(100),
             d(101);
-        }
 
-        internal fun E(rawValue: Int): E? {
-            return when (rawValue) {
-                0 -> E.a
-                1 -> E.b
-                100 -> E.c
-                101 -> E.d
-                else -> null
+            companion object {
+                fun init(rawValue: Int): E? {
+                    return when (rawValue) {
+                        0 -> E.a
+                        1 -> E.b
+                        100 -> E.c
+                        101 -> E.d
+                        else -> null
+                    }
+                }
             }
         }
+
+        internal fun E(rawValue: Int): E? = E.init(rawValue = rawValue)
         """)
 
         try await check(swift: """
@@ -69,16 +73,20 @@ final class EnumTests: XCTestCase {
             a("a"),
             b("B"),
             c("c");
-        }
 
-        internal fun E(rawValue: String): E? {
-            return when (rawValue) {
-                "a" -> E.a
-                "B" -> E.b
-                "c" -> E.c
-                else -> null
+            companion object {
+                fun init(rawValue: String): E? {
+                    return when (rawValue) {
+                        "a" -> E.a
+                        "B" -> E.b
+                        "c" -> E.c
+                        else -> null
+                    }
+                }
             }
         }
+
+        internal fun E(rawValue: String): E? = E.init(rawValue = rawValue)
         """)
     }
 
@@ -92,15 +100,19 @@ final class EnumTests: XCTestCase {
         internal enum class E(override val rawValue: UInt, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): RawRepresentable<UInt> {
             a(UInt(10)),
             b(UInt(20));
-        }
 
-        internal fun E(rawValue: UInt): E? {
-            return when (rawValue) {
-                UInt(10) -> E.a
-                UInt(20) -> E.b
-                else -> null
+            companion object {
+                fun init(rawValue: UInt): E? {
+                    return when (rawValue) {
+                        UInt(10) -> E.a
+                        UInt(20) -> E.b
+                        else -> null
+                    }
+                }
             }
         }
+
+        internal fun E(rawValue: UInt): E? = E.init(rawValue = rawValue)
         """)
 
         try await check(swift: """
@@ -112,15 +124,19 @@ final class EnumTests: XCTestCase {
         internal enum class E(override val rawValue: Float, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): RawRepresentable<Float> {
             a(Float(10)),
             b(Float(20));
-        }
 
-        internal fun E(rawValue: Float): E? {
-            return when (rawValue) {
-                Float(10) -> E.a
-                Float(20) -> E.b
-                else -> null
+            companion object {
+                fun init(rawValue: Float): E? {
+                    return when (rawValue) {
+                        Float(10) -> E.a
+                        Float(20) -> E.b
+                        else -> null
+                    }
+                }
             }
         }
+
+        internal fun E(rawValue: Float): E? = E.init(rawValue = rawValue)
         """)
     }
 
@@ -140,15 +156,19 @@ final class EnumTests: XCTestCase {
             b(1);
 
             internal fun plusOne(): Int = rawValue + 1
-        }
 
-        internal fun E(rawValue: Int): E? {
-            return when (rawValue) {
-                0 -> E.a
-                1 -> E.b
-                else -> null
+            companion object {
+                fun init(rawValue: Int): E? {
+                    return when (rawValue) {
+                        0 -> E.a
+                        1 -> E.b
+                        else -> null
+                    }
+                }
             }
         }
+
+        internal fun E(rawValue: Int): E? = E.init(rawValue = rawValue)
         """)
 
         try await check(swift: """
@@ -168,15 +188,19 @@ final class EnumTests: XCTestCase {
             b(1);
 
             internal fun plusOne(): Int = rawValue + 1
-        }
 
-        internal fun E(rawValue: Int): E? {
-            return when (rawValue) {
-                0 -> E.a
-                1 -> E.b
-                else -> null
+            companion object {
+                fun init(rawValue: Int): E? {
+                    return when (rawValue) {
+                        0 -> E.a
+                        1 -> E.b
+                        else -> null
+                    }
+                }
             }
         }
+
+        internal fun E(rawValue: Int): E? = E.init(rawValue = rawValue)
         """)
     }
 
@@ -501,15 +525,19 @@ final class EnumTests: XCTestCase {
         internal enum class E: RawRepresentable<Int> {
             one,
             two;
-        }
 
-        internal fun E(rawValue: Int): E? {
-            when (rawValue) {
-                1 -> return E.one
-                2 -> return E.two
-                else -> return null
+            companion object {
+
+                fun init(rawValue: Int): E? {
+                    when (rawValue) {
+                        1 -> return E.one
+                        2 -> return E.two
+                        else -> return null
+                    }
+                }
             }
         }
+        internal fun E(rawValue: Int): E? = E.init(rawValue = rawValue)
 
         internal fun f(param: Int): E = E(rawValue = param) ?: E.one
         internal fun g(param: Int): E = E(rawValue = param)!!
@@ -534,10 +562,12 @@ final class EnumTests: XCTestCase {
             companion object {
                 val one: E = OneCase()
                 fun other(associated0: Int): E = OtherCase(associated0)
+
+
+                fun init(value: Int): E = if (value == 1) E.one else E.other(value)
             }
         }
-
-        internal fun E(value: Int): E = if (value == 1) E.one else E.other(value)
+        internal fun E(value: Int): E = E.init(value = value)
         """)
     }
 
@@ -692,14 +722,18 @@ final class EnumTests: XCTestCase {
         """, kotlin: """
         internal enum class E(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CaseIterable, RawRepresentable<String> {
             name_("name");
-        }
 
-        internal fun E(rawValue: String): E? {
-            return when (rawValue) {
-                "name" -> E.name_
-                else -> null
+            companion object {
+                fun init(rawValue: String): E? {
+                    return when (rawValue) {
+                        "name" -> E.name_
+                        else -> null
+                    }
+                }
             }
         }
+
+        internal fun E(rawValue: String): E? = E.init(rawValue = rawValue)
 
         internal fun f(e: E) {
             when (e) {
