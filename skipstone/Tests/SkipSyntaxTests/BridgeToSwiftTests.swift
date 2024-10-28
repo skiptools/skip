@@ -1144,7 +1144,59 @@ final class BridgeToSwiftTests: XCTestCase {
     }
 
     func testStaticVar() async throws {
-        // TODO
+        try await check(swift: """
+        @BridgeToSwift
+        class C {
+            static var i = 0
+        }
+        """, kotlin: """
+        internal open class C {
+
+            companion object {
+                internal var i = 0
+            }
+        }
+        """, swiftBridgeSupport: """
+        class C: BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "C")
+            let Java_peer: JObject
+            required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            init() {
+                Java_peer = jniContext {
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    return JObject(ptr)
+                }
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            func toJavaObject() -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+
+            static var i: Int {
+                get {
+                    return jniContext {
+                        let value_java: Int32 = try! Java_Companion.call(method: Java_Companion_get_i_methodID, args: [])
+                        return Int(value_java)
+                    }
+                }
+                set {
+                    jniContext {
+                        let value_java = Int32(newValue).toJavaParameter()
+                        try! Java_Companion.call(method: Java_Companion_set_i_methodID, args: [value_java])
+                    }
+                }
+            }
+            private static let Java_Companion_class = try! JClass(name: "C$Companion")
+            private static let Java_Companion = JObject(JavaObjectPointer.loadStatic(Java_class.getFieldID(name: "Companion", sig: "LC$Companion;")!, of: Java_Companion_class))
+            private static let Java_Companion_get_i_methodID = Java_Companion_class.getMethodID(name: "getI", sig: "()I")!
+            private static let Java_Companion_set_i_methodID = Java_Companion_class.getMethodID(name: "setI", sig: "(I)V")!
+        }
+        """)
     }
 
     func testStaticFunction() async throws {

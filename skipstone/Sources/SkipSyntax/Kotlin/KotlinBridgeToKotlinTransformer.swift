@@ -107,13 +107,14 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         }
 
         let propertyName = variableDeclaration.propertyName
-        let externalName = "Swift_" + propertyName
+        let externalName = "Swift_" + ((variableDeclaration.isStatic) ? "Companion_" + propertyName : propertyName)
         var externalFunctionDeclarations: [String] = []
         let (cdecl, cdeclName) = cdecl(for: variableDeclaration, name: externalName, translator: translator)
 
         // Getter
-        let getterArguments = classDeclaration == nil ? "()" : "(Swift_peer)"
-        let getterParameters = classDeclaration == nil ? "()" : "(Swift_peer: skip.bridge.SwiftObjectPointer)"
+        let isInstance = classDeclaration != nil && !variableDeclaration.isStatic
+        let getterArguments = isInstance ? "(Swift_peer)" : "()"
+        let getterParameters = isInstance ? "(Swift_peer: skip.bridge.SwiftObjectPointer)" : "()"
         let getterBody = [
             "return " + externalName + getterArguments
         ]
@@ -122,7 +123,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
 
         let cdeclInstanceParameters: [TypeSignature.Parameter]
         let cdeclGetterBody: [String]
-        if let classDeclaration {
+        if isInstance, let classDeclaration {
             cdeclGetterBody = [
                 "let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!",
                 "return " + type.convertToCDecl(value: "peer_swift." + propertyName, strategy: bridgable.strategy)
@@ -137,8 +138,8 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
 
         // Setter
         if variableDeclaration.apiFlags.options.contains(.writeable) {
-            let setterArguments = classDeclaration == nil ? "newValue" : "Swift_peer, newValue"
-            let setterInstanceParameter = classDeclaration == nil ? "" : "Swift_peer: skip.bridge.SwiftObjectPointer, "
+            let setterArguments = isInstance ? "Swift_peer, newValue" : "newValue"
+            let setterInstanceParameter = isInstance ? "Swift_peer: skip.bridge.SwiftObjectPointer, " : ""
             let setterBody = [
                 externalName + "_set(" + setterArguments + ")"
             ]
@@ -146,7 +147,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             externalFunctionDeclarations.append("private external fun \(externalName)_set(\(setterInstanceParameter)value: \(type.kotlin))")
 
             let cdeclSetterBody: [String]
-            if let classDeclaration {
+            if isInstance, let classDeclaration {
                 cdeclSetterBody = [
                     "let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!",
                     "peer_swift.\(propertyName) = " + type.convertFromCDecl(value: "value", strategy: bridgable.strategy)
