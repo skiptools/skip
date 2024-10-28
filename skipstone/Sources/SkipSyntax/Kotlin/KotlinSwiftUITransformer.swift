@@ -250,7 +250,7 @@ private final class TranslateVisitor {
             updateEnvironmentFunctionCallParameters(for: keyPath, in: functionCall)
             return
         }
-
+        addWarningsForGroupModifiers(to: functionCall)
         // Look for closures passed as ViewBuilder arguments to function calls
         guard case .function(let parameterTypes, _, _, _) = functionCall.apiMatch?.signature, parameterTypes.count == functionCall.arguments.count else {
             return
@@ -713,6 +713,21 @@ private final class TranslateVisitor {
         }
     }
 
+    private func addWarningsForGroupModifiers(to functionCall: KotlinFunctionCall) {
+        // We're looking for a modifier function call on a Group/ForEach function call, as in:
+        // Group(content: { ... }).modifier()
+        guard let memberAccess = functionCall.function as? KotlinMemberAccess, memberAccess.member != "Compose", let subject = memberAccess.base as? KotlinFunctionCall, let identifier = subject.function as? KotlinIdentifier else {
+            return
+        }
+        guard identifier.name == "Group" || (identifier.name == "ForEach" && memberAccess.member != "onDelete" && memberAccess.member != "onMove") else {
+            return
+        }
+        guard isInSwiftUIElement("List", node: functionCall) else {
+            return
+        }
+        functionCall.messages.append(.kotlinSwiftUIGroupModifier(functionCall, source: translator.syntaxTree.source))
+    }
+
     private func updateTableColumnFunctionCallParameters(in node: KotlinSyntaxNode) {
         guard let functionCall = node as? KotlinFunctionCall else {
             return
@@ -722,7 +737,7 @@ private final class TranslateVisitor {
             updateTableColumnFunctionCallParameters(in: base)
             return
         }
-        guard (functionCall.function as? KotlinIdentifier)?.name == "TableColumn", isInTableFunctionCall(node: node) else {
+        guard (functionCall.function as? KotlinIdentifier)?.name == "TableColumn", isInSwiftUIElement("Table", node: node) else {
             return
         }
         // The SkipUI framework adds a leading argument to TableColumn that must always be set to the
@@ -730,10 +745,10 @@ private final class TranslateVisitor {
         functionCall.arguments.insert(LabeledValue(value: KotlinRawExpression(sourceCode: "it")), at: 0)
     }
 
-    private func isInTableFunctionCall(node: KotlinSyntaxNode) -> Bool {
+    private func isInSwiftUIElement(_ name: String, node: KotlinSyntaxNode) -> Bool {
         var parent = node.parent
         while parent != nil {
-            if let functionCall = parent as? KotlinFunctionCall, (functionCall.function as? KotlinIdentifier)?.name == "Table" {
+            if let functionCall = parent as? KotlinFunctionCall, (functionCall.function as? KotlinIdentifier)?.name == name {
                 return true
             }
             parent = parent?.parent

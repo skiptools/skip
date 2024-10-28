@@ -346,6 +346,10 @@ extension Message {
         return Message(kind: .warning, message: "Skip does not support nil @AppStorage values. Consider making this property non-optional", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinSwiftUIGroupModifier(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "Skip does not support modifiers on Group or ForEach within a List. This may result in unexpected behavior", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinSwiftUITypeInference(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "Skip is unable to match this API call to determine whether it results in a View. Consider adding additional type information", sourceDerived: sourceDerived, source: source)
     }
