@@ -8,7 +8,12 @@
 SDK="x86_64-swift-linux-musl"
 TOOLCHAIN="${HOME}/Library/Developer/Toolchains/swift-6.0.1-RELEASE.xctoolchain/usr"
 CONFIGURATION=${CONFIGURATION:-"release"}
-${TOOLCHAIN}/bin/swift build --swift-sdk "${SDK}" --configuration "${CONFIGURATION}" --product ${1:-"SkipKey"}
+
+PRODUCT=${PRODUCT:-"SkipRunner"}
+#PRODUCT="SkipKey"
+
+${TOOLCHAIN}/bin/swift build --swift-sdk "${SDK}" --configuration "${CONFIGURATION}" --product ${PRODUCT}
 
 # finally copy up the binary to www.skip.tools with:
-echo scp .build/${SDK}/${CONFIGURATION}/SkipKey www.skip.tools:~/lib/SkipKey
+echo "scp .build/${SDK}/${CONFIGURATION}/${PRODUCT} www.skip.tools:~/lib/${PRODUCT}"
+
