@@ -48,17 +48,45 @@ final class KotlinEnumTransformer: KotlinTransformer {
     }
 
     private func convertConstructorToFactory(_ constructor: KotlinFunctionDeclaration, for classDeclaration: KotlinClassDeclaration) {
-        let factory = KotlinFunctionDeclaration(name: classDeclaration.name, sourceFile: constructor.sourceFile, sourceRange: constructor.sourceRange)
+        let staticInit = KotlinFunctionDeclaration(name: "init", sourceFile: constructor.sourceFile, sourceRange: constructor.sourceRange)
+        staticInit.modifiers.isStatic = true
+        staticInit.modifiers.visibility = .public
+        if constructor.isDecodableConstructor {
+            staticInit.modifiers.isOverride = true // DecodableCompanion override
+        }
+
+        staticInit.generics = classDeclaration.generics.merge(overrides: constructor.generics, addNew: true)
+        staticInit.annotations = constructor.annotations
+        staticInit.extras = constructor.extras
+        staticInit.returnType = classDeclaration.signature.asOptional(constructor.isOptionalInit)
+        staticInit.parameters = constructor.parameters
+        staticInit.disambiguatingParameterCount = constructor.disambiguatingParameterCount
+        staticInit.isGenerated = constructor.isGenerated
+        staticInit.body = constructor.body
+        staticInit.body?.updateWithExpectedReturn(.assignToSelf)
+        classDeclaration.members.append(staticInit)
+        staticInit.parent = classDeclaration
+        staticInit.assignParentReferences()
+
+        let factory = KotlinFunctionDeclaration(name: classDeclaration.name)
         factory.modifiers = classDeclaration.modifiers
-        factory.generics = classDeclaration.generics.merge(overrides: constructor.generics, addNew: true)
-        factory.annotations = constructor.annotations
-        factory.extras = constructor.extras
-        factory.returnType = classDeclaration.signature.asOptional(constructor.isOptionalInit)
-        factory.parameters = constructor.parameters
-        factory.disambiguatingParameterCount = constructor.disambiguatingParameterCount
-        factory.isGenerated = constructor.isGenerated
-        factory.body = constructor.body
-        factory.body?.updateWithExpectedReturn(.assignToSelf)
+        factory.generics = staticInit.generics
+        factory.annotations = staticInit.annotations
+        factory.returnType = staticInit.returnType
+        factory.parameters = staticInit.parameters
+        factory.disambiguatingParameterCount = staticInit.disambiguatingParameterCount
+        factory.isGenerated = staticInit.isGenerated
+
+        var sourceCode = "return \(classDeclaration.name).init("
+        sourceCode += constructor.parameters.map { parameter in
+            if let label = parameter.externalLabel {
+                return label + " = " + parameter.internalLabel
+            } else {
+                return parameter.internalLabel
+            }
+        }.joined(separator: ", ")
+        sourceCode += ")"
+        factory.body = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: sourceCode)])
 
         classDeclaration.remove(statement: constructor)
         if let parentClassDeclaration = classDeclaration.parent as? KotlinClassDeclaration {

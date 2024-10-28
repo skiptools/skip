@@ -80,7 +80,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
             }
         }
         if isDecodable {
-            synthesizeDecodableCompanion(for: classDeclaration)
+            synthesizeDecodableCompanion(for: classDeclaration, hasCustomDecode: decodeDeclaration != nil)
         }
     }
 
@@ -285,26 +285,30 @@ final class KotlinCodableTransformer: KotlinTransformer {
         return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.propertyName) = container.\(decodeFunction)(\(typeArguments), forKey = CodingKeys.\(caseName))")
     }
 
-    private func synthesizeDecodableCompanion(for classDeclaration: KotlinClassDeclaration) {
+    private func synthesizeDecodableCompanion(for classDeclaration: KotlinClassDeclaration, hasCustomDecode: Bool) {
         classDeclaration.companionInherits.append(.interface(.named("DecodableCompanion", [classDeclaration.signature])))
-
-        let factory = KotlinFunctionDeclaration(name: "init")
-        factory.modifiers.isStatic = true
-        if classDeclaration.members.contains(where: { ($0 as? KotlinMemberDeclaration)?.isStatic == true }) {
-            factory.extras = .singleNewline
+        // Special case for enums with custom decode constructors. Enums will already have constructors moved to inits
+        guard classDeclaration.declarationType != .enumDeclaration || !hasCustomDecode else {
+            return
         }
-        factory.modifiers.visibility = .public
-        factory.modifiers.isOverride = true
-        factory.isGenerated = true
-        factory.returnType = classDeclaration.signature
-        factory.parameters = [Parameter<KotlinExpression>(externalLabel: "from", declaredType: .named("Decoder", []))]
 
-        let statement = KotlinRawStatement(sourceCode: "return \(classDeclaration.signature.kotlin)(from = from)")
-        factory.body = KotlinCodeBlock(statements: [statement])
+        let staticInit = KotlinFunctionDeclaration(name: "init")
+        staticInit.modifiers.isStatic = true
+        staticInit.modifiers.visibility = .public
+        staticInit.modifiers.isOverride = true
+        staticInit.isGenerated = true
+        staticInit.returnType = classDeclaration.signature
+        staticInit.parameters = [Parameter<KotlinExpression>(externalLabel: "from", declaredType: .named("Decoder", []))]
+        if classDeclaration.members.contains(where: { ($0 as? KotlinMemberDeclaration)?.isStatic == true }) {
+            staticInit.extras = .singleNewline
+        }
 
-        classDeclaration.members.append(factory)
-        factory.parent = classDeclaration
-        factory.assignParentReferences()
+        let statement = KotlinRawStatement(sourceCode: "return \(classDeclaration.name)(from = from)")
+        staticInit.body = KotlinCodeBlock(statements: [statement])
+
+        classDeclaration.members.append(staticInit)
+        staticInit.parent = classDeclaration
+        staticInit.assignParentReferences()
     }
 
     private func synthesizeDefaultConstructor(for classDeclaration: KotlinClassDeclaration) {
