@@ -107,13 +107,14 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         }
 
         let propertyName = variableDeclaration.propertyName
-        let externalName = "Swift_" + propertyName
+        let externalName = "Swift_" + ((variableDeclaration.isStatic) ? "Companion_" + propertyName : propertyName)
         var externalFunctionDeclarations: [String] = []
         let (cdecl, cdeclName) = cdecl(for: variableDeclaration, name: externalName, translator: translator)
 
         // Getter
-        let getterArguments = classDeclaration == nil ? "()" : "(Swift_peer)"
-        let getterParameters = classDeclaration == nil ? "()" : "(Swift_peer: skip.bridge.SwiftObjectPointer)"
+        let isInstance = classDeclaration != nil && !variableDeclaration.isStatic
+        let getterArguments = isInstance ? "(Swift_peer)" : "()"
+        let getterParameters = isInstance ? "(Swift_peer: skip.bridge.SwiftObjectPointer)" : "()"
         let getterBody = [
             "return " + externalName + getterArguments
         ]
@@ -123,11 +124,16 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         let cdeclInstanceParameters: [TypeSignature.Parameter]
         let cdeclGetterBody: [String]
         if let classDeclaration {
-            cdeclGetterBody = [
-                "let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!",
-                "return " + type.convertToCDecl(value: "peer_swift." + propertyName, strategy: bridgable.strategy)
-            ]
-            cdeclInstanceParameters = [cdeclInstanceParameter]
+            if isInstance {
+                cdeclGetterBody = [
+                    "let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!",
+                    "return " + type.convertToCDecl(value: "peer_swift.\(propertyName)", strategy: bridgable.strategy)
+                ]
+                cdeclInstanceParameters = [cdeclInstanceParameter]
+            } else {
+                cdeclGetterBody = ["return " + type.convertToCDecl(value: "\(classDeclaration.signature).\(propertyName)", strategy: bridgable.strategy)]
+                cdeclInstanceParameters = []
+            }
         } else {
             cdeclGetterBody = ["return " + type.convertToCDecl(value: propertyName, strategy: bridgable.strategy)]
             cdeclInstanceParameters = []
@@ -137,8 +143,8 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
 
         // Setter
         if variableDeclaration.apiFlags.options.contains(.writeable) {
-            let setterArguments = classDeclaration == nil ? "newValue" : "Swift_peer, newValue"
-            let setterInstanceParameter = classDeclaration == nil ? "" : "Swift_peer: skip.bridge.SwiftObjectPointer, "
+            let setterArguments = isInstance ? "Swift_peer, newValue" : "newValue"
+            let setterInstanceParameter = isInstance ? "Swift_peer: skip.bridge.SwiftObjectPointer, " : ""
             let setterBody = [
                 externalName + "_set(" + setterArguments + ")"
             ]
@@ -147,10 +153,14 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
 
             let cdeclSetterBody: [String]
             if let classDeclaration {
-                cdeclSetterBody = [
-                    "let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!",
-                    "peer_swift.\(propertyName) = " + type.convertFromCDecl(value: "value", strategy: bridgable.strategy)
-                ]
+                if isInstance {
+                    cdeclSetterBody = [
+                        "let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!",
+                        "peer_swift.\(propertyName) = " + type.convertFromCDecl(value: "value", strategy: bridgable.strategy)
+                    ]
+                } else {
+                    cdeclSetterBody = ["\(classDeclaration.signature).\(propertyName) = " + type.convertFromCDecl(value: "value", strategy: bridgable.strategy)]
+                }
             } else {
                 cdeclSetterBody = [propertyName + " = " + type.convertFromCDecl(value: "value", strategy: bridgable.strategy)]
             }
@@ -161,7 +171,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         variableDeclaration.didSet = nil
 
         // Add function declarations to transpiled output
-        (variableDeclaration.parent as? KotlinStatement)?.insert(statements: externalFunctionDeclarations.map { KotlinRawStatement(sourceCode: $0) }, after: variableDeclaration)
+        (variableDeclaration.parent as? KotlinStatement)?.insert(statements: externalFunctionDeclarations.map { KotlinRawStatement(sourceCode: $0, isStatic: variableDeclaration.isStatic) }, after: variableDeclaration)
     }
 
     private func isSupportedConstant(_ variableDeclaration: KotlinVariableDeclaration, type: TypeSignature) -> Bool {
@@ -203,7 +213,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         let functionName = functionDeclaration.name
         let isAsync = functionDeclaration.apiFlags.options.contains(.async)
         let isThrows = functionDeclaration.apiFlags.throwsType != .none
-        let externalName = (isAsync ? "Swift_callback_" : "Swift_") + functionName
+        let externalName = (isAsync ? "Swift_callback_" : "Swift_") + ((functionDeclaration.isStatic) ? "Companion_" + functionName : functionName)
 
         var cdeclBody: [String] = []
         for (index, parameter) in functionDeclaration.parameters.enumerated() {
@@ -219,9 +229,14 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         let swiftCallTarget: String
         var externalArgumentsString: String
         if let classDeclaration, functionDeclaration.type != .constructorDeclaration {
-            cdeclBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
-            swiftCallTarget = "peer_swift."
-            externalArgumentsString = "Swift_peer"
+            if functionDeclaration.isStatic {
+                swiftCallTarget = classDeclaration.name + "."
+                externalArgumentsString = ""
+            } else {
+                cdeclBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
+                swiftCallTarget = "peer_swift."
+                externalArgumentsString = "Swift_peer"
+            }
         } else {
             swiftCallTarget = ""
             externalArgumentsString = ""
@@ -342,7 +357,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
 
         var externalFunctionDeclaration = "private external fun \(externalName)("
         var externalParametersString: String
-        if classDeclaration != nil, functionDeclaration.type != .constructorDeclaration {
+        if classDeclaration != nil, functionDeclaration.type != .constructorDeclaration && !functionDeclaration.isStatic {
             externalParametersString = "Swift_peer: skip.bridge.SwiftObjectPointer"
         } else {
             externalParametersString = ""
@@ -372,10 +387,10 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             }
             externalFunctionDeclaration += ": " + returnType.kotlin
         }
-        (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [KotlinRawStatement(sourceCode: externalFunctionDeclaration)], after: functionDeclaration)
+        (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [KotlinRawStatement(sourceCode: externalFunctionDeclaration, isStatic: functionDeclaration.isStatic)], after: functionDeclaration)
 
         let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: externalName, translator: translator)
-        let instanceParameter = classDeclaration != nil && functionDeclaration.type != .constructorDeclaration ? [cdeclInstanceParameter] : []
+        let instanceParameter = classDeclaration != nil && functionDeclaration.type != .constructorDeclaration && !functionDeclaration.isStatic ? [cdeclInstanceParameter] : []
         let callbackParameter = isAsync ? [TypeSignature.Parameter(label: "f_callback", type: .javaObjectPointer)] : []
         let cdeclType: TypeSignature = .function(instanceParameter + functionType.parameters.enumerated().map { (index, parameter) in
             let strategy = bridgables.parameters[index].strategy
@@ -503,14 +518,21 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             cdeclPrefix += package.cdeclEscaped.replacing(".", with: "_") + "_"
         }
         let typeName: String
+        let cdeclTypeName: String
         if let classDeclaration = statement.owningTypeDeclaration as? KotlinClassDeclaration {
             typeName = classDeclaration.signature.description
+            if (statement as? KotlinMemberDeclaration)?.isStatic == true {
+                cdeclTypeName = typeName + "$Companion"
+            } else {
+                cdeclTypeName = typeName
+            }
         } else {
             var file = translator.syntaxTree.source.file
             file.extension = ""
             typeName = file.name + "Kt"
+            cdeclTypeName = typeName
         }
-        return (cdeclPrefix + typeName.cdeclEscaped + "_" + name.cdeclEscaped, typeName + "_" + name)
+        return (cdeclPrefix + cdeclTypeName.cdeclEscaped + "_" + name.cdeclEscaped, typeName + "_" + name)
     }
 
     private var cdeclInstanceParameter: TypeSignature.Parameter {

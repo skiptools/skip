@@ -1196,6 +1196,8 @@ final class KotlinClassDeclaration: KotlinStatement {
         for member in members {
             if (member as? KotlinMemberDeclaration)?.isStatic == true {
                 staticMembers.append(member)
+            } else if let rawStatement = member as? KotlinRawStatement, rawStatement.isStatic {
+                staticMembers.append(member)
             } else if let enumCaseDeclaration = member as? KotlinEnumCaseDeclaration {
                 enumCases.append(enumCaseDeclaration)
             } else {
