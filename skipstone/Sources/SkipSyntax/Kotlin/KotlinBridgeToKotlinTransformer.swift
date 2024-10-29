@@ -213,7 +213,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         let functionName = functionDeclaration.name
         let isAsync = functionDeclaration.apiFlags.options.contains(.async)
         let isThrows = functionDeclaration.apiFlags.throwsType != .none
-        let externalName = (isAsync ? "Swift_callback_" : "Swift_") + functionName
+        let externalName = (isAsync ? "Swift_callback_" : "Swift_") + ((functionDeclaration.isStatic) ? "Companion_" + functionName : functionName)
 
         var cdeclBody: [String] = []
         for (index, parameter) in functionDeclaration.parameters.enumerated() {
@@ -229,9 +229,14 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         let swiftCallTarget: String
         var externalArgumentsString: String
         if let classDeclaration, functionDeclaration.type != .constructorDeclaration {
-            cdeclBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
-            swiftCallTarget = "peer_swift."
-            externalArgumentsString = "Swift_peer"
+            if functionDeclaration.isStatic {
+                swiftCallTarget = classDeclaration.name + "."
+                externalArgumentsString = ""
+            } else {
+                cdeclBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
+                swiftCallTarget = "peer_swift."
+                externalArgumentsString = "Swift_peer"
+            }
         } else {
             swiftCallTarget = ""
             externalArgumentsString = ""
@@ -352,7 +357,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
 
         var externalFunctionDeclaration = "private external fun \(externalName)("
         var externalParametersString: String
-        if classDeclaration != nil, functionDeclaration.type != .constructorDeclaration {
+        if classDeclaration != nil, functionDeclaration.type != .constructorDeclaration && !functionDeclaration.isStatic {
             externalParametersString = "Swift_peer: skip.bridge.SwiftObjectPointer"
         } else {
             externalParametersString = ""
@@ -382,10 +387,10 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             }
             externalFunctionDeclaration += ": " + returnType.kotlin
         }
-        (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [KotlinRawStatement(sourceCode: externalFunctionDeclaration)], after: functionDeclaration)
+        (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [KotlinRawStatement(sourceCode: externalFunctionDeclaration, isStatic: functionDeclaration.isStatic)], after: functionDeclaration)
 
         let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: externalName, translator: translator)
-        let instanceParameter = classDeclaration != nil && functionDeclaration.type != .constructorDeclaration ? [cdeclInstanceParameter] : []
+        let instanceParameter = classDeclaration != nil && functionDeclaration.type != .constructorDeclaration && !functionDeclaration.isStatic ? [cdeclInstanceParameter] : []
         let callbackParameter = isAsync ? [TypeSignature.Parameter(label: "f_callback", type: .javaObjectPointer)] : []
         let cdeclType: TypeSignature = .function(instanceParameter + functionType.parameters.enumerated().map { (index, parameter) in
             let strategy = bridgables.parameters[index].strategy

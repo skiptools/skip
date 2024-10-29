@@ -216,8 +216,13 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             return false
         }
 
-        let swift = swift(for: functionDeclaration, bridgables: bridgables, targetIdentifier: "Java_peer", classIdentifier: "Java_class", methodIdentifier: "Java_" + functionDeclaration.name + "_methodID", translator: translator)
-        swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: swift))
+        let sourceCode: [String]
+        if functionDeclaration.isStatic {
+            sourceCode = swift(for: functionDeclaration, bridgables: bridgables, targetIdentifier: "Java_Companion", classIdentifier: "Java_Companion_class", methodIdentifier: "Java_Companion_" + functionDeclaration.name + "_methodID", translator: translator)
+        } else {
+            sourceCode = swift(for: functionDeclaration, bridgables: bridgables, targetIdentifier: "Java_peer", classIdentifier: "Java_class", methodIdentifier: "Java_" + functionDeclaration.name + "_methodID", translator: translator)
+        }
+        swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: sourceCode))
         appendCallbackFunction(for: functionDeclaration)
         return true
     }
@@ -231,12 +236,12 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         if functionDeclaration.type == .constructorDeclaration {
             functionType = functionType.withReturnType(.void)
         }
-        let visibility = functionDeclaration.modifiers.visibility.swift(suffix: " ")
+        let modifierString = functionDeclaration.modifiers.swift(suffix: " ")
         let parameterString = functionDeclaration.parameters.map(\.swift).joined(separator: ", ")
         var optionsString = isAsync ? " async" : ""
         optionsString += isThrows ? " throws" : ""
         let returnString = functionType.returnType == .void ? "" : " -> " + functionType.returnType.description
-        swift.append(visibility + (functionDeclaration.type == .constructorDeclaration ? "init" : "func " + functionDeclaration.name) + "(\(parameterString))\(optionsString)\(returnString) {")
+        swift.append(modifierString + (functionDeclaration.type == .constructorDeclaration ? "init" : "func " + functionDeclaration.name) + "(\(parameterString))\(optionsString)\(returnString) {")
 
         var returnCallString = functionDeclaration.type == .constructorDeclaration ? "Java_peer = " : ""
         // withCheckedThrowingContinuation requires a 'return' even with void to compile correctly
@@ -300,7 +305,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             swift.append(indentation, "return JObject(ptr)")
         } else if isAsync {
             let callType = functionDeclaration.role == .global ? "callStatic" : "call"
-            let callMethod = functionDeclaration.role == .global ? methodIdentifier : "Self." + methodIdentifier
+            let callMethod = functionDeclaration.role == .global || functionDeclaration.isStatic ? methodIdentifier : "Self." + methodIdentifier
             var argumentsString = javaParameterNames.joined(separator: ", ")
             if !argumentsString.isEmpty {
                 argumentsString += ", "
@@ -310,7 +315,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             swift.append(indentation, call)
         } else {
             let callType = functionDeclaration.role == .global ? "callStatic" : "call"
-            let callMethod = functionDeclaration.role == .global ? methodIdentifier : "Self." + methodIdentifier
+            let callMethod = functionDeclaration.role == .global || functionDeclaration.isStatic ? methodIdentifier : "Self." + methodIdentifier
             let call = "\(tryType) \(targetIdentifier).\(callType)(method: \(callMethod), args: [" + javaParameterNames.joined(separator: ", ") + "])"
             if isThrows {
                 swift.append(indentation, "do {")
