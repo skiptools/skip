@@ -123,12 +123,17 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
 
         let cdeclInstanceParameters: [TypeSignature.Parameter]
         let cdeclGetterBody: [String]
-        if isInstance, let classDeclaration {
-            cdeclGetterBody = [
-                "let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!",
-                "return " + type.convertToCDecl(value: "peer_swift." + propertyName, strategy: bridgable.strategy)
-            ]
-            cdeclInstanceParameters = [cdeclInstanceParameter]
+        if let classDeclaration {
+            if isInstance {
+                cdeclGetterBody = [
+                    "let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!",
+                    "return " + type.convertToCDecl(value: "peer_swift.\(propertyName)", strategy: bridgable.strategy)
+                ]
+                cdeclInstanceParameters = [cdeclInstanceParameter]
+            } else {
+                cdeclGetterBody = ["return " + type.convertToCDecl(value: "\(classDeclaration.signature).\(propertyName)", strategy: bridgable.strategy)]
+                cdeclInstanceParameters = []
+            }
         } else {
             cdeclGetterBody = ["return " + type.convertToCDecl(value: propertyName, strategy: bridgable.strategy)]
             cdeclInstanceParameters = []
@@ -147,11 +152,15 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             externalFunctionDeclarations.append("private external fun \(externalName)_set(\(setterInstanceParameter)value: \(type.kotlin))")
 
             let cdeclSetterBody: [String]
-            if isInstance, let classDeclaration {
-                cdeclSetterBody = [
-                    "let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!",
-                    "peer_swift.\(propertyName) = " + type.convertFromCDecl(value: "value", strategy: bridgable.strategy)
-                ]
+            if let classDeclaration {
+                if isInstance {
+                    cdeclSetterBody = [
+                        "let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!",
+                        "peer_swift.\(propertyName) = " + type.convertFromCDecl(value: "value", strategy: bridgable.strategy)
+                    ]
+                } else {
+                    cdeclSetterBody = ["\(classDeclaration.signature).\(propertyName) = " + type.convertFromCDecl(value: "value", strategy: bridgable.strategy)]
+                }
             } else {
                 cdeclSetterBody = [propertyName + " = " + type.convertFromCDecl(value: "value", strategy: bridgable.strategy)]
             }
@@ -162,7 +171,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         variableDeclaration.didSet = nil
 
         // Add function declarations to transpiled output
-        (variableDeclaration.parent as? KotlinStatement)?.insert(statements: externalFunctionDeclarations.map { KotlinRawStatement(sourceCode: $0) }, after: variableDeclaration)
+        (variableDeclaration.parent as? KotlinStatement)?.insert(statements: externalFunctionDeclarations.map { KotlinRawStatement(sourceCode: $0, isStatic: variableDeclaration.isStatic) }, after: variableDeclaration)
     }
 
     private func isSupportedConstant(_ variableDeclaration: KotlinVariableDeclaration, type: TypeSignature) -> Bool {
@@ -504,14 +513,21 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             cdeclPrefix += package.cdeclEscaped.replacing(".", with: "_") + "_"
         }
         let typeName: String
+        let cdeclTypeName: String
         if let classDeclaration = statement.owningTypeDeclaration as? KotlinClassDeclaration {
             typeName = classDeclaration.signature.description
+            if (statement as? KotlinMemberDeclaration)?.isStatic == true {
+                cdeclTypeName = typeName + "$Companion"
+            } else {
+                cdeclTypeName = typeName
+            }
         } else {
             var file = translator.syntaxTree.source.file
             file.extension = ""
             typeName = file.name + "Kt"
+            cdeclTypeName = typeName
         }
-        return (cdeclPrefix + typeName.cdeclEscaped + "_" + name.cdeclEscaped, typeName + "_" + name)
+        return (cdeclPrefix + cdeclTypeName.cdeclEscaped + "_" + name.cdeclEscaped, typeName + "_" + name)
     }
 
     private var cdeclInstanceParameter: TypeSignature.Parameter {

@@ -94,7 +94,7 @@ extension String {
     /// - Warning: Assumes this is an identifier string that does not contain illegal identifier characters like `;`
     var cdeclEscaped: String {
         // TODO: Unicode chars
-        return replacing("_", with: "_1")
+        return replacing("_", with: "_1").replacing("$", with: "_00024")
     }
 }
 
@@ -339,6 +339,19 @@ extension TypeSignature {
         case .void:
             return "V"
         }
+    }
+}
+
+extension Modifiers {
+    func swift(suffix: String = "") -> String {
+        var string = visibility.swift()
+        if isStatic {
+            if !string.isEmpty {
+                string += " "
+            }
+            string += "static"
+        }
+        return string.isEmpty ? "" : string + suffix
     }
 }
 

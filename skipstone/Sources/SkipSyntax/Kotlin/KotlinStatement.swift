@@ -224,14 +224,17 @@ final class KotlinMessageStatement: KotlinStatement {
 
 final class KotlinRawStatement: KotlinStatement, KotlinSingleStatementAppendable {
     let sourceCode: String
+    var isStatic = false
 
-    init(sourceCode: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+    init(sourceCode: String, isStatic: Bool = false, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
         self.sourceCode = sourceCode
+        self.isStatic = isStatic
         super.init(type: .raw, sourceFile: sourceFile, sourceRange: sourceRange)
     }
 
-    init(statement: RawStatement) {
+    init(statement: RawStatement, isStatic: Bool = false) {
         self.sourceCode = statement.sourceCode
+        self.isStatic = isStatic
         super.init(type: .raw, statement: statement)
     }
 
