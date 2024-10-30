@@ -475,6 +475,39 @@ final class ConcurrencyTests: XCTestCase {
             }
         }
         """)
+
+        // NOTE: We require the use of "as [Int]" to tell Kotlin the generic type of the array when processing the result
+        try await check(supportingSwift: supportingSwift, swift: """
+        func f() async throws -> [Int] {
+            try await withThrowingTaskGroup(of: [Int].self) { group in
+                var results: [Int] = []
+                for i in 1...5 {
+                    group.addTask {
+                        return [i]
+                    }
+                }
+                for try await result in group {
+                    results.append(contentsOf: result as! [Int])
+                }
+                return results
+            }
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        internal suspend fun f(): Array<Int> = Async.run l@{
+            return@l withThrowingTaskGroup(of = Array::class) l@{ group ->
+                var results: Array<Int> = arrayOf()
+                for (i in 1..5) {
+                    group.addTask l@{ -> return@l arrayOf(i) }
+                }
+                for (result in group.sref()) {
+                    results.append(contentsOf = result as Array<Int>)
+                }
+                return@l results
+            }
+        }
+        """)
     }
 
     func testAwaitMainActorGlobal() async throws {

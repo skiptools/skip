@@ -592,7 +592,7 @@ extension TypeSignature {
             strategy = .javaPeer
         } else if typeInfo.attributes.isBridgeToKotlin {
             strategy = .swiftPeer
-        } else if codebaseInfo.global.protocolSignatures(forNamed: self).contains(where: { $0.isNamed("JConvertible", moduleName: "SkipBridge") }) {
+        } else if codebaseInfo.global.protocolSignatures(forNamed: self).contains(where: { $0.isNamed("SwiftCustomBridged", moduleName: "Swift") }) {
             strategy = .convertible
         } else {
             sourceDerived.messages.append(.kotlinBridgeUnbridgedType(sourceDerived, type: description, source: translator.syntaxTree.source))

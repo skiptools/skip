@@ -105,6 +105,8 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         if variableDeclaration.declaredType == .none {
             variableDeclaration.declaredType = type
         }
+        // Bridged types will always be copied, so they can't be shared
+        variableDeclaration.mayBeSharedMutableStruct = false
 
         let propertyName = variableDeclaration.propertyName
         let externalName = "Swift_" + ((variableDeclaration.isStatic) ? "Companion_" + propertyName : propertyName)
@@ -115,8 +117,14 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         let isInstance = classDeclaration != nil && !variableDeclaration.isStatic
         let getterArguments = isInstance ? "(Swift_peer)" : "()"
         let getterParameters = isInstance ? "(Swift_peer: skip.bridge.SwiftObjectPointer)" : "()"
+        let getterSref: String
+        if let onUpdate = variableDeclaration.onUpdate?(), !onUpdate.isEmpty {
+            getterSref = ".sref(\(onUpdate))"
+        } else {
+            getterSref = ""
+        }
         let getterBody = [
-            "return " + externalName + getterArguments
+            "return " + externalName + getterArguments + getterSref
         ]
         variableDeclaration.getter = Accessor(body: KotlinCodeBlock(statements: getterBody.map { KotlinRawStatement(sourceCode: $0) }))
         externalFunctionDeclarations.append("private external fun \(externalName)\(getterParameters): \(type.kotlin)")
