@@ -361,6 +361,32 @@ final class BridgeToKotlinTests: XCTestCase {
         """)
     }
 
+    func testArrayVar() async throws {
+        try await check(swiftBridge: """
+        @BridgeToKotlin
+        var a = [1, 2, 3]
+        """, kotlin: """
+        import skip.lib.Array
+
+        internal var a: Array<Int>
+            get() = Swift_a().sref({ a = it })
+            set(newValue) {
+                Swift_a_set(newValue)
+            }
+        private external fun Swift_a(): Array<Int>
+        private external fun Swift_a_set(value: Array<Int>)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1a")
+        func BridgeKt_Swift_a(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
+            return a.toJavaObject()!
+        }
+        @_cdecl("Java_BridgeKt_Swift_1a_1set")
+        func BridgeKt_Swift_a_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
+            a = [Int].fromJavaObject(value)
+        }
+        """)
+    }
+
     func testKeywordVar() async throws {
         // TODO
     }
