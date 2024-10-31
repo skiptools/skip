@@ -129,7 +129,7 @@ class FrameworkProjectLayout {
 
             let sourceSkipYamlFile = sourceSkipDir.appending(path: "skip.yml")
 
-            var skipYamlGeneric = """
+            let skipYamlGeneric = """
             # Configuration file for https://skip.tools project
             #
             # Kotlin dependencies and Gradle build options for this module can be configured here
@@ -141,8 +141,9 @@ class FrameworkProjectLayout {
 
             """
 
+            var skipYamlModule = skipYamlGeneric
             if native && isModelModule {
-                skipYamlGeneric += """
+                skipYamlModule += """
                 
                 # this is a natively-compiled module
                 skip:
@@ -157,7 +158,7 @@ class FrameworkProjectLayout {
 
             """
 
-            try (isAppModule ? skipYamlApp : skipYamlGeneric).write(to: sourceSkipYamlFile, atomically: false, encoding: .utf8)
+            try (isAppModule ? skipYamlApp : skipYamlModule).write(to: sourceSkipYamlFile, atomically: false, encoding: .utf8)
 
             let sourceSwiftFile = sourceDir.appending(path: "\(moduleName).swift")
 
@@ -177,6 +178,23 @@ class FrameworkProjectLayout {
                 }
                 
                 """
+
+                // a sample of bridging Kotlin back into Swift
+                let nativeModuleKotlinBridge = sourceHeader + """
+                // SKIP @BridgeToSwift
+                func getJavaSystemProperty(_ name: String) -> String? {
+                    #if SKIP
+                    return java.lang.System.getProperty(name)
+                    #else
+                    return nil
+                    #endif
+                }
+
+                """
+
+                let kotlinBridgeDir = try sourceDir.append(path: "Kotlin", create: true)
+                let kotlinBridgeSourceFile = kotlinBridgeDir.appending(path: "\(moduleName)Kotlin.swift")
+                try nativeModuleKotlinBridge.write(to: kotlinBridgeSourceFile, atomically: false, encoding: .utf8)
             } else {
                 moduleCode += """
 
@@ -616,8 +634,15 @@ class FrameworkProjectLayout {
                 #build:
                 #  contents:
                 """
+
+                let skipYamlModuleTests = """
+                # Configuration file for https://skip.tools project
+                #build:
+                #  contents:
+                """
+
                 let testSkipYamlFile = testSkipDir.appending(path: "skip.yml")
-                try (isAppModule ? skipYamlAppTests : skipYamlGeneric).write(to: testSkipYamlFile, atomically: false, encoding: .utf8)
+                try (isAppModule ? skipYamlAppTests : skipYamlModuleTests).write(to: testSkipYamlFile, atomically: false, encoding: .utf8)
 
                 if let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
                     let testResourcesDir = try testDir.append(path: resourceFolder, create: true)
@@ -673,15 +698,25 @@ class FrameworkProjectLayout {
                 if let repoName = modDep.repositoryName {
                     var packDep = ".package(url: \"https://source.skip.tools/\(repoName).git\", "
 
-                    let depVersion = modDep.repositoryVersion ?? "1.0.0"
+                    var depVersion = modDep.repositoryVersion ?? "1.0.0" // "1.2.3"..<"1.2.6"
+                    // special-case skip modules that may not yet be stable by pinning to 0.0.0..<2.0.0
+                    if repoName.hasPrefix("skip-") && !["skip", "skip-unit", "skip-lib", "skip-foundation", "skip-model", "skip-ui"].contains(repoName) {
+                        //depVersion = "0.0.0\"..<\"2.0.0"
+                        depVersion = "main"
+                    }
+                    let isRange = depVersion.contains("..")
                     let isSemanticVersion = !depVersion.split(separator: ".").map({ Int($0) }).contains(nil)
 
-                    if isSemanticVersion {
-                        packDep += "from: \"\(depVersion)\")"
+                    if isRange {
+                        // no qualifier for package range
+                    } else if isSemanticVersion {
+                        packDep += "from: "
                     } else {
                         // if the version was not of the form 1.2.3, then we consider the version to be a branch
-                        packDep += "branch: \"\(depVersion)\")"
+                        packDep += "branch: "
                     }
+                    packDep += "\"\(depVersion)\""
+                    packDep += ")"
 
                     if !packageDependencies.contains(packDep) {
                         packageDependencies.append(packDep)
