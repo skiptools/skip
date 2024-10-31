@@ -18,4 +18,6 @@ jobs:
           generate-job-summary: false
       - run: brew install skiptools/skip/skip
       - run: skip checkup --verbose --double-check
+      - run: skip android sdk install
+      - run: skip checkup --verbose --native
 
