@@ -9,13 +9,17 @@ jobs:
   skip-init:
     runs-on: macos-15
     steps:
-      # cache gradle/maven dependencies which speeds up skip checkup
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: current
           generate-job-summary: false
+      - name: Cache Homebrew packages
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew
+          key: homebrew-packages
       - run: brew install skiptools/skip/skip
       - run: skip checkup --verbose --double-check
-      - run: skip android sdk install
+      - run: skip android sdk install --verbose
       - run: skip checkup --verbose --native
 
