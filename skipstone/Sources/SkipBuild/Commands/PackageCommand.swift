@@ -77,6 +77,9 @@ struct CreateOptions : ParsableArguments {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary of the new files", valueName: "show"))
     var showTree: Bool = false
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create a native model layer", valueName: "native"))
+    var native: Bool = false
+
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create test modules", valueName: "tests"))
     var moduleTests: Bool = true
 

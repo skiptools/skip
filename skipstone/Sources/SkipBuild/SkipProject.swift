@@ -32,7 +32,7 @@ class FrameworkProjectLayout {
     }
 
 
-    static func createSkipLibrary(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, moduleTests: Bool, packageResolved packageResolvedURL: URL?) throws -> URL {
+    static func createSkipLibrary(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, native: Bool, moduleTests: Bool, packageResolved packageResolvedURL: URL?) throws -> URL {
         var isDir: Foundation.ObjCBool = false
         if !FileManager.default.fileExists(atPath: outputFolder.path, isDirectory: &isDir) {
             throw InitError(errorDescription: "Specified output folder does not exist: \(outputFolder)")
@@ -129,7 +129,7 @@ class FrameworkProjectLayout {
 
             let sourceSkipYamlFile = sourceSkipDir.appending(path: "skip.yml")
 
-            let skipYamlGeneric = """
+            var skipYamlGeneric = """
             # Configuration file for https://skip.tools project
             #
             # Kotlin dependencies and Gradle build options for this module can be configured here
@@ -141,6 +141,15 @@ class FrameworkProjectLayout {
 
             """
 
+            if native && isModelModule {
+                skipYamlGeneric += """
+                
+                # this is a natively-compiled module
+                skip:
+                  mode: swift
+                """
+            }
+
             let skipYamlApp = """
             # Configuration file for https://skip.tools project
             build:
@@ -151,11 +160,33 @@ class FrameworkProjectLayout {
             try (isAppModule ? skipYamlApp : skipYamlGeneric).write(to: sourceSkipYamlFile, atomically: false, encoding: .utf8)
 
             let sourceSwiftFile = sourceDir.appending(path: "\(moduleName).swift")
-            try """
-            \(sourceHeader)public class \(moduleName)Module {
+
+            var moduleCode = sourceHeader
+
+            if native && isModelModule {
+                moduleCode += """
+                import Foundation
+                import Observation
+                
+                // SKIP @BridgeToKotlin
+                @Observable public class ViewModel {
+                    public var name = "Skipper"
+                
+                    public init() {
+                    }
+                }
+                
+                """
+            } else {
+                moduleCode += """
+
+                public class \(moduleName)Module {
+                }
+                
+                """
             }
 
-            """.write(to: sourceSwiftFile, atomically: false, encoding: .utf8)
+            try moduleCode.write(to: sourceSwiftFile, atomically: false, encoding: .utf8)
 
             var resourcesAttribute: String = ""
             if let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
@@ -632,13 +663,26 @@ class FrameworkProjectLayout {
                 // in addition to a top-level dependency on SkipUI and a bottom-level dependency on SkipFoundation, a secondary module will also have a dependency on SkipModel for observability
                 if isModelModule {
                     modDeps.append(PackageModule(repositoryName: "skip-model", moduleName: "SkipModel"))
+                    if native {
+                        modDeps.append(PackageModule(repositoryName: "skip-bridge", moduleName: "SkipBridge"))
+                    }
                 }
             }
             var skipModuleDeps: [String] = []
             for modDep in modDeps {
                 if let repoName = modDep.repositoryName {
+                    var packDep = ".package(url: \"https://source.skip.tools/\(repoName).git\", "
+
                     let depVersion = modDep.repositoryVersion ?? "1.0.0"
-                    let packDep = ".package(url: \"https://source.skip.tools/\(repoName).git\", from: \"\(depVersion)\")"
+                    let isSemanticVersion = !depVersion.split(separator: ".").map({ Int($0) }).contains(nil)
+
+                    if isSemanticVersion {
+                        packDep += "from: \"\(depVersion)\")"
+                    } else {
+                        // if the version was not of the form 1.2.3, then we consider the version to be a branch
+                        packDep += "branch: \"\(depVersion)\")"
+                    }
+
                     if !packageDependencies.contains(packDep) {
                         packageDependencies.append(packDep)
                     }
@@ -690,12 +734,17 @@ class FrameworkProjectLayout {
 
         let dependencies = "    dependencies: [\n        " + packageDependencies.joined(separator: ",\n        ") + "\n    ]"
 
+        // native projects use @Observable, which is only available in iOS 17+/macOS 14+
+        let platforms = !native
+            ? "[.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)]"
+            : "[.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)]"
+
         let packageSource = """
         \(packageHeader)
         let package = Package(
             name: "\(projectName)",
             defaultLocalization: "en",
-            platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
+            platforms: \(platforms),
         \(products),
         \(dependencies),
         \(targets)
@@ -919,7 +968,7 @@ class AppProjectLayout : FrameworkProjectLayout {
     }
 
 
-    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, iconColor: String?, version: String?, moduleTests: Bool, fastlane: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool) throws -> (baseURL: URL, project: AppProjectLayout) {
+    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, iconColor: String?, version: String?, native: Bool, moduleTests: Bool, fastlane: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool) throws -> (baseURL: URL, project: AppProjectLayout) {
 
         let sourceHeader = free ? freeLicenseHeader(type: nil) : ""
 
@@ -935,7 +984,10 @@ class AppProjectLayout : FrameworkProjectLayout {
             }
         }
 
-        let projectURL = try createSkipLibrary(projectName: projectName, productName: productName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: appid != nil, moduleTests: moduleTests, packageResolved: packageResolvedURL)
+        let projectURL = try createSkipLibrary(projectName: projectName, productName: productName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: appid != nil, native: native, moduleTests: moduleTests, packageResolved: packageResolvedURL)
+
+        // the second module is the native module
+        let nativeModule = !native ? nil : modules.dropFirst().first
 
         let projectPath = try projectURL.absolutePath
 
@@ -1025,6 +1077,10 @@ ANDROID_PACKAGE_NAME = \(appModulePackage)
         let skipEnvBaseName = "Skip.env"
         let skipEnvFileName = "../\(skipEnvBaseName)"
 
+        let iOSMinVersion = !native ? "16.0" : "17.0"
+        let macOSMinVersion = !native ? "13.0" : "14.0"
+        let swiftVersion = !native ? "5.0" : "6.0"
+
         // create the top-level ModuleName.xcconfig which is the source or truth for the iOS and Android builds
         let configContents = """
 #include "\(skipEnvFileName)"
@@ -1052,8 +1108,8 @@ INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphone*] = YES
 INFOPLIST_KEY_UIStatusBarStyle[sdk=iphone*] = UIStatusBarStyleDefault
 INFOPLIST_KEY_UISupportedInterfaceOrientations[sdk=iphone*] = UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown
 
-IPHONEOS_DEPLOYMENT_TARGET = 16.0
-MACOSX_DEPLOYMENT_TARGET = 13.0
+IPHONEOS_DEPLOYMENT_TARGET = \(iOSMinVersion)
+MACOSX_DEPLOYMENT_TARGET = \(macOSMinVersion)
 SUPPORTS_MACCATALYST = NO
 
 // iPhone + iPad
@@ -1074,8 +1130,7 @@ SDKROOT = auto
 SUPPORTED_PLATFORMS = iphoneos iphonesimulator macosx
 SWIFT_EMIT_LOC_STRINGS = YES
 
-SWIFT_VERSION = 5.0
-//SWIFT_VERSION = 6.0
+SWIFT_VERSION = \(swiftVersion)
 
 // Development team ID for on-device testing
 CODE_SIGNING_REQUIRED = NO
@@ -1464,14 +1519,18 @@ public extension \(primaryModuleAppTarget) {
         try FileManager.default.createDirectory(at: appModuleApplicationStubFileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try appExtContents.write(to: appModuleApplicationStubFileURL, atomically: false, encoding: .utf8)
 
+        // when we are using a native module, then we will generate a ViewModel with a @name parameter, otherwise we use @AppStorage
+        let nativeImport = nativeModule.flatMap({ "\nimport \($0.moduleName)" }) ?? ""
+        let nameState = native ? "@State var viewModel = ViewModel()" : "@AppStorage(\"name\") var name = \"Skipper\""
+        let nameVar = native ? "viewModel.name" : "name"
 
         // Sources/Playground/PlaygroundApp.swift
         let contentViewContents = """
-\(sourceHeader)import SwiftUI
+\(sourceHeader)import SwiftUI\(nativeImport)
 
 public struct ContentView: View {
     @AppStorage("tab") var tab = Tab.welcome
-    @AppStorage("name") var name = "Skipper"
+    \(nameState)
     @State var appearance = ""
     @State var isBeating = false
 
@@ -1481,7 +1540,7 @@ public struct ContentView: View {
     public var body: some View {
         TabView(selection: $tab) {
             VStack(spacing: 0) {
-                Text("Hello [\\(name)](https://skip.tools)!")
+                Text("Hello [\\(\(nameVar))](https://skip.tools)!")
                     .padding()
                 Image(systemName: "heart.fill")
                     .foregroundStyle(.red)
@@ -1511,7 +1570,7 @@ public struct ContentView: View {
 
             NavigationStack {
                 Form {
-                    TextField("Name", text: $name)
+                    TextField("Name", text: $\(nameVar))
                     Picker("Appearance", selection: $appearance) {
                         Text("System").tag("")
                         Text("Light").tag("light")
@@ -2128,7 +2187,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 
         let sourceMainKotlinPackage = appProject.androidAppSrcMainKotlin.appendingPathComponent(appModulePackage.split(separator: ".").joined(separator: "/"), isDirectory: true)
         let sourceMainKotlinSourceFile = sourceMainKotlinPackage.appendingPathComponent("Main.kt")
-        try createKotlinMain(appModulePackage: appModulePackage, appModuleName: appModuleName).write(to: sourceMainKotlinSourceFile.createParentDirectory(), atomically: false, encoding: .utf8)
+        try createKotlinMain(appModulePackage: appModulePackage, appModuleName: appModuleName, nativeLibrary: nativeModule?.moduleName).write(to: sourceMainKotlinSourceFile.createParentDirectory(), atomically: false, encoding: .utf8)
 
         // create the .gitignore file; https://github.com/orgs/skiptools/discussions/208#discussioncomment-10505250
         let gitignore = """
@@ -2377,10 +2436,17 @@ extension FrameworkProjectLayout {
             }
         }
 
+        packaging {
+            jniLibs {
+                keepDebugSymbols.add("**/*.so")
+                pickFirsts.add("**/*.so")
+            }
+        }
+
         """
     }
 
-    static func createKotlinMain(appModulePackage: String, appModuleName: String) -> String {
+    static func createKotlinMain(appModulePackage: String, appModuleName: String, nativeLibrary: String?) -> String {
         """
         package \(appModulePackage)
 
@@ -2415,6 +2481,7 @@ extension FrameworkProjectLayout {
                 super.onCreate()
                 logger.info("starting app")
                 ProcessInfo.launch(applicationContext)
+                \(nativeLibrary == nil ? "" : "System.loadLibrary(\"\(nativeLibrary!)\")")
             }
 
             companion object {
@@ -2520,6 +2587,7 @@ extension FrameworkProjectLayout {
         """
         -keeppackagenames **
         -keep class skip.** { *; }
+        -keep class kotlin.jvm.functions.** {*;}
         -keep class com.sun.jna.** { *; }
         -keep class * implements com.sun.jna.** { *; }
         -keep class \(packageName).** { *; }

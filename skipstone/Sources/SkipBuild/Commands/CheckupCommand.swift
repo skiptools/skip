@@ -21,6 +21,9 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
     @Flag(help: ArgumentHelp("Check twice that sample build outputs produce identical artifacts", valueName: "verify"))
     var doubleCheck: Bool = false
 
+    @Flag(help: ArgumentHelp("Generate native module when running checkup", valueName: "native"))
+    var native: Bool = false
+
     func performCommand(with out: MessageQueue) async {
         await withLogStream(with: out) {
             try await runCheckup(with: out)
@@ -37,10 +40,13 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
             try FileManager.default.createDirectory(atPath: tmpdir, withIntermediateDirectories: true)
 
             //let checkupModules = try [PackageModule(parse: "HelloSkip"), PackageModule(parse: "HelloModel"), PackageModule(parse: "HelloCore")]
-            let checkupModules = try [PackageModule(parse: "HelloSkip")]
-            
+            var checkupModules = [PackageModule(moduleName: "HelloSkip")]
+            // when checking a native package, create a second module that will have the bridge dependency
+            if native == true {
+                checkupModules += [PackageModule(moduleName: "HelloModel")]
+            }
             // create a project differently based on the index, but the ultimate binary output should be identical
-            return try await initSkipProject(projectName: "hello-skip", modules: checkupModules, resourceFolder: "Resources", dir: URL(fileURLWithPath: tmpdir, isDirectory: true), verify: true, configuration: self.configuration, build: primary, test: primary, returnHashes: doubleCheck, messagePrefix: !primary ? "Re-" : "", showTree: false, chain: true, gitRepo: false, free: true, zero: true, appid: "skip.hello.App", iconColor: nil, version: "1.0.0", moduleTests: primary, fastlane: true, validatePackage: true, packageResolved: packageResolvedURL, apk: true, ipa: true, with: out)
+            return try await initSkipProject(projectName: "hello-skip", modules: checkupModules, resourceFolder: "Resources", dir: URL(fileURLWithPath: tmpdir, isDirectory: true), verify: true, configuration: self.configuration, build: primary, test: primary, returnHashes: doubleCheck, messagePrefix: !primary ? "Re-" : "", showTree: false, chain: true, gitRepo: false, free: true, zero: true, appid: "skip.hello.App", iconColor: nil, version: "1.0.0", native: native, moduleTests: primary, fastlane: true, validatePackage: true, packageResolved: packageResolvedURL, apk: true, ipa: true, with: out)
         }
 
         // build a sample project (twice when performing a double-check)

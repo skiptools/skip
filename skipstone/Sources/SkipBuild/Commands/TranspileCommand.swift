@@ -522,10 +522,10 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                         try writeChanges(tag: "skipbridge", to: destPath, contents: content, readOnly: true)
                         shouldLink = false
                     case .appendToSource:
-                        var generatedSwiftContent = try fs.readFileContents(path).withData { $0 }
-                        generatedSwiftContent += matchingBridge.output.content.utf8Data
+                        var generatedSwiftContent = try fs.readFileContents(path).withData { String(data: $0, encoding: .utf8) ?? "" }
+                        generatedSwiftContent += "\n\n" + matchingBridge.output.content
                         info("writing bridge appended swift contents (\(generatedSwiftContent.count.byteCount)) to \(destPath)")
-                        try writeChanges(tag: "skipbridgeappend", to: destPath, contents: generatedSwiftContent, readOnly: true)
+                        try writeChanges(tag: "skipbridgeappend", to: destPath, contents: generatedSwiftContent.data(using: .utf8)!, readOnly: true)
                         shouldLink = false // we are overriding the contents, so do not create a link
                     }
                 }

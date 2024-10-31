@@ -21,7 +21,80 @@ struct AndroidCommand: AsyncParsableCommand {
             AndroidBuildCommand.self,
             AndroidRunCommand.self,
             AndroidTestCommand.self,
+            AndroidSDKCommand.self,
         ], aliases: ["toolchain"])
+}
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct AndroidSDKCommand: AsyncParsableCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "sdk",
+        abstract: "Manage installation of Swift Android SDK",
+        shouldDisplay: androidCommandEnabled,
+        subcommands: [
+            AndroidSDKListCommand.self,
+            AndroidSDKInstallCommand.self,
+        ])
+}
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct AndroidSDKInstallCommand: MessageCommand, ToolOptionsCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "install",
+        abstract: "Install the native Swift Android SDK",
+        shouldDisplay: true)
+
+    @Option(help: ArgumentHelp("Version of the Swift Android SDK to install", valueName: "version"))
+    var version: String = "6.0"
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    @OptionGroup(title: "Tool Options")
+    var toolOptions: ToolOptions
+
+    func performCommand(with out: MessageQueue) async {
+        await run(with: out, "Install Swift Android SDK", ["brew", "install", "skiptools/skip/swift-android-toolchain@\(version)"], additionalEnvironment: ["HOMEBREW_AUTO_UPDATE_SECS": "0"])
+    }
+}
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct AndroidSDKListCommand: SkipCommand, StreamingCommand, OutputOptionsCommand, ToolOptionsCommand {
+    typealias Output = SwiftSDKLineOutput
+
+    static var configuration = CommandConfiguration(
+        commandName: "list",
+        abstract: "List the installed Swift Android SDKs",
+        shouldDisplay: true)
+
+    @OptionGroup(title: "Tool Options")
+    var toolOptions: ToolOptions
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    func performCommand(with out: MessageQueue) async throws {
+        try await listAndroidSDKs(with: out)
+    }
+
+    func listAndroidSDKs(with out: MessageQueue) async throws {
+        let swiftSDKListOutput = try await launchTool("swift", arguments: ["sdk", "list"], includeStdErr: false)
+        for try await sdkLine in swiftSDKListOutput {
+            let info = SwiftSDKLineOutput(name: sdkLine.line)
+            if info.name.contains("-android-") {
+                await out.yield(info)
+            }
+        }
+    }
+
+    struct SwiftSDKLineOutput : MessageEncodable, Decodable {
+        let name: String
+
+        /// Returns the message for the output with optional ANSI coloring
+        func message(term: Term) -> String? {
+            name
+        }
+    }
 }
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
@@ -51,11 +124,19 @@ fileprivate extension AndroidOperationCommand {
         }) {
             //print(outputLine.line)
 
+            // squelch common warnings in non-verbose output mode
             if outputLine.err {
+                if !outputOptions.verbose && (
+                    // additional filters to to handle warnings raised by the way we replace remote dependencies with their local equivalents
+                    outputLine.line.hasSuffix(" is not used by any target") // 'swift': dependency 'swift-system' is not used by any target
+                    || outputLine.line.hasSuffix(" this will be escalated to an error in future versions of SwiftPM.") // '…': '…' dependency on '…' conflicts with dependency on '…' which has the same identity '…'. this will be escalated to an error in future versions of SwiftPM.
+                    || outputLine.line.hasSuffix("unhandled; explicitly declare them as resources or exclude from the target")
+                ) {
+                    continue
+                }
                 print(outputLine.line, to: &stderrStream)
                 stderrStream.flush()
             } else {
-                // squelch common warnings in non-verbose output mode
                 if !outputOptions.verbose && (
                     outputLine.line.hasPrefix("warning: Could not read SDKSettings.json for SDK")
                     || outputLine.line.hasPrefix("<unknown>:0: warning: glibc not found for")
@@ -63,7 +144,6 @@ fileprivate extension AndroidOperationCommand {
                 ) {
                     continue
                 }
-
                 print(outputLine.line, to: &stdoutStream)
                 stdoutStream.flush()
             }
@@ -85,10 +165,10 @@ fileprivate extension AndroidOperationCommand {
         }
 
         for arch in architectures {
-            let tc = try createToolchainDestinationJSON(for: arch)
+            let tc = try buildToolchainConfiguration(for: arch)
 
             var env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths
-            let toolchainBin = tc.destination.toolchain.appendingPathComponent("usr/bin")
+            let toolchainBin = tc.toolchainPath.appendingPathComponent("usr/bin", isDirectory: true)
             let path = toolchainBin.path + ":" + (env["PATH"] ?? "")
             env["PATH"] = path
             // when Xcode invokes gradle which invokes `skip android build` which invokes `swift build`,
@@ -102,16 +182,20 @@ fileprivate extension AndroidOperationCommand {
             // set the SKIP_JNI_MODE flag, which is transferred through to a build #define in SkipBridge and can be used to check whether the current build mode is targetting JNI
             env["SKIP_JNI_MODE"] = "1"
 
-            let swiftCmd = toolchainBin.appendingPathComponent("swift").path
+            let swiftCmd = toolchainBin.appendingPathComponent("swift", isDirectory: false).path
             if !FileManager.default.fileExists(atPath: swiftCmd) {
                 throw CrossCompilerError(errorDescription: "Could not locate swift command at: \(swiftCmd)")
             }
             var cmd: [String] = []
 
-            cmd += [swiftCmd] // causes weird error with the Swift 6 toolchain: "error: invalid absolute path ''"
-            //cmd += ["swift"]
+            cmd += [swiftCmd]
             cmd += ["build"]
-            cmd += ["--destination", tc.url.path]
+
+            if let destinationURL = tc.destinationURL {
+                cmd += ["--destination", destinationURL.path]
+            } else if let sdkName = tc.sdkName {
+                cmd += ["--swift-sdk", sdkName]
+            }
 
             let runTests = cleanup != nil && executable == nil
             if runTests {
@@ -144,28 +228,51 @@ fileprivate extension AndroidOperationCommand {
             let buildOutputFolder = [
                 packageDir,
                 toolchainOptions.scratchPath ?? ".build",
-                arch.target,
+                arch.target(api: toolchainOptions.androidAPILevel),
                 toolchainOptions.configuration?.rawValue ?? "debug",
             ].joined(separator: "/")
 
             let buildOutputFolderURL = URL(fileURLWithPath: buildOutputFolder)
 
-            /// Returns all the shared object files that will need to be linked to an binary on Android
+            /// Returns all the shared object files that will need to be linked to a binary
             ///
             /// e.g.: `~/Library/Developer/Skip/SDKs/swift-5.10.1-android-24-ndk-27-sdk/usr/lib/aarch64-linux-android/*.so`
             func dependencySharedObjectFiles() throws -> [URL] {
-                let libFolder = tc.destination.sdk.appendingPathComponent("usr/lib/" + arch.triple)
+                let libFolder = tc.libPath
                 if !FileManager.default.fileExists(atPath: libFolder.path) {
                     throw AndroidError(errorDescription: "Android SDK library folder did not exist at: \(libFolder)")
                 }
                 // check for .so files like libswift_Concurrency.so or libxml2.so.2.13.3
                 // we need to preserve symbolic links because some libraries link to a linked version
-                let sharedObjects = try files(at: libFolder, allowLinks: true).filter({ $0.lastPathComponent.contains(".so") })
+                let sharedObjects = try files(at: libFolder, allowLinks: true)
+                    .filter({ $0.lastPathComponent.contains(".so") })
+                    .filter {
+                        // filter out some of the native Android libraries that are located in the same folder as the Swift libraries
+                        // including these seems to result in a hang when running test cases
+                        [
+                            "libEGL.so",
+                            "libGLESv1_CM.so",
+                            "libGLESv2.so",
+                            "libGLESv3.so",
+                            "libOpenMAXAL.so",
+                            "libOpenSLES.so",
+                            "libandroid.so",
+                            "libc++.so",
+                            "libc.so",
+                            "libcamera2ndk.so",
+                            "libdl.so",
+                            "libjnigraphics.so",
+                            "liblog.so",
+                            "libm.so",
+                            "libmediandk.so",
+                            "libvulkan.so",
+                        ].contains($0.lastPathComponent) == false
+                    }
                 return sharedObjects
             }
 
             if let archiveOutputFolder = archiveOutputFolder {
-                let archOutputFolder = archiveOutputFolder.appendingPathComponent(arch.abi)
+                let archOutputFolder = archiveOutputFolder.appendingPathComponent(arch.abi, isDirectory: true)
                 //try? FileManager.default.removeItem(at: archiveOutputFolder) // delete any existing archive output folder
                 try FileManager.default.createDirectory(at: archOutputFolder, withIntermediateDirectories: true)
 
@@ -174,7 +281,8 @@ fileprivate extension AndroidOperationCommand {
                 copyFiles += try dependencySharedObjectFiles()
 
                 for so in copyFiles {
-                    let dest = archOutputFolder.appendingPathComponent(so.lastPathComponent)
+                    let dest = archOutputFolder.appendingPathComponent(so.lastPathComponent, isDirectory: true)
+                    // TODO: we could create hardlinks rather than copying if we can check if they are on the same volume…
                     try? FileManager.default.removeItem(at: dest) // delete any pre-existing file before copy
                     try FileManager.default.copyItem(at: so, to: dest)
                 }
@@ -240,7 +348,7 @@ fileprivate extension AndroidOperationCommand {
     /// Create a temporary directory
     func createTempDir() throws -> URL {
         let tmpDir = FileManager.default.temporaryDirectory // or URL.temporaryDirectory, but unavailable on Linux
-        let tempURL = tmpDir.appendingPathComponent(UUID().uuidString)
+        let tempURL = tmpDir.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: tempURL, withIntermediateDirectories: true)
         return tempURL
     }
@@ -307,58 +415,126 @@ fileprivate extension AndroidOperationCommand {
             }
     }
 
+    private var homeDir: URL {
+        FileManager.default.homeDirectoryForCurrentUser // or URL.homeDirectory, but unavailable on Linux
+    }
 
-    /// Create the destination JSON for cross-compiling to Android
+    func buildToolchainConfiguration(for arch: AndroidArch) throws -> (toolchainPath: URL, destinationURL: URL?, sdkName: String?, libPath: URL) {
+        // 5.0.1 and 6.0.1 are legacy toolchains that create a desintation JSON file
+        if toolchainOptions.swiftVersion == "5.0.1" || toolchainOptions.swiftVersion == "6.0.1" {
+            let tc = try createToolchainLegacy(for: arch)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes, .sortedKeys]
+            let encoded = try encoder.encode(tc.destination)
+            // create a temporary destination JSON file like "aarch64-unknown-linux-android24.json"
+            let tmpFile = try createTempDir().appendingPathComponent((tc.destination.target ?? "destination") + ".json", isDirectory: false)
+            try encoded.write(to: tmpFile)
+
+            let libPath = tc.sdk.appendingPathComponent("usr/lib", isDirectory: true).appendingPathComponent(arch.triple, isDirectory: true)
+
+            return (toolchainPath: tc.toolchain, destinationURL: tmpFile, sdkName: nil, libPath: libPath)
+        } else {
+            let apiLevel = toolchainOptions.androidAPILevel
+
+            // look for swift-sdks like: ~/Library/org.swift.swiftpm/swift-sdks/swift-6.0.2-RELEASE-android-24-0.1.artifactbundle
+            let localSDKsPath = (toolchainOptions.swiftSDKHome ?? ProcessInfo.processInfo.environment["SWIFT_SDK_HOME"]).flatMap(URL.init(fileURLWithPath:)) ?? homeDir.appendingPathComponent("Library/org.swift.swiftpm/swift-sdks", isDirectory: true)
+
+            let installAdvice = "Install the Swift Android SDK using `skip android sdk install`."
+
+            if !isDir(localSDKsPath) {
+                throw CrossCompilerError(errorDescription: "No SDKs were installed at \(localSDKsPath.path). \(installAdvice)")
+            }
+
+            let sdks = try dirs(at: localSDKsPath)
+                .filter({ $0.pathExtension == "artifactbundle" })
+                .filter({ $0.lastPathComponent.hasPrefix("swift-\(toolchainOptions.swiftVersion ?? "")") })
+                .filter({ $0.lastPathComponent.contains("RELEASE-android-\(apiLevel)") })
+                .sorted { u1, u2 in
+                    // localizedStandardCompare will handle sorting semantic versions like:
+                    // swift-1.10.0-RELEASE > swift-1.2.0-RELEASE
+                    u1.lastPathComponent.localizedStandardCompare(u2.lastPathComponent) == .orderedAscending
+                }
+
+            guard let sdkPath = sdks.last else {
+                throw CrossCompilerError(errorDescription: "No Swift Android SDKs matching version \(toolchainOptions.swiftVersion ?? "latest") were found in: \(localSDKsPath.path). \(installAdvice)")
+            }
+
+            //let sdkName = sdkPath.deletingPathExtension().lastPathComponent // e.g. "swift-6.0.2-RELEASE-android-24-0.1"
+            let sdkName = arch.target(api: apiLevel)
+            let swiftSDKVersion = sdkPath.lastPathComponent.split(separator: "-").dropFirst().first ?? "latest" // e.g.: 6.0.2
+            let toolchainPath = try swiftToolchainFolder(sdkVersion: swiftSDKVersion.description)
+            let sdkRoot = sdkPath.appendingPathComponent("swift-\(swiftSDKVersion)-release-android-\(apiLevel)-sdk", isDirectory: true)
+            if !isDir(sdkRoot) {
+                throw CrossCompilerError(errorDescription: "The Swift Android SDK did not exist at \(sdkRoot.path)")
+            }
+            let sdkJSONURL = sdkRoot.appendingPathComponent("swift-sdk.json", isDirectory: false)
+
+            let schemaSDK = try JSONDecoder().decode(SchemaSDK.self, from: Data(contentsOf: sdkJSONURL))
+
+            //let sysroot = try dirs(in: [sdkRoot]).first(where: { $0.lastPathComponent.hasSuffix("-sysroot") }) // e.g.: "android-27c-sysroot"
+            let sysrootPath = schemaSDK.targetTriples?[arch.tripleKey(api: apiLevel)]?.sdkRootPath
+
+            guard let sysrootPath else {
+                throw CrossCompilerError(errorDescription: "The Swift Android SDK did not contain an NDK sysroot at \(sdkRoot.path)")
+            }
+
+            let libFolder = arch.libpath(api: apiLevel)
+            let libPath = sdkRoot.appendingPathComponent(sysrootPath, isDirectory: true).appendingPathComponent("usr/lib", isDirectory: true).appendingPathComponent(libFolder, isDirectory: true)
+            if !isDir(libPath) {
+                throw CrossCompilerError(errorDescription: "The Swift Android SDK sysroot for \(arch.tripleKey(api: apiLevel)) did not exist at: \(libPath.path)")
+            }
+
+            return (toolchainPath: toolchainPath, destinationURL: nil, sdkName: sdkName, libPath: libPath)
+        }
+    }
+
+    func swiftToolchainFolder(sdkVersion: String) throws -> URL {
+
+        // work out which toolchain to use by matching it to the Swift Android SDK
+        let toolchain = try toolchainOptions.toolchain ?? {
+            let toolchainOverride = ProcessInfo.processInfo.environment["SWIFT_TOOLCHAIN_DIR"].flatMap(URL.init(fileURLWithPath:))
+
+            let toolchainsHomeGlobal = URL(fileURLWithPath: "/Library/Developer/Toolchains", isDirectory: true)
+            let toolchainsHomeLocal = homeDir.appendingPathComponent("/Library/Developer/Toolchains", isDirectory: true)
+
+            let toolchainDirs = toolchainOverride != nil ? [toolchainOverride!] : [toolchainsHomeGlobal, toolchainsHomeLocal]
+
+            if toolchainDirs.filter({ isDir($0) }).isEmpty {
+                throw CrossCompilerError(errorDescription: "The Swift toolchains folder could not be located at: \(toolchainDirs.map(\.path))")
+            }
+
+            var toolchains = try dirs(in: toolchainDirs).filter({ $0.pathExtension == "xctoolchain" })
+            let swiftVersion = toolchainOptions.swiftVersion ?? sdkVersion
+            toolchains = toolchains.filter({ $0.lastPathComponent.hasPrefix("swift-\(swiftVersion)") })
+
+            guard let toolchain = toolchains.last else {
+                throw CrossCompilerError(errorDescription: "No Swift Toolchain matching version \(swiftVersion) were found in: \(toolchainDirs.map(\.path))")
+            }
+
+            return toolchain.path
+        }()
+
+        let toolchainURL = URL(fileURLWithPath: toolchain)
+        if !isDir(toolchainURL) {
+            throw CrossCompilerError(errorDescription: "The Swift toolchain path could not be found at: \(toolchainURL.path)")
+        }
+
+        return toolchainURL
+    }
+
+    /// Create the destination JSON for cross-compiling to Android.
+    ///
+    /// This is a legacy function for Swift 5.10.1 and 6.0.1. Later versions are packages as a proper Swift SDK, and so can use the `--swift-sdk` argument to locate the toolchain.
+    ///
     /// - Returns: the path to the temporary destination file
-    func createToolchainDestination(for arch: AndroidArch) throws -> (destination: SerializedDestinationV1, sdk: URL, ndk: URL, toolchain: URL) {
-        let homeDir = FileManager.default.homeDirectoryForCurrentUser // or URL.homeDirectory, but unavailable on Linux
-
+    func createToolchainLegacy(for arch: AndroidArch) throws -> (destination: SerializedDestinationV1, sdk: URL, ndk: URL, toolchain: URL) {
         var tc = SerializedDestinationV1()
 
-        let target = arch.target // "aarch64-unknown-linux-android24"
+        let target = arch.target(api: self.toolchainOptions.androidAPILevel) // "aarch64-unknown-linux-android24"
         let triple = arch.triple // "aarch64-linux-android"
 
-        // GH Runner ANDROID_NDK=/Users/runner/Library/Android/sdk/ndk/26.3.11579264
-        // https://github.com/actions/runner-images/blob/main/images/macos/macos-13-Readme.md#environment-variables-1
-
-        // `brew install android-ndk` puts the NDK at /opt/homebrew/share/android-ndk which links to something like /opt/homebrew/Caskroom/android-ndk/27/AndroidNDK12077973.app/Contents/NDK
-        var ndkURL = URL(fileURLWithPath: toolchainOptions.ndk ?? ProcessInfo.processInfo.environment["ANDROID_NDK_HOME"] ?? (ProcessInfo.homebrewRoot + "/share/android-ndk"))
-
-        // if it is not there, then fallback to checking the local ANDROID_HOME location for any installed NDKs
-        if !isDir(ndkURL) {
-            // GH Runner ANDROID_HOME=/Users/runner/Library/Android/sdk
-            let androidHome = ProcessInfo.processInfo.environment["ANDROID_HOME"] ?? homeDir.appendingPathComponent("Library/Android/sdk").path
-
-            let androidNDKHome = URL(fileURLWithPath: androidHome).appendingPathComponent("ndk")
-            if isDir(androidNDKHome) {
-                let versions = try dirs(at: androidNDKHome).filter { dir in
-                    guard let initialPart = dir.lastPathComponent.split(separator: ".").first else {
-                        return false
-                    }
-                    guard let initialNumber = Int(initialPart.description) else {
-                        return false
-                    }
-                    // filter out old NDK versions that won't work with the toolchain (26 or 27+ are needed)
-                    return initialNumber >= 26
-                }
-
-                if let version = versions.last {
-                    ndkURL = URL(fileURLWithPath: version.path)
-                }
-            }
-        }
-
-        if !isDir(ndkURL) {
-            throw CrossCompilerError(errorDescription: "The Android NDK path could not be found. Try passing the --ndk flag or setting the ANDROID_NDK environment variable.")
-        }
-
-        let ndkPrebuilt = ndkURL.appendingPathComponent("/toolchains/llvm/prebuilt/darwin-x86_64")
-        if !isDir(ndkPrebuilt) {
-            throw CrossCompilerError(errorDescription: "The Android NDK prebuilt path could not be found at: \(ndkPrebuilt.path). Try passing the --ndk flag or setting the ANDROID_NDK environment variable.")
-        }
-
         let sdk = try toolchainOptions.sdk ?? {
-            let skipSDKHome = ProcessInfo.processInfo.environment["SKIP_SDK_HOME"] ?? homeDir.appendingPathComponent("Library/Developer/Skip/SDKs").path
+            let skipSDKHome = ProcessInfo.processInfo.environment["SKIP_SDK_HOME"] ?? homeDir.appendingPathComponent("Library/Developer/Skip/SDKs", isDirectory: true).path
 
             if !FileManager.default.fileExists(atPath: skipSDKHome) {
                 throw CrossCompilerError(errorDescription: "The Skip SDKs folder does not exist: \(skipSDKHome)")
@@ -389,63 +565,78 @@ fileprivate extension AndroidOperationCommand {
             throw CrossCompilerError(errorDescription: "Could not extract SDK version from: \(sdkURL.path)")
         }
 
-        // work out which toolchain to use by matching it to the Swift Android SDK
-        let toolchain = try toolchainOptions.toolchain ?? {
-            let toolchainOverride = ProcessInfo.processInfo.environment["SWIFT_TOOLCHAIN_DIR"].flatMap(URL.init(fileURLWithPath:))
+        let sdkUsrLib = sdkURL.appendingPathComponent("usr/lib", isDirectory: true)
 
-            let toolchainsHomeGlobal = URL(fileURLWithPath: "/Library/Developer/Toolchains")
-            let toolchainsHomeLocal = homeDir.appendingPathComponent("/Library/Developer/Toolchains")
-
-            let toolchainDirs = toolchainOverride != nil ? [toolchainOverride!] : [toolchainsHomeGlobal, toolchainsHomeLocal]
-
-            if toolchainDirs.filter({ isDir($0) }).isEmpty {
-                throw CrossCompilerError(errorDescription: "The Swift toolchains folder could not be located at: \(toolchainDirs.map(\.path))")
-            }
-
-            var toolchains = try dirs(in: toolchainDirs).filter({ $0.pathExtension == "xctoolchain" })
-            let swiftVersion = toolchainOptions.swiftVersion ?? sdkVersion
-            toolchains = toolchains.filter({ $0.lastPathComponent.hasPrefix("swift-\(swiftVersion)") })
-
-            guard let toolchain = toolchains.last else {
-                throw CrossCompilerError(errorDescription: "No Swift Toolchain matching version \(swiftVersion) were found in: \(toolchainDirs.map(\.path))")
-            }
-
-            return toolchain.path
-        }()
-
-        let toolchainURL = URL(fileURLWithPath: toolchain)
-        if !isDir(toolchainURL) {
-            throw CrossCompilerError(errorDescription: "The Swift toolchain path could not be found at: \(toolchainURL.path)")
+        let sdkUsrLibSwift = sdkUsrLib.appendingPathComponent("swift", isDirectory: true)
+        if !isDir(sdkUsrLibSwift) {
+            throw CrossCompilerError(errorDescription: "Missing required SDK Swift directory: \(sdkUsrLibSwift.path)")
         }
 
-        let toolchainUsrBin = toolchainURL.appendingPathComponent("usr/bin")
+        let sdkUsrLibTriple = sdkUsrLib.appendingPathComponent(triple, isDirectory: true)
+        if !isDir(sdkUsrLibTriple) {
+            throw CrossCompilerError(errorDescription: "Missing required SDK Triple directory: \(sdkUsrLibTriple.path)")
+        }
+
+        let toolchainURL = try swiftToolchainFolder(sdkVersion: sdkVersion)
+        let toolchainUsrBin = toolchainURL.appendingPathComponent("usr/bin", isDirectory: true)
         if !isDir(toolchainUsrBin) {
             throw CrossCompilerError(errorDescription: "Missing required toolchain directory: \(toolchainUsrBin.path)")
         }
 
-        let toolchainInclude = toolchainURL.appendingPathComponent("usr/lib/swift/clang/include")
+        let toolchainInclude = toolchainURL.appendingPathComponent("usr/lib/swift/clang/include", isDirectory: true)
         if !isDir(toolchainInclude) {
             throw CrossCompilerError(errorDescription: "Missing required toolchain directory: \(toolchainInclude.path)")
         }
 
-        let toolsDirectory = ndkPrebuilt.appendingPathComponent("bin")
+        // Now get the NDK location
+
+        // GH Runner ANDROID_NDK=/Users/runner/Library/Android/sdk/ndk/26.3.11579264
+        // https://github.com/actions/runner-images/blob/main/images/macos/macos-13-Readme.md#environment-variables-1
+
+        // `brew install android-ndk` puts the NDK at /opt/homebrew/share/android-ndk which links to something like /opt/homebrew/Caskroom/android-ndk/27/AndroidNDK12077973.app/Contents/NDK
+        var ndkURL = URL(fileURLWithPath: toolchainOptions.ndk ?? ProcessInfo.processInfo.environment["ANDROID_NDK_HOME"] ?? (ProcessInfo.homebrewRoot + "/share/android-ndk"))
+
+        // if it is not there, then fallback to checking the local ANDROID_HOME location for any installed NDKs
+        if !isDir(ndkURL) {
+            // GH Runner ANDROID_HOME=/Users/runner/Library/Android/sdk
+            let androidHome = ProcessInfo.processInfo.environment["ANDROID_HOME"] ?? homeDir.appendingPathComponent("Library/Android/sdk", isDirectory: true).path
+
+            let androidNDKHome = URL(fileURLWithPath: androidHome).appendingPathComponent("ndk", isDirectory: true)
+            if isDir(androidNDKHome) {
+                let versions = try dirs(at: androidNDKHome).filter { dir in
+                    guard let initialPart = dir.lastPathComponent.split(separator: ".").first else {
+                        return false
+                    }
+                    guard let initialNumber = Int(initialPart.description) else {
+                        return false
+                    }
+                    // filter out old NDK versions that won't work with the toolchain (26 or 27+ are needed)
+                    return initialNumber >= 26
+                }
+
+                if let version = versions.last {
+                    ndkURL = URL(fileURLWithPath: version.path)
+                }
+            }
+        }
+
+        if !isDir(ndkURL) {
+            throw CrossCompilerError(errorDescription: "The Android NDK path could not be found. Try passing the --ndk flag or setting the ANDROID_NDK environment variable.")
+        }
+
+        let ndkPrebuilt = ndkURL.appendingPathComponent("/toolchains/llvm/prebuilt/darwin-x86_64", isDirectory: true)
+        if !isDir(ndkPrebuilt) {
+            throw CrossCompilerError(errorDescription: "The Android NDK prebuilt path could not be found at: \(ndkPrebuilt.path). Try passing the --ndk flag or setting the ANDROID_NDK environment variable.")
+        }
+
+        let toolsDirectory = ndkPrebuilt.appendingPathComponent("bin", isDirectory: true)
         if !isDir(toolsDirectory) {
             throw CrossCompilerError(errorDescription: "Missing required NDK directory: \(toolsDirectory.path)")
         }
 
-        let ndkSysroot = ndkPrebuilt.appendingPathComponent("sysroot")
+        let ndkSysroot = ndkPrebuilt.appendingPathComponent("sysroot", isDirectory: true)
         if !isDir(ndkSysroot) {
             throw CrossCompilerError(errorDescription: "Missing required NDK directory: \(ndkSysroot.path)")
-        }
-
-        let sdkUsrLibSwift = sdkURL.appendingPathComponent("usr/lib/swift")
-        if !isDir(sdkUsrLibSwift) {
-            throw CrossCompilerError(errorDescription: "Missing required SDK directory: \(sdkUsrLibSwift.path)")
-        }
-
-        let sdkUsrLibTriple = sdkURL.appendingPathComponent("/usr/lib/" + triple)
-        if !isDir(sdkUsrLibTriple) {
-            throw CrossCompilerError(errorDescription: "Missing required SDK directory: \(sdkUsrLibTriple.path)")
         }
 
         tc.version = 1
@@ -466,17 +657,6 @@ fileprivate extension AndroidOperationCommand {
         ]
 
         return (destination: tc, sdk: sdkURL, ndk: ndkURL, toolchain: toolchainURL)
-    }
-
-    func createToolchainDestinationJSON(for arch: AndroidArch) throws -> (destination: (destination: SerializedDestinationV1, sdk: URL, ndk: URL, toolchain: URL), url: URL) {
-        let tc = try createToolchainDestination(for: arch)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes, .sortedKeys]
-        let encoded = try encoder.encode(tc.destination)
-        // create a temporary destination JSON file like "aarch64-unknown-linux-android24.json"
-        let tmpFile = try createTempDir().appendingPathComponent((tc.destination.target ?? "destination") + ".json")
-        try encoded.write(to: tmpFile)
-        return (destination: tc, url: tmpFile)
     }
 }
 
@@ -611,6 +791,12 @@ struct ToolchainOptions: ParsableArguments {
 
     @Option(help: ArgumentHelp("Destination architectures"))
     var arch: [AndroidArch] = []
+
+    @Option(help: ArgumentHelp("Android API level", valueName: "level"))
+    var androidAPILevel: Int = 24
+
+    @Option(help: ArgumentHelp("Root path for Swift SDK", valueName: "path"))
+    var swiftSDKHome: String? = nil
 }
 
 public struct CrossCompilerError : LocalizedError {
@@ -626,14 +812,48 @@ enum AndroidArch: String, CaseIterable, ExpressibleByArgument {
     case armv7
     case x86_64
 
-    var target: String {
+    func target(api: Int) -> String {
         switch self {
         case .aarch64:
-            return "aarch64-unknown-linux-android24"
+            return "aarch64-unknown-linux-android\(api)"
         case .armv7:
-            return "armv7-unknown-linux-androideabi24"
+            return "armv7-unknown-linux-androideabi\(api)"
         case .x86_64:
-            return "x86_64-unknown-linux-android24"
+            return "x86_64-unknown-linux-android\(api)"
+        }
+    }
+
+    /// The key in the `swift-sdk.json` file as decoded by `SchemaSDK`
+    func tripleKey(api: Int) -> String {
+        switch self {
+        case .aarch64:
+            return "aarch64-unknown-linux-android\(api)"
+        case .armv7:
+            return "armv7-unknown-linux-androideabi\(api)"
+        case .x86_64:
+            return "x86_64-unknown-linux-android\(api)"
+        }
+    }
+
+    var triple: String {
+        switch self {
+        case .aarch64:
+            return "aarch64-linux-android"
+        case .armv7:
+            return "arm-linux-androideabi"
+        case .x86_64:
+            return "x86_64-linux-android"
+        }
+    }
+
+    func libpath(api: Int) -> String {
+        switch self {
+        case .aarch64:
+            return "aarch64-linux-android/\(api)"
+        case .armv7:
+            return "armv7-linux-androideabi/\(api)" // note: different from triple, which is: "arm-linux-androideabi"
+        case .x86_64:
+            return "x86_64-linux-android/\(api)"
         }
     }
 
@@ -649,15 +869,40 @@ enum AndroidArch: String, CaseIterable, ExpressibleByArgument {
         }
     }
 
-    var triple: String {
-        switch self {
-        case .aarch64:
-            return "aarch64-linux-android"
-        case .armv7:
-            return "arm-linux-androideabi"
-        case .x86_64:
-            return "x86_64-linux-android"
-        }
+}
+
+/**
+ ```
+ {
+     "schemaVersion": "4.0",
+     "targetTriples": {
+         "aarch64-unknown-linux-android24": {
+             "sdkRootPath": "android-27c-sysroot",
+             "swiftResourcesPath": "android-27c-sysroot/usr/lib/swift",
+             "swiftStaticResourcesPath": "android-27c-sysroot/usr/lib/swift_static-aarch64"
+         },
+         "x86_64-unknown-linux-android24": {
+             "sdkRootPath": "android-27c-sysroot",
+             "swiftResourcesPath": "android-27c-sysroot/usr/lib/swift",
+             "swiftStaticResourcesPath": "android-27c-sysroot/usr/lib/swift_static-x86_64"
+         },
+         "armv7-unknown-linux-androideabi24": {
+             "sdkRootPath": "android-27c-sysroot",
+             "swiftResourcesPath": "android-27c-sysroot/usr/lib/swift",
+             "swiftStaticResourcesPath": "android-27c-sysroot/usr/lib/swift_static-armv7"
+         }
+     }
+ }
+ ```
+ */
+struct SchemaSDK: Decodable {
+    let schemaVersion: String
+    let targetTriples: [String: SchemaTargetTriple]?
+
+    struct SchemaTargetTriple: Decodable {
+        let sdkRootPath: String?
+        let swiftResourcesPath: String?
+        let swiftStaticResourcesPath: String?
     }
 }
 
@@ -708,8 +953,6 @@ private struct SerializedDestinationV1: Codable {
         case extraCPPFlags = "extra-cpp-flags"
     }
 }
-
-
 
 fileprivate extension URL {
     var homeDir: URL {
