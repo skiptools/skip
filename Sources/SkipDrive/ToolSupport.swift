@@ -1136,7 +1136,7 @@ public final class Process {
     public func waitUntilExit() async throws -> ProcessResult {
 #if compiler(>=5.6)
         return try await withCheckedThrowingContinuation { continuation in
-            waitUntilExit(continuation.resume(with:))
+            waitUntilExit({ continuation.resume(with: $0) })
         }
 #else
         if #available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *) {
