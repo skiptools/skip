@@ -2394,7 +2394,10 @@ extension FrameworkProjectLayout {
                 jvmTarget = libs.versions.jvm.get().toString()
             }
             packaging {
-                jniLibs.keepDebugSymbols.add("**/*.so")
+                jniLibs {
+                    keepDebugSymbols.add("**/*.so")
+                    pickFirsts.add("**/*.so")
+                }
             }
 
             defaultConfig {
@@ -2433,13 +2436,6 @@ extension FrameworkProjectLayout {
                     isDebuggable = false // can be set to true for debugging release build, but needs to be false when uploading to store
                     proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
                 }
-            }
-        }
-
-        packaging {
-            jniLibs {
-                keepDebugSymbols.add("**/*.so")
-                pickFirsts.add("**/*.so")
             }
         }
 
