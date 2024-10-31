@@ -420,8 +420,8 @@ fileprivate extension AndroidOperationCommand {
     }
 
     func buildToolchainConfiguration(for arch: AndroidArch) throws -> (toolchainPath: URL, destinationURL: URL?, sdkName: String?, libPath: URL) {
-        // 5.0.1 and 6.0.1 are legacy toolchains that create a desintation JSON file
-        if toolchainOptions.swiftVersion == "5.0.1" || toolchainOptions.swiftVersion == "6.0.1" {
+        // 5.10.* and 6.0.1 are legacy toolchains that create a desintation JSON file
+        if toolchainOptions.swiftVersion?.hasPrefix("5.") == true || toolchainOptions.swiftVersion == "6.0.1" {
             let tc = try createToolchainLegacy(for: arch)
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes, .sortedKeys]
