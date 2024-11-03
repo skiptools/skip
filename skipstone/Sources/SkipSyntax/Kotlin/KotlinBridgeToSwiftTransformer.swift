@@ -45,7 +45,10 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         let outputNode = SwiftDefinition { output, indentation, _ in
             output.append("import SkipBridge\n\n")
             for importDeclaration in importDeclarations {
-                let path = importDeclaration.modulePath.joined(separator: ".")
+                guard importDeclaration.unmappedModulePath.count != 1 || importDeclaration.unmappedModulePath[0] != "SkipBridge" else {
+                    continue
+                }
+                let path = importDeclaration.unmappedModulePath.joined(separator: ".")
                 output.append(indentation).append("import ").append(path).append("\n")
             }
             if needsGlobalsJavaClass {

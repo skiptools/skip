@@ -2314,6 +2314,7 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
 }
 
 final class KotlinImportDeclaration: KotlinStatement {
+    let unmappedModulePath: [String]
     var modulePath: [String]
     var modulePathString: String {
         guard modulePath.count > 0 else {
@@ -2353,11 +2354,13 @@ final class KotlinImportDeclaration: KotlinStatement {
     }
 
     init(modulePath: [String], sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+        self.unmappedModulePath = modulePath
         self.modulePath = modulePath
         super.init(type: .importDeclaration, sourceFile: sourceFile, sourceRange: sourceRange)
     }
     
     init(statement: ImportDeclaration) {
+        self.unmappedModulePath = statement.modulePath
         self.modulePath = statement.modulePath
         super.init(type: .importDeclaration, statement: statement)
     }

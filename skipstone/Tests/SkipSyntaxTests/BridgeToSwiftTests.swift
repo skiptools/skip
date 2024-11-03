@@ -1355,29 +1355,30 @@ final class BridgeToSwiftTests: XCTestCase {
         // TODO
     }
 
-//    func testImports() async throws {
-//        try await check(swift: """
-//        import Foundation        
-//        @BridgeToSwift
-//        var i: Int {
-//            return 1
-//        }
-//        """, kotlin: """
-//        import skip.foundation.*
-//        internal val i: Int
-//            get() = 1
-//        """, swiftBridgeSupport: """
-//        import Foundation
-//        private let Java_SourceKt = try! JClass(name: "SourceKt")
-//        var i: Int {
-//            get {
-//                return jniContext {
-//                    let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
-//                    return Int(value_java)
-//                }
-//            }
-//        }
-//        private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!"
-//        """)
-//    }
+    func testImports() async throws {
+        try await check(swift: """
+        import Foundation
+        @BridgeToSwift
+        var i: Int {
+            return 1
+        }
+        """, kotlin: """
+        import skip.foundation.*
+        internal val i: Int
+            get() = 1
+        """, swiftBridgeSupport: """
+
+        import Foundation
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        var i: Int {
+            get {
+                return jniContext {
+                    let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
+                    return Int(value_java)
+                }
+            }
+        }
+        private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!
+        """)
+    }
 }
