@@ -561,7 +561,7 @@ final class Closure: Expression {
         let attributes = Attributes.for(syntax: closureExpr.signature?.attributes, in: syntaxTree)
         let isAsync = closureExpr.signature?.effectSpecifiers?.asyncSpecifier != nil
         let throwsType =  closureExpr.signature?.effectSpecifiers?.throwsClause?.typeSignature(in: syntaxTree) ?? .none
-        var statements = StatementDecoder.decode(syntaxList: closureExpr.statements, in: syntaxTree)
+        var statements = StatementDecoder.decode(syntaxList: closureExpr.statements, context: DecodeContext(), in: syntaxTree)
         if let extras = StatementExtras.decode(syntax: closureExpr.rightBrace) {
             let (extraStatements, _) = extras.statements(syntax: closureExpr.rightBrace, in: syntaxTree)
             statements += extraStatements
@@ -1017,16 +1017,16 @@ final class If: Expression {
         }
 
         let conditions = ifExpr.conditions.map { ExpressionDecoder.decode(syntax: $0.condition, in: syntaxTree) }
-        let statements = StatementDecoder.decode(syntaxListContainer: ifExpr.body, in: syntaxTree)
+        let statements = StatementDecoder.decode(syntaxListContainer: ifExpr.body, context: DecodeContext(), in: syntaxTree)
         let body = CodeBlock(statements: statements)
         var elseBody: CodeBlock? = nil
         if let elseSyntax = ifExpr.elseBody {
             let statements: [Statement]
             switch elseSyntax {
             case .ifExpr(let syntax):
-                statements = StatementDecoder.decode(syntax: syntax, in: syntaxTree)
+                statements = StatementDecoder.decode(syntax: syntax, context: DecodeContext(), in: syntaxTree)
             case .codeBlock(let syntax):
-                statements = StatementDecoder.decode(syntaxListContainer: syntax, in: syntaxTree)
+                statements = StatementDecoder.decode(syntaxListContainer: syntax, context: DecodeContext(), in: syntaxTree)
             }
             elseBody = CodeBlock(statements: statements)
         }
@@ -1989,7 +1989,7 @@ final class SwitchCase: Expression, BindingExpression {
             patterns = []
             break
         }
-        let body = CodeBlock(statements: StatementDecoder.decode(syntaxList: statement.statements, in: syntaxTree))
+        let body = CodeBlock(statements: StatementDecoder.decode(syntaxList: statement.statements, context: DecodeContext(), in: syntaxTree))
         return SwitchCase(patterns: patterns, body: body, syntax: statement, sourceFile: syntaxTree.source.file, sourceRange: statement.range(in: syntaxTree.source))
     }
 
@@ -2002,7 +2002,7 @@ final class SwitchCase: Expression, BindingExpression {
             let whereGuard = item.whereClause.map { ExpressionDecoder.decode(syntax: $0.condition, in: syntaxTree) }
             return (pattern, whereGuard)
         }
-        let body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: statement.body, in: syntaxTree))
+        let body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: statement.body, context: DecodeContext(), in: syntaxTree))
         return SwitchCase(patterns: patterns, body: body, syntax: statement, sourceFile: syntaxTree.source.file, sourceRange: statement.range(in: syntaxTree.source))
     }
 

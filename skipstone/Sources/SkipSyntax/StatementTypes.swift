@@ -122,7 +122,7 @@ final class Break: Statement {
         super.init(type: .break, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .breakStmt, let breakStmnt = syntax.as(BreakStmtSyntax.self) else {
             return nil
         }
@@ -231,7 +231,7 @@ final class Continue: Statement {
         super.init(type: .continue, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .continueStmt, let continueStmnt = syntax.as(ContinueStmtSyntax.self) else {
             return nil
         }
@@ -253,11 +253,11 @@ final class Defer: Statement {
         super.init(type: .defer, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .deferStmt, let deferStmt = syntax.as(DeferStmtSyntax.self) else {
             return nil
         }
-        let statements = StatementDecoder.decode(syntaxListContainer: deferStmt.body, in: syntaxTree)
+        let statements = StatementDecoder.decode(syntaxListContainer: deferStmt.body, context: context, in: syntaxTree)
         let body = CodeBlock(statements: statements)
         return [Defer(body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
     }
@@ -277,7 +277,7 @@ final class Discard: ExpressionStatement {
         super.init(type: .discard, expression: expression, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .discardStmt, let discardStmnt = syntax.as(DiscardStmtSyntax.self) else {
             return nil
         }
@@ -303,11 +303,11 @@ final class DoCatch: Statement {
         super.init(type: .doCatch, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .doStmt, let doStmnt = syntax.as(DoStmtSyntax.self) else {
             return nil
         }
-        let statements = StatementDecoder.decode(syntaxListContainer: doStmnt.body, in: syntaxTree)
+        let statements = StatementDecoder.decode(syntaxListContainer: doStmnt.body, context: context, in: syntaxTree)
         let body = CodeBlock(statements: statements)
         var catches: [SwitchCase] = []
         var messages: [Message] = []
@@ -351,7 +351,7 @@ final class Fallthrough: Statement {
         super.init(type: .fallthrough, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .fallThroughStmt else {
             return nil
         }
@@ -382,7 +382,7 @@ final class ForLoop: Statement {
         super.init(type: .forLoop, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .forStmt, let forStmnt = syntax.as(ForStmtSyntax.self) else {
             return nil
         }
@@ -411,7 +411,7 @@ final class ForLoop: Statement {
         if let whereSyntax = forStmnt.whereClause?.condition {
             whereGuard = ExpressionDecoder.decode(syntax: whereSyntax, in: syntaxTree)
         }
-        let statements = StatementDecoder.decode(syntaxListContainer: forStmnt.body, in: syntaxTree)
+        let statements = StatementDecoder.decode(syntaxListContainer: forStmnt.body, context: context, in: syntaxTree)
         let body = CodeBlock(statements: statements)
         return [ForLoop(identifierPatterns: identifierPatterns, declaredType: declaredType, isTry: isTry, isAwait: isAwait, isNonNilMatch: isNonNilMatch, sequence: sequence, whereGuard: whereGuard, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
     }
@@ -453,13 +453,13 @@ final class Guard: Statement {
         super.init(type: .guard, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .guardStmt, let guardStmnt = syntax.as(GuardStmtSyntax.self) else {
             return nil
         }
         
         let conditions = guardStmnt.conditions.map { ExpressionDecoder.decode(syntax: $0.condition, in: syntaxTree) }
-        let statements = StatementDecoder.decode(syntaxListContainer: guardStmnt.body, in: syntaxTree)
+        let statements = StatementDecoder.decode(syntaxListContainer: guardStmnt.body, context: context, in: syntaxTree)
         let body = CodeBlock(statements: statements)
         return [Guard(conditions: conditions, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
     }
@@ -485,13 +485,13 @@ final class Guard: Statement {
 ///
 /// - Note: We never instantiate this class. It is only used ot extract the statements from an `#if`.
 final class IfDefined: Statement {
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .ifConfigDecl, let ifConfigDecl = syntax.as(IfConfigDeclSyntax.self) else {
             return nil
         }
 
         let match = extractClause(from: ifConfigDecl, in: syntaxTree)
-        var statements = try extractStatements(from: match?.clause, asMember: asMember, in: syntaxTree)
+        var statements = try extractStatements(from: match?.clause, context: context, in: syntaxTree)
         if let endSyntax = match?.endSyntax, let extras = StatementExtras.decode(syntax: endSyntax) {
             let (extraStatements, _) = extras.statements(syntax: endSyntax, in: syntaxTree)
             statements += extraStatements
@@ -651,17 +651,17 @@ final class IfDefined: Statement {
         }
     }
 
-    private static func extractStatements(from clause: IfConfigClauseSyntax?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement] {
+    private static func extractStatements(from clause: IfConfigClauseSyntax?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement] {
         guard let elements = clause?.elements else {
             return []
         }
         switch elements {
         case .statements(let syntax):
-            return StatementDecoder.decode(syntaxList: syntax, in: syntaxTree)
+            return StatementDecoder.decode(syntaxList: syntax, context: context, in: syntaxTree)
         case .switchCases(let syntax):
             throw Message.ifDeclPlacement(syntax, source: syntaxTree.source)
         case .decls(let syntax):
-            return StatementDecoder.decode(syntaxList: syntax, in: syntaxTree)
+            return StatementDecoder.decode(syntaxList: syntax, context: context, in: syntaxTree)
         case .postfixExpression(let syntax):
             throw Message.ifDeclPlacement(syntax, source: syntaxTree.source)
         case .attributes(let syntax):
@@ -681,13 +681,13 @@ final class LabeledStatement: Statement {
         super.init(type: .labeled, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .labeledStmt, let labeledStmnt = syntax.as(LabeledStmtSyntax.self) else {
             return nil
         }
 
         let label = labeledStmnt.label.text
-        guard let target = StatementDecoder.decode(syntax: labeledStmnt.statement, in: syntaxTree).first else {
+        guard let target = StatementDecoder.decode(syntax: labeledStmnt.statement, context: context, in: syntaxTree).first else {
             throw Message.unsupportedSyntax(labeledStmnt.statement, source: syntaxTree.source)
         }
         return [LabeledStatement(label: label, target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))]
@@ -716,7 +716,7 @@ final class Return: ExpressionStatement {
         super.init(type: .return, expression: expression, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .returnStmt, let returnStmnt = syntax.as(ReturnStmtSyntax.self) else {
             return nil
         }
@@ -751,7 +751,7 @@ final class Throw: Statement {
         super.init(type: .throw, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .throwStmt, let throwStmt = syntax.as(ThrowStmtSyntax.self) else {
             return nil
         }
@@ -782,26 +782,26 @@ final class WhileLoop: Statement {
         super.init(type: .whileLoop, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         if syntax.kind == .whileStmt, let whileStmnt = syntax.as(WhileStmtSyntax.self) {
-            return try [decodeWhile(statement: whileStmnt, extras: extras, in: syntaxTree)]
+            return try [decodeWhile(statement: whileStmnt, extras: extras, context: context, in: syntaxTree)]
         } else if syntax.kind == .repeatStmt, let repeatStmnt = syntax.as(RepeatStmtSyntax.self) {
-            return [decodeRepeat(statement: repeatStmnt, extras: extras, in: syntaxTree)]
+            return [decodeRepeat(statement: repeatStmnt, extras: extras, context: context, in: syntaxTree)]
         } else {
             return nil
         }
     }
 
-    private static func decodeWhile(statement: WhileStmtSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> WhileLoop {
+    private static func decodeWhile(statement: WhileStmtSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> WhileLoop {
         let conditions = statement.conditions.map { ExpressionDecoder.decode(syntax: $0.condition, in: syntaxTree) }
-        let statements = StatementDecoder.decode(syntaxListContainer: statement.body, in: syntaxTree)
+        let statements = StatementDecoder.decode(syntaxListContainer: statement.body, context: context, in: syntaxTree)
         let body = CodeBlock(statements: statements)
         return WhileLoop(conditions: conditions, body: body, syntax: statement, sourceFile: syntaxTree.source.file, sourceRange: statement.range(in: syntaxTree.source), extras: extras)
     }
 
-    private static func decodeRepeat(statement: RepeatStmtSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> WhileLoop {
+    private static func decodeRepeat(statement: RepeatStmtSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> WhileLoop {
         let condition = ExpressionDecoder.decode(syntax: statement.condition, in: syntaxTree)
-        let statements = StatementDecoder.decode(syntaxListContainer: statement.body, in: syntaxTree)
+        let statements = StatementDecoder.decode(syntaxListContainer: statement.body, context: context, in: syntaxTree)
         let body = CodeBlock(statements: statements)
         return WhileLoop(conditions: [condition], body: body, isRepeatWhile: true, syntax: statement, sourceFile: syntaxTree.source.file, sourceRange: statement.range(in: syntaxTree.source), extras: extras)
     }
@@ -867,14 +867,14 @@ final class EnumCaseDeclaration: Statement {
         super.init(type: .enumCaseDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
         guard syntax.kind == .enumCaseDecl, let enumCaseDecl = syntax.as(EnumCaseDeclSyntax.self) else {
             return nil
         }
         var attributes = Attributes.for(syntax: enumCaseDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: enumCaseDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: true) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
             return []
         }
         return enumCaseDecl.elements.enumerated().map { (index, element) in
@@ -942,7 +942,7 @@ final class ExtensionDeclaration: TypeDeclaration {
         super.init(type: .extensionDeclaration, name: name, signature: extends, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
         guard syntax.kind == .extensionDecl, let extensionDecl = syntax.as(ExtensionDeclSyntax.self) else {
             return nil
         }
@@ -950,15 +950,18 @@ final class ExtensionDeclaration: TypeDeclaration {
         guard extends != .none else {
             return nil
         }
+        var context = context
+        context.memberOf = .extensionDeclaration
+
         var attributes = Attributes.for(syntax: extensionDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
             return []
         }
         let (inherits, inheritsMessages) = extensionDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: nil, where: extensionDecl.genericWhereClause, in: syntaxTree)
-        let members = StatementDecoder.decode(syntaxListContainer: extensionDecl.memberBlock, asMember: true, in: syntaxTree)
+        let members = StatementDecoder.decode(syntaxListContainer: extensionDecl.memberBlock, context: context, in: syntaxTree)
         let statement = ExtensionDeclaration(extends: extends, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages
         return [statement]
@@ -1007,21 +1010,21 @@ final class FunctionDeclaration: Statement {
         super.init(type: type, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
         if syntax.kind == .functionDecl, let functionDecl = syntax.as(FunctionDeclSyntax.self) {
-            if let declaration = decodeFunctionDeclaration(functionDecl, extras: extras, asMember: asMember, in: syntaxTree) {
+            if let declaration = decodeFunctionDeclaration(functionDecl, extras: extras, context: context, in: syntaxTree) {
                 return [declaration]
             } else {
                 return []
             }
         } else if syntax.kind == .initializerDecl, let initializerDecl = syntax.as(InitializerDeclSyntax.self) {
-            if let declaration = decodeInitializerDeclaration(initializerDecl, extras: extras, in: syntaxTree) {
+            if let declaration = decodeInitializerDeclaration(initializerDecl, extras: extras, context: context, in: syntaxTree) {
                 return [declaration]
             } else {
                 return []
             }
         } else if syntax.kind == .deinitializerDecl, let deinitializerDecl = syntax.as(DeinitializerDeclSyntax.self) {
-            if let declaration = decodeDeinitializerDeclaration(deinitializerDecl, extras: extras, in: syntaxTree) {
+            if let declaration = decodeDeinitializerDeclaration(deinitializerDecl, extras: extras, context: context, in: syntaxTree) {
                 return [declaration]
             } else {
                 return []
@@ -1031,11 +1034,11 @@ final class FunctionDeclaration: Statement {
         }
     }
 
-    private static func decodeFunctionDeclaration(_ functionDecl: FunctionDeclSyntax, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) -> FunctionDeclaration? {
+    private static func decodeFunctionDeclaration(_ functionDecl: FunctionDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> FunctionDeclaration? {
         var attributes = Attributes.for(syntax: functionDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: functionDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: asMember) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
             return nil
         }
         let name = functionDecl.name.text.removingBacktickEscaping
@@ -1046,18 +1049,18 @@ final class FunctionDeclaration: Statement {
         let (generics, genericsMessages) = Generics.for(syntax: functionDecl.genericParameterClause, where: functionDecl.genericWhereClause, in: syntaxTree)
         var body: CodeBlock? = nil
         if !syntaxTree.isBridgeFile, let bodySyntax = functionDecl.body {
-            body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
+            body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, context: context, in: syntaxTree))
         }
         let statement = FunctionDeclaration(type: .functionDeclaration, name: name, returnType: returnType, parameters: parameters, asyncBehavior: isAsync ? .async : .sync, throwsType: throwsType, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: functionDecl, sourceFile: syntaxTree.source.file, sourceRange: functionDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = signatureMessges + genericsMessages
         return statement
     }
 
-    private static func decodeInitializerDeclaration(_ initializerDecl: InitializerDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> FunctionDeclaration? {
+    private static func decodeInitializerDeclaration(_ initializerDecl: InitializerDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> FunctionDeclaration? {
         var attributes = Attributes.for(syntax: initializerDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: initializerDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: true) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
             return nil
         }
         let isOptionalInit = initializerDecl.optionalMark != nil
@@ -1067,14 +1070,14 @@ final class FunctionDeclaration: Statement {
         let (generics, genericsMessages) = Generics.for(syntax: initializerDecl.genericParameterClause, where: initializerDecl.genericWhereClause, in: syntaxTree)
         var body: CodeBlock? = nil
         if !syntaxTree.isBridgeFile, let bodySyntax = initializerDecl.body {
-            body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
+            body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, context: context, in: syntaxTree))
         }
         let statement = FunctionDeclaration(type: .initDeclaration, name: "init", isOptionalInit: isOptionalInit, returnType: .void, parameters: parameters, asyncBehavior: isAsync ? .async : .sync, throwsType: throwsType, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: initializerDecl, sourceFile: syntaxTree.source.file, sourceRange: initializerDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = signatureMessages + genericsMessages
         return statement
     }
 
-    private static func decodeDeinitializerDeclaration(_ deinitializerDecl: DeinitializerDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> FunctionDeclaration? {
+    private static func decodeDeinitializerDeclaration(_ deinitializerDecl: DeinitializerDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> FunctionDeclaration? {
         // Deinit is never bridged
         guard !syntaxTree.isBridgeFile else {
             return nil
@@ -1084,7 +1087,7 @@ final class FunctionDeclaration: Statement {
         let modifiers = Modifiers.for(syntax: deinitializerDecl.modifiers)
         var body: CodeBlock? = nil
         if let bodySyntax = deinitializerDecl.body {
-            body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree))
+            body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, context: context, in: syntaxTree))
         }
         let statement = FunctionDeclaration(type: .deinitDeclaration, name: "deinit", returnType: .void, attributes: attributes, modifiers: modifiers, body: body, syntax: deinitializerDecl, sourceFile: syntaxTree.source.file, sourceRange: deinitializerDecl.range(in: syntaxTree.source), extras: extras)
         return statement
@@ -1177,7 +1180,7 @@ final class ImportDeclaration: Statement {
         super.init(type: .importDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
         guard syntax.kind == .importDecl, let importDecl = syntax.as(ImportDeclSyntax.self) else {
             return nil
         }
@@ -1224,14 +1227,14 @@ final class SubscriptDeclaration: Statement {
         super.init(type: .subscriptDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
         guard syntax.kind == .subscriptDecl, let subscriptDecl = syntax.as(SubscriptDeclSyntax.self) else {
             return nil
         }
         var attributes = Attributes.for(syntax: subscriptDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: subscriptDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: true) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
             return []
         }
         let elementType = TypeSignature.for(syntax: subscriptDecl.returnClause.type, in: syntaxTree)
@@ -1241,15 +1244,15 @@ final class SubscriptDeclaration: Statement {
         if let accessor = subscriptDecl.accessorBlock?.accessors {
             switch accessor {
             case .accessors(let syntax):
-                accessors = syntax.accessors(decodeBody: !syntaxTree.isBridgeFile, in: syntaxTree)
-                if syntaxTree.isBridgeFile, !isBridge(attributes: attributes, visibility: modifiers.setVisibility, asMember: true) {
+                accessors = syntax.accessors(decodeBody: !syntaxTree.isBridgeFile, context: context, in: syntaxTree)
+                if syntaxTree.isBridgeFile, !isBridge(attributes: attributes, visibility: modifiers.setVisibility, context: context) {
                     accessors.setter = nil
                 }
             case .getter(let syntax):
                 if syntaxTree.isBridgeFile {
                     accessors.getter = Accessor()
                 } else {
-                    let statements = StatementDecoder.decode(syntaxList: syntax, in: syntaxTree)
+                    let statements = StatementDecoder.decode(syntaxList: syntax, context: context, in: syntaxTree)
                     accessors.getter = Accessor(body: CodeBlock(statements: statements))
                 }
             }
@@ -1343,14 +1346,14 @@ final class TypealiasDeclaration: Statement {
         super.init(type: .typealiasDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
         guard syntax.kind == .typeAliasDecl, let typealiasDecl = syntax.as(TypeAliasDeclSyntax.self) else {
             return nil
         }
         var attributes = Attributes.for(syntax: typealiasDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: typealiasDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
             return []
         }
         let name = typealiasDecl.name.text.removingBacktickEscaping
@@ -1417,33 +1420,33 @@ class TypeDeclaration: Statement {
         super.init(type: type, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
         if syntax.kind == .classDecl, let classDecl = syntax.as(ClassDeclSyntax.self) {
-            if let declaration = decodeClassDeclaration(classDecl, extras: extras, in: syntaxTree) {
+            if let declaration = decodeClassDeclaration(classDecl, extras: extras, context: context, in: syntaxTree) {
                 return [declaration]
             } else {
                 return []
             }
         } else if syntax.kind == .structDecl, let structDecl = syntax.as(StructDeclSyntax.self) {
-            if let declaration = decodeStructDeclaration(structDecl, extras: extras, in: syntaxTree) {
+            if let declaration = decodeStructDeclaration(structDecl, extras: extras, context: context, in: syntaxTree) {
                 return [declaration]
             } else {
                 return []
             }
         } else if syntax.kind == .protocolDecl, let protocolDecl = syntax.as(ProtocolDeclSyntax.self) {
-            if let declaration = decodeProtocolDeclaration(protocolDecl, extras: extras, in: syntaxTree) {
+            if let declaration = decodeProtocolDeclaration(protocolDecl, extras: extras, context: context, in: syntaxTree) {
                 return [declaration]
             } else {
                 return []
             }
         } else if syntax.kind == .enumDecl, let enumDecl = syntax.as(EnumDeclSyntax.self) {
-            if let declaration = decodeEnumDeclaration(enumDecl, extras: extras, in: syntaxTree) {
+            if let declaration = decodeEnumDeclaration(enumDecl, extras: extras, context: context, in: syntaxTree) {
                 return [declaration]
             } else {
                 return []
             }
         } else if syntax.kind == .actorDecl, let actorDecl = syntax.as(ActorDeclSyntax.self) {
-            if let declaration = decodeActorDeclaration(actorDecl, extras: extras, in: syntaxTree) {
+            if let declaration = decodeActorDeclaration(actorDecl, extras: extras, context: context, in: syntaxTree) {
                 return [declaration]
             } else {
                 return []
@@ -1452,43 +1455,52 @@ class TypeDeclaration: Statement {
         return nil
     }
 
-    private static func decodeClassDeclaration(_ classDecl: ClassDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+    private static func decodeClassDeclaration(_ classDecl: ClassDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+        var context = context
+        context.memberOf = .classDeclaration
+
         var attributes = Attributes.for(syntax: classDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: classDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
             return nil
         }
         let name = classDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = classDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: classDecl.genericParameterClause, where: classDecl.genericWhereClause, in: syntaxTree)
-        let members = StatementDecoder.decode(syntaxListContainer: classDecl.memberBlock, asMember: true, in: syntaxTree)
+        let members = StatementDecoder.decode(syntaxListContainer: classDecl.memberBlock, context: context, in: syntaxTree)
         let statement = TypeDeclaration(type: .classDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: classDecl, sourceFile: syntaxTree.source.file, sourceRange: classDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages
         return statement
     }
 
-    private static func decodeStructDeclaration(_ structDecl: StructDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+    private static func decodeStructDeclaration(_ structDecl: StructDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+        var context = context
+        context.memberOf = .structDeclaration
+
         var attributes = Attributes.for(syntax: structDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: structDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
             return nil
         }
         let name = structDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = structDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: structDecl.genericParameterClause, where: structDecl.genericWhereClause, in: syntaxTree)
-        let members = StatementDecoder.decode(syntaxListContainer: structDecl.memberBlock, asMember: true, in: syntaxTree)
+        let members = StatementDecoder.decode(syntaxListContainer: structDecl.memberBlock, context: context, in: syntaxTree)
         let statement = TypeDeclaration(type: .structDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: structDecl, sourceFile: syntaxTree.source.file, sourceRange: structDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages
         return statement
     }
 
-    private static func decodeProtocolDeclaration(_ protocolDecl: ProtocolDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+    private static func decodeProtocolDeclaration(_ protocolDecl: ProtocolDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+        var context = context
+        context.memberOf = .protocolDeclaration
+
         var attributes = Attributes.for(syntax: protocolDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
             return nil
         }
         let name = protocolDecl.name.text.removingBacktickEscaping
@@ -1496,39 +1508,45 @@ class TypeDeclaration: Statement {
         let associatedTypeDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind == .associatedTypeDecl ? $0.decl.as(AssociatedTypeDeclSyntax.self) : nil }
         let memberDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind != .associatedTypeDecl ? $0.decl : nil }
         let (generics, genericsMessages) = Generics.for(syntax: nil, associatedTypeSyntax: associatedTypeDecls, where: protocolDecl.genericWhereClause, in: syntaxTree)
-        let members = memberDecls.flatMap { StatementDecoder.decode(syntax: $0, asMember: true, in: syntaxTree) }
+        let members = memberDecls.flatMap { StatementDecoder.decode(syntax: $0, context: context, in: syntaxTree) }
         let statement = TypeDeclaration(type: .protocolDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: protocolDecl, sourceFile: syntaxTree.source.file, sourceRange: protocolDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages
         return statement
     }
 
-    private static func decodeEnumDeclaration(_ enumDecl: EnumDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+    private static func decodeEnumDeclaration(_ enumDecl: EnumDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+        var context = context
+        context.memberOf = .enumDeclaration
+
         var attributes = Attributes.for(syntax: enumDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
             return nil
         }
         let name = enumDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = enumDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: enumDecl.genericParameterClause, where: enumDecl.genericWhereClause, in: syntaxTree)
-        let members = StatementDecoder.decode(syntaxListContainer: enumDecl.memberBlock, asMember: true, in: syntaxTree)
+        let members = StatementDecoder.decode(syntaxListContainer: enumDecl.memberBlock, context: context, in: syntaxTree)
         let statement = TypeDeclaration(type: .enumDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: enumDecl, sourceFile: syntaxTree.source.file, sourceRange: enumDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages
         return statement
     }
 
-    private static func decodeActorDeclaration(_ actorDecl: ActorDeclSyntax, extras: StatementExtras?, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+    private static func decodeActorDeclaration(_ actorDecl: ActorDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+        var context = context
+        context.memberOf = .actorDeclaration
+
         var attributes = Attributes.for(syntax: actorDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: actorDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: false) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
             return nil
         }
         let name = actorDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = actorDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: actorDecl.genericParameterClause, where: actorDecl.genericWhereClause, in: syntaxTree)
-        let members = StatementDecoder.decode(syntaxListContainer: actorDecl.memberBlock, asMember: true, in: syntaxTree)
+        let members = StatementDecoder.decode(syntaxListContainer: actorDecl.memberBlock, context: context, in: syntaxTree)
         let statement = TypeDeclaration(type: .actorDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: actorDecl, sourceFile: syntaxTree.source.file, sourceRange: actorDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages
         return statement
@@ -1638,14 +1656,14 @@ final class VariableDeclaration: Statement {
         super.init(type: .variableDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         guard syntax.kind == .variableDecl, let variableDecl = syntax.as(VariableDeclSyntax.self) else {
             return nil
         }
         var attributes = Attributes.for(syntax: variableDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: variableDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, asMember: asMember) else {
+        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
             return []
         }
         let isLet = variableDecl.bindingSpecifier.text == "let"
@@ -1654,13 +1672,13 @@ final class VariableDeclaration: Statement {
         let lastTypeSyntax = variableDecl.bindings.last?.typeAnnotation?.type
         for (index, syntax) in variableDecl.bindings.enumerated() {
             let bindingExtras = index == 0 ? extras : nil
-            let statement = try decode(syntax: syntax, lastTypeSyntax: lastTypeSyntax, isLet: isLet, asyncBehavior: isAsync ? .async : .sync, attributes: attributes, modifiers: modifiers, extras: bindingExtras, in: syntaxTree)
+            let statement = try decode(syntax: syntax, lastTypeSyntax: lastTypeSyntax, isLet: isLet, asyncBehavior: isAsync ? .async : .sync, attributes: attributes, modifiers: modifiers, extras: bindingExtras, context: context, in: syntaxTree)
             statements.append(statement)
         }
         return statements
     }
 
-    private static func decode(syntax: PatternBindingSyntax, lastTypeSyntax: TypeSyntax?, isLet: Bool, asyncBehavior: AsyncBehavior, attributes: Attributes, modifiers: Modifiers, extras: StatementExtras?, in syntaxTree: SyntaxTree) throws -> Statement {
+    private static func decode(syntax: PatternBindingSyntax, lastTypeSyntax: TypeSyntax?, isLet: Bool, asyncBehavior: AsyncBehavior, attributes: Attributes, modifiers: Modifiers, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> Statement {
         var declaredType: TypeSignature = .none
         if let typeSyntax = syntax.typeAnnotation?.type ?? lastTypeSyntax {
             declaredType = TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
@@ -1678,12 +1696,12 @@ final class VariableDeclaration: Statement {
         if let accessor = syntax.accessorBlock?.accessors {
             switch accessor {
             case .accessors(let syntax):
-                accessors = syntax.accessors(decodeBody: !syntaxTree.isBridgeFile, in: syntaxTree)
+                accessors = syntax.accessors(decodeBody: !syntaxTree.isBridgeFile, context: context, in: syntaxTree)
             case .getter(let syntax):
                 if syntaxTree.isBridgeFile {
                     accessors.getter = Accessor()
                 } else {
-                    let statements = StatementDecoder.decode(syntaxList: syntax, in: syntaxTree)
+                    let statements = StatementDecoder.decode(syntaxList: syntax, context: context, in: syntaxTree)
                     accessors.getter = Accessor(body: CodeBlock(statements: statements))
                 }
             }
@@ -1692,7 +1710,7 @@ final class VariableDeclaration: Statement {
         if let accessorsAttributes = accessors.attributes {
             attributes.attributes += accessorsAttributes.attributes
         }
-        if syntaxTree.isBridgeFile, !isBridge(attributes: attributes, visibility: modifiers.setVisibility, asMember: true) {
+        if syntaxTree.isBridgeFile, !isBridge(attributes: attributes, visibility: modifiers.setVisibility, context: context) || modifiers.setVisibility < modifiers.visibility && modifiers.setVisibility <= .fileprivate {
             accessors.setter = nil
             // We need to add a getter so that the variable does not appear to be writeable
             if accessors.getter == nil {

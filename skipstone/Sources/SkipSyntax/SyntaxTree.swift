@@ -14,7 +14,7 @@ public final class SyntaxTree: PrettyPrintable {
         self.preprocessorSymbols = preprocessorSymbols
         var parser = Parser(source.content, experimentalFeatures: [.sendingArgsAndResults])
         let syntax = SourceFileSyntax.parse(from: &parser)
-        self.root.statements = StatementDecoder.decode(syntaxListContainer: syntax, in: self)
+        self.root.statements = StatementDecoder.decode(syntaxListContainer: syntax, context: DecodeContext(), in: self)
 
         let importedModuleNames = root.statements.importedModulePaths.compactMap(\.moduleName)
         let codebaseContext = codebaseInfo?.context(importedModuleNames: importedModuleNames, sourceFile: source.file)
