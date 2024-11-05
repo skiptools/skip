@@ -488,14 +488,16 @@ extension KotlinClassDeclaration {
 
 extension TypeSignature {
     /// Check that this type is bridgable, adding any messages to the given source object.
-    fileprivate func checkBridgable(_ sourceDerived: SourceDerived, translator: KotlinTranslator) -> Bridgable? {
+    func checkBridgable(_ sourceDerived: SourceDerived? = nil, translator: KotlinTranslator) -> Bridgable? {
         guard let codebaseInfo = translator.codebaseInfo else {
             return nil
         }
         
         switch self {
         case .any, .anyObject:
-            sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            }
             return nil
         case .array(let elementType):
             guard elementType?.checkBridgable(sourceDerived, translator: translator) != nil else {
@@ -506,10 +508,14 @@ extension TypeSignature {
             return Bridgable(type: self, qualifiedType: self, strategy: .direct)
         case .character:
             // TODO
-            sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            }
             return nil
         case .composition:
-            sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            }
             return nil
         case .dictionary(let keyType, let valueType):
             guard keyType?.checkBridgable(sourceDerived, translator: translator) != nil, valueType?.checkBridgable(sourceDerived, translator: translator) != nil else {
@@ -535,15 +541,21 @@ extension TypeSignature {
             return Bridgable(type: self, qualifiedType: self, strategy: .direct)
         case .int128:
             // TODO
-            sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            }
             return nil
         case .member, .module, .named:
             return checkNamedBridgable(sourceDerived, codebaseInfo: codebaseInfo, translator: translator)
         case .metaType:
-            sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            }
             return nil
         case .none:
-            sourceDerived.messages.append(.kotlinBridgeUnknownType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived {
+                sourceDerived.messages.append(.kotlinBridgeUnknownType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            }
             return nil
         case .optional(let type):
             guard let bridgable = type.checkBridgable(sourceDerived, translator: translator) else {
@@ -552,39 +564,53 @@ extension TypeSignature {
             return Bridgable(type: self, qualifiedType: bridgable.qualifiedType.asOptional(true), strategy: bridgable.strategy)
         case .range:
             // TODO
-            sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            }
             return nil
         case .set:
             // TODO
-            sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            }
             return nil
         case .string:
             return Bridgable(type: self, qualifiedType: self, strategy: .direct)
         case .tuple:
             // TODO
-            sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            }
             return nil
         case .typealiased(_, let type):
             return type.checkBridgable(sourceDerived, translator: translator)
         case .uint, .uint8, .uint16, .uint32, .uint64:
             // TODO
-            sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            }
             return nil
         case .uint128:
             // TODO
-            sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            }
             return nil
         case .unwrappedOptional(let type):
             return type.checkBridgable(sourceDerived, translator: translator)
         case .void:
-            sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            }
             return nil
         }
     }
 
-    fileprivate func checkNamedBridgable(_ sourceDerived: SourceDerived, codebaseInfo: CodebaseInfo.Context, translator: KotlinTranslator) -> Bridgable? {
+    fileprivate func checkNamedBridgable(_ sourceDerived: SourceDerived?, codebaseInfo: CodebaseInfo.Context, translator: KotlinTranslator) -> Bridgable? {
         guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: self) else {
-            sourceDerived.messages.append(.kotlinBridgeUnknownType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived {
+                sourceDerived.messages.append(.kotlinBridgeUnknownType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            }
             return nil
         }
         let strategy: Bridgable.Strategy
@@ -595,7 +621,9 @@ extension TypeSignature {
         } else if codebaseInfo.global.protocolSignatures(forNamed: self).contains(where: { $0.isNamed("SwiftCustomBridged", moduleName: "Swift") }) {
             strategy = .convertible
         } else {
-            sourceDerived.messages.append(.kotlinBridgeUnbridgedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived {
+                sourceDerived.messages.append(.kotlinBridgeUnbridgedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            }
             return nil
         }
         let qualifiedType: TypeSignature
@@ -616,10 +644,12 @@ private func checkNonPrivate(_ sourceDerived: SourceDerived, modifiers: Modifier
     return false
 }
 
-private func checkNonTypedThrows(_ sourceDerived: SourceDerived, apiFlags: APIFlags, translator: KotlinTranslator) -> Bool {
+private func checkNonTypedThrows(_ sourceDerived: SourceDerived?, apiFlags: APIFlags, translator: KotlinTranslator) -> Bool {
     guard apiFlags.throwsType != .none && apiFlags.throwsType != .any else {
         return true
     }
-    sourceDerived.messages.append(Message.kotlinBridgeTypedThrows(sourceDerived, source: translator.syntaxTree.source))
+    if let sourceDerived {
+        sourceDerived.messages.append(Message.kotlinBridgeTypedThrows(sourceDerived, source: translator.syntaxTree.source))
+    }
     return false
 }

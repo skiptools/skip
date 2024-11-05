@@ -408,6 +408,95 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         cdeclFunctions.append(cdeclFunction)
     }
 
+    private func updateEqualsDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+        functionDeclaration.extras = nil
+        functionDeclaration.body = KotlinCodeBlock(statements: [
+            "return Swift_isequal(lhs, rhs)"
+        ].map { KotlinRawStatement(sourceCode: $0) })
+
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_isequal(lhs: \(classDeclaration.signature), rhs: \(classDeclaration.signature)): Boolean")
+        classDeclaration.insert(statements: [externalFunctionDeclaration], after: functionDeclaration)
+
+        let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: "Swift_isequal", translator: translator)
+        let cdeclType: TypeSignature = .function([TypeSignature.Parameter(label: "lhs", type: .javaObjectPointer), TypeSignature.Parameter(label: "rhs", type: .javaObjectPointer)], .bool, APIFlags(), nil)
+        let cdeclBody: [String] = [
+            "let lhs_swift = \(classDeclaration.signature).fromJavaObject(lhs)",
+            "let rhs_swift = \(classDeclaration.signature).fromJavaObject(rhs)",
+            "return lhs_swift == rhs_swift"
+        ]
+        let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
+        cdeclFunctions.append(cdeclFunction)
+    }
+
+    private func defaultEqualsDeclaration() -> KotlinStatement {
+        let equals = KotlinFunctionDeclaration(name: "equals")
+        equals.parameters = [Parameter<KotlinExpression>(externalLabel: "other", declaredType: .optional(.any))]
+        equals.returnType = .bool
+        equals.modifiers.visibility = .public
+        equals.modifiers.isOverride = true
+        equals.ensureLeadingNewlines(1)
+        equals.isGenerated = true
+        let sourceCode: [String] = [
+            "if (other !is skip.bridge.SwiftPeerBridged) return false",
+            "return Swift_peer == other.Swift_bridgedPeer()"
+        ]
+        equals.body = KotlinCodeBlock(statements: sourceCode.map { KotlinRawStatement(sourceCode: $0) })
+        return equals
+    }
+
+    private func updateHashDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+        functionDeclaration.extras = nil
+        functionDeclaration.body = KotlinCodeBlock(statements: [
+            "hasher.value.combine(Swift_hashvalue(Swift_peer))"
+        ].map { KotlinRawStatement(sourceCode: $0) })
+
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_hashvalue(Swift_peer: skip.bridge.SwiftObjectPointer): Long")
+        classDeclaration.insert(statements: [externalFunctionDeclaration], after: functionDeclaration)
+
+        let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: "Swift_hashvalue", translator: translator)
+        let cdeclType: TypeSignature = .function([cdeclInstanceParameter], .int64, APIFlags(), nil)
+        let cdeclBody: [String] = [
+            "let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!",
+            "return Int64(peer_swift.hashValue)"
+        ]
+        let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
+        cdeclFunctions.append(cdeclFunction)
+    }
+
+    private func defaultHashDeclaration() -> KotlinStatement {
+        let hash = KotlinFunctionDeclaration(name: "hashCode")
+        hash.returnType = .int
+        hash.modifiers.visibility = .public
+        hash.modifiers.isOverride = true
+        hash.ensureLeadingNewlines(1)
+        hash.isGenerated = true
+        let sourceCode: [String] = [
+            "return Swift_peer.hashCode()",
+        ]
+        hash.body = KotlinCodeBlock(statements: sourceCode.map { KotlinRawStatement(sourceCode: $0) })
+        return hash
+    }
+
+    private func updateLessThanDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+        functionDeclaration.extras = nil
+        functionDeclaration.body = KotlinCodeBlock(statements: [
+            "return Swift_islessthan(lhs, rhs)"
+        ].map { KotlinRawStatement(sourceCode: $0) })
+
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_islessthan(lhs: \(classDeclaration.signature), rhs: \(classDeclaration.signature)): Boolean")
+        classDeclaration.insert(statements: [externalFunctionDeclaration], after: functionDeclaration)
+
+        let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: "Swift_islessthan", translator: translator)
+        let cdeclType: TypeSignature = .function([TypeSignature.Parameter(label: "lhs", type: .javaObjectPointer), TypeSignature.Parameter(label: "rhs", type: .javaObjectPointer)], .bool, APIFlags(), nil)
+        let cdeclBody: [String] = [
+            "let lhs_swift = \(classDeclaration.signature).fromJavaObject(lhs)",
+            "let rhs_swift = \(classDeclaration.signature).fromJavaObject(rhs)",
+            "return lhs_swift < rhs_swift"
+        ]
+        let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
+        cdeclFunctions.append(cdeclFunction)
+    }
+
     private func updateClassDeclaration(_ classDeclaration: KotlinClassDeclaration, swiftDefinitions: inout [SwiftDefinition], cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) -> Bool {
         guard !classDeclaration.attributes.isBridgeToSwift else {
             classDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(classDeclaration, source: translator.syntaxTree.source))
@@ -417,6 +506,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             return false
         }
         classDeclaration.extras = nil
+        classDeclaration.inherits = classDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.checkBridgable(translator: translator) != nil }
         classDeclaration.inherits.append(.named("skip.bridge.SwiftPeerBridged", []))
 
         var insertStatements: [KotlinStatement] = []
@@ -484,12 +574,32 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         ]
         cdeclFunctions.append(CDeclFunction(name: releaseCdecl.cdeclFunctionName, cdecl: releaseCdecl.cdecl, signature: .function([cdeclInstanceParameter], .void, APIFlags(), nil), body: releaseBody))
 
+        var hasEqualsDeclaration = false
+        var hasHashDeclaration = false
         for member in classDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
                 updateVariableDeclaration(variableDeclaration, in: classDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
-                updateFunctionDeclaration(functionDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
+                if functionDeclaration.isEqualImplementation {
+                    updateEqualsDeclaration(functionDeclaration, in: classDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
+                    hasEqualsDeclaration = true
+                } else if functionDeclaration.isHashImplementation {
+                    updateHashDeclaration(functionDeclaration, in: classDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
+                    hasHashDeclaration = true
+                } else if functionDeclaration.isLessThanImplementation {
+                    updateLessThanDeclaration(functionDeclaration, in: classDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
+                } else {
+                    updateFunctionDeclaration(functionDeclaration, in: classDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
+                }
             }
+        }
+        if !hasEqualsDeclaration {
+            let equalsDeclaration = defaultEqualsDeclaration()
+            insertStatements.append(equalsDeclaration)
+        }
+        if !hasHashDeclaration {
+            let hashDeclaration = defaultHashDeclaration()
+            insertStatements.append(hashDeclaration)
         }
 
         (classDeclaration.children.first as? KotlinStatement)?.ensureLeadingNewlines(1)
