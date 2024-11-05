@@ -3,7 +3,9 @@ final class KotlinCodableTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         syntaxTree.root.visit {
             if let classDeclaration = $0 as? KotlinClassDeclaration {
-                if classDeclaration.declarationType == .enumDeclaration && classDeclaration.inherits.contains(where: \.isCodingKey) {
+                if syntaxTree.isBridgeFile {
+                    removeCodable(from: classDeclaration)
+                } else if classDeclaration.declarationType == .enumDeclaration && classDeclaration.inherits.contains(where: \.isCodingKey) {
                     fixupCodingKey(enumDeclaration: classDeclaration, translator: translator)
                 } else {
                     synthesizeCodable(for: classDeclaration, translator: translator)
@@ -373,6 +375,21 @@ final class KotlinCodableTransformer: KotlinTransformer {
     private func elementArgument(label: String, type: TypeSignature) -> LabeledValue<KotlinExpression> {
         return LabeledValue(label: label, value: KotlinRawExpression(sourceCode: "\(type.kotlin)::class"))
     }
+
+    private func removeCodable(from classDeclaration: KotlinClassDeclaration) {
+        guard classDeclaration.type == .classDeclaration else {
+            return
+        }
+        classDeclaration.inherits.removeAll { $0.isCodable || $0.isEncodable || $0.isDecodable }
+        for member in classDeclaration.members {
+            guard let functionDeclaration = member as? KotlinFunctionDeclaration else {
+                continue
+            }
+            if functionDeclaration.isDecodableConstructor || functionDeclaration.isEncode {
+                classDeclaration.remove(statement: functionDeclaration)
+            }
+        }
+    }
 }
 
 extension KotlinEnumCaseDeclaration {
@@ -390,17 +407,5 @@ extension KotlinEnumCaseDeclaration {
 extension TypeSignature {
     fileprivate var isCodingKey: Bool {
         return isNamed("CodingKey", moduleName: "Swift", generics: [])
-    }
-
-    fileprivate var isCodable: Bool {
-        return isNamed("Codable", moduleName: "Swift", generics: [])
-    }
-
-    fileprivate var isDecodable: Bool {
-        return isNamed("Decodable", moduleName: "Swift", generics: [])
-    }
-
-    fileprivate var isEncodable: Bool {
-        return isNamed("Encodable", moduleName: "Swift", generics: [])
     }
 }

@@ -142,6 +142,14 @@ extension KotlinFunctionDeclaration {
         }
         return parameters.count == 1 && parameters[0].externalLabel == "from" && parameters[0].declaredType.isNamed("Decoder", moduleName: "Swift", generics: [])
     }
+
+    /// Whether this declaration is the `Encodable` encode function.
+    var isEncode: Bool {
+        guard type == .functionDeclaration else {
+            return false
+        }
+        return name == "encode" && parameters.count == 1 && parameters[0].externalLabel == "to" && parameters[0].declaredType.isNamed("Encoder", moduleName: "Swift", generics: [])
+    }
 }
 
 extension KotlinStatement {

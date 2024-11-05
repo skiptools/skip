@@ -575,6 +575,13 @@ final class BridgeToSwiftTests: XCTestCase {
             private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer
 
             override fun Swift_bridgedPeer(): skip.bridge.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_bridgedPeer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
         }
         """, """
         internal var c = C()
@@ -1340,7 +1347,198 @@ final class BridgeToSwiftTests: XCTestCase {
     }
 
     func testCommonProtocols() async throws {
-        // TODO: Handling of Equatable, Hashable, Codable, etc
+        try await check(swift: """
+        @BridgeToSwift
+        class C: Equatable, Hashable, Comparable {
+            var i = 1
+            static func ==(lhs: C, rhs: C) -> Bool {
+                return lhs.i == rhs.i
+            }
+            func hash(into hasher: inout Hasher) {
+                hasher.combine(i)
+            }
+            static func <(lhs: C, rhs: C) -> Bool {
+                return lhs.i < rhs.i
+            }
+        }
+        """, kotlin: """
+        internal open class C: Comparable<C> {
+            internal open var i = 1
+            override fun equals(other: Any?): Boolean {
+                if (other !is C) {
+                    return false
+                }
+                val lhs = this
+                val rhs = other
+                return lhs.i == rhs.i
+            }
+            override fun hashCode(): Int {
+                var hasher = Hasher()
+                hash(into = InOut<Hasher>({ hasher }, { hasher = it }))
+                return hasher.finalize()
+            }
+            internal open fun hash(into: InOut<Hasher>) {
+                val hasher = into
+                hasher.value.combine(i)
+            }
+            override fun compareTo(other: C): Int {
+                if (this == other) return 0
+                fun islessthan(lhs: C, rhs: C): Boolean {
+                    return lhs.i < rhs.i
+                }
+                return if (islessthan(this, other)) -1 else 1
+            }
+        }
+        """, swiftBridgeSupport: """
+        class C: Equatable, Hashable, Comparable, BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "C")
+            let Java_peer: JObject
+            required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            init() {
+                Java_peer = jniContext {
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    return JObject(ptr)
+                }
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            func toJavaObject() -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+
+            var i: Int {
+                get {
+                    return jniContext {
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
+                        return Int(value_java)
+                    }
+                }
+                set {
+                    jniContext {
+                        let value_java = Int32(newValue).toJavaParameter()
+                        try! Java_peer.call(method: Self.Java_set_i_methodID, args: [value_java])
+                    }
+                }
+            }
+            private static let Java_get_i_methodID = Java_class.getMethodID(name: "getI", sig: "()I")!
+            private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
+
+            static func ==(lhs: C, rhs: C) -> Bool {
+                return jniContext {
+                    let lhs_java = lhs.toJavaObject()!
+                    let rhs_java = rhs.toJavaObject()!
+                    return try! Bool.call(Java_isequal_methodID, on: lhs_java, args: [rhs_java.toJavaParameter()])
+                }
+            }
+            private static let Java_isequal_methodID = Java_class.getMethodID(name: "equals", sig: "(Ljava/lang/Object;)Z")!
+
+            func hash(into hasher: inout Hasher) {
+                let hashCode: Int32 = jniContext {
+                    return try! Java_peer.call(method: Self.Java_hashCode_methodID, args: [])
+                }
+                hasher.combine(hashCode)
+            }
+            private static let Java_hashCode_methodID = Java_class.getMethodID(name: "hashCode", sig: "()I")!
+
+            static func <(lhs: C, rhs: C) -> Bool {
+                return jniContext {
+                    let lhs_java = lhs.toJavaObject()!
+                    let rhs_java = rhs.toJavaObject()!
+                    let f_return_java = try! Int32.call(Java_compareTo_methodID, on: lhs_java, args: [rhs_java.toJavaParameter()])
+                    return f_return_java < 0
+                }
+            }
+            private static let Java_compareTo_methodID = Java_class.getMethodID(name: "compareTo", sig: "(Ljava/lang/Object;)I")!
+        }
+        """)
+    }
+
+    func testCodable() async throws {
+        try await check(swift: """
+        @BridgeToSwift
+        class C: Codable {
+            var i = 1
+        
+            private enum CK: CodingKey {
+                case i
+            }
+
+            func encode(to encoder: Encoder) {
+            }
+
+            init(from decoder: Decoder) {
+            }
+        }
+        """, kotlin: """
+        internal open class C: Codable {
+            internal open var i = 1
+
+            private enum class CK(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
+                i("i");
+
+                companion object {
+                    fun init(rawValue: String): C.CK? {
+                        return when (rawValue) {
+                            "i" -> CK.i
+                            else -> null
+                        }
+                    }
+                }
+            }
+
+            internal open fun encode(to: Encoder) = Unit
+
+            internal constructor(from: Decoder) {
+            }
+
+            companion object {
+
+                private fun CK(rawValue: String): C.CK? = CK.init(rawValue = rawValue)
+            }
+        }
+        """, swiftBridgeSupport: """
+        class C: BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "C")
+            let Java_peer: JObject
+            required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            init() {
+                Java_peer = jniContext {
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    return JObject(ptr)
+                }
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            func toJavaObject() -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+
+            var i: Int {
+                get {
+                    return jniContext {
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
+                        return Int(value_java)
+                    }
+                }
+                set {
+                    jniContext {
+                        let value_java = Int32(newValue).toJavaParameter()
+                        try! Java_peer.call(method: Self.Java_set_i_methodID, args: [value_java])
+                    }
+                }
+            }
+            private static let Java_get_i_methodID = Java_class.getMethodID(name: "getI", sig: "()I")!
+            private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
+        }
+        """)
     }
 
     func testSubclass() async throws {

@@ -2038,6 +2038,18 @@ extension TypeSignature {
         return isNamed("RawRepresentable", moduleName: "Swift")
     }
 
+    var isCodable: Bool {
+        return isNamed("Codable", moduleName: "Swift", generics: [])
+    }
+
+    var isDecodable: Bool {
+        return isNamed("Decodable", moduleName: "Swift", generics: [])
+    }
+
+    var isEncodable: Bool {
+        return isNamed("Encodable", moduleName: "Swift", generics: [])
+    }
+
     /// Return this type as a binding.
     func asBinding() -> TypeSignature {
         return .named("Binding", [self])

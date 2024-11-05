@@ -54,12 +54,16 @@ extension Message {
         return Message(kind: .error, message: "This entity will already be transpiled to Kotlin; it cannot be bridged to Kotlin too. Did you mean to use @BridgeToSwift?", sourceDerived: sourceDerived, source: source)
     }
 
-    static func kotlinBridgePrivate(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Private members cannot be bridged", sourceDerived: sourceDerived, source: source)
+    static func kotlinBridgeMissingInfo(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Skip is missing bridging metadata for this declaration", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinBridgeNeedsTypeDeclaration(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Skip is unable to determine the type of this property for bridging. Add an explicit type to the declaration", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinBridgePrivate(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Private members cannot be bridged", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinBridgeSwiftToSwift(_ sourceDerived: SourceDerived, source: Source) -> Message {
