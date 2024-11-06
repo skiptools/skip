@@ -27,16 +27,33 @@ class Statement: SyntaxNode {
         }
     }
 
-    /// Whether a declaration with the given attributes and visibility is bridging.
-    static func isBridge(attributes: Attributes, visibility: Modifiers.Visibility, context: DecodeContext) -> Bool {
-        if let memberOf = context.memberOf, !(self is TypeDeclaration.Type) {
-            guard !attributes.isBridgeIgnored else {
-                return false
+    /// How to decode a declaration with the given attributes and visibility.
+    static func decodeLevel(for type: StatementType, attributes: Attributes, visibility: Modifiers.Visibility, context: DecodeContext, in syntaxTree: SyntaxTree) -> DecodeLevel {
+        guard syntaxTree.isBridgeFile else {
+            return .full
+        }
+        switch type {
+        case .actorDeclaration, .classDeclaration, .extensionDeclaration:
+            return attributes.isBridgeToKotlin || attributes.isBridgeToSwift ? .api : .none
+        case .enumDeclaration, .protocolDeclaration, .structDeclaration:
+            return attributes.isBridgeToKotlin || attributes.isBridgeToSwift ? .full : .none
+        default:
+            if let memberOf = context.memberOf {
+                guard memberOf != .extensionDeclaration else {
+                    return .none
+                }
+                guard !attributes.isBridgeIgnored else {
+                    return .none
+                }
+                // Reference types don't bridge private members, but value types do because we fully copy their logic
+                let isFull = memberOf == .enumDeclaration || memberOf == .protocolDeclaration || memberOf == .structDeclaration
+                guard visibility > .fileprivate else {
+                    return isFull ? .full : .none
+                }
+                return isFull ? .full : .api
+            } else {
+                return attributes.isBridgeToKotlin || attributes.isBridgeToSwift ? .api : .none
             }
-            // Reference types don't bridge private members, but value types do because we fully copy their logic
-            return visibility > .fileprivate || memberOf == .structDeclaration || memberOf == .enumDeclaration || memberOf == .protocolDeclaration
-        } else {
-            return attributes.isBridgeToKotlin || attributes.isBridgeToSwift
         }
     }
 }

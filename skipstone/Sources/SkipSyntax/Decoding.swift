@@ -50,6 +50,13 @@ struct DecodeContext {
     var memberOf: StatementType?
 }
 
+/// Levels of decoding.
+enum DecodeLevel {
+    case none
+    case api
+    case full
+}
+
 /// Decode expressions from syntax.
 struct ExpressionDecoder {
     static func decodeIfExpression(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> Expression? {

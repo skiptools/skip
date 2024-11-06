@@ -507,6 +507,20 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         }
         classDeclaration.extras = nil
         classDeclaration.inherits = classDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.checkBridgable(translator: translator) != nil }
+        switch classDeclaration.declarationType {
+        case .classDeclaration:
+            updateClass(classDeclaration, swiftDefinitions: &swiftDefinitions, cdeclFunctions: &cdeclFunctions, translator: translator)
+            return true
+        case .structDeclaration:
+            updateStruct(classDeclaration, swiftDefinitions: &swiftDefinitions, cdeclFunctions: &cdeclFunctions, translator: translator)
+            return true
+        default:
+            classDeclaration.messages.append(.kotlinBridgeUnsupportedDeclaration(classDeclaration, source: translator.syntaxTree.source))
+            return false
+        }
+    }
+
+    private func updateClass(_ classDeclaration: KotlinClassDeclaration, swiftDefinitions: inout [SwiftDefinition], cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
         classDeclaration.inherits.append(.named("skip.bridge.SwiftPeerBridged", []))
 
         var insertStatements: [KotlinStatement] = []
@@ -627,7 +641,12 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
 
         let swiftDefinition = SwiftDefinition(swift: swift)
         swiftDefinitions.append(swiftDefinition)
-        return true
+    }
+
+    private func updateStruct(_ classDeclaration: KotlinClassDeclaration, swiftDefinitions: inout [SwiftDefinition], cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+        // Require a memberwise constructor (generated or custom)
+
+        // Implement JConvertible using transpiled constructor
     }
 
     private func cdecl(for statement: KotlinStatement, name: String, translator: KotlinTranslator) -> (cdecl: String, cdeclFunctionName: String) {

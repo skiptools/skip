@@ -1781,6 +1781,33 @@ final class BridgeToKotlinTests: XCTestCase {
         // TODO
     }
 
+    func testStruct() async throws {
+        try await check(swiftBridge: """
+        @BridgeToKotlin
+        struct S {
+            var i = 1
+        
+            private func f() -> Int {
+                return i
+            }
+        }
+        """, kotlin: """
+        """, swiftBridgeSupport: """
+        """)
+    }
+
+    func testProtocol() async throws {
+        // TODO: Also test protocol properties/args for ability to convert to/fromJava
+    }
+
+    func testEnum() async throws {
+        // TODO
+    }
+
+    func testEnumWithAssociatedValue() async throws {
+        // TODO
+    }
+
     func testObservable() async throws {
         try await check(swiftBridge: """
         @BridgeToKotlin @Observable

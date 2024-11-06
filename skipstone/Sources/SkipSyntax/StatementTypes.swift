@@ -874,7 +874,7 @@ final class EnumCaseDeclaration: Statement {
         var attributes = Attributes.for(syntax: enumCaseDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: enumCaseDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
+        guard decodeLevel(for: .enumCaseDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return []
         }
         return enumCaseDecl.elements.enumerated().map { (index, element) in
@@ -955,10 +955,15 @@ final class ExtensionDeclaration: TypeDeclaration {
 
         var attributes = Attributes.for(syntax: extensionDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
-        let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
+        var bridgeMessages: [Message] = []
+        if attributes.isBridgeToKotlin || attributes.isBridgeToSwift {
+            bridgeMessages.append(.bridgeExtension(extensionDecl, source: syntaxTree.source))
+        }
+        guard !syntaxTree.isBridgeFile else {
             return []
         }
+        let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
+
         let (inherits, inheritsMessages) = extensionDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: nil, where: extensionDecl.genericWhereClause, in: syntaxTree)
         let members = StatementDecoder.decode(syntaxListContainer: extensionDecl.memberBlock, context: context, in: syntaxTree)
@@ -1038,7 +1043,8 @@ final class FunctionDeclaration: Statement {
         var attributes = Attributes.for(syntax: functionDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: functionDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
+        let decodeLevel = decodeLevel(for: .functionDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        guard decodeLevel != .none else {
             return nil
         }
         let name = functionDecl.name.text.removingBacktickEscaping
@@ -1048,7 +1054,7 @@ final class FunctionDeclaration: Statement {
 
         let (generics, genericsMessages) = Generics.for(syntax: functionDecl.genericParameterClause, where: functionDecl.genericWhereClause, in: syntaxTree)
         var body: CodeBlock? = nil
-        if !syntaxTree.isBridgeFile, let bodySyntax = functionDecl.body {
+        if decodeLevel == .full, let bodySyntax = functionDecl.body {
             body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, context: context, in: syntaxTree))
         }
         let statement = FunctionDeclaration(type: .functionDeclaration, name: name, returnType: returnType, parameters: parameters, asyncBehavior: isAsync ? .async : .sync, throwsType: throwsType, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: functionDecl, sourceFile: syntaxTree.source.file, sourceRange: functionDecl.range(in: syntaxTree.source), extras: extras)
@@ -1060,7 +1066,8 @@ final class FunctionDeclaration: Statement {
         var attributes = Attributes.for(syntax: initializerDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: initializerDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
+        let decodeLevel = decodeLevel(for: .functionDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        guard decodeLevel != .none else {
             return nil
         }
         let isOptionalInit = initializerDecl.optionalMark != nil
@@ -1069,7 +1076,7 @@ final class FunctionDeclaration: Statement {
         let throwsType = initializerDecl.signature.effectSpecifiers?.throwsClause?.typeSignature(in: syntaxTree) ?? .none
         let (generics, genericsMessages) = Generics.for(syntax: initializerDecl.genericParameterClause, where: initializerDecl.genericWhereClause, in: syntaxTree)
         var body: CodeBlock? = nil
-        if !syntaxTree.isBridgeFile, let bodySyntax = initializerDecl.body {
+        if decodeLevel == .full, let bodySyntax = initializerDecl.body {
             body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, context: context, in: syntaxTree))
         }
         let statement = FunctionDeclaration(type: .initDeclaration, name: "init", isOptionalInit: isOptionalInit, returnType: .void, parameters: parameters, asyncBehavior: isAsync ? .async : .sync, throwsType: throwsType, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: initializerDecl, sourceFile: syntaxTree.source.file, sourceRange: initializerDecl.range(in: syntaxTree.source), extras: extras)
@@ -1234,7 +1241,8 @@ final class SubscriptDeclaration: Statement {
         var attributes = Attributes.for(syntax: subscriptDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: subscriptDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
+        let decodeLevel = decodeLevel(for: .subscriptDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        guard decodeLevel != .none else {
             return []
         }
         let elementType = TypeSignature.for(syntax: subscriptDecl.returnClause.type, in: syntaxTree)
@@ -1244,12 +1252,13 @@ final class SubscriptDeclaration: Statement {
         if let accessor = subscriptDecl.accessorBlock?.accessors {
             switch accessor {
             case .accessors(let syntax):
-                accessors = syntax.accessors(decodeBody: !syntaxTree.isBridgeFile, context: context, in: syntaxTree)
-                if syntaxTree.isBridgeFile, !isBridge(attributes: attributes, visibility: modifiers.setVisibility, context: context) {
+                accessors = syntax.accessors(decodeBody: decodeLevel == .full, context: context, in: syntaxTree)
+                // Check if setter should be excluded because of lower visibility
+                if decodeLevel == .api && modifiers.setVisibility <= .fileprivate {
                     accessors.setter = nil
                 }
             case .getter(let syntax):
-                if syntaxTree.isBridgeFile {
+                if decodeLevel != .full {
                     accessors.getter = Accessor()
                 } else {
                     let statements = StatementDecoder.decode(syntaxList: syntax, context: context, in: syntaxTree)
@@ -1353,7 +1362,7 @@ final class TypealiasDeclaration: Statement {
         var attributes = Attributes.for(syntax: typealiasDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: typealiasDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
+        guard decodeLevel(for: .typealiasDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return []
         }
         let name = typealiasDecl.name.text.removingBacktickEscaping
@@ -1462,7 +1471,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: classDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: classDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
+        guard decodeLevel(for: .classDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
         let name = classDecl.name.text.removingBacktickEscaping
@@ -1481,7 +1490,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: structDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: structDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
+        guard self.decodeLevel(for: .structDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
         let name = structDecl.name.text.removingBacktickEscaping
@@ -1500,7 +1509,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: protocolDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
+        guard decodeLevel(for: .protocolDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
         let name = protocolDecl.name.text.removingBacktickEscaping
@@ -1521,7 +1530,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: enumDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
+        guard decodeLevel(for: .enumDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
         let name = enumDecl.name.text.removingBacktickEscaping
@@ -1540,7 +1549,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: actorDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: actorDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
+        guard decodeLevel(for: .actorDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
         let name = actorDecl.name.text.removingBacktickEscaping
@@ -1663,7 +1672,8 @@ final class VariableDeclaration: Statement {
         var attributes = Attributes.for(syntax: variableDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: variableDecl.modifiers)
-        guard !syntaxTree.isBridgeFile || isBridge(attributes: attributes, visibility: modifiers.visibility, context: context) else {
+        let decodeLevel = decodeLevel(for: .variableDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        guard decodeLevel != .none else {
             return []
         }
         let isLet = variableDecl.bindingSpecifier.text == "let"
@@ -1672,13 +1682,13 @@ final class VariableDeclaration: Statement {
         let lastTypeSyntax = variableDecl.bindings.last?.typeAnnotation?.type
         for (index, syntax) in variableDecl.bindings.enumerated() {
             let bindingExtras = index == 0 ? extras : nil
-            let statement = try decode(syntax: syntax, lastTypeSyntax: lastTypeSyntax, isLet: isLet, asyncBehavior: isAsync ? .async : .sync, attributes: attributes, modifiers: modifiers, extras: bindingExtras, context: context, in: syntaxTree)
+            let statement = try decode(syntax: syntax, lastTypeSyntax: lastTypeSyntax, level: decodeLevel, isLet: isLet, asyncBehavior: isAsync ? .async : .sync, attributes: attributes, modifiers: modifiers, extras: bindingExtras, context: context, in: syntaxTree)
             statements.append(statement)
         }
         return statements
     }
 
-    private static func decode(syntax: PatternBindingSyntax, lastTypeSyntax: TypeSyntax?, isLet: Bool, asyncBehavior: AsyncBehavior, attributes: Attributes, modifiers: Modifiers, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> Statement {
+    private static func decode(syntax: PatternBindingSyntax, lastTypeSyntax: TypeSyntax?, level decodeLevel: DecodeLevel, isLet: Bool, asyncBehavior: AsyncBehavior, attributes: Attributes, modifiers: Modifiers, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> Statement {
         var declaredType: TypeSignature = .none
         if let typeSyntax = syntax.typeAnnotation?.type ?? lastTypeSyntax {
             declaredType = TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
@@ -1686,8 +1696,8 @@ final class VariableDeclaration: Statement {
         var value: Expression? = nil
         if let valueSyntax = syntax.initializer?.value {
             value = ExpressionDecoder.decode(syntax: valueSyntax, in: syntaxTree)
-            // RawExpression indicates an error decoding. Ignore for bridge code
-            if syntaxTree.isBridgeFile && value is RawExpression {
+            // RawExpression indicates an error decoding. Ignore when decoding API only
+            if decodeLevel != .full && value is RawExpression {
                 value = nil
             }
         }
@@ -1696,9 +1706,9 @@ final class VariableDeclaration: Statement {
         if let accessor = syntax.accessorBlock?.accessors {
             switch accessor {
             case .accessors(let syntax):
-                accessors = syntax.accessors(decodeBody: !syntaxTree.isBridgeFile, context: context, in: syntaxTree)
+                accessors = syntax.accessors(decodeBody: decodeLevel == .full, context: context, in: syntaxTree)
             case .getter(let syntax):
-                if syntaxTree.isBridgeFile {
+                if decodeLevel != .full {
                     accessors.getter = Accessor()
                 } else {
                     let statements = StatementDecoder.decode(syntaxList: syntax, context: context, in: syntaxTree)
@@ -1710,7 +1720,8 @@ final class VariableDeclaration: Statement {
         if let accessorsAttributes = accessors.attributes {
             attributes.attributes += accessorsAttributes.attributes
         }
-        if syntaxTree.isBridgeFile, !isBridge(attributes: attributes, visibility: modifiers.setVisibility, context: context) || modifiers.setVisibility < modifiers.visibility && modifiers.setVisibility <= .fileprivate {
+        // Check if setter should be excluded because of lower visibility
+        if decodeLevel == .api && modifiers.setVisibility <= .fileprivate {
             accessors.setter = nil
             // We need to add a getter so that the variable does not appear to be writeable
             if accessors.getter == nil {
