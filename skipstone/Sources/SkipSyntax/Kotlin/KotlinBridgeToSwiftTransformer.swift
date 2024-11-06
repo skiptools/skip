@@ -470,7 +470,10 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         let classRef = JavaClassRef(for: classDeclaration, translator: translator)
 
         let visibilityString = primaryTypeInfo.modifiers.visibility.swift(suffix: " ")
-        let inherits = primaryTypeInfo.inherits.filter { $0.isEquatable || $0.isHashable || $0.isComparable || $0.checkBridgable(translator: translator) != nil }
+        let inherits = primaryTypeInfo.inherits.compactMap {
+            let inherit = $0.withGenerics([])
+            return inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.checkBridgable(translator: translator) != nil ? inherit : nil
+        }
         var inheritsString = inherits.map { $0.description }.joined(separator: ", ")
         if !inheritsString.isEmpty {
             inheritsString += ", "

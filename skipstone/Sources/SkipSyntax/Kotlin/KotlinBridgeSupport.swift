@@ -618,6 +618,9 @@ extension TypeSignature {
             strategy = .javaPeer
         } else if typeInfo.attributes.isBridgeToKotlin {
             strategy = .swiftPeer
+        } else if typeInfo.declarationType == .protocolDeclaration, let moduleName = typeInfo.moduleName, isSkipModule(name: moduleName) {
+            // Any protocol in a built-in module will have a Swift and Kotlin representation
+            strategy = .convertible
         } else if codebaseInfo.global.protocolSignatures(forNamed: self).contains(where: { $0.isNamed("SwiftCustomBridged", moduleName: "Swift") }) {
             strategy = .convertible
         } else {
@@ -633,6 +636,13 @@ extension TypeSignature {
             qualifiedType = self.withModuleName(typeInfo.moduleName)
         }
         return Bridgable(type: self, qualifiedType: qualifiedType, strategy: strategy)
+    }
+
+    private func isSkipModule(name: String) -> Bool {
+        guard name.hasPrefix("Skip") else {
+            return false
+        }
+        return CodebaseInfo.moduleNameMap.values.contains { $0.contains(name) }
     }
 }
 
