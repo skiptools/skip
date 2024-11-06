@@ -874,7 +874,7 @@ final class EnumCaseDeclaration: Statement {
         var attributes = Attributes.for(syntax: enumCaseDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: enumCaseDecl.modifiers)
-        guard decodeLevel(for: .enumCaseDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
+        guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return []
         }
         return enumCaseDecl.elements.enumerated().map { (index, element) in
@@ -953,16 +953,12 @@ final class ExtensionDeclaration: TypeDeclaration {
         var context = context
         context.memberOf = .extensionDeclaration
 
+        let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
         var attributes = Attributes.for(syntax: extensionDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
-        var bridgeMessages: [Message] = []
-        if attributes.isBridgeToKotlin || attributes.isBridgeToSwift {
-            bridgeMessages.append(.bridgeExtension(extensionDecl, source: syntaxTree.source))
-        }
-        guard !syntaxTree.isBridgeFile else {
+        guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return []
         }
-        let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
 
         let (inherits, inheritsMessages) = extensionDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: nil, where: extensionDecl.genericWhereClause, in: syntaxTree)
@@ -1043,7 +1039,7 @@ final class FunctionDeclaration: Statement {
         var attributes = Attributes.for(syntax: functionDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: functionDecl.modifiers)
-        let decodeLevel = decodeLevel(for: .functionDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        let decodeLevel = decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
         guard decodeLevel != .none else {
             return nil
         }
@@ -1066,7 +1062,7 @@ final class FunctionDeclaration: Statement {
         var attributes = Attributes.for(syntax: initializerDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: initializerDecl.modifiers)
-        let decodeLevel = decodeLevel(for: .functionDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        let decodeLevel = decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
         guard decodeLevel != .none else {
             return nil
         }
@@ -1241,7 +1237,7 @@ final class SubscriptDeclaration: Statement {
         var attributes = Attributes.for(syntax: subscriptDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: subscriptDecl.modifiers)
-        let decodeLevel = decodeLevel(for: .subscriptDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        let decodeLevel = decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
         guard decodeLevel != .none else {
             return []
         }
@@ -1362,7 +1358,7 @@ final class TypealiasDeclaration: Statement {
         var attributes = Attributes.for(syntax: typealiasDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: typealiasDecl.modifiers)
-        guard decodeLevel(for: .typealiasDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
+        guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return []
         }
         let name = typealiasDecl.name.text.removingBacktickEscaping
@@ -1471,7 +1467,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: classDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: classDecl.modifiers)
-        guard decodeLevel(for: .classDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
+        guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
         let name = classDecl.name.text.removingBacktickEscaping
@@ -1490,7 +1486,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: structDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: structDecl.modifiers)
-        guard self.decodeLevel(for: .structDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
+        guard self.decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
         let name = structDecl.name.text.removingBacktickEscaping
@@ -1509,7 +1505,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: protocolDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
-        guard decodeLevel(for: .protocolDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
+        guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
         let name = protocolDecl.name.text.removingBacktickEscaping
@@ -1530,7 +1526,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: enumDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
-        guard decodeLevel(for: .enumDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
+        guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
         let name = enumDecl.name.text.removingBacktickEscaping
@@ -1549,7 +1545,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: actorDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: actorDecl.modifiers)
-        guard decodeLevel(for: .actorDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
+        guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
         let name = actorDecl.name.text.removingBacktickEscaping
@@ -1672,7 +1668,7 @@ final class VariableDeclaration: Statement {
         var attributes = Attributes.for(syntax: variableDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: variableDecl.modifiers)
-        let decodeLevel = decodeLevel(for: .variableDeclaration, attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        let decodeLevel = decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
         guard decodeLevel != .none else {
             return []
         }
