@@ -144,7 +144,7 @@ extension TypeSignature {
             if strategy == .direct && !isOptional {
                 return value
             } else if strategy == .unknown {
-                let converted = "(\(value) as! JConvertible).toJavaObject()"
+                let converted = "((\(value) as? JConvertible)?.toJavaObject())"
                 return isOptional ? converted : converted + "!"
             } else {
                 let converted = value + ".toJavaObject()"
@@ -207,7 +207,7 @@ extension TypeSignature {
             if strategy == .direct {
                 return value
             } else if strategy == .unknown {
-                let converted = "(\(value) as! JConvertible).toJavaObject()"
+                let converted = "((\(value) as? JConvertible)?.toJavaObject())"
                 return isOptional ? converted : converted + "!"
             } else {
                 let converted = value + ".toJavaObject()"
@@ -414,18 +414,24 @@ struct Bridgable {
     let strategy: Strategy
 }
 
+/// Information used to bridge functions.
+struct FunctionBridgable {
+    let parameters: [Bridgable]
+    let `return`: Bridgable
+}
+
 extension KotlinVariableDeclaration {
     /// Check that this variable is bridgable.
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
-    func checkBridgable(with signature: TypeSignature?, allowUnknown: Bool, translator: KotlinTranslator) -> Bridgable? {
+    func checkBridgable(allowUnknown: Bool, translator: KotlinTranslator) -> Bridgable? {
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
             return nil
         }
         guard checkNonTypedThrows(self, apiFlags: apiFlags, translator: translator) else {
             return nil
         }
-        let type = signature ?? declaredType.or(propertyType)
+        let type = declaredType.or(propertyType)
         return type.checkBridgable(self, allowUnknown: allowUnknown, translator: translator)
     }
 }
@@ -434,7 +440,7 @@ extension KotlinFunctionDeclaration {
     /// Check that this function is bridgable.
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
-    func checkBridgable(with signature: TypeSignature?, allowUnknownParameters: Bool, allowUnknownReturn: Bool, translator: KotlinTranslator) -> (parameters: [Bridgable], return: Bridgable)? {
+    func checkBridgable(allowUnknownParameters: Bool, allowUnknownReturn: Bool, translator: KotlinTranslator) -> FunctionBridgable? {
         guard type != .finalizerDeclaration else {
             return nil
         }
@@ -444,7 +450,6 @@ extension KotlinFunctionDeclaration {
         guard checkNonTypedThrows(self, apiFlags: apiFlags, translator: translator) else {
             return nil
         }
-        let functionType = signature ?? self.functionType
         let returnBridgable: Bridgable
         if functionType.returnType == .void {
             returnBridgable = Bridgable(type: .void, qualifiedType: .void, strategy: .direct)
@@ -461,14 +466,14 @@ extension KotlinFunctionDeclaration {
             }
             parameterBridgables.append(bridgable)
         }
-        return (parameterBridgables, returnBridgable)
+        return FunctionBridgable(parameters: parameterBridgables, return: returnBridgable)
     }
 
-    func callbackClosureType(with signature: TypeSignature?, java: Bool) -> TypeSignature {
-        let functionType = signature ?? self.functionType
+    func callbackClosureType(with functionType: TypeSignature, java: Bool) -> TypeSignature {
         let isThrows = apiFlags.throwsType != .none
         let throwsParameterType: TypeSignature = java ? .named("Throwable", []).asOptional(true) : .javaObjectPointer.asOptional(true)
-        if functionType.returnType == .void {
+        let returnType = functionType.returnType
+        if returnType == .void {
             if isThrows {
                 return .function([TypeSignature.Parameter(type: throwsParameterType)], .void, APIFlags(), nil)
             } else {
@@ -476,11 +481,26 @@ extension KotlinFunctionDeclaration {
             }
         } else {
             if isThrows {
-                return .function([TypeSignature.Parameter(type: functionType.returnType.asOptional(true)), TypeSignature.Parameter(type: throwsParameterType)], .void, APIFlags(), nil)
+                return .function([TypeSignature.Parameter(type: returnType.asOptional(true)), TypeSignature.Parameter(type: throwsParameterType)], .void, APIFlags(), nil)
             } else {
-                return .function([TypeSignature.Parameter(type: functionType.returnType)], .void, APIFlags(), nil)
+                return .function([TypeSignature.Parameter(type: returnType)], .void, APIFlags(), nil)
             }
         }
+    }
+
+    func functionType(with bridgable: FunctionBridgable) -> TypeSignature {
+        var functionType = self.functionType
+        if type == .constructorDeclaration {
+            functionType = functionType.withReturnType(.void)
+        } else {
+            functionType = functionType.withReturnType(bridgable.return.type)
+        }
+        let functionTypeParameters = functionType.parameters.enumerated().map {
+            var parameter = $0.element
+            parameter.type = bridgable.parameters[$0.offset].type
+            return parameter
+        }
+        return functionType.withParameters(functionTypeParameters)
     }
 }
 
