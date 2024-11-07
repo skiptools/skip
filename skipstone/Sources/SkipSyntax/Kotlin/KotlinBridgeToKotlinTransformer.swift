@@ -27,6 +27,9 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
                     hasBridgedObservables = hasBridgedObservables || classDeclaration.attributes.contains(.observable)
                 }
                 return .recurse(nil)
+            } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
+                updateInterfaceDeclaration(interfaceDeclaration, translator: translator)
+                return .recurse(nil)
             } else {
                 return .recurse(nil)
             }
@@ -90,7 +93,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             variableDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(variableDeclaration, source: translator.syntaxTree.source))
             return
         }
-        guard let bridgable = variableDeclaration.checkBridgable(translator: translator) else {
+        guard let bridgable = variableDeclaration.checkBridgable(allowUnknown: !variableDeclaration.apiFlags.options.contains(.writeable), translator: translator) else {
             return
         }
         let type = bridgable.type
@@ -211,7 +214,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             functionDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(functionDeclaration, source: translator.syntaxTree.source))
             return
         }
-        guard let bridgables = functionDeclaration.checkBridgable(translator: translator) else {
+        guard let bridgables = functionDeclaration.checkBridgable(allowUnknownParameters: false, allowUnknownReturn: true, translator: translator) else {
             return
         }
         let functionType = functionDeclaration.functionType
@@ -497,7 +500,20 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         cdeclFunctions.append(cdeclFunction)
     }
 
-    private func updateClassDeclaration(_ classDeclaration: KotlinClassDeclaration, swiftDefinitions: inout [SwiftDefinition], cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) -> Bool {
+    @discardableResult private func updateInterfaceDeclaration(_ interfaceDeclaration: KotlinInterfaceDeclaration, translator: KotlinTranslator) -> Bool {
+        guard !interfaceDeclaration.attributes.isBridgeToSwift else {
+            interfaceDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(interfaceDeclaration, source: translator.syntaxTree.source))
+            return false
+        }
+        guard interfaceDeclaration.checkBridgable(translator: translator) else {
+            return false
+        }
+        interfaceDeclaration.extras = nil
+        interfaceDeclaration.inherits = interfaceDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.checkBridgable(allowUnknown: true, translator: translator) != nil }
+        return true
+    }
+
+    @discardableResult private func updateClassDeclaration(_ classDeclaration: KotlinClassDeclaration, swiftDefinitions: inout [SwiftDefinition], cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) -> Bool {
         guard !classDeclaration.attributes.isBridgeToSwift else {
             classDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(classDeclaration, source: translator.syntaxTree.source))
             return false
@@ -506,13 +522,10 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             return false
         }
         classDeclaration.extras = nil
-        classDeclaration.inherits = classDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.checkBridgable(translator: translator) != nil }
+        classDeclaration.inherits = classDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.checkBridgable(allowUnknown: true, translator: translator) != nil }
         switch classDeclaration.declarationType {
         case .classDeclaration:
             updateClass(classDeclaration, swiftDefinitions: &swiftDefinitions, cdeclFunctions: &cdeclFunctions, translator: translator)
-            return true
-        case .structDeclaration:
-            updateStruct(classDeclaration, swiftDefinitions: &swiftDefinitions, cdeclFunctions: &cdeclFunctions, translator: translator)
             return true
         default:
             classDeclaration.messages.append(.kotlinBridgeUnsupportedDeclaration(classDeclaration, source: translator.syntaxTree.source))
@@ -641,12 +654,6 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
 
         let swiftDefinition = SwiftDefinition(swift: swift)
         swiftDefinitions.append(swiftDefinition)
-    }
-
-    private func updateStruct(_ classDeclaration: KotlinClassDeclaration, swiftDefinitions: inout [SwiftDefinition], cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
-        // Require a memberwise constructor (generated or custom)
-
-        // Implement JConvertible using transpiled constructor
     }
 
     private func cdecl(for statement: KotlinStatement, name: String, translator: KotlinTranslator) -> (cdecl: String, cdeclFunctionName: String) {

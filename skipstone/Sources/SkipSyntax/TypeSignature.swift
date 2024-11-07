@@ -418,6 +418,26 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
+    /// Set the parameters for this function.
+    func withParameters(_ parameters: [Parameter]) -> TypeSignature {
+        switch self {
+        case .function(_, let returnType, let apiFlags, let attributes):
+            return .function(parameters, returnType, apiFlags, attributes)
+        case .member(let base, let type):
+            return .member(base, type.withParameters(parameters))
+        case .module(let moduleName, let type):
+            return .module(moduleName, type.withParameters(parameters))
+        case .optional(let type):
+            return .optional(type.withParameters(parameters))
+        case .typealiased(let alias, let type):
+            return .typealiased(alias, type.withParameters(parameters))
+        case .unwrappedOptional(let type):
+            return .unwrappedOptional(type.withParameters(parameters))
+        default:
+            return self
+        }
+    }
+
     /// The return type of this function.
     var returnType: TypeSignature {
         switch self {

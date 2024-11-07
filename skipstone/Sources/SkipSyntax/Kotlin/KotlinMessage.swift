@@ -50,6 +50,10 @@ extension Message {
         return Message(kind: .warning, message: "Shadowing a SwiftUI Binding parameter with a variable of the same name may produce incorrect Kotlin. Consider using a different variable name", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinBridgeAbstractType(_ sourceDerived: SourceDerived, type: String, source: Source) -> Message {
+        return Message(kind: .error, message: "'\(type)' is not a concrete type. Only known types can be bridged here", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinBridgeKotlinToKotlin(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "This entity will already be transpiled to Kotlin; it cannot be bridged to Kotlin too. Did you mean to use @BridgeToSwift?", sourceDerived: sourceDerived, source: source)
     }
