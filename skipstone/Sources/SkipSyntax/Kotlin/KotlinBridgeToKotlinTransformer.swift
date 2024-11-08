@@ -28,7 +28,11 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
                 }
                 return .recurse(nil)
             } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
-                updateInterfaceDeclaration(interfaceDeclaration, translator: translator)
+                if updateInterfaceDeclaration(interfaceDeclaration, translator: translator) {
+                    if let bridgeImplDefinition = KotlinBridgeToSwiftTransformer.unknownBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, statement: interfaceDeclaration, codebaseInfo: codebaseInfo) {
+                        swiftDefinitions.append(bridgeImplDefinition)
+                    }
+                }
                 return .recurse(nil)
             } else {
                 return .recurse(nil)
@@ -93,7 +97,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             variableDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(variableDeclaration, source: translator.syntaxTree.source))
             return
         }
-        guard let bridgable = variableDeclaration.checkBridgable(allowUnknown: !variableDeclaration.apiFlags.options.contains(.writeable), translator: translator) else {
+        guard let bridgable = variableDeclaration.checkBridgable(translator: translator) else {
             return
         }
         let type = bridgable.type
@@ -214,10 +218,10 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             functionDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(functionDeclaration, source: translator.syntaxTree.source))
             return
         }
-        guard let bridgable = functionDeclaration.checkBridgable(allowUnknownParameters: false, allowUnknownReturn: true, translator: translator) else {
+        guard let bridgable = functionDeclaration.checkBridgable(translator: translator) else {
             return
         }
-        let functionType = functionDeclaration.functionType(with: bridgable)
+        let functionType = functionDeclaration.functionType.functionType(with: bridgable, isConstructor: functionDeclaration.type == .constructorDeclaration)
         let functionTypeParameters = functionType.parameters
         functionDeclaration.extras = nil
 
@@ -233,7 +237,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             cdeclBody.append("let \(parameter.internalLabel)_swift = " + functionTypeParameters[index].type.convertFromCDecl(value: parameter.internalLabel, strategy: strategy))
         }
 
-        let callbackType = functionDeclaration.callbackClosureType(with: functionType, java: false)
+        let callbackType = functionType.callbackClosureType(apiFlags: functionDeclaration.apiFlags, java: false)
         if isAsync {
             cdeclBody.append("let f_callback_swift = " + callbackType.convertFromCDecl(value: "f_callback", strategy: .direct) + " as " + callbackType.description)
         }
@@ -386,7 +390,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             if !externalParametersString.isEmpty {
                 externalParametersString += ", "
             }
-            externalParametersString += "f_callback: " + functionDeclaration.callbackClosureType(with: functionType, java: true).kotlin
+            externalParametersString += "f_callback: " + functionType.callbackClosureType(apiFlags: functionDeclaration.apiFlags, java: true).kotlin
         }
         externalFunctionDeclaration += externalParametersString
         externalFunctionDeclaration += ")"
@@ -509,8 +513,11 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         guard interfaceDeclaration.checkBridgable(translator: translator) else {
             return false
         }
+        guard let codebaseInfo = translator.codebaseInfo else {
+            return false
+        }
         interfaceDeclaration.extras = nil
-        interfaceDeclaration.inherits = interfaceDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.checkBridgable(allowUnknown: true, translator: translator) != nil }
+        interfaceDeclaration.inherits = interfaceDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.checkBridgable(codebaseInfo: codebaseInfo) != nil }
         return true
     }
 
@@ -522,8 +529,11 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         guard classDeclaration.checkBridgable(translator: translator) else {
             return false
         }
+        guard let codebaseInfo = translator.codebaseInfo else {
+            return false
+        }
         classDeclaration.extras = nil
-        classDeclaration.inherits = classDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.checkBridgable(allowUnknown: true, translator: translator) != nil }
+        classDeclaration.inherits = classDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.checkBridgable(codebaseInfo: codebaseInfo) != nil }
         switch classDeclaration.declarationType {
         case .classDeclaration:
             updateClass(classDeclaration, swiftDefinitions: &swiftDefinitions, cdeclFunctions: &cdeclFunctions, translator: translator)

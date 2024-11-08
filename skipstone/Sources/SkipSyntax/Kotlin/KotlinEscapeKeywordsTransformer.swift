@@ -9,13 +9,8 @@ final class KotlinEscapeKeywordsTransformer: KotlinTransformer {
 
 /// Appends an underscore to the end of hard keywords in Kotlin.
 private final class EscapeKeywordsVisitor {
-    /// https://kotlinlang.org/docs/keyword-reference.html#hard-keywords
-    static let hardKeywords: Set<String> = [
-        "as", "break", "class", "continue", "do", "else", "false", "for", "fun", "if", "in", "interface", "checks", "is", "null", "object", "package", "return", "this", "throw", "true", "try", "typealias", "typeof", "val", "var", "when", "while", //"super", // super causes conflicts with the super() call
-    ]
-
     func fixKeyword(name: String) -> String {
-        return name.fixingKeyword(in: Self.hardKeywords)
+        return name.fixingKeyword(in: KotlinIdentifier.hardKeywords)
     }
 
     func fixParameter<T>(param: Parameter<T>) -> Parameter<T> {
@@ -43,8 +38,16 @@ private final class EscapeKeywordsVisitor {
         } else if let node = node as? KotlinMemberAccess {
             node.member = fixKeyword(name: node.member)
         } else if let node = node as? KotlinFunctionDeclaration {
+            let name = node.name
             node.name = fixKeyword(name: node.name)
+            if node.name != name {
+                node.preEscapedName = name
+            }
+            let parameterLabels = node.parameters.map(\.externalLabel)
             node.parameters = node.parameters.map(fixParameter)
+            node.preEscapedParameterLabels = zip(node.parameters, parameterLabels).map {
+                return $0.externalLabel == $1 ? nil : $1
+            }
         } else if let node = node as? KotlinFunctionCall {
             node.arguments = node.arguments.map(fixLabeledArgument)
         } else if let node = node as? KotlinVariableDeclaration {

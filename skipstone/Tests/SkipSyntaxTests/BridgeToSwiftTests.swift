@@ -785,10 +785,10 @@ final class BridgeToSwiftTests: XCTestCase {
         internal fun nolabel(i: Int) = Unit
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        func nolabel(_ i: Int) {
+        func nolabel(_ p_0: Int) {
             jniContext {
-                let i_java = Int32(i).toJavaParameter()
-                try! Java_SourceKt.callStatic(method: Java_nolabel_methodID, args: [i_java])
+                let p_0_java = Int32(p_0).toJavaParameter()
+                try! Java_SourceKt.callStatic(method: Java_nolabel_methodID, args: [p_0_java])
             }
         }
         private let Java_nolabel_methodID = Java_SourceKt.getStaticMethodID(name: "nolabel", sig: "(I)V")!
@@ -1589,6 +1589,31 @@ final class BridgeToSwiftTests: XCTestCase {
 
             func f() -> Int
         }
+        final class P_BridgeImpl: P {
+            var i: Int {
+                get {
+                    return jniContext {
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
+                        return Int(value_java)
+                    }
+                }
+                set {
+                    jniContext {
+                        let value_java = Int32(newValue).toJavaParameter()
+                        try! Java_peer.call(method: Self.Java_set_i_methodID, args: [value_java])
+                    }
+                }
+            }
+            private static let Java_get_i_methodID = Java_class.getMethodID(name: "getI", sig: "()I")!
+            private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
+            func f() -> Int {
+                return jniContext {
+                    let f_return_java: Int32 = try! Java_peer.call(method: Self.Java_f_methodID, args: [])
+                    return Int(f_return_java)
+                }
+            }
+            private static let Java_f_methodID = Java_class.getMethodID(name: "f", sig: "()I")!
+        }
         class C: P, BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
             let Java_peer: JObject
@@ -1620,45 +1645,32 @@ final class BridgeToSwiftTests: XCTestCase {
     }
 
     func testProtocolTypeMembers() async throws {
-        try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        protocol P {
-        }
-        @BridgeToSwift
-        class C {
-            var p: P?
-        }
-        """)
-
-        try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        protocol P {
-        }
-        @BridgeToSwift
-        class C {
-            func f() -> P? {
-                return nil
-            }
-        }
-        """)
-
         try await check(swift: """
         @BridgeToSwift
         protocol P {
         }
         @BridgeToSwift
         class C {
-            func f(p: P?) {
+            var p: (any P)?
+            func f(p: any P) -> (any P)? {
+                return nil
             }
         }
         """, kotlin: """
         internal interface P {
         }
         internal open class C {
-            internal open fun f(p: P?) = Unit
+            internal open var p: P? = null
+                get() = field.sref({ this.p = it })
+                set(newValue) {
+                    field = newValue.sref()
+                }
+            internal open fun f(p: P): P? = null
         }
         """, swiftBridgeSupport: """
         protocol P {
+        }
+        final class P_BridgeImpl: P {
         }
         class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
@@ -1680,13 +1692,31 @@ final class BridgeToSwiftTests: XCTestCase {
                 return Java_peer.safePointer()
             }
 
-            func f(p: P?) {
-                jniContext {
-                    let p_java = (p as! JConvertible).toJavaObject().toJavaParameter()
-                    try! Java_peer.call(method: Self.Java_f_methodID, args: [p_java])
+            var p: (any P)? {
+                get {
+                    return jniContext {
+                        let value_java: JavaObjectPointer? = try! Java_peer.call(method: Self.Java_get_p_methodID, args: [])
+                        return P_BridgeImpl?.fromJavaObject(value_java)
+                    }
+                }
+                set {
+                    jniContext {
+                        let value_java = ((newValue as? JConvertible)?.toJavaObject()).toJavaParameter()
+                        try! Java_peer.call(method: Self.Java_set_p_methodID, args: [value_java])
+                    }
                 }
             }
-            private static let Java_f_methodID = Java_class.getMethodID(name: "f", sig: "(LP;)V")!
+            private static let Java_get_p_methodID = Java_class.getMethodID(name: "getP", sig: "()LP;")!
+            private static let Java_set_p_methodID = Java_class.getMethodID(name: "setP", sig: "(LP;)V")!
+
+            func f(p: any P) -> (any P)? {
+                return jniContext {
+                    let p_java = ((p as? JConvertible)?.toJavaObject())!.toJavaParameter()
+                    let f_return_java: JavaObjectPointer? = try! Java_peer.call(method: Self.Java_f_methodID, args: [p_java])
+                    return P_BridgeImpl?.fromJavaObject(f_return_java)
+                }
+            }
+            private static let Java_f_methodID = Java_class.getMethodID(name: "f", sig: "(LP;)LP;")!
         }
         """)
     }

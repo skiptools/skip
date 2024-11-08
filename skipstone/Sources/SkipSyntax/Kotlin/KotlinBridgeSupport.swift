@@ -105,6 +105,11 @@ extension TypeSignature {
         return java ? .named("skip.bridge.SwiftObjectPointer", []) : .named("SwiftObjectPointer", [])
     }
 
+    /// The generated native type when the bridging strategy is unknown - e.g. for protocols.
+    var unknownBridgeImpl: TypeSignature {
+        return withName(name + "_BridgeImpl")
+    }
+
     /// Return the `@_cdecl` function equivalent of this type.
     func cdecl(strategy: Bridgable.Strategy) -> TypeSignature {
         switch self {
@@ -155,6 +160,9 @@ extension TypeSignature {
 
     /// Return code that converts the given value of our `@_cdecl` function type back to this type.
     func convertFromCDecl(value: String, strategy: Bridgable.Strategy) -> String {
+        guard strategy != .unknown else {
+            return self.unknownBridgeImpl.description + ".fromJavaObject(\(value))"
+        }
         switch self.asOptional(false) {
         case .function(let parameters, _, _, _):
             let converted = "SwiftClosure\(parameters.count).closure(forJavaObject: \(value))"
@@ -218,20 +226,36 @@ extension TypeSignature {
 
     /// Return code that converts the given value of our Java type back to this type.
     func convertFromJava(value: String, strategy: Bridgable.Strategy) -> String {
+        guard strategy != .unknown else {
+            return self.unknownBridgeImpl.description + ".fromJavaObject(\(value))"
+        }
         switch self {
-        case .function(let parameters, let returnType, _, _):
-            let parametersString = (0..<parameters.count).map { "p\($0)" }.joined(separator: ", ")
-            let parametersInString = parametersString.isEmpty ? parametersString : parametersString + " in "
-            return "{ let closure_swift = JavaBackedClosure<\(returnType)>(\(value)); return { \(parametersInString)try! closure_swift.invoke(\(parametersString)) } }()"
+        case .function:
+            return convertClosureFromJava(value: value, isOptional: false)
         case .int:
             return "Int(\(value))"
-        case .optional:
-            return description + ".fromJavaObject(\(value))"
+        case .optional(let type):
+            if case .function = type {
+                return type.convertClosureFromJava(value: value, isOptional: true)
+            } else {
+                return description + ".fromJavaObject(\(value))"
+            }
         case .unwrappedOptional(let type):
             return type.convertFromJava(value: value, strategy: strategy)
         default:
-            return strategy == .direct ? value : description + ".fromJavaObject(\(value))"
+            if strategy == .direct {
+                return value
+            } else {
+                return description + ".fromJavaObject(\(value))"
+            }
         }
+    }
+
+    private func convertClosureFromJava(value: String, isOptional: Bool) -> String {
+        let parametersString = (0..<parameters.count).map { "p\($0)" }.joined(separator: ", ")
+        let parametersInString = parametersString.isEmpty ? parametersString : parametersString + " in "
+        let handleNil = isOptional ? "\(value) == nil ? nil : " : ""
+        return "\(handleNil){ let closure_swift = JavaBackedClosure<\(returnType)>(\(value)); return { \(parametersInString)try! closure_swift.invoke(\(parametersString)) } }()"
     }
 
     /// Return the JNI signature of this type.
@@ -378,26 +402,6 @@ extension Modifiers.Visibility {
     }
 }
 
-extension Parameter {
-    func swift(with signature: TypeSignature.Parameter?) -> String {
-        var str = ""
-        if let externalLabel {
-            str += externalLabel
-        } else {
-            str += "_"
-        }
-        if let internalLabel = _internalLabel {
-            str += " " + internalLabel
-        }
-        let type = signature?.type ?? declaredType
-        str += ": " + type.description
-        if let defaultValueSwift, !defaultValueSwift.isEmpty {
-            str += " " + defaultValueSwift
-        }
-        return str
-    }
-}
-
 /// Information used to bridge values.
 struct Bridgable {
     /// Strategies for bridging values.
@@ -424,15 +428,18 @@ extension KotlinVariableDeclaration {
     /// Check that this variable is bridgable.
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
-    func checkBridgable(allowUnknown: Bool, translator: KotlinTranslator) -> Bridgable? {
+    func checkBridgable(translator: KotlinTranslator) -> Bridgable? {
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
             return nil
         }
-        guard checkNonTypedThrows(self, apiFlags: apiFlags, translator: translator) else {
+        guard checkNonTypedThrows(apiFlags: apiFlags, sourceDerived: self, source: translator.syntaxTree.source) else {
+            return nil
+        }
+        guard let codebaseInfo = translator.codebaseInfo else {
             return nil
         }
         let type = declaredType.or(propertyType)
-        return type.checkBridgable(self, allowUnknown: allowUnknown, translator: translator)
+        return type.checkBridgable(codebaseInfo: codebaseInfo, sourceDerived: self, source: translator.syntaxTree.source)
     }
 }
 
@@ -440,67 +447,20 @@ extension KotlinFunctionDeclaration {
     /// Check that this function is bridgable.
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
-    func checkBridgable(allowUnknownParameters: Bool, allowUnknownReturn: Bool, translator: KotlinTranslator) -> FunctionBridgable? {
+    func checkBridgable(translator: KotlinTranslator) -> FunctionBridgable? {
         guard type != .finalizerDeclaration else {
             return nil
         }
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
             return nil
         }
-        guard checkNonTypedThrows(self, apiFlags: apiFlags, translator: translator) else {
+        guard checkNonTypedThrows(apiFlags: apiFlags, sourceDerived: self, source: translator.syntaxTree.source) else {
             return nil
         }
-        let returnBridgable: Bridgable
-        if functionType.returnType == .void {
-            returnBridgable = Bridgable(type: .void, qualifiedType: .void, strategy: .direct)
-        } else {
-            guard let bridgable = functionType.returnType.checkBridgable(self, allowUnknown: allowUnknownReturn, translator: translator) else {
-                return nil
-            }
-            returnBridgable = bridgable
+        guard let codebaseInfo = translator.codebaseInfo else {
+            return nil
         }
-        var parameterBridgables: [Bridgable] = []
-        for parameter in functionType.parameters {
-            guard let bridgable = parameter.type.checkBridgable(self, allowUnknown: allowUnknownParameters, translator: translator) else {
-                return nil
-            }
-            parameterBridgables.append(bridgable)
-        }
-        return FunctionBridgable(parameters: parameterBridgables, return: returnBridgable)
-    }
-
-    func callbackClosureType(with functionType: TypeSignature, java: Bool) -> TypeSignature {
-        let isThrows = apiFlags.throwsType != .none
-        let throwsParameterType: TypeSignature = java ? .named("Throwable", []).asOptional(true) : .javaObjectPointer.asOptional(true)
-        let returnType = functionType.returnType
-        if returnType == .void {
-            if isThrows {
-                return .function([TypeSignature.Parameter(type: throwsParameterType)], .void, APIFlags(), nil)
-            } else {
-                return .function([], .void, APIFlags(), nil)
-            }
-        } else {
-            if isThrows {
-                return .function([TypeSignature.Parameter(type: returnType.asOptional(true)), TypeSignature.Parameter(type: throwsParameterType)], .void, APIFlags(), nil)
-            } else {
-                return .function([TypeSignature.Parameter(type: returnType)], .void, APIFlags(), nil)
-            }
-        }
-    }
-
-    func functionType(with bridgable: FunctionBridgable) -> TypeSignature {
-        var functionType = self.functionType
-        if type == .constructorDeclaration {
-            functionType = functionType.withReturnType(.void)
-        } else {
-            functionType = functionType.withReturnType(bridgable.return.type)
-        }
-        let functionTypeParameters = functionType.parameters.enumerated().map {
-            var parameter = $0.element
-            parameter.type = bridgable.parameters[$0.offset].type
-            return parameter
-        }
-        return functionType.withParameters(functionTypeParameters)
+        return functionType.checkFunctionBridgable(codebaseInfo: codebaseInfo, sourceDerived: self, source: translator.syntaxTree.source)
     }
 }
 
@@ -529,20 +489,49 @@ extension KotlinInterfaceDeclaration {
 }
 
 extension TypeSignature {
-    /// Check that this type is bridgable, adding any messages to the given source object.
-    func checkBridgable(_ sourceDerived: SourceDerived? = nil, allowUnknown: Bool, translator: KotlinTranslator) -> Bridgable? {
-        guard let codebaseInfo = translator.codebaseInfo else {
-            return nil
+    func functionType(with bridgable: FunctionBridgable, isConstructor: Bool) -> TypeSignature {
+        var functionType = self
+        if isConstructor {
+            functionType = functionType.withReturnType(.void)
+        } else {
+            functionType = functionType.withReturnType(bridgable.return.type)
         }
-        
+        let functionTypeParameters = functionType.parameters.enumerated().map {
+            var parameter = $0.element
+            parameter.type = bridgable.parameters[$0.offset].type
+            return parameter
+        }
+        return functionType.withParameters(functionTypeParameters)
+    }
+
+    func callbackClosureType(apiFlags: APIFlags, java: Bool) -> TypeSignature {
+        let isThrows = apiFlags.throwsType != .none
+        let throwsParameterType: TypeSignature = java ? .named("Throwable", []).asOptional(true) : .javaObjectPointer.asOptional(true)
+        if returnType == .void {
+            if isThrows {
+                return .function([TypeSignature.Parameter(type: throwsParameterType)], .void, APIFlags(), nil)
+            } else {
+                return .function([], .void, APIFlags(), nil)
+            }
+        } else {
+            if isThrows {
+                return .function([TypeSignature.Parameter(type: returnType.asOptional(true)), TypeSignature.Parameter(type: throwsParameterType)], .void, APIFlags(), nil)
+            } else {
+                return .function([TypeSignature.Parameter(type: returnType)], .void, APIFlags(), nil)
+            }
+        }
+    }
+
+    /// Check that this type is bridgable, adding any messages to the given source object.
+    func checkBridgable(codebaseInfo: CodebaseInfo.Context, sourceDerived: SourceDerived? = nil, source: Source? = nil) -> Bridgable? {
         switch self {
         case .any, .anyObject:
-            if let sourceDerived {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived, let source {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
             }
             return nil
         case .array(let elementType):
-            guard elementType?.checkBridgable(sourceDerived, allowUnknown: allowUnknown, translator: translator) != nil else {
+            guard elementType?.checkBridgable(codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) != nil else {
                 return nil
             }
             return Bridgable(type: self, qualifiedType: self, strategy: .convertible)
@@ -550,31 +539,31 @@ extension TypeSignature {
             return Bridgable(type: self, qualifiedType: self, strategy: .direct)
         case .character:
             // TODO
-            if let sourceDerived {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived, let source {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
             }
             return nil
         case .composition:
-            if let sourceDerived {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived, let source {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
             }
             return nil
         case .dictionary(let keyType, let valueType):
-            guard keyType?.checkBridgable(sourceDerived, allowUnknown: allowUnknown, translator: translator) != nil, valueType?.checkBridgable(sourceDerived, allowUnknown: allowUnknown, translator: translator) != nil else {
+            guard keyType?.checkBridgable(codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) != nil, valueType?.checkBridgable(codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) != nil else {
                 return nil
             }
             return Bridgable(type: self, qualifiedType: self, strategy: .convertible)
         case .double, .float:
             return Bridgable(type: self, qualifiedType: self, strategy: .direct)
         case .function(let parameters, let returnType, let apiFlags, _):
-            guard checkNonTypedThrows(sourceDerived, apiFlags: apiFlags, translator: translator) else {
+            guard checkNonTypedThrows(apiFlags: apiFlags, sourceDerived: sourceDerived, source: source) else {
                 return nil
             }
-            if returnType != .void && returnType.checkBridgable(sourceDerived, allowUnknown: allowUnknown, translator: translator) == nil {
+            if returnType != .void && returnType.checkBridgable(codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) == nil {
                 return nil
             }
             for parameter in parameters {
-                if parameter.type.checkBridgable(sourceDerived, allowUnknown: allowUnknown, translator: translator) == nil {
+                if parameter.type.checkBridgable(codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) == nil {
                     return nil
                 }
             }
@@ -583,75 +572,96 @@ extension TypeSignature {
             return Bridgable(type: self, qualifiedType: self, strategy: .direct)
         case .int128:
             // TODO
-            if let sourceDerived {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived, let source {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
             }
             return nil
         case .member, .module, .named:
-            return checkNamedBridgable(sourceDerived, allowUnknown: allowUnknown, codebaseInfo: codebaseInfo, translator: translator)
+            return checkNamedBridgable(codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source)
         case .metaType:
-            if let sourceDerived {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived, let source {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
             }
             return nil
         case .none:
-            if let sourceDerived {
-                sourceDerived.messages.append(.kotlinBridgeUnknownType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived, let source {
+                sourceDerived.messages.append(.kotlinBridgeUnknownType(sourceDerived, type: description, source: source))
             }
             return nil
         case .optional(let type):
-            guard let bridgable = type.checkBridgable(sourceDerived, allowUnknown: allowUnknown, translator: translator) else {
+            guard let bridgable = type.checkBridgable(codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) else {
                 return nil
             }
             return Bridgable(type: self, qualifiedType: bridgable.qualifiedType.asOptional(true), strategy: bridgable.strategy)
         case .range:
             // TODO
-            if let sourceDerived {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived, let source {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
             }
             return nil
         case .set:
             // TODO
-            if let sourceDerived {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived, let source {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
             }
             return nil
         case .string:
             return Bridgable(type: self, qualifiedType: self, strategy: .direct)
         case .tuple:
             // TODO
-            if let sourceDerived {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived, let source {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
             }
             return nil
         case .typealiased(_, let type):
-            return type.checkBridgable(sourceDerived, allowUnknown: allowUnknown, translator: translator)
+            return type.checkBridgable(codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source)
         case .uint, .uint8, .uint16, .uint32, .uint64:
             // TODO
-            if let sourceDerived {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived, let source {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
             }
             return nil
         case .uint128:
             // TODO
-            if let sourceDerived {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived, let source {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
             }
             return nil
         case .unwrappedOptional(let type):
-            return type.checkBridgable(sourceDerived, allowUnknown: allowUnknown, translator: translator)
+            return type.checkBridgable(codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source)
         case .void:
-            if let sourceDerived {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived, let source {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
             }
             return nil
         }
     }
 
-    fileprivate func checkNamedBridgable(_ sourceDerived: SourceDerived?, allowUnknown: Bool, codebaseInfo: CodebaseInfo.Context, translator: KotlinTranslator) -> Bridgable? {
+    /// Check that this function is bridgable, adding any messages to the given source object.
+    func checkFunctionBridgable(codebaseInfo: CodebaseInfo.Context, sourceDerived: SourceDerived? = nil, source: Source? = nil) -> FunctionBridgable? {
+        let returnBridgable: Bridgable
+        if returnType == .void {
+            returnBridgable = Bridgable(type: .void, qualifiedType: .void, strategy: .direct)
+        } else {
+            guard let bridgable = returnType.checkBridgable(codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) else {
+                return nil
+            }
+            returnBridgable = bridgable
+        }
+        var parameterBridgables: [Bridgable] = []
+        for parameter in parameters {
+            guard let bridgable = parameter.type.checkBridgable(codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) else {
+                return nil
+            }
+            parameterBridgables.append(bridgable)
+        }
+        return FunctionBridgable(parameters: parameterBridgables, return: returnBridgable)
+    }
+
+    fileprivate func checkNamedBridgable(codebaseInfo: CodebaseInfo.Context, sourceDerived: SourceDerived?, source: Source?) -> Bridgable? {
         guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: self) else {
-            if let sourceDerived {
-                sourceDerived.messages.append(.kotlinBridgeUnknownType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived, let source {
+                sourceDerived.messages.append(.kotlinBridgeUnknownType(sourceDerived, type: description, source: source))
             }
             return nil
         }
@@ -666,14 +676,8 @@ extension TypeSignature {
         } else if codebaseInfo.global.protocolSignatures(forNamed: self).contains(where: { $0.isNamed("SwiftCustomBridged", moduleName: "Swift") }) {
             strategy = .convertible
         } else {
-            if let sourceDerived {
-                sourceDerived.messages.append(.kotlinBridgeUnbridgedType(sourceDerived, type: description, source: translator.syntaxTree.source))
-            }
-            return nil
-        }
-        guard strategy != .unknown || allowUnknown else {
-            if let sourceDerived {
-                sourceDerived.messages.append(.kotlinBridgeAbstractType(sourceDerived, type: description, source: translator.syntaxTree.source))
+            if let sourceDerived, let source {
+                sourceDerived.messages.append(.kotlinBridgeUnbridgedType(sourceDerived, type: description, source: source))
             }
             return nil
         }
@@ -702,12 +706,12 @@ private func checkNonPrivate(_ sourceDerived: SourceDerived, modifiers: Modifier
     return false
 }
 
-private func checkNonTypedThrows(_ sourceDerived: SourceDerived?, apiFlags: APIFlags, translator: KotlinTranslator) -> Bool {
+private func checkNonTypedThrows(apiFlags: APIFlags, sourceDerived: SourceDerived?, source: Source?) -> Bool {
     guard apiFlags.throwsType != .none && apiFlags.throwsType != .any else {
         return true
     }
-    if let sourceDerived {
-        sourceDerived.messages.append(Message.kotlinBridgeTypedThrows(sourceDerived, source: translator.syntaxTree.source))
+    if let sourceDerived, let source {
+        sourceDerived.messages.append(Message.kotlinBridgeTypedThrows(sourceDerived, source: source))
     }
     return false
 }

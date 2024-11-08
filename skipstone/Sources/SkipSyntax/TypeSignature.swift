@@ -336,6 +336,26 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
+    /// Set the name of this named type.
+    func withName(_ name: String) -> TypeSignature {
+        switch self {
+        case .metaType(let type):
+            return .metaType(type.withName(name))
+        case .member(let owner, let type):
+            return .member(owner, type.withName(name))
+        case .module(let moduleName, let type):
+            return .module(moduleName, type.withName(name))
+        case .named(_, let generics):
+            return .named(name, generics)
+        case .optional(let type):
+            return .optional(type.withName(name))
+        case .unwrappedOptional(let type):
+            return .unwrappedOptional(type.withName(name))
+        default:
+            return self
+        }
+    }
+
     /// The name of this type without package, outer types, generics, and optionals.
     var unqualifiedName: String {
         let name = self.name
