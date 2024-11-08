@@ -6,7 +6,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         guard !syntaxTree.isBridgeFile, let codebaseInfo = translator.codebaseInfo, let outputFile = syntaxTree.source.file.bridgeOutputFile else {
             return []
         }
-        let globalsClassRef = JavaClassRef(forFile: translator)
+        let globalsClassRef = JavaClassRef(forFileName: translator.syntaxTree.source.file.name, packageName: translator.packageName)
         var swiftDefinitions: [SwiftDefinition] = []
         var needsGlobalsJavaClass = false
         syntaxTree.root.visit { node in
@@ -110,6 +110,10 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         let preEscapedPropertyName = propertyName
         let propertyName = propertyName.fixingKeyword(in: KotlinIdentifier.hardKeywords)
 
+        var modifiers = modifiers
+        if inProtocol {
+            modifiers.visibility = .default
+        }
         let modifierString = modifiers.swift(suffix: " ")
         let hasSetter = apiFlags.options.contains(.writeable) && modifiers.setVisibility != .private && modifiers.setVisibility != .fileprivate
         var declarationSuffix = " {"
@@ -269,6 +273,11 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         let isThrows = apiFlags.throwsType != .none
         let functionType = type.functionType(with: bridgable, isConstructor: isConstructor)
         let functionTypeParameters = functionType.parameters
+        
+        var modifiers = modifiers
+        if inProtocol {
+            modifiers.visibility = .default
+        }
         let modifierString = modifiers.swift(suffix: " ")
 
         let parameterString = functionTypeParameters.enumerated().map { index, parameter in
@@ -541,7 +550,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             classDeclaration.messages.append(Message.kotlinBridgeMissingInfo(classDeclaration, source: translator.syntaxTree.source))
             return
         }
-        let classRef = JavaClassRef(for: classDeclaration, translator: translator)
+        let classRef = JavaClassRef(for: classDeclaration.signature, packageName: translator.packageName)
 
         let visibilityString = primaryTypeInfo.modifiers.visibility.swift(suffix: " ")
         let inherits = typeInfos.flatMap(\.inherits).compactMap {
@@ -614,13 +623,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             swift.append(1, "private static let Java_Companion_class = try! JClass(name: \"\(classRef.className)$Companion\")")
             swift.append(1, "private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: \"Companion\", sig: \"L\(classRef.className)$Companion;\")!))")
         }
-
-        swift.append(1, visibilityString + "static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {")
-        swift.append(2, "return .init(Java_ptr: obj!)")
-        swift.append(1, "}")
-        swift.append(1, visibilityString + "func toJavaObject() -> JavaObjectPointer? {")
-        swift.append(2, "return Java_peer.safePointer()")
-        swift.append(1, "}")
+        swift.append(1, Self.swiftForJConvertibleContract(visibility: primaryTypeInfo.modifiers.visibility))
 
         let definition = SwiftDefinition(statement: classDeclaration, children: memberDefinitions) { output, indentation, children in
             swift.forEach { output.append(indentation).append($0).append("\n") }
@@ -629,6 +632,18 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             output.append(indentation).append("}\n")
         }
         swiftDefinitions.append(definition)
+    }
+
+    private static func swiftForJConvertibleContract(visibility: Modifiers.Visibility) -> [String] {
+        let visibilityString = visibility.swift(suffix: " ")
+        var swift: [String] = []
+        swift.append(visibilityString + "static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {")
+        swift.append(1, "return .init(Java_ptr: obj!)")
+        swift.append("}")
+        swift.append(visibilityString + "func toJavaObject() -> JavaObjectPointer? {")
+        swift.append(1, "return Java_peer.safePointer()")
+        swift.append("}")
+        return swift
     }
 
     private func update(_ interfaceDeclaration: KotlinInterfaceDeclaration, swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator, codebaseInfo: CodebaseInfo.Context) {
@@ -675,21 +690,28 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         }
         swiftDefinitions.append(definition)
 
-        if let bridgeImplDefinition = Self.unknownBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, statement: interfaceDeclaration, codebaseInfo: codebaseInfo) {
+        if let bridgeImplDefinition = Self.unknownBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, codebaseInfo: codebaseInfo) {
             swiftDefinitions.append(bridgeImplDefinition)
         }
     }
 
-    static func unknownBridgeImplDefinition(forProtocol type: TypeSignature, statement: KotlinStatement?, codebaseInfo: CodebaseInfo.Context) -> SwiftDefinition? {
+    static func unknownBridgeImplDefinition(forProtocol type: TypeSignature, inPackage packageName: String?, statement: KotlinStatement?, codebaseInfo: CodebaseInfo.Context) -> SwiftDefinition? {
         guard let primaryTypeInfo = codebaseInfo.primaryTypeInfo(forNamed: type) else {
             return nil
         }
         let protocolSignatures = codebaseInfo.global.protocolSignatures(forNamed: type).dropFirst()
-        let modifierString = primaryTypeInfo.modifiers.swift(suffix: " ")
         let bridgeImpl = type.unknownBridgeImpl
 
         var swift: [String] = []
-        swift.append("\(modifierString)final class \(bridgeImpl): \(type) {")
+        swift.append("final class \(bridgeImpl): \(type), BridgedFromKotlin {")
+
+        let classRef = JavaClassRef(for: type, packageName: packageName)
+        swift.append(1, classRef.declaration)
+        swift.append(1, "let Java_peer: JObject")
+        swift.append(1, "required init(Java_ptr: JavaObjectPointer) {")
+        swift.append(2, "Java_peer = JObject(Java_ptr)")
+        swift.append(1, "}")
+
         swift.append(1, self.swift(forUnknownBridgeImplMembers: primaryTypeInfo, codebaseInfo: codebaseInfo))
         var seenProtocolSignatures: Set<TypeSignature> = []
         for protocolSignature in protocolSignatures {
@@ -697,15 +719,17 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
                 continue
             }
             if protocolSignature.isEquatable {
-                swift.append(1, self.swift(forEqualsFunctionIn: bridgeImpl, modifiers: primaryTypeInfo.modifiers))
+                swift.append(1, self.swift(forEqualsFunctionIn: bridgeImpl, modifiers: Modifiers(isStatic: true)))
             } else if protocolSignature.isHashable {
-                swift.append(1, self.swift(forHashFunctionIn: bridgeImpl, modifiers: primaryTypeInfo.modifiers))
+                swift.append(1, self.swift(forHashFunctionIn: bridgeImpl, modifiers: Modifiers()))
             } else if protocolSignature.isComparable {
-                swift.append(1, self.swift(forLessThanDeclarationIn: bridgeImpl, modifiers: primaryTypeInfo.modifiers))
+                swift.append(1, self.swift(forLessThanDeclarationIn: bridgeImpl, modifiers: Modifiers(isStatic: true)))
             } else if let protocolInfo = codebaseInfo.primaryTypeInfo(forNamed: protocolSignature) {
                 swift.append(1, self.swift(forUnknownBridgeImplMembers: protocolInfo, codebaseInfo: codebaseInfo))
             }
         }
+        swift.append(1, swiftForJConvertibleContract(visibility: .default))
+
         swift.append("}")
         return SwiftDefinition(statement: statement, swift: swift)
     }
@@ -719,7 +743,9 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             guard let bridgable = variableInfo.signature.checkBridgable(codebaseInfo: codebaseInfo) else {
                 continue
             }
-            swift += self.swift(forMemberVariableWithName: variableInfo.name, inProtocol: false, bridgable: bridgable, modifiers: info.modifiers, attributes: variableInfo.attributes, apiFlags: variableInfo.apiFlags ?? APIFlags())
+            var modifiers = variableInfo.modifiers
+            modifiers.visibility = .default
+            swift += self.swift(forMemberVariableWithName: variableInfo.name, inProtocol: false, bridgable: bridgable, modifiers: modifiers, attributes: variableInfo.attributes, apiFlags: variableInfo.apiFlags ?? APIFlags())
         }
         for functionInfo in info.functions {
             guard !functionInfo.attributes.isBridgeIgnored else {
@@ -728,7 +754,9 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             guard let bridgable = functionInfo.signature.checkFunctionBridgable(codebaseInfo: codebaseInfo) else {
                 continue
             }
-            swift += self.swift(forMemberFunctionWithName: functionInfo.name, type: functionInfo.signature, parameterValues: nil, isConstructor: false, inProtocol: false, bridgable: bridgable, modifiers: functionInfo.modifiers, apiFlags: functionInfo.apiFlags ?? APIFlags())
+            var modifiers = functionInfo.modifiers
+            modifiers.visibility = .default
+            swift += self.swift(forMemberFunctionWithName: functionInfo.name, type: functionInfo.signature, parameterValues: nil, isConstructor: false, inProtocol: false, bridgable: bridgable, modifiers: modifiers, apiFlags: functionInfo.apiFlags ?? APIFlags())
         }
         return swift
     }

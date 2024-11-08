@@ -867,7 +867,7 @@ final class FunctionCall: Expression, APICallExpression, MemberAccessExpression 
     }
 
     private func inferTypesFromFunction(context: TypeInferenceContext, apiMatch: APIMatch?, expecting: TypeSignature) {
-        let functionType = function.inferredType.asTypealiased(nil).asOptional(false).withoutOptionality()
+        let functionType = function.inferredType.asTypealiased(nil).withoutOptionality()
         if case .function(let parameterTypes, var returnType, let apiFlags, let attributes) = functionType {
             if parameterTypes.count == arguments.count {
                 for i in 0..<parameterTypes.count {

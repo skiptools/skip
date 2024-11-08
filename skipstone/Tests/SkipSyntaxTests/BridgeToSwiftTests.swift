@@ -1709,7 +1709,7 @@ final class BridgeToSwiftTests: XCTestCase {
             private static let Java_get_p_methodID = Java_class.getMethodID(name: "getP", sig: "()LP;")!
             private static let Java_set_p_methodID = Java_class.getMethodID(name: "setP", sig: "(LP;)V")!
 
-            func f(p: any P) -> (any P)? {
+            func f(p: (any P)) -> (any P)? {
                 return jniContext {
                     let p_java = ((p as? JConvertible)?.toJavaObject())!.toJavaParameter()
                     let f_return_java: JavaObjectPointer? = try! Java_peer.call(method: Self.Java_f_methodID, args: [p_java])

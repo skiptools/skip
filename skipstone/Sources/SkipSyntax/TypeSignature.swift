@@ -15,6 +15,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     case character
     case composition([TypeSignature]) // (A & B & C)
     case dictionary(TypeSignature?, TypeSignature?) // Nil means the generic type has been erased
+    case existential(ExistentialMode, TypeSignature) // any A
     case double
     case float
     case function([Parameter], TypeSignature, APIFlags, Attributes?)
@@ -54,7 +55,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         guard withoutOptionality || (isOptional == other.isOptional && isUnwrappedOptional == other.isUnwrappedOptional) else {
             return false
         }
-        return asTypealiased(nil).withoutOptionality().withModuleName(nil).withAPIFlags(APIFlags()) == other.asTypealiased(nil).withoutOptionality().withModuleName(nil).withAPIFlags(APIFlags())
+        return asTypealiased(nil).withoutOptionality().withExistentialMode(.none).withModuleName(nil).withAPIFlags(APIFlags()) == other.asTypealiased(nil).withoutOptionality().withExistentialMode(.none).withModuleName(nil).withAPIFlags(APIFlags())
     }
 
     /// What type this was typealiased from, if any.
@@ -149,9 +150,47 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         }
     }
 
+    /// Existential mode.
+    var existentialMode: ExistentialMode {
+        switch self {
+        case .existential(let mode, _):
+            return mode
+        case .optional(let type):
+            return type.existentialMode
+        case .typealiased(_, let type):
+            return type.existentialMode
+        case .unwrappedOptional(let type):
+            return type.existentialMode
+        default:
+            return .none
+        }
+    }
+
+    /// Assign the existential mode.
+    func withExistentialMode(_ mode: ExistentialMode) -> TypeSignature {
+        switch self {
+        case .existential(_, let type):
+            return mode == .none ? type : .existential(mode, type)
+        case .module, .member, .named:
+            return mode == .none ? self : .existential(mode, self)
+        case .metaType(let type):
+            return .metaType(type.withExistentialMode(mode))
+        case .optional(let type):
+            return .optional(type.withExistentialMode(mode))
+        case .typealiased(let alias, let type):
+            return .typealiased(alias, type.withExistentialMode(mode))
+        case .unwrappedOptional(let type):
+            return .unwrappedOptional(type.withExistentialMode(mode))
+        default:
+            return self
+        }
+    }
+
     /// Whether this is a meta type.
     var isMetaType: Bool {
         switch self {
+        case .existential(_, let type):
+            return type.isMetaType
         case .metaType:
             return true
         case .optional(let type):
@@ -205,6 +244,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// This type's module name, if specified.
     var moduleName: String? {
         switch self {
+        case .existential(_, let type):
+            return type.moduleName
         case .metaType(let type):
             return type.moduleName
         case .module(let moduleName, _):
@@ -223,6 +264,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// Add a module name to this type.
     func withModuleName(_ moduleName: String?) -> TypeSignature {
         switch self {
+        case .existential(let mode, let type):
+            return .existential(mode, type.withModuleName(moduleName))
         case .member, .named:
             if let moduleName {
                 return .module(moduleName, self)
@@ -249,6 +292,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// The base type of this member, if any.
     var baseType: TypeSignature {
         switch self {
+        case .existential(_, let type):
+            return type.baseType
         case .member(let base, _):
             return base
         case .metaType(let type):
@@ -269,6 +314,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// The leaf type of this member, or the type itself.
     var memberType: TypeSignature {
         switch self {
+        case .existential(_, let type):
+            return type.memberType
         case .member(_, let type):
             return type
         case .metaType(let type):
@@ -300,10 +347,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         let isOptional = baseType.isOptional || self.isOptional
         let isUnwrappedOptional = baseType.isUnwrappedOptional || self.isUnwrappedOptional
         let isMetaType = baseType.isMetaType || self.isMetaType
+        let existentialMode = baseType.existentialMode == .none ? self.existentialMode : baseType.existentialMode
         let moduleName = baseType.moduleName ?? self.moduleName
 
-        let baseType = baseType.asTypealiased(nil).withoutOptionality().asMetaType(false).withModuleName(nil)
-        let memberType = self.asTypealiased(nil).withoutOptionality().asMetaType(false).withModuleName(nil)
+        let baseType = baseType.asTypealiased(nil).withoutOptionality().asMetaType(false).withExistentialMode(.none).withModuleName(nil)
+        let memberType = self.asTypealiased(nil).withoutOptionality().asMetaType(false).withExistentialMode(.none).withModuleName(nil)
         let ret: TypeSignature
         switch memberType {
         case .member(let intermediate, let type):
@@ -311,7 +359,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         default:
             ret = .member(baseType, memberType)
         }
-        return ret.withModuleName(moduleName).asMetaType(isMetaType).asUnwrappedOptional(isUnwrappedOptional).asOptional(isOptional)
+        return ret.withModuleName(moduleName).withExistentialMode(existentialMode).asMetaType(isMetaType).asUnwrappedOptional(isUnwrappedOptional).asOptional(isOptional)
     }
 
     /// The name of this type without generics and optionals.
@@ -321,16 +369,18 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return "Array"
         case .dictionary:
             return "Dictionary"
+        case .existential(_, let type):
+            return type.name
         case .named(let name, _):
             return name
         case .optional(let type):
-            return type.descriptionUsing(\.name)
+            return type.name
         case .range:
             return "Range"
         case .set:
             return "Set"
         case .unwrappedOptional(let type):
-            return type.descriptionUsing(\.name)
+            return type.name
         default:
             return descriptionUsing(\.name)
         }
@@ -339,6 +389,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// Set the name of this named type.
     func withName(_ name: String) -> TypeSignature {
         switch self {
+        case .existential(let mode, let type):
+            return .existential(mode, type.withName(name))
         case .metaType(let type):
             return .metaType(type.withName(name))
         case .member(let owner, let type):
@@ -635,6 +687,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             } else {
                 return []
             }
+        case .existential(_, let type):
+            return type.generics
         case .member(_, let type):
             return type.generics
         case .metaType(let type):
@@ -681,6 +735,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             } else if generics.count == 2 {
                 return .dictionary(generics[0], generics[1])
             }
+        case .existential(let mode, let type):
+            return .existential(mode, type.withGenerics(generics))
         case .member(let base, let type):
             // Special case for stripping generics
             if generics.isEmpty {
@@ -739,6 +795,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return .composition(types.map { $0.constrainedTypeWithGenerics(generics) })
         case .dictionary(let key, let value):
             return .dictionary(key?.constrainedTypeWithGenerics(generics), value?.constrainedTypeWithGenerics(generics))
+        case .existential(let mode, let type):
+            return .existential(mode, type.constrainedTypeWithGenerics(generics))
         case .function(let parameters, let returnType, let apiFlags, let attributes):
             return .function(parameters.map { $0.constrainedTypeWithGenerics(generics) }, returnType.constrainedTypeWithGenerics(generics), APIFlags(options: apiFlags.options, throwsType: apiFlags.throwsType.constrainedTypeWithGenerics(generics)), attributes)
         case .member(let base, let type):
@@ -776,11 +834,12 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     }
 
     private func addGenericMappings(to: TypeSignature, into generics: inout Generics) {
-        let to = to.asTypealiased(nil)
-        guard !to.isSameType(as: self) else {
+        let to = to.asTypealiased(nil).withExistentialMode(.none)
+        let selfType = self.withExistentialMode(.none)
+        guard !to.isSameType(as: selfType) else {
             return
         }
-        if case .named(let name, []) = self, let index = generics.entries.firstIndex(where: { $0.name == name }) {
+        if case .named(let name, []) = selfType, let index = generics.entries.firstIndex(where: { $0.name == name }) {
             if let whereEqual = generics.entries[index].whereEqual {
                 generics.entries[index].whereEqual = whereEqual.or(to, replaceAny: true)
             } else {
@@ -788,7 +847,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
             return
         }
-        switch self {
+        switch selfType {
         case .array(let element):
             if let element {
                 if case .array(let element2) = to, let element2 {
@@ -814,6 +873,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                     value.addGenericMappings(to: value2, into: &generics)
                 }
             }
+        case .existential(_, let type):
+            type.addGenericMappings(to: to.withExistentialMode(.none), into: &generics)
         case .function(let parameters, let returnType, let apiFlags, _):
             if case .function(let parameters2, let returnType2, let apiFlags2, _) = to, parameters.count == parameters2.count {
                 zip(parameters, parameters2).forEach { $0.0.type.addGenericMappings(to: $0.1.type, into: &generics) }
@@ -915,6 +976,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .dictionary(let key, let value):
             key?.visit(visitor)
             value?.visit(visitor)
+        case .existential(_, let type):
+            type.visit(visitor)
         case .function(let parameters, let returnType, let apiFlags, _):
             parameters.forEach { $0.type.visit(visitor) }
             returnType.visit(visitor)
@@ -987,6 +1050,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return .composition(types.map { $0.mappingTypes(with: map) })
         case .dictionary(let key, let value):
             return .dictionary(key?.mappingTypes(with: map), value?.mappingTypes(with: map))
+        case .existential(let mode, let type):
+            return .existential(mode, type.mappingTypes(with: map))
         case .function(let parameters, let returnType, let apiFlags, let attributes):
             return .function(parameters.map { $0.mappingTypes(with: map) }, returnType.mappingTypes(with: map), APIFlags(options: apiFlags.options, throwsType: apiFlags.throwsType.mappingTypes(with: map)), attributes)
         case .member(let base, let type):
@@ -1034,6 +1099,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             return .composition(types.map { $0.resolved(in: node, declaringType: declaringType, context: context) })
         case .dictionary(let keyType, let valueType):
             return .dictionary(keyType?.resolved(in: node, declaringType: declaringType, context: context), valueType?.resolved(in: node, declaringType: declaringType, context: context))
+        case .existential(let mode, let type):
+            return .existential(mode, type.resolved(in: node, declaringType: declaringType, moduleName: moduleName, context: context))
         case .function(let parameters, let returnType, let apiFlags, let attributes):
             let resolvedParameters = parameters.map { Parameter(label: $0.label, type: $0.type.resolved(in: node, declaringType: declaringType, context: context), isInOut: $0.isInOut, isVariadic: $0.isVariadic, isVariadicContinuation: $0.isVariadicContinuation, hasDefaultValue: $0.hasDefaultValue) }
             return .function(resolvedParameters, returnType.resolved(in: node, declaringType: declaringType, context: context), APIFlags(options: apiFlags.options, throwsType: apiFlags.throwsType.resolved(in: node, declaringType: declaringType, context: context)), attributes)
@@ -1111,7 +1178,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// Attempt to replace `.none` cases in this type signature with information from the given signature.
     func or(_ typeSignature: TypeSignature, replaceAny: Bool = false) -> TypeSignature {
         let typeModule = typeSignature.moduleName
-        let strippedTypeSignature = typeSignature.asTypealiased(nil).withoutOptionality().withModuleName(nil)
+        let strippedTypeSignature = typeSignature.asTypealiased(nil).withoutOptionality().withExistentialMode(.none).withModuleName(nil)
 
         switch self {
         case .any:
@@ -1129,6 +1196,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 let resolvedValueType = valueType2 == nil ? valueType : valueType?.or(valueType2!, replaceAny: replaceAny)
                 return .dictionary(resolvedKeyType, resolvedValueType)
             }
+        case .existential(let mode, let type):
+            let resolvedType = type.or(strippedTypeSignature)
+            return .existential(mode, resolvedType)
         case .function(let parameters, let returnType, let apiFlags, let attributes):
             if case .function(let parameters2, let returnType2, let apiFlags2, _) = strippedTypeSignature {
                 // We may use an empty parameters array to represent .none
@@ -1269,6 +1339,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// Whether this is any named type.
     var isNamedType: Bool {
         switch self {
+        case .existential(_, let type):
+            return type.isNamedType
         case .member:
             return true
         case .module(_, let type):
@@ -1289,6 +1361,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// Whether this is a named type with the given name, optionally matching a module and generics.
     func isNamed(_ name: String, moduleName: String? = nil, generics: [TypeSignature]? = nil) -> Bool {
         switch self {
+        case .existential(_, let type):
+            return type.isNamed(name, moduleName: moduleName, generics: generics)
         case .member(let base, let member):
             guard let dotIdx = name.lastIndex(of: ".") else {
                 return false
@@ -1327,11 +1401,11 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     /// Compound types with multiple elements return an average of their elements' scores.
     func compatibilityScore(target: TypeSignature, codebaseInfo: CodebaseInfo.Context, isLiteral: Bool = false, isInterpolated: Bool = false) -> Double? {
         let moduleName = self.moduleName
-        let type = asTypealiased(nil).withModuleName(nil)
+        let type = asTypealiased(nil).withExistentialMode(.none).withModuleName(nil)
         let targetIsOptional = target.isOptional
         let targetModuleName = target.moduleName
         let maybeSameModule = moduleName == nil || targetModuleName == nil || moduleName == targetModuleName
-        let strippedTarget = target.asTypealiased(nil).withoutOptionality().withModuleName(nil)
+        let strippedTarget = target.asTypealiased(nil).withoutOptionality().withExistentialMode(.none).withModuleName(nil)
         if type == strippedTarget && maybeSameModule {
             if type == .string {
                 // Favor using ExpressibleByStringLiteral or ExpressibleByStringInterpolation for literals
@@ -1608,7 +1682,14 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             guard let someOrAnyType = syntax.as(SomeOrAnyTypeSyntax.self) else {
                 return .none
             }
-            return self.for(syntax: someOrAnyType.constraint, in: syntaxTree)
+            switch someOrAnyType.someOrAnySpecifier.text {
+            case "any":
+                return .existential(.any, self.for(syntax: someOrAnyType.constraint, in: syntaxTree))
+            case "some":
+                return .existential(.some, self.for(syntax: someOrAnyType.constraint, in: syntaxTree))
+            default:
+                return self.for(syntax: someOrAnyType.constraint, in: syntaxTree)
+            }
         case .functionType:
             guard let functionType = syntax.as(FunctionTypeSyntax.self) else {
                 return .none
@@ -1870,6 +1951,15 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
         case .double:
             return "Double"
+        case .existential(let mode, let type):
+            switch mode {
+            case .none:
+                return type.descriptionUsing(keyPath)
+            case .any:
+                return "(any \(type.descriptionUsing(keyPath)))"
+            case .some:
+                return "(some \(type.descriptionUsing(keyPath)))"
+            }
         case .float:
             return "Float"
         case .function(let parameters, let returnType, let apiFlags, _):
@@ -1967,6 +2057,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .void:
             return "Void"
         }
+    }
+
+    /// Existential type handling.
+    enum ExistentialMode: Hashable, Codable {
+        case none
+        case any
+        case some
     }
 
     /// Typealias information.

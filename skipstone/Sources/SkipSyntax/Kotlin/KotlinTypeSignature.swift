@@ -38,6 +38,8 @@ extension TypeSignature {
             }
         case .double:
             return "Double"
+        case .existential(_, let type):
+            return type.kotlin
         case .float:
             return "Float"
         case .function(let parameters, let returnType, let apiFlags, let attributes):
@@ -176,6 +178,8 @@ extension TypeSignature {
             return !types.contains { $0.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo) == false }
         case .dictionary:
             return true
+        case .existential(_, let type):
+            return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
         case .double:
             return false
         case .float:
@@ -258,6 +262,8 @@ extension TypeSignature {
             return false
         case .double:
             return true
+        case .existential(_, let type):
+            return type.kotlinIsNative(primitive: primitive)
         case .float:
             return true
         case .function:

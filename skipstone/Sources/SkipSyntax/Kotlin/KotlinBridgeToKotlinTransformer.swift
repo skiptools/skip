@@ -29,7 +29,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
                 return .recurse(nil)
             } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
                 if updateInterfaceDeclaration(interfaceDeclaration, translator: translator) {
-                    if let bridgeImplDefinition = KotlinBridgeToSwiftTransformer.unknownBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, statement: interfaceDeclaration, codebaseInfo: codebaseInfo) {
+                    if let bridgeImplDefinition = KotlinBridgeToSwiftTransformer.unknownBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, codebaseInfo: codebaseInfo) {
                         swiftDefinitions.append(bridgeImplDefinition)
                     }
                 }
@@ -644,7 +644,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         classDeclaration.insert(statements: insertStatements, after: nil)
 
         // Conform to `BridgedToKotlin`
-        let classRef = JavaClassRef(for: classDeclaration, translator: translator)
+        let classRef = JavaClassRef(for: classDeclaration.signature, packageName: translator.packageName)
         var swift: [String] = []
         swift.append("extension \(classDeclaration.signature): BridgedToKotlin {")
         swift.append(1, classRef.declaration)

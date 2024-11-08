@@ -41,28 +41,27 @@ struct JavaClassRef {
     let className: String
     let isFileClass: Bool
 
-    init(for classDeclaration: KotlinClassDeclaration, translator: KotlinTranslator) {
+    init(for signature: TypeSignature, packageName: String?) {
         let className: String
-        if let packageName = translator.packageName {
-            className = packageName.replacing(".", with: "/") + "/" + classDeclaration.name
+        if let packageName {
+            className = packageName.replacing(".", with: "/") + "/" + signature.name
         } else {
-            className = classDeclaration.name
+            className = signature.name
         }
         self.identifier = "Java_class"
         self.className = className
         self.isFileClass = false
     }
 
-    init(forFile translator: KotlinTranslator) {
-        let file = translator.syntaxTree.source.file
-        var identifier = file.name
-        let ext = file.extension
-        if !ext.isEmpty {
-            identifier = String(identifier.dropLast(ext.count + 1))
+    init(forFileName fileName: String, packageName: String?) {
+        var identifier = fileName
+        if let extensionIndex = fileName.lastIndex(of: ".") {
+            let extensionCount = fileName.suffix(from: extensionIndex).count
+            identifier = String(identifier.dropLast(extensionCount))
         }
         identifier += "Kt"
         let className: String
-        if let packageName = translator.packageName {
+        if let packageName {
             className = packageName.replacing(".", with: "/") + "/" + identifier
         } else {
             className = identifier
@@ -107,7 +106,7 @@ extension TypeSignature {
 
     /// The generated native type when the bridging strategy is unknown - e.g. for protocols.
     var unknownBridgeImpl: TypeSignature {
-        return withName(name + "_BridgeImpl")
+        return withExistentialMode(.none).withName(name + "_BridgeImpl")
     }
 
     /// Return the `@_cdecl` function equivalent of this type.
@@ -277,6 +276,8 @@ extension TypeSignature {
             return "Lskip/lib/Dictionary;"
         case .double:
             return "D"
+        case .existential(_, let type):
+            return type.jni()
         case .float:
             return "F"
         case .function(let parameters, let returnType, _, _):
@@ -413,9 +414,9 @@ struct Bridgable {
         case unknown
     }
 
-    let type: TypeSignature
-    let qualifiedType: TypeSignature
-    let strategy: Strategy
+    var type: TypeSignature
+    var qualifiedType: TypeSignature
+    var strategy: Strategy
 }
 
 /// Information used to bridge functions.
@@ -555,6 +556,13 @@ extension TypeSignature {
             return Bridgable(type: self, qualifiedType: self, strategy: .convertible)
         case .double, .float:
             return Bridgable(type: self, qualifiedType: self, strategy: .direct)
+        case .existential(let mode, let type):
+            guard var bridgable = type.checkBridgable(codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) else {
+                return nil
+            }
+            bridgable.type = bridgable.type.withExistentialMode(mode)
+            bridgable.qualifiedType = bridgable.qualifiedType.withExistentialMode(mode)
+            return bridgable
         case .function(let parameters, let returnType, let apiFlags, _):
             guard checkNonTypedThrows(apiFlags: apiFlags, sourceDerived: sourceDerived, source: source) else {
                 return nil
