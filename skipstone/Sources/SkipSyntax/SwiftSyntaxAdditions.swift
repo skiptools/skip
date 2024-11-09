@@ -103,7 +103,7 @@ extension FunctionParameterClauseSyntax {
 }
 
 extension AccessorDeclListSyntax {
-    func accessors(decodeBody: Bool = true, in syntaxTree: SyntaxTree) -> Accessors {
+    func accessors(decodeBody: Bool = true, context: DecodeContext, in syntaxTree: SyntaxTree) -> Accessors {
         var accessors = Accessors()
         for accessorSyntax in self {
             if accessorSyntax.effectSpecifiers?.asyncSpecifier != nil {
@@ -114,7 +114,7 @@ extension AccessorDeclListSyntax {
             }
             var body: CodeBlock? = nil
             if decodeBody, let bodySyntax = accessorSyntax.body {
-                let statements = StatementDecoder.decode(syntaxListContainer: bodySyntax, in: syntaxTree)
+                let statements = StatementDecoder.decode(syntaxListContainer: bodySyntax, context: context, in: syntaxTree)
                 body = CodeBlock(statements: statements)
             }
 

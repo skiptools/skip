@@ -402,7 +402,7 @@ public final class CodebaseInfo {
         ///
         /// - Note: Assumes that the constrained `type` has been resolved.
         func matchIdentifier(name: String, inConstrained type: TypeSignature, excludeConstrainedExtensions: Bool = false) -> APIMatch? {
-            var type = type.asTypealiased(nil).asOptional(false)
+            var type = type.asTypealiased(nil).asOptional(false).withExistentialMode(.none)
             if case .tuple(let labels, let types) = type {
                 for (index, label) in labels.enumerated() {
                     if name == label || name == "\(index)" {
@@ -469,7 +469,7 @@ public final class CodebaseInfo {
         ///
         /// - Note: Assumes that the constrained `type` has been resolved.
         func matchFunction(name: String?, inConstrained type: TypeSignature, arguments: [LabeledValue<ArgumentValue>], excludeConstrainedExtensions: Bool = false) -> [APIMatch] {
-            let type = type.asOptional(false)
+            let type = type.asOptional(false).withExistentialMode(.none)
             if case .tuple(let labels, let types) = type.asTypealiased(nil) {
                 for (index, label) in labels.enumerated() {
                     if name == label || name == "\(index)" {
@@ -548,7 +548,6 @@ public final class CodebaseInfo {
         
         /// Return the associated values of the given enum case.
         func associatedValueSignatures(of member: String, inConstrained type: TypeSignature) -> [TypeSignature.Parameter] {
-            let type = type.asOptional(false)
             for typeInfo in typeInfos(forNamed: type) {
                 if let types = associatedValueSignatures(of: member, in: typeInfo, constrainedGenerics: type.generics) {
                     return types
@@ -764,7 +763,7 @@ public final class CodebaseInfo {
 
         /// - Note: Returns unsorted results.
         private func typeNameFunctionCandidates(for type: TypeSignature, moduleName: String? = nil, constrainedGenerics: [TypeSignature], arguments: [LabeledValue<ArgumentValue>], excludeConstrainedExtensions: Bool) -> [FunctionCandidate] {
-            switch type.withoutOptionality() {
+            switch type.withoutOptionality().withExistentialMode(.none) {
             case .member(let baseType, let type):
                 return functionCandidates(name: type.name, in: baseType.asMetaType(true), constrainedGenerics: constrainedGenerics, arguments: arguments, excludeConstrainedExtensions: excludeConstrainedExtensions)
             case .module(let moduleName, let type):
@@ -997,6 +996,8 @@ public final class CodebaseInfo {
             return types.flatMap { candidateTypeNames(for: $0) }
         case .dictionary:
             return [("Dictionary", nil)]
+        case .existential(_, let type):
+            return candidateTypeNames(for: type)
         case .function:
             return []
         case .member(let base, let member):

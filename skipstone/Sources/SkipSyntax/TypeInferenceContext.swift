@@ -530,8 +530,8 @@ struct TypeInferenceContext {
 
     /// For an operation on two types, return the probable result type.
     func operationResult(_ type1: TypeSignature, _ type2: TypeSignature) -> TypeSignature {
-        let type1 = type1.constrainedTypeWithGenerics(generics).asTypealiased(nil).withoutOptionality().withModuleName(nil)
-        let type2 = type2.constrainedTypeWithGenerics(generics).asTypealiased(nil).withoutOptionality().withModuleName(nil)
+        let type1 = type1.constrainedTypeWithGenerics(generics).asTypealiased(nil).withoutOptionality().withExistentialMode(.none).withModuleName(nil)
+        let type2 = type2.constrainedTypeWithGenerics(generics).asTypealiased(nil).withoutOptionality().withExistentialMode(.none).withModuleName(nil)
         if type1 == type2 {
             return type1
         }

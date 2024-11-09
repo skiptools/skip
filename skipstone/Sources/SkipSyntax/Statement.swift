@@ -14,7 +14,7 @@ class Statement: SyntaxNode {
     /// Attempt to construct statements of this type from the given syntax.
     ///
     /// - Throws: `Message` when unable to decode a compatible syntax.
-    class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         return nil
     }
 
@@ -27,61 +27,19 @@ class Statement: SyntaxNode {
         }
     }
 
-    /// Whether a declaration with the given attributes and visibility is bridging.
-    static func isBridge(attributes: Attributes, visibility: Modifiers.Visibility, asMember: Bool) -> Bool {
-        if asMember {
+    /// How to decode a declaration with the given attributes and visibility.
+    static func decodeLevel(attributes: Attributes, visibility: Modifiers.Visibility, context: DecodeContext, in syntaxTree: SyntaxTree) -> DecodeLevel {
+        guard syntaxTree.isBridgeFile else {
+            return .full
+        }
+        if context.memberOf != nil, !(self is TypeDeclaration.Type) {
             guard !attributes.isBridgeIgnored else {
-                return false
+                return .none
             }
-            return visibility != .private && visibility != .fileprivate
+            return visibility > .fileprivate ? .api : .none
         } else {
-            return attributes.isBridgeToKotlin || attributes.isBridgeToSwift
+            return attributes.isBridgeToKotlin || attributes.isBridgeToSwift ? .api : .none
         }
-    }
-}
-
-/// Decode statements from syntax.
-struct  StatementDecoder {
-    static func decode(syntax: SyntaxProtocol, asMember: Bool = false, in syntaxTree: SyntaxTree) -> [Statement] {
-        let extras = StatementExtras.decode(syntax: syntax)
-        var statements: [Statement] = []
-        if let extras {
-            let (extraStatements, replace) = extras.statements(syntax: syntax, in: syntaxTree)
-            guard !replace else {
-                return extraStatements
-            }
-            statements = extraStatements
-        }
-
-        var message: Message? = nil
-        do {
-            for statementType in StatementType.allCases {
-                if let representingType = statementType.representingType, let decodedStatements = try representingType.decode(syntax: syntax, extras: extras, asMember: asMember, in: syntaxTree) {
-                    statements += decodedStatements
-                    return statements
-                }
-            }
-        } catch {
-            message = error as? Message
-        }
-        // Unsupported
-        statements.append(RawStatement(syntax: syntax, message: message, extras: extras, in: syntaxTree))
-        return statements
-    }
-
-    static func decode<ListContainer: SyntaxListContainer>(syntaxListContainer: ListContainer, asMember: Bool = false, in syntaxTree: SyntaxTree) -> [Statement] {
-        var statements = decode(syntaxList: syntaxListContainer.syntaxList, asMember: asMember, in: syntaxTree)
-        let endSyntax = syntaxListContainer.endOfListSyntax
-        if let extras = StatementExtras.decode(syntax: endSyntax) {
-            let (extraStatements, _) = extras.statements(syntax: endSyntax, in: syntaxTree)
-            statements += extraStatements
-            statements.append(Empty(syntax: endSyntax, extras: extras, in: syntaxTree))
-        }
-        return statements
-    }
-
-    static func decode<List: SyntaxList>(syntaxList: List, asMember: Bool = false, in syntaxTree: SyntaxTree) -> [Statement] {
-        return syntaxList.flatMap { decode(syntax: $0.content, asMember: asMember, in: syntaxTree) }
     }
 }
 
@@ -96,7 +54,7 @@ class ExpressionStatement: Statement {
         super.init(type: type, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
         if syntax.kind == .expressionStmt, let expressionStmnt = syntax.as(ExpressionStmtSyntax.self) {
             let expression = ExpressionDecoder.decode(syntax: expressionStmnt.expression, in: syntaxTree)
             return [ExpressionStatement(expression: expression, syntax: expressionStmnt.expression, sourceFile: syntaxTree.source.file, sourceRange: expressionStmnt.expression.range(in: syntaxTree.source), extras: extras)]
@@ -127,7 +85,7 @@ final class MessageStatement: Statement {
         self.messages = [message]
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
         return nil
     }
 }
@@ -171,7 +129,7 @@ final class RawStatement: Statement {
         return expectedType
     }
 
-    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, asMember: Bool, in syntaxTree: SyntaxTree) -> [Statement]? {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
         return nil
     }
 

@@ -1170,6 +1170,11 @@ final class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APIC
 }
 
 final class KotlinIdentifier: KotlinExpression, KotlinMainActorTargeting, KotlinCastTarget, KotlinSwiftUIBindable, APICallExpression {
+    /// https://kotlinlang.org/docs/keyword-reference.html#hard-keywords
+    static let hardKeywords: Set<String> = [
+        "as", "break", "class", "continue", "do", "else", "false", "for", "fun", "if", "in", "interface", "checks", "is", "null", "object", "package", "return", "this", "throw", "true", "try", "typealias", "typeof", "val", "var", "when", "while", //"super", // super causes conflicts with the super() call
+    ]
+    
     var name: String
     var apiMatch: APIMatch?
     var mayBeSharedMutableStruct = false

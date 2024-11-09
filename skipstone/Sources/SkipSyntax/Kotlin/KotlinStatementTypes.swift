@@ -1689,8 +1689,10 @@ struct KotlinExtensionDeclaration {
 /// - Seealso: ``KotlinConstructorTransformer``
 final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration {
     var name: String
+    var preEscapedName: String?
     var returnType: TypeSignature = .void
     var parameters: [Parameter<KotlinExpression>] = []
+    var preEscapedParameterLabels: [String?]?
     var isOpen = false
     var role: Role = .member
     var isOptionalInit = false
@@ -1710,6 +1712,13 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
     var isGenerated = false
     var functionType: TypeSignature {
         return attributes.apply(toFunction: .function(parameters.map(\.signature), returnType, apiFlags, nil))
+    }
+    var preEscapedFunctionType: TypeSignature {
+        let parameters = parameters.map(\.signature).enumerated().map {
+            let label = preEscapedParameterLabel($0.offset) ?? $0.element.label
+            return TypeSignature.Parameter(label: label, type: $0.element.type, isInOut: $0.element.isInOut, isVariadic: $0.element.isVariadic, isVariadicContinuation: $0.element.isVariadicContinuation, hasDefaultValue: $0.element.hasDefaultValue)
+        }
+        return attributes.apply(toFunction: .function(parameters, returnType, apiFlags, nil))
     }
     var functionGenerics: Generics {
         get {
@@ -1963,6 +1972,13 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
     private init(statement: SubscriptDeclaration, isSetter: Bool) {
         self.name = isSetter ? "set" : "get"
         super.init(type: .functionDeclaration, statement: statement)
+    }
+
+    func preEscapedParameterLabel(_ index: Int) -> String? {
+        guard let preEscapedParameterLabels, preEscapedParameterLabels.count == parameters.count else {
+            return nil
+        }
+        return preEscapedParameterLabels[index]
     }
 
     override func insertDependencies(into dependencies: inout KotlinDependencies) {

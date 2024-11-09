@@ -719,7 +719,7 @@ private final class TranslateVisitor {
         guard let memberAccess = functionCall.function as? KotlinMemberAccess, memberAccess.member != "Compose", let subject = memberAccess.base as? KotlinFunctionCall, let identifier = subject.function as? KotlinIdentifier else {
             return
         }
-        guard identifier.name == "Group" || (identifier.name == "ForEach" && memberAccess.member != "onDelete" && memberAccess.member != "onMove") else {
+        guard identifier.name == "Group" || identifier.name == "Section" || (identifier.name == "ForEach" && memberAccess.member != "onDelete" && memberAccess.member != "onMove") else {
             return
         }
         guard isInSwiftUIElement("List", node: functionCall) else {

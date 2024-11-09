@@ -234,7 +234,7 @@ extension CodebaseInfo.Context {
             return !global.protocolSignatures(forNamed: type).contains(.anyObject)
         } else if typeInfos.isEmpty {
             // Assume an unknown type could be a mutable struct
-            switch type.asTypealiased(nil).withoutOptionality() {
+            switch type.asTypealiased(nil).withoutOptionality().withExistentialMode(.none) {
             case .named, .member, .module:
                 // Cross platform typealiases should not be treated as mutable structs
                 return crossPlatformTypealias(forUnknownNamed: type) == nil

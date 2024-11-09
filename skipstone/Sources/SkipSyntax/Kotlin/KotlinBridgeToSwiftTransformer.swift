@@ -6,7 +6,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         guard !syntaxTree.isBridgeFile, let codebaseInfo = translator.codebaseInfo, let outputFile = syntaxTree.source.file.bridgeOutputFile else {
             return []
         }
-        let globalsClassRef = JavaClassRef(forFile: translator)
+        let globalsClassRef = JavaClassRef(forFileName: translator.syntaxTree.source.file.name, packageName: translator.packageName)
         var swiftDefinitions: [SwiftDefinition] = []
         var needsGlobalsJavaClass = false
         syntaxTree.root.visit { node in
@@ -29,6 +29,13 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
                     update(classDeclaration, swiftDefinitions: &swiftDefinitions, translator: translator, codebaseInfo: codebaseInfo)
                 } else if classDeclaration.attributes.isBridgeToKotlin {
                     classDeclaration.messages.append(Message.kotlinBridgeKotlinToKotlin(classDeclaration, source: translator.syntaxTree.source))
+                }
+                return .recurse(nil)
+            } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
+                if interfaceDeclaration.attributes.isBridgeToSwift {
+                    update(interfaceDeclaration, swiftDefinitions: &swiftDefinitions, translator: translator, codebaseInfo: codebaseInfo)
+                } else if interfaceDeclaration.attributes.isBridgeToKotlin {
+                    interfaceDeclaration.messages.append(Message.kotlinBridgeKotlinToKotlin(interfaceDeclaration, source: translator.syntaxTree.source))
                 }
                 return .recurse(nil)
             } else {
@@ -64,55 +71,77 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         guard let bridgable = variableDeclaration.checkBridgable(translator: translator) else {
             return false
         }
-        guard !addConstantDefinition(for: variableDeclaration, type: bridgable.type, modifiers: variableDeclaration.modifiers, to: &swiftDefinitions, translator: translator) else {
+        guard !addConstantDefinition(for: variableDeclaration, type: bridgable.type, modifiers: variableDeclaration.modifiers, to: &swiftDefinitions) else {
             return false
         }
-        let swift = swift(for: variableDeclaration, bridgable: bridgable, modifiers: variableDeclaration.modifiers, targetIdentifier: globalsClassRef.identifier, classIdentifier: globalsClassRef.identifier, getMethodIdentifier: "Java_get_" + variableDeclaration.propertyName + "_methodID", setMethodIdentifier: "Java_set_" + variableDeclaration.propertyName + "_methodID", translator: translator)
+        let propertyName = variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName
+        let swift = Self.swift(forVariableWithName: propertyName, isGlobal: true, bridgable: bridgable, modifiers: variableDeclaration.modifiers, attributes: variableDeclaration.attributes, apiFlags: variableDeclaration.apiFlags, targetIdentifier: globalsClassRef.identifier, classIdentifier: globalsClassRef.identifier, getMethodIdentifier: "Java_get_" + variableDeclaration.propertyName + "_methodID", setMethodIdentifier: "Java_set_" + variableDeclaration.propertyName + "_methodID")
         swiftDefinitions.append(SwiftDefinition(statement: variableDeclaration, swift: swift))
         return true
     }
 
-    private func update(_ variableDeclaration: KotlinVariableDeclaration, info: CodebaseInfo.VariableInfo?, swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) -> Bool {
+    @discardableResult private func update(_ variableDeclaration: KotlinVariableDeclaration, info: CodebaseInfo.VariableInfo?, swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) -> Bool {
         guard let bridgable = variableDeclaration.checkBridgable(translator: translator) else {
             return false
         }
         let modifiers = info?.modifiers ?? variableDeclaration.modifiers
-        guard !addConstantDefinition(for: variableDeclaration, type: bridgable.type, modifiers: modifiers, to: &swiftDefinitions, translator: translator) else {
+        guard !addConstantDefinition(for: variableDeclaration, type: bridgable.type, modifiers: modifiers, to: &swiftDefinitions) else {
             return false
         }
-
-        let sourceCode: [String]
-        if variableDeclaration.isStatic {
-            sourceCode = swift(for: variableDeclaration, bridgable: bridgable, modifiers: modifiers, targetIdentifier: "Java_Companion", classIdentifier: "Java_Companion_class", getMethodIdentifier: "Java_Companion_get_" + variableDeclaration.propertyName + "_methodID", setMethodIdentifier: "Java_Companion_set_" + variableDeclaration.propertyName + "_methodID", translator: translator)
-        } else {
-            sourceCode = swift(for: variableDeclaration, bridgable: bridgable, modifiers: modifiers, targetIdentifier: "Java_peer", classIdentifier: "Java_class", getMethodIdentifier: "Java_get_" + variableDeclaration.propertyName + "_methodID", setMethodIdentifier: "Java_set_" + variableDeclaration.propertyName + "_methodID", translator: translator)
-        }
-        swiftDefinitions.append(SwiftDefinition(statement: variableDeclaration, swift: sourceCode))
+        let isProtocol = variableDeclaration.parent is KotlinInterfaceDeclaration
+        let propertyName = info?.name ?? variableDeclaration.propertyName
+        let attributes = info?.attributes ?? variableDeclaration.attributes
+        let apiFlags = info?.apiFlags ?? variableDeclaration.apiFlags
+        let swift = Self.swift(forMemberVariableWithName: propertyName, inProtocol: isProtocol, bridgable: bridgable, modifiers: modifiers, attributes: attributes, apiFlags: apiFlags)
+        swiftDefinitions.append(SwiftDefinition(statement: variableDeclaration, swift: swift))
         return true
     }
 
-    private func swift(for variableDeclaration: KotlinVariableDeclaration, bridgable: Bridgable, modifiers: Modifiers, targetIdentifier: String, classIdentifier: String, getMethodIdentifier: String, setMethodIdentifier: String, translator: KotlinTranslator) -> [String] {
+    private static func swift(forMemberVariableWithName propertyName: String, inProtocol: Bool, bridgable: Bridgable, modifiers: Modifiers, attributes: Attributes, apiFlags: APIFlags) -> [String] {
+        if modifiers.isStatic {
+            return swift(forVariableWithName: propertyName, inProtocol: inProtocol, bridgable: bridgable, modifiers: modifiers, attributes: attributes, apiFlags: apiFlags, targetIdentifier: "Java_Companion", classIdentifier: "Java_Companion_class", getMethodIdentifier: "Java_Companion_get_" + propertyName + "_methodID", setMethodIdentifier: "Java_Companion_set_" + propertyName + "_methodID")
+        } else {
+            return swift(forVariableWithName: propertyName, inProtocol: inProtocol, bridgable: bridgable, modifiers: modifiers, attributes: attributes, apiFlags: apiFlags, targetIdentifier: "Java_peer", classIdentifier: "Java_class", getMethodIdentifier: "Java_get_" + propertyName + "_methodID", setMethodIdentifier: "Java_set_" + propertyName + "_methodID")
+        }
+    }
+
+    private static func swift(forVariableWithName propertyName: String, isGlobal: Bool = false, inProtocol: Bool = false, bridgable: Bridgable, modifiers: Modifiers, attributes: Attributes, apiFlags: APIFlags, targetIdentifier: String, classIdentifier: String, getMethodIdentifier: String, setMethodIdentifier: String) -> [String] {
         var swift: [String] = []
-        let type = bridgable.type
-        let propertyName = variableDeclaration.propertyName
-        let preEscapedPropertyName = variableDeclaration.preEscapedPropertyName
+        let preEscapedPropertyName = propertyName
+        let propertyName = propertyName.fixingKeyword(in: KotlinIdentifier.hardKeywords)
+
+        var modifiers = modifiers
+        if inProtocol {
+            modifiers.visibility = .default
+        }
         let modifierString = modifiers.swift(suffix: " ")
-        swift.append("\(modifierString)var \(preEscapedPropertyName ?? propertyName): \(type.description) {")
+        let hasSetter = apiFlags.options.contains(.writeable) && modifiers.setVisibility != .private && modifiers.setVisibility != .fileprivate
+        var declarationSuffix = " {"
+        if inProtocol {
+            declarationSuffix += " get"
+            if hasSetter {
+                declarationSuffix += " set"
+            }
+            declarationSuffix += " }"
+        }
+        swift.append("\(modifierString)var \(preEscapedPropertyName): \(bridgable.type.description)\(declarationSuffix)")
+        guard !inProtocol else {
+            return swift
+        }
 
         // Getter
-        let callType = variableDeclaration.role == .global ? "callStatic" : "call"
-        let callGet = variableDeclaration.role == .global || variableDeclaration.isStatic ? getMethodIdentifier : "Self." + getMethodIdentifier
+        let callType = isGlobal ? "callStatic" : "call"
+        let callGet = isGlobal || modifiers.isStatic ? getMethodIdentifier : "Self." + getMethodIdentifier
         swift.append(1, "get {")
         swift.append(2, "return jniContext {")
         swift.append(3, [
-            "let value_java: " + type.java(strategy: bridgable.strategy).description + " = try! \(targetIdentifier).\(callType)(method: \(callGet), args: [])",
-            "return " + type.convertFromJava(value: "value_java", strategy: bridgable.strategy)
+            "let value_java: " + bridgable.type.java(strategy: bridgable.strategy).description + " = try! \(targetIdentifier).\(callType)(method: \(callGet), args: [])",
+            "return " + bridgable.type.convertFromJava(value: "value_java", strategy: bridgable.strategy)
         ])
         swift.append(2, "}")
         swift.append(1, "}")
 
         // Setter
-        let hasSetter = variableDeclaration.apiFlags.options.contains(.writeable) && variableDeclaration.modifiers.setVisibility != .private && variableDeclaration.modifiers.setVisibility != .fileprivate
         if hasSetter {
             let setVisibility: String
             if modifiers.setVisibility < modifiers.visibility {
@@ -120,11 +149,11 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             } else {
                 setVisibility = ""
             }
-            let callSet = variableDeclaration.role == .global || variableDeclaration.isStatic ? setMethodIdentifier : "Self." + setMethodIdentifier
+            let callSet = isGlobal || modifiers.isStatic ? setMethodIdentifier : "Self." + setMethodIdentifier
             swift.append(1, setVisibility + "set {")
             swift.append(2, "jniContext {")
             swift.append(3, [
-                "let value_java = " + type.convertToJava(value: "newValue", strategy: bridgable.strategy) + ".toJavaParameter()",
+                "let value_java = " + bridgable.type.convertToJava(value: "newValue", strategy: bridgable.strategy) + ".toJavaParameter()",
                 "try! \(targetIdentifier).\(callType)(method: \(callSet), args: [value_java])"
             ])
             swift.append(2, "}")
@@ -133,8 +162,8 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         swift.append("}")
 
         let capitalizedPropertyName = (propertyName.first?.uppercased() ?? "") + propertyName.dropFirst()
-        let declarationType = variableDeclaration.role == .global ? "let " : "static let "
-        let callMethodID = variableDeclaration.role == .global ? "getStaticMethodID" : "getMethodID"
+        let declarationType = isGlobal ? "let " : "static let "
+        let callMethodID = isGlobal ? "getStaticMethodID" : "getMethodID"
         let getMethodID = "private \(declarationType )\(getMethodIdentifier) = \(classIdentifier).\(callMethodID)(name: \"get\(capitalizedPropertyName)\", sig: \"()\(bridgable.qualifiedType.jni())\")!"
         swift.append(getMethodID)
         if hasSetter {
@@ -144,7 +173,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         return swift
     }
 
-    private func addConstantDefinition(for variableDeclaration: KotlinVariableDeclaration, type: TypeSignature, modifiers: Modifiers, to swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) -> Bool {
+    private func addConstantDefinition(for variableDeclaration: KotlinVariableDeclaration, type: TypeSignature, modifiers: Modifiers, to swiftDefinitions: inout [SwiftDefinition]) -> Bool {
         guard variableDeclaration.isLet, let value = variableDeclaration.value else {
             return false
         }
@@ -172,8 +201,9 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         guard let assignment else {
             return false
         }
+        let propertyName = variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName
         let modifierString = modifiers.swift(suffix: " ")
-        let swift = "\(modifierString)let \(variableDeclaration.propertyName)\(assignment)"
+        let swift = "\(modifierString)let \(propertyName)\(assignment)"
         swiftDefinitions.append(SwiftDefinition(statement: variableDeclaration, swift: [swift]))
         return true
     }
@@ -199,55 +229,88 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
     }
 
     private func update(global functionDeclaration: KotlinFunctionDeclaration, swiftDefinitions: inout [SwiftDefinition], globalsClassRef: JavaClassRef, translator: KotlinTranslator) -> Bool {
-        guard let bridgables = functionDeclaration.checkBridgable(translator: translator) else {
+        guard let bridgable = functionDeclaration.checkBridgable(translator: translator) else {
             return false
         }
-
-        let swift = swift(for: functionDeclaration, bridgables: bridgables, modifiers: functionDeclaration.modifiers, targetIdentifier: globalsClassRef.identifier, classIdentifier: globalsClassRef.identifier, methodIdentifier: "Java_" + functionDeclaration.name + "_methodID", translator: translator)
+        let name = functionDeclaration.preEscapedName ?? functionDeclaration.name
+        let type = functionDeclaration.preEscapedFunctionType
+        let modifiers = functionDeclaration.modifiers
+        let parameterValues = functionDeclaration.parameters.map(\.defaultValueSwift)
+        let swift = Self.swift(forFunctionWithName: name, type: type, parameterValues: parameterValues, isGlobal: true, bridgable: bridgable, modifiers: modifiers, apiFlags: functionDeclaration.apiFlags, targetIdentifier: globalsClassRef.identifier, classIdentifier: globalsClassRef.identifier, methodIdentifier: "Java_" + functionDeclaration.name + "_methodID")
         swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: swift))
-        appendCallbackFunction(for: functionDeclaration, modifiers: functionDeclaration.modifiers)
+        appendCallbackFunction(for: functionDeclaration, bridgable: bridgable, modifiers: functionDeclaration.modifiers)
         return true
     }
 
-    private func update(_ functionDeclaration: KotlinFunctionDeclaration, info: CodebaseInfo.FunctionInfo?, swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) -> Bool {
-        guard let bridgables = functionDeclaration.checkBridgable(translator: translator) else {
+    @discardableResult private func update(_ functionDeclaration: KotlinFunctionDeclaration, info: CodebaseInfo.FunctionInfo?, swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) -> Bool {
+        guard let bridgable = functionDeclaration.checkBridgable(translator: translator) else {
             return false
         }
-
+        let isProtocol = functionDeclaration.parent is KotlinInterfaceDeclaration
+        let name = info?.name ?? functionDeclaration.preEscapedName ?? functionDeclaration.name
+        let type = info?.signature ?? functionDeclaration.preEscapedFunctionType
         let modifiers = info?.modifiers ?? functionDeclaration.modifiers
-        let sourceCode: [String]
-        if functionDeclaration.isStatic {
-            sourceCode = swift(for: functionDeclaration, bridgables: bridgables, modifiers: modifiers, targetIdentifier: "Java_Companion", classIdentifier: "Java_Companion_class", methodIdentifier: "Java_Companion_" + functionDeclaration.name + "_methodID", translator: translator)
-        } else {
-            sourceCode = swift(for: functionDeclaration, bridgables: bridgables, modifiers: modifiers, targetIdentifier: "Java_peer", classIdentifier: "Java_class", methodIdentifier: "Java_" + functionDeclaration.name + "_methodID", translator: translator)
-        }
-        swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: sourceCode))
-        appendCallbackFunction(for: functionDeclaration, modifiers: modifiers)
+        let apiFlags = info?.apiFlags ?? functionDeclaration.apiFlags
+        let parameterValues = functionDeclaration.parameters.map(\.defaultValueSwift)
+        let swift = Self.swift(forMemberFunctionWithName: name, type: type, parameterValues: parameterValues, isConstructor: functionDeclaration.type == .constructorDeclaration, inProtocol: isProtocol, bridgable: bridgable, modifiers: modifiers, apiFlags: apiFlags)
+        swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: swift))
+        appendCallbackFunction(for: functionDeclaration, bridgable: bridgable, modifiers: modifiers)
         return true
     }
 
-    private func swift(for functionDeclaration: KotlinFunctionDeclaration, bridgables: (parameters: [Bridgable], return: Bridgable), modifiers: Modifiers, targetIdentifier: String, classIdentifier: String, methodIdentifier: String, translator: KotlinTranslator) -> [String] {
+    private static func swift(forMemberFunctionWithName name: String, type: TypeSignature, parameterValues: [String?]?, isConstructor: Bool, inProtocol: Bool, bridgable: FunctionBridgable, modifiers: Modifiers, apiFlags: APIFlags) -> [String] {
+        if modifiers.isStatic {
+            return swift(forFunctionWithName: name, type: type, parameterValues: parameterValues, isConstructor: isConstructor, inProtocol: inProtocol, bridgable: bridgable, modifiers: modifiers, apiFlags: apiFlags, targetIdentifier: "Java_Companion", classIdentifier: "Java_Companion_class", methodIdentifier: "Java_Companion_" + name + "_methodID")
+        } else {
+            return swift(forFunctionWithName: name, type: type, parameterValues: parameterValues, isConstructor: isConstructor, inProtocol: inProtocol, bridgable: bridgable, modifiers: modifiers, apiFlags: apiFlags, targetIdentifier: "Java_peer", classIdentifier: "Java_class", methodIdentifier: "Java_" + name + "_methodID")
+        }
+    }
+
+    private static func swift(forFunctionWithName name: String, type: TypeSignature, parameterValues: [String?]?, isGlobal: Bool = false, isConstructor: Bool = false, inProtocol: Bool = false, bridgable: FunctionBridgable, modifiers: Modifiers, apiFlags: APIFlags, targetIdentifier: String, classIdentifier: String, methodIdentifier: String) -> [String] {
         var swift: [String] = []
 
-        let isAsync = functionDeclaration.apiFlags.options.contains(.async)
-        let isThrows = functionDeclaration.apiFlags.throwsType != .none
-        var functionType = functionDeclaration.functionType
-        if functionDeclaration.type == .constructorDeclaration {
-            functionType = functionType.withReturnType(.void)
+        let isAsync = apiFlags.options.contains(.async)
+        let isThrows = apiFlags.throwsType != .none
+        let functionType = type.functionType(with: bridgable, isConstructor: isConstructor)
+        let functionTypeParameters = functionType.parameters
+        
+        var modifiers = modifiers
+        if inProtocol {
+            modifiers.visibility = .default
         }
         let modifierString = modifiers.swift(suffix: " ")
-        let parameterString = functionDeclaration.parameters.map(\.swift).joined(separator: ", ")
+
+        let parameterString = functionTypeParameters.enumerated().map { index, parameter in
+            var str = ""
+            if let label = parameter.label {
+                str += label
+            } else {
+                str += "_ p_\(index)"
+            }
+            str += ": " + parameter.type.description
+            if let value = parameterValues?[index], !value.isEmpty {
+                str += " " + value
+            }
+            return str
+        }
+        .joined(separator: ", ")
         var optionsString = isAsync ? " async" : ""
         optionsString += isThrows ? " throws" : ""
-        let returnString = functionType.returnType == .void ? "" : " -> " + functionType.returnType.description
-        swift.append(modifierString + (functionDeclaration.type == .constructorDeclaration ? "init" : "func " + functionDeclaration.name) + "(\(parameterString))\(optionsString)\(returnString) {")
+        var returnString = functionType.returnType == .void ? "" : " -> " + functionType.returnType.description
+        if !inProtocol {
+            returnString += " {"
+        }
+        swift.append(modifierString + (isConstructor ? "init" : "func " + name) + "(\(parameterString))\(optionsString)\(returnString)")
+        guard !inProtocol else {
+            return swift
+        }
 
-        var returnCallString = functionDeclaration.type == .constructorDeclaration ? "Java_peer = " : ""
+        var returnCallString = isConstructor ? "Java_peer = " : ""
         // withCheckedThrowingContinuation requires a 'return' even with void to compile correctly
         if functionType.returnType != .void || (isAsync && isThrows) {
             returnCallString += "return "
         }
-        if functionDeclaration.apiFlags.options.contains(.throws) {
+        if apiFlags.options.contains(.throws) {
             returnCallString += "try "
         }
         var indentation: Indentation = 2
@@ -257,7 +320,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             } else {
                 swift.append(1, returnCallString + "await withCheckedContinuation { f_continuation in")
             }
-            let callbackType = functionDeclaration.callbackClosureType(java: false)
+            let callbackType = functionType.callbackClosureType(apiFlags: apiFlags, java: false)
             if callbackType.parameters.isEmpty {
                 swift.append(2, "let f_return_callback: \(callbackType) = {")
                 swift.append(3, "f_continuation.resume()")
@@ -275,7 +338,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
                 swift.append(3, "} else {")
                 if callbackType.parameters.count == 1 {
                     swift.append(4, "f_continuation.resume()")
-                } else if functionDeclaration.returnType.isOptional {
+                } else if functionType.returnType.isOptional {
                     swift.append(4, "f_continuation.resume(returning: f_return)")
                 } else {
                     swift.append(4, "f_continuation.resume(returning: f_return!)")
@@ -291,20 +354,21 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         }
 
         var javaParameterNames: [String] = []
-        for (index, parameter) in functionDeclaration.parameters.enumerated() {
-            let name = parameter.internalLabel + "_java"
+        for (index, parameter) in functionTypeParameters.enumerated() {
+            let label = parameter.label ?? "p_\(index)"
+            let name = label + "_java"
             javaParameterNames.append(name)
-            let strategy = bridgables.parameters[index].strategy
-            swift.append(indentation, "let \(name) = " + parameter.declaredType.convertToJava(value: parameter.internalLabel, strategy: strategy) + ".toJavaParameter()")
+            let strategy = bridgable.parameters[index].strategy
+            swift.append(indentation, "let \(name) = " + parameter.type.convertToJava(value: label, strategy: strategy) + ".toJavaParameter()")
         }
 
         let tryType = isThrows && !isAsync ? "try" : "try!"
-        if functionDeclaration.type == .constructorDeclaration {
+        if isConstructor {
             swift.append(indentation, "let ptr = \(tryType) Self.Java_class.create(ctor: Self.\(methodIdentifier), args: [" + javaParameterNames.joined(separator: ", ") + "])")
             swift.append(indentation, "return JObject(ptr)")
         } else if isAsync {
-            let callType = functionDeclaration.role == .global ? "callStatic" : "call"
-            let callMethod = functionDeclaration.role == .global || functionDeclaration.isStatic ? methodIdentifier : "Self." + methodIdentifier
+            let callType = isGlobal ? "callStatic" : "call"
+            let callMethod = isGlobal || modifiers.isStatic ? methodIdentifier : "Self." + methodIdentifier
             var argumentsString = javaParameterNames.joined(separator: ", ")
             if !argumentsString.isEmpty {
                 argumentsString += ", "
@@ -313,8 +377,8 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             let call = "\(tryType) \(targetIdentifier).\(callType)(method: \(callMethod), args: [\(argumentsString)])"
             swift.append(indentation, call)
         } else {
-            let callType = functionDeclaration.role == .global ? "callStatic" : "call"
-            let callMethod = functionDeclaration.role == .global || functionDeclaration.isStatic ? methodIdentifier : "Self." + methodIdentifier
+            let callType = isGlobal ? "callStatic" : "call"
+            let callMethod = isGlobal || modifiers.isStatic ? methodIdentifier : "Self." + methodIdentifier
             let call = "\(tryType) \(targetIdentifier).\(callType)(method: \(callMethod), args: [" + javaParameterNames.joined(separator: ", ") + "])"
             if isThrows {
                 swift.append(indentation, "do {")
@@ -323,8 +387,8 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             if functionType.returnType == .void {
                 swift.append(indentation, call)
             } else {
-                swift.append(indentation, "let f_return_java: " + functionType.returnType.java(strategy: bridgables.return.strategy).description + " = \(call)")
-                swift.append(indentation, "return " + functionType.returnType.convertFromJava(value: "f_return_java", strategy: bridgables.return.strategy))
+                swift.append(indentation, "let f_return_java: " + functionType.returnType.java(strategy: bridgable.return.strategy).description + " = \(call)")
+                swift.append(indentation, "return " + functionType.returnType.convertFromJava(value: "f_return_java", strategy: bridgable.return.strategy))
             }
             if isThrows {
                 indentation = indentation.dec()
@@ -340,21 +404,21 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             swift.append(indentation, "}")
         }
 
-        let declarationType = functionDeclaration.role == .global ? "let " : "static let "
-        let getType = functionDeclaration.role == .global ? "getStaticMethodID" : "getMethodID"
-        var qualifiedParameters = bridgables.parameters.map { TypeSignature.Parameter(type: $0.qualifiedType) }
+        let declarationType = isGlobal ? "let " : "static let "
+        let getType = isGlobal ? "getStaticMethodID" : "getMethodID"
+        var qualifiedParameters = bridgable.parameters.map { TypeSignature.Parameter(type: $0.qualifiedType) }
         let functionName: String
         let qualifiedReturnType: TypeSignature
-        if functionDeclaration.type == .constructorDeclaration {
+        if isConstructor {
             functionName = "<init>"
             qualifiedReturnType = .void
         } else if isAsync {
-            functionName = "callback_" + functionDeclaration.name
-            qualifiedParameters.append(TypeSignature.Parameter(type: functionDeclaration.callbackClosureType(java: false)))
+            functionName = "callback_" + name
+            qualifiedParameters.append(TypeSignature.Parameter(type: functionType.callbackClosureType(apiFlags: apiFlags, java: false)))
             qualifiedReturnType = .void
         } else {
-            functionName = functionDeclaration.name
-            qualifiedReturnType = bridgables.return.qualifiedType
+            functionName = name
+            qualifiedReturnType = bridgable.return.qualifiedType
         }
         let qualifiedType: TypeSignature = .function(qualifiedParameters, qualifiedReturnType, APIFlags(), nil)
         let methodID = "private \(declarationType)\(methodIdentifier) = \(classIdentifier).\(getType)(name: \"\(functionName)\", sig: \"" + qualifiedType.jni(isFunctionDeclaration: true) + "\")!"
@@ -362,13 +426,14 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         return swift
     }
 
-    private func appendCallbackFunction(for functionDeclaration: KotlinFunctionDeclaration, modifiers: Modifiers) {
+    private func appendCallbackFunction(for functionDeclaration: KotlinFunctionDeclaration, bridgable: FunctionBridgable, modifiers: Modifiers) {
         guard functionDeclaration.apiFlags.options.contains(.async) else {
             return
         }
         let callbackFunction = KotlinFunctionDeclaration(name: "callback_" + functionDeclaration.name)
         callbackFunction.parameters = functionDeclaration.parameters.map { Parameter<KotlinExpression>(externalLabel: $0.externalLabel, internalLabel: $0.internalLabel, declaredType: $0.declaredType, isInOut: $0.isInOut, isVariadic: $0.isVariadic, attributes: $0.attributes, defaultValue: nil, defaultValueSwift: nil) }
-        let callbackType = functionDeclaration.callbackClosureType(java: true)
+        let functionType = functionDeclaration.functionType.functionType(with: bridgable, isConstructor: false)
+        let callbackType = functionType.callbackClosureType(apiFlags: functionDeclaration.apiFlags, java: true)
         callbackFunction.parameters.append(Parameter<KotlinExpression>(externalLabel: "f_return_callback", declaredType: callbackType))
         callbackFunction.returnType = .void
         callbackFunction.modifiers = modifiers
@@ -416,10 +481,16 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         return functionDeclaration.name + "(\(argumentsString))"
     }
 
-    private func updateEqualsDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration, info: CodebaseInfo.FunctionInfo?, swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) {
-        let modifiersString = (info?.modifiers ?? functionDeclaration.modifiers).swift(suffix: " ")
+    private func updateEqualsDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration, info: CodebaseInfo.FunctionInfo?, swiftDefinitions: inout [SwiftDefinition]) {
+        let modifiers = info?.modifiers ?? functionDeclaration.modifiers
+        let swift = Self.swift(forEqualsFunctionIn: classDeclaration.signature, modifiers: modifiers)
+        swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: swift))
+    }
+
+    private static func swift(forEqualsFunctionIn type: TypeSignature, modifiers: Modifiers) -> [String] {
+        let modifiersString = modifiers.swift(suffix: " ")
         var sourceCode: [String] = []
-        sourceCode.append("\(modifiersString)func ==(lhs: \(classDeclaration.signature), rhs: \(classDeclaration.signature)) -> Bool {")
+        sourceCode.append("\(modifiersString)func ==(lhs: \(type), rhs: \(type)) -> Bool {")
         sourceCode.append(1, "return jniContext {")
         sourceCode.append(2, "let lhs_java = lhs.toJavaObject()!")
         sourceCode.append(2, "let rhs_java = rhs.toJavaObject()!")
@@ -427,11 +498,17 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         sourceCode.append(1, "}")
         sourceCode.append("}")
         sourceCode.append("private static let Java_isequal_methodID = Java_class.getMethodID(name: \"equals\", sig: \"(Ljava/lang/Object;)Z\")!")
-        swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: sourceCode))
+        return sourceCode
     }
 
-    private func updateHashDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration, info: CodebaseInfo.FunctionInfo?, swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) {
-        let modifiersString = (info?.modifiers ?? functionDeclaration.modifiers).swift(suffix: " ")
+    private func updateHashDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration, info: CodebaseInfo.FunctionInfo?, swiftDefinitions: inout [SwiftDefinition]) {
+        let modifiers = info?.modifiers ?? functionDeclaration.modifiers
+        let swift = Self.swift(forHashFunctionIn: classDeclaration.signature, modifiers: modifiers)
+        swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: swift))
+    }
+
+    private static func swift(forHashFunctionIn type: TypeSignature, modifiers: Modifiers) -> [String] {
+        let modifiersString = modifiers.swift(suffix: " ")
         var sourceCode: [String] = []
         sourceCode.append("\(modifiersString)func hash(into hasher: inout Hasher) {")
         sourceCode.append(1, "let hashCode: Int32 = jniContext {")
@@ -440,13 +517,19 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         sourceCode.append(1, "hasher.combine(hashCode)")
         sourceCode.append("}")
         sourceCode.append("private static let Java_hashCode_methodID = Java_class.getMethodID(name: \"hashCode\", sig: \"()I\")!")
-        swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: sourceCode))
+        return sourceCode
     }
 
-    private func updateLessThanDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration, info: CodebaseInfo.FunctionInfo?, swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator) {
-        let modifiersString = (info?.modifiers ?? functionDeclaration.modifiers).swift(suffix: " ")
+    private func updateLessThanDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration, info: CodebaseInfo.FunctionInfo?, swiftDefinitions: inout [SwiftDefinition]) {
+        let modifiers = info?.modifiers ?? functionDeclaration.modifiers
+        let swift = Self.swift(forLessThanDeclarationIn: classDeclaration.signature, modifiers: modifiers)
+        swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: swift))
+    }
+
+    private static func swift(forLessThanDeclarationIn type: TypeSignature, modifiers: Modifiers) -> [String] {
+        let modifiersString = modifiers.swift(suffix: " ")
         var sourceCode: [String] = []
-        sourceCode.append("\(modifiersString)func <(lhs: \(classDeclaration.signature), rhs: \(classDeclaration.signature)) -> Bool {")
+        sourceCode.append("\(modifiersString)func <(lhs: \(type), rhs: \(type)) -> Bool {")
         sourceCode.append(1, "return jniContext {")
         sourceCode.append(2, "let lhs_java = lhs.toJavaObject()!")
         sourceCode.append(2, "let rhs_java = rhs.toJavaObject()!")
@@ -455,7 +538,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         sourceCode.append(1, "}")
         sourceCode.append("}")
         sourceCode.append("private static let Java_compareTo_methodID = Java_class.getMethodID(name: \"compareTo\", sig: \"(Ljava/lang/Object;)I\")!")
-        swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: sourceCode))
+        return sourceCode
     }
 
     private func update(_ classDeclaration: KotlinClassDeclaration, swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator, codebaseInfo: CodebaseInfo.Context) {
@@ -463,14 +546,17 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             return
         }
         let typeInfos = codebaseInfo.typeInfos(forNamed: classDeclaration.signature)
-        guard let primaryTypeInfo = typeInfos.first(where: { $0.declarationType == .classDeclaration }) else {
+        guard let primaryTypeInfo = typeInfos.first(where: { $0.declarationType != .extensionDeclaration }) else {
             classDeclaration.messages.append(Message.kotlinBridgeMissingInfo(classDeclaration, source: translator.syntaxTree.source))
             return
         }
-        let classRef = JavaClassRef(for: classDeclaration, translator: translator)
+        let classRef = JavaClassRef(for: classDeclaration.signature, packageName: translator.packageName)
 
         let visibilityString = primaryTypeInfo.modifiers.visibility.swift(suffix: " ")
-        let inherits = primaryTypeInfo.inherits.filter { $0.isEquatable || $0.isHashable || $0.isComparable || $0.checkBridgable(translator: translator) != nil }
+        let inherits = typeInfos.flatMap(\.inherits).compactMap {
+            let inherit = $0.withGenerics([])
+            return inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.checkBridgable(codebaseInfo: codebaseInfo) != nil ? inherit : nil
+        }
         var inheritsString = inherits.map { $0.description }.joined(separator: ", ")
         if !inheritsString.isEmpty {
             inheritsString += ", "
@@ -520,11 +606,11 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
                 }
                 let info = typeInfos.flatMap({ $0.functions }).first(where: { $0.name == functionDeclaration.name && $0.signature == functionDeclaration.functionType && $0.modifiers.visibility >= .fileprivate })
                 if functionDeclaration.isEqualImplementation {
-                    updateEqualsDeclaration(functionDeclaration, in: classDeclaration, info: info, swiftDefinitions: &memberDefinitions, translator: translator)
+                    updateEqualsDeclaration(functionDeclaration, in: classDeclaration, info: info, swiftDefinitions: &memberDefinitions)
                 } else if functionDeclaration.isHashImplementation {
-                    updateHashDeclaration(functionDeclaration, in: classDeclaration, info: info, swiftDefinitions: &memberDefinitions, translator: translator)
+                    updateHashDeclaration(functionDeclaration, in: classDeclaration, info: info, swiftDefinitions: &memberDefinitions)
                 } else if functionDeclaration.isLessThanImplementation {
-                    updateLessThanDeclaration(functionDeclaration, in: classDeclaration, info: info, swiftDefinitions: &memberDefinitions, translator: translator)
+                    updateLessThanDeclaration(functionDeclaration, in: classDeclaration, info: info, swiftDefinitions: &memberDefinitions)
                 } else {
                     if update(functionDeclaration, info: info, swiftDefinitions: &memberDefinitions, translator: translator), functionDeclaration.isStatic {
                         hasBridgedStaticMembers = true
@@ -537,13 +623,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             swift.append(1, "private static let Java_Companion_class = try! JClass(name: \"\(classRef.className)$Companion\")")
             swift.append(1, "private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: \"Companion\", sig: \"L\(classRef.className)$Companion;\")!))")
         }
-
-        swift.append(1, visibilityString + "static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {")
-        swift.append(2, "return .init(Java_ptr: obj!)")
-        swift.append(1, "}")
-        swift.append(1, visibilityString + "func toJavaObject() -> JavaObjectPointer? {")
-        swift.append(2, "return Java_peer.safePointer()")
-        swift.append(1, "}")
+        swift.append(1, Self.swiftForJConvertibleContract(visibility: primaryTypeInfo.modifiers.visibility))
 
         let definition = SwiftDefinition(statement: classDeclaration, children: memberDefinitions) { output, indentation, children in
             swift.forEach { output.append(indentation).append($0).append("\n") }
@@ -552,5 +632,132 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             output.append(indentation).append("}\n")
         }
         swiftDefinitions.append(definition)
+    }
+
+    private static func swiftForJConvertibleContract(visibility: Modifiers.Visibility) -> [String] {
+        let visibilityString = visibility.swift(suffix: " ")
+        var swift: [String] = []
+        swift.append(visibilityString + "static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {")
+        swift.append(1, "return .init(Java_ptr: obj!)")
+        swift.append("}")
+        swift.append(visibilityString + "func toJavaObject() -> JavaObjectPointer? {")
+        swift.append(1, "return Java_peer.safePointer()")
+        swift.append("}")
+        return swift
+    }
+
+    private func update(_ interfaceDeclaration: KotlinInterfaceDeclaration, swiftDefinitions: inout [SwiftDefinition], translator: KotlinTranslator, codebaseInfo: CodebaseInfo.Context) {
+        guard interfaceDeclaration.checkBridgable(translator: translator) else {
+            return
+        }
+        guard let primaryTypeInfo = codebaseInfo.primaryTypeInfo(forNamed: interfaceDeclaration.signature) else {
+            interfaceDeclaration.messages.append(Message.kotlinBridgeMissingInfo(interfaceDeclaration, source: translator.syntaxTree.source))
+            return
+        }
+
+        let visibilityString = primaryTypeInfo.modifiers.visibility.swift(suffix: " ")
+        let inherits = primaryTypeInfo.inherits.compactMap {
+            let inherit = $0.withGenerics([])
+            return inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.checkBridgable(codebaseInfo: codebaseInfo) != nil ? inherit : nil
+        }
+        let inheritsString = inherits.isEmpty ? "" : ": " + inherits.map { $0.description }.joined(separator: ", ")
+
+        var swift: [String] = []
+        swift.append("\(visibilityString)protocol \(interfaceDeclaration.name)\(inheritsString) {")
+
+        var memberDefinitions: [SwiftDefinition] = []
+        for member in interfaceDeclaration.members {
+            if let variableDeclaration = member as? KotlinVariableDeclaration {
+                guard !variableDeclaration.attributes.isBridgeIgnored else {
+                    continue
+                }
+                let info = primaryTypeInfo.variables.first(where: { $0.name == variableDeclaration.propertyName })
+                update(variableDeclaration, info: info, swiftDefinitions: &memberDefinitions, translator: translator)
+            } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
+                guard !functionDeclaration.attributes.isBridgeIgnored else {
+                    continue
+                }
+                let info = primaryTypeInfo.functions.first(where: { $0.name == functionDeclaration.name && $0.signature == functionDeclaration.functionType && $0.modifiers.visibility >= .fileprivate })
+                update(functionDeclaration, info: info, swiftDefinitions: &memberDefinitions, translator: translator)
+            }
+        }
+
+        let definition = SwiftDefinition(statement: interfaceDeclaration, children: memberDefinitions) { output, indentation, children in
+            swift.forEach { output.append(indentation).append($0).append("\n") }
+            let childIndentation = indentation.inc()
+            children.forEach { output.append("\n").append($0, indentation: childIndentation) }
+            output.append(indentation).append("}\n")
+        }
+        swiftDefinitions.append(definition)
+
+        if let bridgeImplDefinition = Self.unknownBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, codebaseInfo: codebaseInfo) {
+            swiftDefinitions.append(bridgeImplDefinition)
+        }
+    }
+
+    static func unknownBridgeImplDefinition(forProtocol type: TypeSignature, inPackage packageName: String?, statement: KotlinStatement?, codebaseInfo: CodebaseInfo.Context) -> SwiftDefinition? {
+        guard let primaryTypeInfo = codebaseInfo.primaryTypeInfo(forNamed: type) else {
+            return nil
+        }
+        let protocolSignatures = codebaseInfo.global.protocolSignatures(forNamed: type).dropFirst()
+        let bridgeImpl = type.unknownBridgeImpl
+
+        var swift: [String] = []
+        swift.append("final class \(bridgeImpl): \(type), BridgedFromKotlin {")
+
+        let classRef = JavaClassRef(for: type, packageName: packageName)
+        swift.append(1, classRef.declaration)
+        swift.append(1, "let Java_peer: JObject")
+        swift.append(1, "required init(Java_ptr: JavaObjectPointer) {")
+        swift.append(2, "Java_peer = JObject(Java_ptr)")
+        swift.append(1, "}")
+
+        swift.append(1, self.swift(forUnknownBridgeImplMembers: primaryTypeInfo, codebaseInfo: codebaseInfo))
+        var seenProtocolSignatures: Set<TypeSignature> = []
+        for protocolSignature in protocolSignatures {
+            guard seenProtocolSignatures.insert(protocolSignature).inserted else {
+                continue
+            }
+            if protocolSignature.isEquatable {
+                swift.append(1, self.swift(forEqualsFunctionIn: bridgeImpl, modifiers: Modifiers(isStatic: true)))
+            } else if protocolSignature.isHashable {
+                swift.append(1, self.swift(forHashFunctionIn: bridgeImpl, modifiers: Modifiers()))
+            } else if protocolSignature.isComparable {
+                swift.append(1, self.swift(forLessThanDeclarationIn: bridgeImpl, modifiers: Modifiers(isStatic: true)))
+            } else if let protocolInfo = codebaseInfo.primaryTypeInfo(forNamed: protocolSignature) {
+                swift.append(1, self.swift(forUnknownBridgeImplMembers: protocolInfo, codebaseInfo: codebaseInfo))
+            }
+        }
+        swift.append(1, swiftForJConvertibleContract(visibility: .default))
+
+        swift.append("}")
+        return SwiftDefinition(statement: statement, swift: swift)
+    }
+
+    private static func swift(forUnknownBridgeImplMembers info: CodebaseInfo.TypeInfo, codebaseInfo: CodebaseInfo.Context) -> [String] {
+        var swift: [String] = []
+        for variableInfo in info.variables {
+            guard !variableInfo.attributes.isBridgeIgnored else {
+                continue
+            }
+            guard let bridgable = variableInfo.signature.checkBridgable(codebaseInfo: codebaseInfo) else {
+                continue
+            }
+            var modifiers = variableInfo.modifiers
+            modifiers.visibility = .default
+            swift += self.swift(forMemberVariableWithName: variableInfo.name, inProtocol: false, bridgable: bridgable, modifiers: modifiers, attributes: variableInfo.attributes, apiFlags: variableInfo.apiFlags ?? APIFlags())
+        }
+        for functionInfo in info.functions {
+            guard !functionInfo.attributes.isBridgeIgnored else {
+                continue
+            }
+            guard let bridgable = functionInfo.signature.checkFunctionBridgable(codebaseInfo: codebaseInfo) else {
+                continue
+            }
+            var modifiers = functionInfo.modifiers
+            modifiers.visibility = .default
+            swift += self.swift(forMemberFunctionWithName: functionInfo.name, type: functionInfo.signature, parameterValues: nil, isConstructor: false, inProtocol: false, bridgable: bridgable, modifiers: modifiers, apiFlags: functionInfo.apiFlags ?? APIFlags())
+        }
+        return swift
     }
 }
