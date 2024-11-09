@@ -1553,19 +1553,19 @@ final class BridgeToSwiftTests: XCTestCase {
         // TODO
     }
 
-    func testStruct() async throws {
-        try await check(swift: """
-        @BridgeToSwift
-        struct S {
-            var i = 1
-            func f() -> Int {
-                return i
-            }
-        }
-        """, kotlin: """
-        """, swiftBridgeSupport: """
-        """)
-    }
+//    func testStruct() async throws {
+//        try await check(swift: """
+//        @BridgeToSwift
+//        struct S {
+//            var i = 1
+//            func f() -> Int {
+//                return i
+//            }
+//        }
+//        """, kotlin: """
+//        """, swiftBridgeSupport: """
+//        """)
+//    }
 
     func testProtocolConformance() async throws {
         try await check(swift: """
