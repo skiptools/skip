@@ -546,7 +546,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
             return
         }
         let typeInfos = codebaseInfo.typeInfos(forNamed: classDeclaration.signature)
-        guard let primaryTypeInfo = typeInfos.first(where: { $0.declarationType == .classDeclaration }) else {
+        guard let primaryTypeInfo = typeInfos.first(where: { $0.declarationType != .extensionDeclaration }) else {
             classDeclaration.messages.append(Message.kotlinBridgeMissingInfo(classDeclaration, source: translator.syntaxTree.source))
             return
         }

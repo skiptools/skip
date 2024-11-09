@@ -1554,7 +1554,17 @@ final class BridgeToSwiftTests: XCTestCase {
     }
 
     func testStruct() async throws {
-        // TODO
+        try await check(swift: """
+        @BridgeToSwift
+        struct S {
+            var i = 1
+            func f() -> Int {
+                return i
+            }
+        }
+        """, kotlin: """
+        """, swiftBridgeSupport: """
+        """)
     }
 
     func testProtocolConformance() async throws {
@@ -1589,7 +1599,12 @@ final class BridgeToSwiftTests: XCTestCase {
 
             func f() -> Int
         }
-        final class P_BridgeImpl: P {
+        final class P_BridgeImpl: P, BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "P")
+            let Java_peer: JObject
+            required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
             var i: Int {
                 get {
                     return jniContext {
@@ -1613,6 +1628,12 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_f_methodID = Java_class.getMethodID(name: "f", sig: "()I")!
+            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            func toJavaObject() -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
         }
         class C: P, BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
@@ -1670,7 +1691,18 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         protocol P {
         }
-        final class P_BridgeImpl: P {
+        final class P_BridgeImpl: P, BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "P")
+            let Java_peer: JObject
+            required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            func toJavaObject() -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
         }
         class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
