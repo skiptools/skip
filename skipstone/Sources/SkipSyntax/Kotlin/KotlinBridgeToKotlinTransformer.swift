@@ -117,8 +117,6 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         if variableDeclaration.declaredType == .none {
             variableDeclaration.declaredType = type
         }
-        // Bridged types will always be copied, so they can't be shared
-        variableDeclaration.mayBeSharedMutableStruct = false
 
         let propertyName = variableDeclaration.propertyName
         let externalName = "Swift_" + ((variableDeclaration.isStatic) ? "Companion_" + propertyName : propertyName)

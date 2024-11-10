@@ -371,6 +371,7 @@ final class BridgeToKotlinTests: XCTestCase {
         internal var a: Array<Int>
             get() = Swift_a().sref({ a = it })
             set(newValue) {
+                @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
                 Swift_a_set(newValue)
             }
         private external fun Swift_a(): Array<Int>
@@ -2108,6 +2109,7 @@ final class BridgeToKotlinTests: XCTestCase {
             internal open var p: P?
                 get() = Swift_p(Swift_peer).sref({ this.p = it })
                 set(newValue) {
+                    @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
                     Swift_p_set(Swift_peer, newValue)
                 }
             private external fun Swift_p(Swift_peer: skip.bridge.SwiftObjectPointer): P?

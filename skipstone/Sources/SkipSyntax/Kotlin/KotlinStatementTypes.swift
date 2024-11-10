@@ -2698,9 +2698,6 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
     var mutationFunctionNames: (willMutate: String, didMutate: String)?
     var storage: KotlinVariableStorage?
     var isGenerated = false
-    var isDescriptionImplementation: Bool {
-        return role.isProperty && propertyName == "description" && propertyType == .string
-    }
     var isAppendAsFunction: Bool {
         return (apiFlags.options.contains(.viewBuilder) && apiFlags.options.contains(.computed) && !propertyType.isFunction) || (apiFlags.options.contains(.async) && !isAsyncLet)
     }

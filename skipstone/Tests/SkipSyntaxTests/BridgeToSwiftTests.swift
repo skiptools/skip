@@ -1553,19 +1553,99 @@ final class BridgeToSwiftTests: XCTestCase {
         // TODO
     }
 
-//    func testStruct() async throws {
-//        try await check(swift: """
-//        @BridgeToSwift
-//        struct S {
-//            var i = 1
-//            func f() -> Int {
-//                return i
-//            }
-//        }
-//        """, kotlin: """
-//        """, swiftBridgeSupport: """
-//        """)
-//    }
+    func testStruct() async throws {
+        try await check(swift: """
+        @BridgeToSwift
+        struct S {
+            var i = 1
+            init(_ s: String) {
+                self.i = Int(s) ?? 0
+            }
+            mutating func inc() {
+                i += 1
+            }
+        }
+        """, kotlin: """
+        internal class S: MutableStruct {
+            internal var i = 1
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+            internal constructor(s: String) {
+                this.i = Int(s) ?: 0
+            }
+            internal fun inc() {
+                willmutate()
+                try {
+                    i += 1
+                } finally {
+                    didmutate()
+                }
+            }
+
+            private constructor(copy: MutableStruct) {
+                @Suppress("NAME_SHADOWING", "UNCHECKED_CAST") val copy = copy as S
+                this.i = copy.i
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S(this as MutableStruct)
+        }
+        """, swiftBridgeSupport: """
+        struct S: BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "S")
+            var Java_peer: JObject
+            init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            private static let Java_scopy_methodID = Java_class.getMethodID(name: "scopy", sig: "()Lskip/lib/MutableStruct;")!
+            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            func toJavaObject() -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+
+            var i: Int {
+                get {
+                    return jniContext {
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
+                        return Int(value_java)
+                    }
+                }
+                set {
+                    jniContext {
+                        Java_peer = try! JObject(Java_peer.call(method: Self.Java_scopy_methodID, args: []))
+                        let value_java = Int32(newValue).toJavaParameter()
+                        try! Java_peer.call(method: Self.Java_set_i_methodID, args: [value_java])
+                    }
+                }
+            }
+            private static let Java_get_i_methodID = Java_class.getMethodID(name: "getI", sig: "()I")!
+            private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
+
+            init(_ p_0: String) {
+                Java_peer = jniContext {
+                    let p_0_java = p_0.toJavaParameter()
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [p_0_java])
+                    return JObject(ptr)
+                }
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(Ljava/lang/String;)V")!
+
+            mutating func inc() {
+                jniContext {
+                    Java_peer = try! JObject(Java_peer.call(method: Self.Java_scopy_methodID, args: []))
+                    try! Java_peer.call(method: Self.Java_inc_methodID, args: [])
+                }
+            }
+            private static let Java_inc_methodID = Java_class.getMethodID(name: "inc", sig: "()V")!
+        }
+        """)
+    }
 
     func testProtocolConformance() async throws {
         try await check(swift: """
