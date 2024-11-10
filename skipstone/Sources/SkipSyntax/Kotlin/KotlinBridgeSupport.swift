@@ -381,6 +381,11 @@ extension Modifiers {
                 string += " "
             }
             string += "static"
+        } else if isMutating {
+            if !string.isEmpty {
+                string += " "
+            }
+            string += "mutating"
         }
         return string.isEmpty ? "" : string + suffix
     }
