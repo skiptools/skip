@@ -105,7 +105,7 @@ import PackagePlugin
             // convert ModuleKotlinTests -> ModuleTests
             let expectedName = kotlinModule + testSuffix
 
-            // Known issue with SPM in Xcode: we cannot have a depencency from one testTarget to another, or we hit the error:
+            // Known issue with SPM in Xcode: we cannot have a dependency from one testTarget to another, or we hit the error:
             // Enable to resolve build file: XCBCore.BuildFile (The workspace has a reference to a missing target with GUID 'PACKAGE-TARGET:SkipLibTests')
             // so we cannot use `target.dependencies.first` to find the target; we just need to scan by name
             guard let dependencyTarget = try context.package.targets(named: [expectedName]).first else {
@@ -272,15 +272,23 @@ import PackagePlugin
             "--module-root", outputBase.path,
             ]
 
-        // pass dependencies ids to local paths through to skipstone so that it can set up local links for native swift builds
-        for depencency in recursivePackageDependencies(for: context.package) {
-            //Diagnostics.remark("dependency: \(depencency.package.id) \(depencency.package.directory)")
-            buildArguments += ["--dependency", "\(depencency.package.id):\(depencency.package.directory)"]
+        // create a map from [target ID: package] for all known targ
+        let targetsToPackage = Dictionary(recursivePackageDependencies(for: context.package).flatMap({ packageDep in
+            packageDep.package.targets.map({ target in
+                (target.id, packageDep.package)
+            })
+        }), uniquingKeysWith: { $1 })
 
+        // pass dependencies ids to local paths through to skipstone so that it can set up local links for native swift builds from one bridged swift package to another bridged swift package
+        for targetDep in target.recursiveTargetDependencies {
+            guard let package = targetsToPackage[targetDep.id] else { continue }
+            //Diagnostics.remark("recursiveTargetDependencies: \(target.name):\(package.id):\(package.directory)")
+            buildArguments += ["--dependency", [targetDep.name, package.id, package.directory.string].joined(separator: ":")]
         }
 
         buildArguments += buildModuleArgs
 
+        //Diagnostics.remark("invoke skip \(buildArguments.joined(separator: " "))")
         return [
             .buildCommand(displayName: "Skip \(target.name)", executable: skipToolPath, arguments: buildArguments,
                 inputFiles: inputFiles,
