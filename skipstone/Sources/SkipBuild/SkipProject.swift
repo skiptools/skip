@@ -689,7 +689,7 @@ class FrameworkProjectLayout {
                 if isModelModule {
                     modDeps.append(PackageModule(repositoryName: "skip-model", moduleName: "SkipModel"))
                     if native {
-                        modDeps.append(PackageModule(repositoryName: "skip-bridge", moduleName: "SkipBridge"))
+                        modDeps.append(PackageModule(repositoryName: "skip-android-bridge", moduleName: "SkipAndroidBridge"))
                     }
                 }
             }
