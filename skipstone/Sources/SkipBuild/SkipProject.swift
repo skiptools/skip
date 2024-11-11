@@ -2512,7 +2512,7 @@ extension FrameworkProjectLayout {
                 super.onCreate()
                 logger.info("starting app")
                 ProcessInfo.launch(applicationContext)
-                \(nativeLibrary == nil ? "" : "System.loadLibrary(\"\(nativeLibrary!)\")")
+                \(nativeLibrary == nil ? "" : "skip.android.bridge.AndroidBridge.initBridge(\"\(nativeLibrary!)\")")
             }
 
             companion object {

@@ -179,8 +179,8 @@ fileprivate extension AndroidOperationCommand {
 
             // manually disable the skipstone plugin from being run again in the derived build; we don't need to transpile and bridge the code a second time, we only need to build the native libraries with the Android toolchain
             env["SKIP_PLUGIN_DISABLED"] = "1"
-            // set the SKIP_JNI_MODE flag, which is transferred through to a build #define in SkipBridge and can be used to check whether the current build mode is targetting JNI
-            env["SKIP_JNI_MODE"] = "1"
+            // set the SKIP_BRIDGE flag, which is transferred through to a build #define in SkipBridge and can be used to check whether the current build mode is targetting JNI
+            env["SKIP_BRIDGE"] = "1"
 
             let swiftCmd = toolchainBin.appendingPathComponent("swift", isDirectory: false).path
             if !FileManager.default.fileExists(atPath: swiftCmd) {
@@ -217,6 +217,9 @@ fileprivate extension AndroidOperationCommand {
             if let configuration = toolchainOptions.configuration {
                 cmd += ["--configuration", configuration.rawValue]
             }
+            for xswiftc in toolchainOptions.xswiftc {
+                cmd += ["-Xswiftc", xswiftc]
+            }
             // when executable is specified, then the arguments are the command to run;
             // otherwise, they are considered build arguments
             if executable == nil {
@@ -226,8 +229,8 @@ fileprivate extension AndroidOperationCommand {
             try await runCommand(command: cmd, env: env, with: out)
 
             let buildOutputFolder = [
-                packageDir,
-                toolchainOptions.scratchPath ?? ".build",
+                // the output folder is either the scratch path we have specified, or is the default package/.build output directory
+                toolchainOptions.scratchPath ?? (packageDir + "/.build"),
                 arch.target(api: toolchainOptions.androidAPILevel),
                 toolchainOptions.configuration?.rawValue ?? "debug",
             ].joined(separator: "/")
@@ -289,7 +292,7 @@ fileprivate extension AndroidOperationCommand {
             }
 
             if executable == nil && runTests == false {
-                continue // nothing to do but build, so more on to the next list arch…
+                continue // nothing to do but build, so move on to the next list arch…
             }
 
             // to figure out the generated test executable name, we need to parse the Package.swift
@@ -785,6 +788,9 @@ struct ToolchainOptions: ParsableArguments {
 
     @Option(help: ArgumentHelp("Custom scratch directory path", valueName: ".build"))
     var scratchPath: String? = nil
+
+    @Option(name: [.customLong("Xswiftc", withSingleDash: true)], parsing: .unconditionalSingleValue, help: ArgumentHelp("Swift compiler options to pass", valueName: "option"))
+    var xswiftc: [String] = []
 
     @Option(name: [.customShort("c"), .long], help: ArgumentHelp("Build with configuration", valueName: "debug"))
     var configuration: BuildConfiguration? = nil

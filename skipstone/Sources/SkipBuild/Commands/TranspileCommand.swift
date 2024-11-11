@@ -49,10 +49,13 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         })
     }
 
-    var dependencyIdPaths: [(id: String, path: String)] {
-        transpileOptions.dependencies.map({
+    var dependencyIdPaths: [(targetName: String, packageID: String, packagePath: String)] {
+        transpileOptions.dependencies.compactMap({
             let parts = $0.split(separator: ":")
-            return (id: parts.first?.description ?? "", path: parts.last?.description ?? "")
+            guard let targetName: Substring = parts.dropFirst(0).first else { return nil }
+            guard let packageID: Substring = parts.dropFirst(1).first else { return nil }
+            guard let packagePath: Substring = parts.dropFirst(2).first else { return nil }
+            return (targetName: targetName.description, packageID: packageID.description, packagePath: packagePath.description)
         })
     }
 
@@ -476,18 +479,34 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             let packagesLinkFolder = try AbsolutePath(swiftLinkFolder, validating: "Packages")
             try fs.createDirectory(packagesLinkFolder, recursive: true)
             var createdIds: Set<String> = []
-            for (id, path) in self.dependencyIdPaths {
-                if !createdIds.insert(id).inserted {
+
+            let moduleLinkPaths = Dictionary(self.linkNamePaths, uniquingKeysWith: { $1 })
+
+            for (targetName, packageID, var packagePath) in self.dependencyIdPaths {
+                if !createdIds.insert(packageID).inserted {
                     // only create the link once, even if specified multiple times
                     continue
                 }
-                info("creating dependency link: \(id)->\(path)")
-                let dependencyPackageLink = try AbsolutePath(packagesLinkFolder, validating: id)
-                let destinationPath = try AbsolutePath(validating: path)
+
+                // check whether the linked target is another linked Skip folder, and if so, check whether it has a derived src/main/swift folder (which indicates that it is a bridging package in which case we need the package to reference the *derived* sources rather than the *original* sources)
+                if let relativeLinkPath = moduleLinkPaths[targetName] {
+                    let linkModuleRoot = moduleRootPath
+                        .parentDirectory
+                        .appending(try RelativePath(validating: relativeLinkPath))
+                    let linkModuleSrcMainSwift = linkModuleRoot.appending(components: "src", "main", "swift")
+                    //trace("override link path for \(targetName) from \(packagePath) to \(linkModuleSrcMainSwift.pathString)")
+                    if fs.exists(linkModuleSrcMainSwift) {
+                        trace("override link path for \(targetName) from \(packagePath) to \(linkModuleSrcMainSwift.pathString)")
+                        packagePath = linkModuleSrcMainSwift.pathString
+                    }
+                }
+
+                let dependencyPackageLink = try AbsolutePath(packagesLinkFolder, validating: packageID)
+                let destinationPath = try AbsolutePath(validating: packagePath)
                 try addLink(dependencyPackageLink, pointingAt: destinationPath, relative: false)
 
                 packageAddendum += """
-                useLocalPackage(named: "\(id)")
+                useLocalPackage(named: "\(packageID)")
                 
                 """
             }
