@@ -288,13 +288,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
         let modifierString = modifiers.swift(suffix: " ")
 
         let parameterString = functionTypeParameters.enumerated().map { index, parameter in
-            var str = ""
-            if let label = parameter.label {
-                str += label
-            } else {
-                str += "_ p_\(index)"
-            }
-            str += ": " + parameter.type.description
+            var str = "\(parameter.label ?? "_") p_\(index): \(parameter.type)"
             if let value = parameterValues?[index], !value.isEmpty {
                 str += " " + value
             }
@@ -366,7 +360,7 @@ final class KotlinBridgeToSwiftTransformer: KotlinTransformer {
 
         var javaParameterNames: [String] = []
         for (index, parameter) in functionTypeParameters.enumerated() {
-            let label = parameter.label ?? "p_\(index)"
+            let label = "p_\(index)"
             let name = label + "_java"
             javaParameterNames.append(name)
             let strategy = bridgable.parameters[index].strategy
