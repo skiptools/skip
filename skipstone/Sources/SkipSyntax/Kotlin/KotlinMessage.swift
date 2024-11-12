@@ -79,15 +79,11 @@ extension Message {
     }
 
     static func kotlinBridgeUnknownType(_ sourceDerived: SourceDerived, type: String, source: Source) -> Message {
-        return Message(kind: .error, message: "Skip is not able to determine whether '\(type)' is bridgable. Ensure that it is in a Skip-enabled module and is a bridged type", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "'\(type)' does not appear to be a bridged type", sourceDerived: sourceDerived, source: source)
     }
 
-    static func kotlinBridgeUnsupportedDeclaration(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Skip does not yet support bridging this declaration", sourceDerived: sourceDerived, source: source)
-    }
-
-    static func kotlinBridgeUnsupportedType(_ sourceDerived: SourceDerived, type: String, source: Source) -> Message {
-        return Message(kind: .error, message: "Skip does not yet support bridging type '\(type)'", sourceDerived: sourceDerived, source: source)
+    static func kotlinBridgeUnsupportedFeature(_ sourceDerived: SourceDerived, feature: String, source: Source) -> Message {
+        return Message(kind: .error, message: "This preview does not yet support bridging \(feature)", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinCatchCaseCast(_ sourceDerived: SourceDerived, source: Source) -> Message {

@@ -438,7 +438,16 @@ extension KotlinVariableDeclaration {
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
             return nil
         }
-        guard checkNonTypedThrows(apiFlags: apiFlags, sourceDerived: self, source: translator.syntaxTree.source) else {
+        guard !apiFlags.options.contains(.async) else {
+            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "async vars", source: translator.syntaxTree.source))
+            return nil
+        }
+        guard apiFlags.throwsType == .none else {
+            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "throws vars", source: translator.syntaxTree.source))
+            return nil
+        }
+        guard !modifiers.isLazy else {
+            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "lazy vars", source: translator.syntaxTree.source))
             return nil
         }
         guard let codebaseInfo = translator.codebaseInfo else {
@@ -460,7 +469,15 @@ extension KotlinFunctionDeclaration {
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
             return nil
         }
-        guard checkNonTypedThrows(apiFlags: apiFlags, sourceDerived: self, source: translator.syntaxTree.source) else {
+        guard !isOptionalInit else {
+            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "optional inits", source: translator.syntaxTree.source))
+            return nil
+        }
+        guard checkNonTypedThrows(self, apiFlags: apiFlags, source: translator.syntaxTree.source) else {
+            return nil
+        }
+        guard !parameters.contains(where: { $0.isVariadic }) else {
+            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "variadic parameters", source: translator.syntaxTree.source))
             return nil
         }
         guard let codebaseInfo = translator.codebaseInfo else {
@@ -475,10 +492,41 @@ extension KotlinClassDeclaration {
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
     func checkBridgable(translator: KotlinTranslator) -> Bool {
+        switch declarationType {
+        case .actorDeclaration:
+            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "actors", source: translator.syntaxTree.source))
+            return false
+        case .classDeclaration:
+            guard !isSubclass(translator: translator) else {
+                messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "subclasses", source: translator.syntaxTree.source))
+                return false
+            }
+            break
+        case .enumDeclaration:
+            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "enums", source: translator.syntaxTree.source))
+            return false
+        case .structDeclaration:
+            break
+        default:
+            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: String(describing: declarationType), source: translator.syntaxTree.source))
+            return false
+        }
         guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
             return false
         }
+        guard !(parent is KotlinClassDeclaration) else {
+            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "inner types", source: translator.syntaxTree.source))
+            return false
+        }
         return true
+    }
+
+    private func isSubclass(translator: KotlinTranslator) -> Bool {
+        guard let codebaseInfo = translator.codebaseInfo, let inherit = inherits.first else {
+            return false
+        }
+        let primaryTypeInfo = codebaseInfo.primaryTypeInfo(forNamed: inherit)
+        return primaryTypeInfo != nil && primaryTypeInfo?.declarationType != .protocolDeclaration
     }
 }
 
@@ -533,7 +581,7 @@ extension TypeSignature {
         switch self {
         case .any, .anyObject:
             if let sourceDerived, let source {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))
             }
             return nil
         case .array(let elementType):
@@ -546,12 +594,12 @@ extension TypeSignature {
         case .character:
             // TODO
             if let sourceDerived, let source {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))
             }
             return nil
         case .composition:
             if let sourceDerived, let source {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))
             }
             return nil
         case .dictionary(let keyType, let valueType):
@@ -569,7 +617,7 @@ extension TypeSignature {
             bridgable.qualifiedType = bridgable.qualifiedType.withExistentialMode(mode)
             return bridgable
         case .function(let parameters, let returnType, let apiFlags, _):
-            guard checkNonTypedThrows(apiFlags: apiFlags, sourceDerived: sourceDerived, source: source) else {
+            guard checkNonTypedThrows(sourceDerived, apiFlags: apiFlags, source: source) else {
                 return nil
             }
             if returnType != .void && returnType.checkBridgable(codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) == nil {
@@ -586,14 +634,14 @@ extension TypeSignature {
         case .int128:
             // TODO
             if let sourceDerived, let source {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))
             }
             return nil
         case .member, .module, .named:
             return checkNamedBridgable(codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source)
         case .metaType:
             if let sourceDerived, let source {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))
             }
             return nil
         case .none:
@@ -609,13 +657,13 @@ extension TypeSignature {
         case .range:
             // TODO
             if let sourceDerived, let source {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))
             }
             return nil
         case .set:
             // TODO
             if let sourceDerived, let source {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))
             }
             return nil
         case .string:
@@ -623,7 +671,7 @@ extension TypeSignature {
         case .tuple:
             // TODO
             if let sourceDerived, let source {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))
             }
             return nil
         case .typealiased(_, let type):
@@ -631,20 +679,24 @@ extension TypeSignature {
         case .uint, .uint8, .uint16, .uint32, .uint64:
             // TODO
             if let sourceDerived, let source {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))
             }
             return nil
         case .uint128:
             // TODO
             if let sourceDerived, let source {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))
             }
             return nil
-        case .unwrappedOptional(let type):
-            return type.checkBridgable(codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source)
+        case .unwrappedOptional:
+            // TODO - force unwrapped properties compiled as Java fields not get/set methods
+            if let sourceDerived, let source {
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: "force unwrapped types", source: source))
+            }
+            return nil
         case .void:
             if let sourceDerived, let source {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedType(sourceDerived, type: description, source: source))
+                sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))
             }
             return nil
         }
@@ -719,7 +771,7 @@ private func checkNonPrivate(_ sourceDerived: SourceDerived, modifiers: Modifier
     return false
 }
 
-private func checkNonTypedThrows(apiFlags: APIFlags, sourceDerived: SourceDerived?, source: Source?) -> Bool {
+private func checkNonTypedThrows(_ sourceDerived: SourceDerived?, apiFlags: APIFlags, source: Source?) -> Bool {
     guard apiFlags.throwsType != .none && apiFlags.throwsType != .any else {
         return true
     }
