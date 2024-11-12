@@ -1062,9 +1062,12 @@ final class FunctionDeclaration: Statement {
         var attributes = Attributes.for(syntax: initializerDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: initializerDecl.modifiers)
-        let decodeLevel = decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
-        guard decodeLevel != .none else {
-            return nil
+        var decodeLevel = decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        // We have to decode constructors so that the parent type sees that constructors exist. Otherwise it may
+        // generate an invalid default construtor. But explicitly mark these constructors as ignored
+        if decodeLevel == .none {
+            decodeLevel = .api
+            attributes.attributes.append(Attribute(signature: .named("BridgeIgnored", [])))
         }
         let isOptionalInit = initializerDecl.optionalMark != nil
         let (_, parameters, signatureMessages) = initializerDecl.signature.typeSignatures(in: syntaxTree)
