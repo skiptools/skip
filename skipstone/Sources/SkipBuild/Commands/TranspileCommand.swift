@@ -119,6 +119,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
     }
 
     private func transpileThrows(root rootPath: AbsolutePath, project projectFolderPath: AbsolutePath, module moduleRootPath: AbsolutePath, skip skipFolderPath: AbsolutePath, output outputFolderPath: AbsolutePath, fs: FileSystem, with out: MessageQueue) async throws {
+        trace("transpileThrows: rootPath=\(rootPath), projectFolderPath=\(projectFolderPath), moduleRootPath=\(moduleRootPath), skipFolderPath=\(skipFolderPath), outputFolderPath=\(outputFolderPath)")
+
         // the path that will contain the `skip.yml`
 
         // the module will be treated differently if it is an app versus a library (it will use the "com.android.application" plugin instead of "com.android.library")
@@ -280,7 +282,10 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         // load and merge each of the skip.yml files for the dependent modules
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
 
-        let isNativeSwiftProject = baseSkipConfig.skip?.mode?.lowercased() == "swift"
+        let skipMode = baseSkipConfig.skip?.mode?.lowercased()
+        let isNativeSwiftProject = skipMode != nil
+        let isNativeSwiftProjectSwift = skipMode == "swift"
+        //let isNativeSwiftProjectKotlin = skipMode == "kotlin"
         let swiftSourceFolder = skipFolderPath.parentDirectory.appending(component: "Swift")
         let kotlinSourceFolder = skipFolderPath.parentDirectory.appending(component: "Kotlin")
 
@@ -339,7 +344,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         var transpileFiles: [String] = []
         var swiftFiles: [String] = []
         for sourceFile in sourceURLs.map(\.path).sorted() {
-            if isNativeSwiftProject {
+            if isNativeSwiftProjectSwift {
                 if sourceFile.hasPrefix(kotlinSourcePrefix) {
                     transpileFiles.append(sourceFile)
                 } else {
@@ -357,7 +362,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         try await transpiler.transpile(handler: handleTranspilation)
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json
-        if isNativeSwiftProject || fs.exists(swiftSourceFolder) {
+        if isNativeSwiftProject {
             try saveSkipBridgeCode(swiftSourceFolder: swiftSourceFolder)
         }
 
@@ -447,37 +452,39 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         }
 
         func saveSkipBridgeCode(swiftSourceFolder: AbsolutePath) throws {
-            // Link src/main/swift/ to the relative Swift project folder
-            let swiftLinkFolder = try AbsolutePath(outputFolderPath, validating: "swift")
+            let swiftDirName = "swift"
+
+            // Link src/main/swift/ to the relative Swift project folder; this is where SkipBridge's skip.yml will assume any compiled Swift exists
+            let swiftLinkFolder = try AbsolutePath(outputFolderPath, validating: swiftDirName)
             try fs.createDirectory(swiftLinkFolder.parentDirectory, recursive: true)
 
             // create Packages/swift-package-name links for all the project's package dependencies so we use the local versions in our swift build rather than downloading the remote dependencies
             // this will sync with Xcode's workspace, which will enable local package development of dependencies to work the same with this derived package as it does in Xcode
+            let packagesLinkFolder = try AbsolutePath(swiftLinkFolder, validating: "Packages")
+            try fs.createDirectory(packagesLinkFolder, recursive: true)
 
             // to use the package, we could do the equivalent of `swift package edit --path /path/to/local/package-id package-id,
             // but this would involve writing to the .build/workspace-state.json file with the "edited" property, which is
-            // not a stable or documented format, and would require a lot of other metadata about the package;
+            // not a stable or well-documented format, and would require a lot of other metadata about the package;
             // so instead we tack on some code to the Package.swift file that we output
             var packageAddendum = """
 
-            func useLocalPackage(named: String) {
+            func useLocalPackage(named packageName: String) {
                 package.dependencies = package.dependencies.filter {
                     switch $0.kind {
                     case let .sourceControl(name: name, location: location, requirement: _):
-                        return name != named && !location.hasSuffix(named) && !location.hasSuffix(named + ".git")
+                        return name != packageName && !location.hasSuffix(packageName) && !location.hasSuffix(packageName + ".git")
                     default:
                         return true
                     }
                 }
                 // change the dependency to a link to the given package
-                package.dependencies += [.package(path: "Packages/" + named)]
+                package.dependencies += [.package(name: packageName, path: "Packages/" + packageName)]
             }
             
             
             """
 
-            let packagesLinkFolder = try AbsolutePath(swiftLinkFolder, validating: "Packages")
-            try fs.createDirectory(packagesLinkFolder, recursive: true)
             var createdIds: Set<String> = []
 
             let moduleLinkPaths = Dictionary(self.linkNamePaths, uniquingKeysWith: { $1 })
@@ -493,8 +500,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                     let linkModuleRoot = moduleRootPath
                         .parentDirectory
                         .appending(try RelativePath(validating: relativeLinkPath))
-                    let linkModuleSrcMainSwift = linkModuleRoot.appending(components: "src", "main", "swift")
-                    //trace("override link path for \(targetName) from \(packagePath) to \(linkModuleSrcMainSwift.pathString)")
+                    let linkModuleSrcMainSwift = linkModuleRoot.appending(components: "src", "main", swiftDirName)
                     if fs.exists(linkModuleSrcMainSwift) {
                         trace("override link path for \(targetName) from \(packagePath) to \(linkModuleSrcMainSwift.pathString)")
                         packagePath = linkModuleSrcMainSwift.pathString
@@ -511,7 +517,14 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 """
             }
 
-            try createMirroredLinkTree(from: rootPath, to: swiftLinkFolder, excluding: ["Packages", "Package.resolved", ".build", ".swiftpm"]) { path, destPath in
+
+            // The source of the link tree needs to be the root project for the module in question, which we don't have access to (it can't be the `rootPath`, since that will be the topmost package that resulted in the transpiler invocation, which may not be the module in question).
+            // So we need to guess from the projectFolderPath, which will be something like `/path/to/project-name/Sources/TargetName` by tacking `../..` to the end of the path.
+            // WARNING: this is delicate, because there is nothing guaranteeing that the project follows the convention of `Sources/TargetName` for their modules!
+            let mirrorSource = projectFolderPath.appending(components: "..", "..")
+
+            trace("creating absolute merged link tree from: swiftLinkFolder=\(swiftLinkFolder) to mirrorSource=\(mirrorSource) (rootPath=\(rootPath)) THROUGH: dependencyIdPaths=\(dependencyIdPaths)")
+            try createMirroredLinkTree(from: mirrorSource, to: swiftLinkFolder, excluding: ["Packages", "Package.resolved", ".build", ".swiftpm"]) { path, destPath in
                 trace("createMirroredLinkTree for \(path.pathString)->\(destPath)")
 
                 // manually add the packageAddendum the Package.swift
