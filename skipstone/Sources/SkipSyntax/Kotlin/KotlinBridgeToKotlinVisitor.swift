@@ -598,6 +598,13 @@ final class KotlinBridgeToKotlinVisitor {
         }
         interfaceDeclaration.extras = nil
         interfaceDeclaration.inherits = interfaceDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.checkBridgable(options: options, codebaseInfo: codebaseInfo) != nil }
+        for member in interfaceDeclaration.members {
+            if let variableDeclaration = member as? KotlinVariableDeclaration, !variableDeclaration.attributes.isBridgeIgnored {
+                _ = variableDeclaration.checkBridgable(options: options, translator: translator)
+            } else if let functionDeclaration = member as? KotlinFunctionDeclaration, !functionDeclaration.attributes.isBridgeIgnored {
+                _ = functionDeclaration.checkBridgable(options: options, translator: translator)
+            }
+        }
         return true
     }
 

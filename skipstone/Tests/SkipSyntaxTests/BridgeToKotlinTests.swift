@@ -1226,6 +1226,17 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testGenericClass() async throws {
+        try await checkProducesMessage(swift: """
+        public class C<T> {
+            var value: T
+            func f(v: T) -> T {
+                return v
+            }
+        }
+        """, isSwiftBridge: true, transformers: transformers)
+    }
+
     func testOpenClass() async throws {
         try await check(swiftBridge: """
         open class C {
@@ -2122,6 +2133,21 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testSubscript() async throws {
+        try await checkProducesMessage(swift: """
+        @BridgeToKotlin
+        class C {
+            subscript(index: Int) -> Int {
+                get {
+                    return 0
+                }
+                set {
+                }
+            }
+        }
+        """, isSwiftBridge: true)
+    }
+
     func testUnbridgedMember() async throws {
         try await check(swiftBridge: """
         public class C {
@@ -2931,6 +2957,16 @@ final class BridgeToKotlinTests: XCTestCase {
             return ((f_return_swift as? JConvertible)?.toJavaObject(options: []))
         }
         """, transformers: transformers)
+    }
+
+    func testStaticProtocolRequirements() async throws {
+        try await checkProducesMessage(swift: """
+        @BridgeToKotlin
+        protocol P {
+            static var i: Int { get }
+            var s: String { get }
+        }
+        """, isSwiftBridge: true)
     }
 
     func testEnum() async throws {

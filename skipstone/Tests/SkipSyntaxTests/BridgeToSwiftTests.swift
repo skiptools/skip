@@ -1138,6 +1138,18 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testGenericClass() async throws {
+        try await checkProducesMessage(swift: """
+        @BridgeToSwift
+        class C<T> {
+            var value: T
+            func f(v: T) -> T {
+                return v
+            }
+        }
+        """)
+    }
+
     func testOpenClass() async throws {
         try await check(swift: """
         open class C {
@@ -1762,6 +1774,21 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testSubscript() async throws {
+        try await checkProducesMessage(swift: """
+        @BridgeToSwift
+        class C {
+            subscript(index: Int) -> Int {
+                get {
+                    return 0
+                }
+                set {
+                }
+            }
+        }
+        """)
+    }
+
     func testUnbridgedMember() async throws {
         try await check(swift: """
         public class C {
@@ -2297,6 +2324,16 @@ final class BridgeToSwiftTests: XCTestCase {
             private static let Java_f_methodID = Java_class.getMethodID(name: "f", sig: "(LP;)LP;")!
         }
         """, transformers: transformers)
+    }
+
+    func testStaticProtocolRequirements() async throws {
+        try await checkProducesMessage(swift: """
+        @BridgeToSwift
+        protocol P {
+            static var i: Int { get }
+            var s: String { get }
+        }
+        """)
     }
 
     func testEnum() async throws {
