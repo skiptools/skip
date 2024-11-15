@@ -6,7 +6,8 @@ public protocol KotlinTransformer {
 
     /// Gather any needed info from the given Swift syntax tree.
     ///
-    /// - Note: This phase is run during pre-flight and can also be used to add messages to the syntax trees.
+    /// - Note: This phase is run during pre-flight and can also be used to add messages
+    ///   and information to the syntax trees.
     func gather(from syntaxTree: SyntaxTree)
 
     /// Called when gathering from all syntax trees is complete.
@@ -74,8 +75,6 @@ public let builtinKotlinTransformerTypes: [KotlinTransformer.Type] = [
     KotlinImportsTransformer.self,
     KotlinUnitTestTransformer.self,
     KotlinModuleBundleTransformer.self,
-    KotlinBridgeToKotlinTransformer.self,
-    KotlinBridgeToSwiftTransformer.self,
 ]
 
 /// The builtin transformers can implement this protocol to modify how type signatures are output.
@@ -88,17 +87,17 @@ protocol KotlinTypeSignatureOutputTransformer {
 }
 
 extension KotlinTransformer {
-    func gather(from syntaxTree: SyntaxTree) {
+    public func gather(from syntaxTree: SyntaxTree) {
     }
 
-    func prepareForUse(codebaseInfo: CodebaseInfo?) {
+    public func prepareForUse(codebaseInfo: CodebaseInfo?) {
     }
 
-    func messages(for sourceFile: Source.FilePath) -> [Message] {
+    public func messages(for sourceFile: Source.FilePath) -> [Message] {
         return []
     }
 
-    func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> Bool {
+    public func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> Bool {
         return false
     }
 }

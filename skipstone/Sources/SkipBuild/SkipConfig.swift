@@ -20,6 +20,8 @@ struct TranspilationConfig : Codable {
     var package: String?
     /// Skip mode: kotlin|swift
     var mode: String?
+    /// Whether to bridge this module
+    var bridging: Bool?
 }
 
 

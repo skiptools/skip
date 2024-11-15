@@ -105,16 +105,6 @@ extension Message {
         return Message(kind: .warning, message: message ?? deprecatedLabel, sourceDerived: sourceDerived, source: source)
     }
 
-    static func bridgeExtension(_ syntax: SyntaxProtocol, source: Source) -> Message {
-        let range = syntax.range(in: source)
-        return Message(kind: .error, message: "Bridging extensions is not supported", source: source, sourceRange: range)
-    }
-
-    static func bridgeUnsupported(_ syntax: SyntaxProtocol, source: Source) -> Message {
-        let range = syntax.range(in: source)
-        return Message(kind: .error, message: "This is not supported in compiled bridging code [\(syntax.kind)]", source: source, sourceRange: range)
-    }
-
     static func ifDeclPlacement(_ syntax: SyntaxProtocol, source: Source) -> Message {
         let range = syntax.range(in: source)
         return Message(kind: .error, message: "Skip does not support this use of #if. Only placement around statement blocks, switch cases, or member chains is supported", source: source, sourceRange: range)

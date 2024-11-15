@@ -220,16 +220,6 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
         return attributes.first(where: { $0.kind == .state || $0.kind == .stateObject })
     }
 
-    /// Convenience to check whether this type is bridged to Kotlin.
-    var isBridgeToKotlin: Bool {
-        return contains(directive: "BridgeToKotlin") || contains(.bridgeToKotlin) || contains(.bridgeToKotlinObservable)
-    }
-
-    /// Convenience to check whether this type is bridged to Swift.
-    var isBridgeToSwift: Bool {
-        return contains(directive: "BridgeToSwift") || contains(.bridgeToSwift)
-    }
-
     /// Convenience to check whether this member is marked to ignore bridging.
     var isBridgeIgnored: Bool {
         return contains(directive: "BridgeIgnored") || contains(.bridgeIgnored)
@@ -292,9 +282,6 @@ struct Attribute: Hashable, Codable {
         case bindable
         case binding
         case bridgeIgnored
-        case bridgeToKotlin
-        case bridgeToKotlinObservable
-        case bridgeToSwift
         case deprecated
         case discardableResult
         /// Recorded from `StatementExtras.attributes`.
@@ -345,12 +332,6 @@ struct Attribute: Hashable, Codable {
             return .binding
         case "BridgeIgnored":
             return .bridgeIgnored
-        case "BridgeToKotlin":
-            return .bridgeToKotlin
-        case "BridgeToKotlinObservable":
-            return .bridgeToKotlinObservable
-        case "BridgeToSwift":
-            return.bridgeToSwift
         case "discardableResult":
             return .discardableResult
         case "directive":
@@ -497,13 +478,6 @@ enum CaptureType {
     case none
     case unowned
     case weak
-}
-
-/// Known directives in `Attributes`.
-enum Directive: String {
-    case bridgeToKotlin
-    case bridgeToSwift
-    case nobridge
 }
 
 /// Generic information for a type or API.

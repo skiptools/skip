@@ -37,11 +37,12 @@ public struct Transpiler {
                     return try SyntaxTree(source: Source(file: transpileFile), preprocessorSymbols: preprocessorSymbols)
                 }
             }
+            //~~~ add bridge translator to system if bridging mode
             for bridgeFile in bridgeFiles {
                 group.addTask {
                     let bridgeSource = try Source(file: bridgeFile)
-                    // Most compiled files do not contain bridging code
-                    guard bridgeSource.content.contains("@BridgeTo") else {
+                    // Most compiled files may not contain any public code
+                    guard bridgeSource.content.contains("public") || bridgeSource.content.contains("open") else {
                         return nil
                     }
                     return SyntaxTree(source: bridgeSource, isBridgeFile: true, preprocessorSymbols: preprocessorSymbols)
@@ -51,8 +52,9 @@ public struct Transpiler {
                 guard let syntaxTree else {
                     continue
                 }
-                codebaseInfo.gather(from: syntaxTree)
+                // Allow transformers to gather first so that they can add information to trees
                 transformers.forEach { $0.gather(from: syntaxTree) }
+                codebaseInfo.gather(from: syntaxTree)
                 if syntaxTree.isBridgeFile {
                     bridgeSources.append(syntaxTree.source)
                 } else if !syntaxTree.isSymbolFile {

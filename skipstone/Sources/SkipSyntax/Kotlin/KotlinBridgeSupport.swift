@@ -435,9 +435,6 @@ extension KotlinVariableDeclaration {
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
     func checkBridgable(translator: KotlinTranslator) -> Bridgable? {
-        guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
-            return nil
-        }
         guard !apiFlags.options.contains(.async) else {
             messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "async vars", source: translator.syntaxTree.source))
             return nil
@@ -466,9 +463,6 @@ extension KotlinFunctionDeclaration {
         guard type != .finalizerDeclaration else {
             return nil
         }
-        guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
-            return nil
-        }
         guard !isOptionalInit else {
             messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "optional inits", source: translator.syntaxTree.source))
             return nil
@@ -493,28 +487,18 @@ extension KotlinClassDeclaration {
     /// This function will add messages about invalid modifiers or types to this variable.
     func checkBridgable(translator: KotlinTranslator) -> Bool {
         switch declarationType {
-        case .actorDeclaration:
-            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "actors", source: translator.syntaxTree.source))
-            return false
         case .classDeclaration:
             guard !isSubclass(translator: translator) else {
                 messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "subclasses", source: translator.syntaxTree.source))
                 return false
             }
             break
-        case .enumDeclaration:
-            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "enums", source: translator.syntaxTree.source))
-            return false
         case .structDeclaration:
             break
         default:
-            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: String(describing: declarationType), source: translator.syntaxTree.source))
             return false
         }
-        guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
-            return false
-        }
-        guard !(parent is KotlinClassDeclaration) else {
+        guard !(parent is KotlinClassDeclaration) && !(parent is KotlinInterfaceDeclaration) else {
             messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "inner types", source: translator.syntaxTree.source))
             return false
         }
@@ -535,9 +519,6 @@ extension KotlinInterfaceDeclaration {
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
     func checkBridgable(translator: KotlinTranslator) -> Bool {
-        guard checkNonPrivate(self, modifiers: modifiers, translator: translator) else {
-            return false
-        }
         return true
     }
 }
@@ -761,14 +742,6 @@ extension TypeSignature {
         }
         return CodebaseInfo.moduleNameMap.values.contains { $0.contains(name) }
     }
-}
-
-private func checkNonPrivate(_ sourceDerived: SourceDerived, modifiers: Modifiers, translator: KotlinTranslator) -> Bool {
-    guard modifiers.visibility == .private || modifiers.visibility == .fileprivate else {
-        return true
-    }
-    sourceDerived.messages.append(Message.kotlinBridgePrivate(sourceDerived, source: translator.syntaxTree.source))
-    return false
 }
 
 private func checkNonTypedThrows(_ sourceDerived: SourceDerived?, apiFlags: APIFlags, source: Source?) -> Bool {
