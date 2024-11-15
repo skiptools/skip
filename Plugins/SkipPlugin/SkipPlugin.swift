@@ -285,7 +285,7 @@ import PackagePlugin
         }), uniquingKeysWith: { $1 })
 
         // pass dependencies ids to local paths through to skipstone so that it can set up local links for native swift builds from one bridged swift package to another bridged swift package
-        for targetDep in target.recursiveTargetDependencies {
+        for targetDep in context.package.targets.flatMap(\.recursiveTargetDependencies) {
             guard let package = targetsToPackage[targetDep.id] else {
                 continue
             }
