@@ -32,7 +32,10 @@ import PackagePlugin
     let skippyOnly = ProcessInfo.processInfo.environment["CONFIGURATION"] == "Skippy"
 
     /// Whether to turn off the Skip plugin manually
-    let skipDisabled = (ProcessInfo.processInfo.environment["SKIP_PLUGIN_DISABLED"]?.count ?? 0) > 0
+    let skipDisabled = (ProcessInfo.processInfo.environment["SKIP_PLUGIN_DISABLED"] ?? "0") != "0"
+
+    /// Whether we are in SkipBridge generation mode
+    let skipBridgeMode = (ProcessInfo.processInfo.environment["SKIP_BRIDGE"] ?? "0") != "0"
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         if skipDisabled {
@@ -213,7 +216,7 @@ import PackagePlugin
         var deps = dependencies(for: target.dependencies, in: context.package)
         deps = makeUniqueById(deps)
 
-        let outputFiles: [Path] = [sourcehashOutputPath]
+        var outputFiles: [Path] = [sourcehashOutputPath]
 
         // input files consist of the source files, as well as all the dependent module output source hash directory files, which will be modified whenever a transpiled module changes
         // note that using the directory as the input will cause the transpile to re-run for any sub-folder change, although this behavior is not explicitly documented
@@ -272,23 +275,49 @@ import PackagePlugin
             "--module-root", outputBase.path,
             ]
 
-        // create a map from [target ID: package] for all known targ
-        let targetsToPackage = Dictionary(recursivePackageDependencies(for: context.package).flatMap({ packageDep in
+        let packageDeps = recursivePackageDependencies(for: context.package)
+
+        // create a map from [target ID: package] for all known targets
+        let targetsToPackage = Dictionary(packageDeps.flatMap({ packageDep in
             packageDep.package.targets.map({ target in
                 (target.id, packageDep.package)
             })
         }), uniquingKeysWith: { $1 })
 
         // pass dependencies ids to local paths through to skipstone so that it can set up local links for native swift builds from one bridged swift package to another bridged swift package
-        for targetDep in target.recursiveTargetDependencies {
-            guard let package = targetsToPackage[targetDep.id] else { continue }
+        for targetDep in context.package.targets.flatMap(\.recursiveTargetDependencies) {
+            guard let package = targetsToPackage[targetDep.id] else {
+                continue
+            }
             //Diagnostics.remark("recursiveTargetDependencies: \(target.name):\(package.id):\(package.directory)")
             buildArguments += ["--dependency", [targetDep.name, package.id, package.directory.string].joined(separator: ":")]
         }
 
+        for pack in packageDeps {
+            for executableProduct in pack.package.products(ofType: ExecutableProduct.self) {
+                // also add the Skip plugin dependency itself, so we use the local version of the plugin
+                if executableProduct.name == "skip" {
+                    buildArguments += ["--dependency", [executableProduct.name, pack.package.id, pack.package.directory.string].joined(separator: ":")]
+                }
+            }
+        }
+
+        if skipBridgeMode {
+            // when we are running with SKIP_BRIDGE, we also output NAME_Bridge.swift files for each Swift file that contains bridging information
+            let skipBridgeOutputDir = outputFolder.appending(subpath: "SkipBridgeGenerated")
+            let bridgeSuffix = "_Bridge.swift" // SkipSyntax.Source.FilePath.bridgeFileSuffix
+
+            outputFiles += target.sourceFiles(withSuffix: "swift").map({ swiftFile in
+                let swiftPath = swiftFile.path
+                let bridgeName = swiftPath.stem + bridgeSuffix
+                return skipBridgeOutputDir.appending(subpath: bridgeName)
+            })
+            buildArguments += ["--skip-bridge-output", skipBridgeOutputDir.string]
+        }
+
         buildArguments += buildModuleArgs
 
-        //Diagnostics.remark("invoke skip \(buildArguments.joined(separator: " "))")
+        Diagnostics.remark("invoke skip \(buildArguments.joined(separator: " "))")
         return [
             .buildCommand(displayName: "Skip \(target.name)", executable: skipToolPath, arguments: buildArguments,
                 inputFiles: inputFiles,

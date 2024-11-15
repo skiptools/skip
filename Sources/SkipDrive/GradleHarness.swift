@@ -2,7 +2,11 @@
 #if !SKIP
 import Foundation
 
-/// A harness for invoking `gradle` and processing the output of builds and tests.
+/// The `GradleHarness` is the interface to launching the `gradle` command and processing the output.
+///
+/// It is used by the `skip` command when it needs to launch Gradle (e.g., with `skip export`),
+/// as well as from the `XCSkiptests` unit test runner, which will use it to launch the JUnit test runner
+/// on the transpied Kotlin.
 @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
 public protocol GradleHarness {
     /// Scans the output line of the Gradle command and processes it for errors or issues.
@@ -70,14 +74,10 @@ extension GradleHarness {
                     // found the folder; now make a link from its parent folder to the project source…
                     if let linkFolder = linkFolder {
                         let localModuleLink = URL(fileURLWithPath: outputFolder.lastPathComponent, isDirectory: false, relativeTo: linkFolder)
-                        //print("findModuleFolder: localModuleLink:", localModuleLink.path)
-
                         // make sure the output root folder exists
                         try FileManager.default.createDirectory(at: linkFolder, withIntermediateDirectories: true)
 
                         let linkFrom = localModuleLink.path, linkTo = outputFolder.path
-                        //print("findModuleFolder: createSymbolicLink:", linkFrom, linkTo)
-
                         if (try? FileManager.default.destinationOfSymbolicLink(atPath: linkFrom)) != linkTo {
                             try? FileManager.default.removeItem(atPath: linkFrom) // if it exists
                             try FileManager.default.createSymbolicLink(atPath: linkFrom, withDestinationPath: linkTo)
@@ -85,7 +85,6 @@ extension GradleHarness {
 
                         let localTranspilerOut = URL(fileURLWithPath: outputFolder.lastPathComponent, isDirectory: true, relativeTo: localModuleLink)
                         let linkedPluginModuleOutputFolder = URL(fileURLWithPath: moduleTranspilerFolder, isDirectory: true, relativeTo: localTranspilerOut)
-                        //print("findModuleFolder: linkedPluginModuleOutputFolder:", linkedPluginModuleOutputFolder.path)
                         return linkedPluginModuleOutputFolder
                     } else {
                         return pluginModuleOutputFolder
