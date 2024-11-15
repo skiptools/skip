@@ -161,7 +161,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         }
 
         /// track every output file written using `addOutputFile` to prevent the file from being cleaned up at the end
-        func addOutputFile(_ path: AbsolutePath) -> AbsolutePath {
+        @discardableResult func addOutputFile(_ path: AbsolutePath) -> AbsolutePath {
             outputFiles.append(path)
             return path
         }
@@ -225,11 +225,19 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             msg(.trace, "linking: \(linkSource) to: \(destPath)")
 
             if replace && fs.isSymlink(destPath) {
-                try fs.removeFileTree(destPath) // clear any pre-existing symlink
+                removePath(destPath) // clear any pre-existing symlink
+            }
+
+            if let existingSymlinkDestination = try? FileManager.default.destinationOfSymbolicLink(atPath: linkSource.pathString) {
+                if existingSymlinkDestination == destPath.pathString {
+                    msg(.trace, "retaining existing link from \(destPath.pathString) to \(existingSymlinkDestination)")
+                    addOutputFile(linkSource) // remember that we are using the linkSource file
+                    return
+                }
             }
 
             let modTime = try? fs.getFileInfo(destPath).modTime
-            try? fs.removeFileTree(linkSource) // remove any existing link in order to re-create it
+            removePath(linkSource) // remove any existing link in order to re-create it
             try fs.createSymbolicLink(addOutputFile(linkSource), pointingAt: destPath, relative: relative)
             // set the output link mod time to match the source link mod time
             if let modTime = modTime {
@@ -252,7 +260,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         ]
 
         let sourcehashOutputPath = try AbsolutePath(validating: transpileOptions.sourcehash)
-        try fs.removeFileTree(sourcehashOutputPath) // delete the build completion marker to force its re-creation (removeFileTree doesn't throw when the file doesn't exist)
+        removePath(sourcehashOutputPath) // delete the build completion marker to force its re-creation (removeFileTree doesn't throw when the file doesn't exist)
 
         // also add any files in the skipFolderFile to the list of sources (including the skip.yml and other metadata files)
         let skipFolderPathContents = try FileManager.default.enumeratedURLs(of: skipFolderPath.asURL)
@@ -316,11 +324,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         // now make a link from src/androidTest/kotlin to src/test/kotlin so the same tests will run against an Android emulator/device with the ANDROID_SERIAL environment
         if primaryModuleName.hasSuffix("Tests") {
             let androidTestOutputFolder = try AbsolutePath(outputFolderPath, validating: "../androidTest")
-            try? fs.removeFileTree(androidTestOutputFolder) // remove any existing link in order to re-create it
+            removePath(androidTestOutputFolder) // remove any existing link in order to re-create it
             try fs.createSymbolicLink(addOutputFile(androidTestOutputFolder), pointingAt: outputFolderPath, relative: true)
         }
-
-        //let isAppProject = skipFolderPathContents.contains(where: { $0.lastPathComponent == AndroidManifestName })
 
         let packageName = KotlinTranslator.packageName(forModule: primaryModuleName)
 
@@ -332,8 +338,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         // the contents of a folder named "buildSrc" are linked at the top level to contain scripts and plugins
         let buildSrcFolder = skipFolderPath.appending(component: buildSrcFolderName)
         if fs.isDirectory(buildSrcFolder) {
-            // we link (recursively) the individual files in a mirror of the directory hierarchy
-            try createMirroredLinkTree(from: buildSrcFolder, to: moduleBasePath.appending(component: buildSrcFolderName))
+            try addLink(moduleBasePath.appending(component: buildSrcFolderName), pointingAt: buildSrcFolder, relative: false)
         }
 
         // feed the transpiler the files to transpile and any compiled files to potentially bridge.
@@ -362,9 +367,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         try await transpiler.transpile(handler: handleTranspilation)
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json
-        if isNativeSwiftProject {
-            try saveSkipBridgeCode(swiftSourceFolder: swiftSourceFolder)
-        }
+        try saveSkipBridgeCode(swiftSourceFolder: swiftSourceFolder)
 
         let sourceModules = try linkDependentModuleSources()
         try linkResources()
@@ -452,11 +455,39 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         }
 
         func saveSkipBridgeCode(swiftSourceFolder: AbsolutePath) throws {
-            let swiftDirName = "swift"
+            // create the generated bridge files when the SKIP_BRIDGE environment is set and the plugin passed the --skip-bridge-output flag to the tool
+            if let skipBridgeOutput = transpileOptions.skipBridgeOutput {
+                let skipBridgeOutputFolder = try AbsolutePath(validating: skipBridgeOutput)
 
-            // Link src/main/swift/ to the relative Swift project folder; this is where SkipBridge's skip.yml will assume any compiled Swift exists
-            let swiftLinkFolder = try AbsolutePath(outputFolderPath, validating: swiftDirName)
-            try fs.createDirectory(swiftLinkFolder.parentDirectory, recursive: true)
+                let candidateBridgeFiles = skipBridgeTranspilations.map({ $0.output.file.name })
+
+                for swiftSourceFile in sourceURLs.filter({ $0.pathExtension == "swift"}) {
+                    let swiftFileBase = swiftSourceFile.deletingPathExtension().lastPathComponent
+                    let swiftBridgeFileName = swiftFileBase.appending(Source.FilePath.bridgeFileSuffix)
+                    let swiftBridgeOutputPath = skipBridgeOutputFolder.appending(components: [swiftBridgeFileName])
+
+                    var bridgeContents = ""
+
+                    if !candidateBridgeFiles.isEmpty {
+                        // FIXME: this doesn't handle the case where there are multiple files with the same name in a project (e.g., Folder1/Utils.swift and Folder2/Utils.swift). We would need to handle un-flattened project hierarchies to get past this
+                        if let bridgeMatch = skipBridgeTranspilations.first(where: { $0.output.file.name == swiftBridgeFileName }) {
+                            bridgeContents += bridgeMatch.output.content
+                        }
+                    }
+
+                    try writeChanges(tag: "skipbridge", to: swiftBridgeOutputPath, contents: bridgeContents.utf8Data, readOnly: true)
+                }
+
+                return
+            }
+
+            if !isNativeSwiftProject && !fs.exists(swiftSourceFolder) {
+                return // not actually a bridge package
+            }
+
+            // Link src/main/swift/ to the absolute Swift project folder
+            let swiftLinkFolder = try AbsolutePath(outputFolderPath, validating: "swift")
+            try fs.createDirectory(swiftLinkFolder, recursive: true)
 
             // create Packages/swift-package-name links for all the project's package dependencies so we use the local versions in our swift build rather than downloading the remote dependencies
             // this will sync with Xcode's workspace, which will enable local package development of dependencies to work the same with this derived package as it does in Xcode
@@ -482,7 +513,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 package.dependencies += [.package(name: packageName, path: "Packages/" + packageName)]
             }
             
-            
             """
 
             var createdIds: Set<String> = []
@@ -500,7 +530,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                     let linkModuleRoot = moduleRootPath
                         .parentDirectory
                         .appending(try RelativePath(validating: relativeLinkPath))
-                    let linkModuleSrcMainSwift = linkModuleRoot.appending(components: "src", "main", swiftDirName)
+                    let linkModuleSrcMainSwift = linkModuleRoot.appending(components: "src", "main", "swift")
                     if fs.exists(linkModuleSrcMainSwift) {
                         trace("override link path for \(targetName) from \(packagePath) to \(linkModuleSrcMainSwift.pathString)")
                         packagePath = linkModuleSrcMainSwift.pathString
@@ -521,10 +551,10 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             // The source of the link tree needs to be the root project for the module in question, which we don't have access to (it can't be the `rootPath`, since that will be the topmost package that resulted in the transpiler invocation, which may not be the module in question).
             // So we need to guess from the projectFolderPath, which will be something like `/path/to/project-name/Sources/TargetName` by tacking `../..` to the end of the path.
             // WARNING: this is delicate, because there is nothing guaranteeing that the project follows the convention of `Sources/TargetName` for their modules!
-            let mirrorSource = projectFolderPath.appending(components: "..", "..")
+            let mirrorSource = rootPath // projectFolderPath.appending(components: "..", "..")
 
-            trace("creating absolute merged link tree from: swiftLinkFolder=\(swiftLinkFolder) to mirrorSource=\(mirrorSource) (rootPath=\(rootPath)) THROUGH: dependencyIdPaths=\(dependencyIdPaths)")
-            try createMirroredLinkTree(from: mirrorSource, to: swiftLinkFolder, excluding: ["Packages", "Package.resolved", ".build", ".swiftpm"]) { path, destPath in
+            //warn("creating absolute merged link tree from: swiftLinkFolder=\(swiftLinkFolder) to mirrorSource=\(mirrorSource) (rootPath=\(rootPath)) with dependencyIdPaths=\(dependencyIdPaths)")
+            try createMirroredLinkTree(swiftLinkFolder, pointingAt: mirrorSource, shallow: true, excluding: ["Packages", "Package.resolved", ".build", ".swiftpm"]) { destPath, path in
                 trace("createMirroredLinkTree for \(path.pathString)->\(destPath)")
 
                 // manually add the packageAddendum the Package.swift
@@ -532,37 +562,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                     let packageContents = try fs.readFileContents(path).withData { $0 + packageAddendum.utf8Data }
                     try writeChanges(tag: "skippackage", to: destPath, contents: packageContents, readOnly: true)
                     return false // override the linking of the file
+                } else {
+                    return true
                 }
-
-                var shouldLink = true
-
-                // check each of the bridge transpilations to see if we should be altering or appending to the file, or creating a "sidecar" file with the JNI @_cdecl functions
-                for matchingBridge in skipBridgeTranspilations.filter({ t in
-                    return t.output.file.bridgelessOutputFile == path.sourceFile || t.output.file.swiftOutputFile == path.sourceFile
-                }) {
-                    let content = matchingBridge.output.content.utf8Data
-                    let basename = try AbsolutePath(validating: matchingBridge.output.file.path).basename
-                    switch matchingBridge.outputType {
-                    case .default:
-                        continue // link as normal
-                    case .bridgeToKotlin:
-                        let destPathPeer = try destPath.parentDirectory.appending(RelativePath(validating: basename))
-                        info("writing bridge sidecar contents (\(content.count.byteCount)) to \(destPathPeer)")
-                        try writeChanges(tag: "skipbridgeadd", to: destPathPeer, contents: content, readOnly: true)
-                    case .bridgeToSwift:
-                        info("writing bridge swift contents (\(content.count.byteCount)) to \(destPath)")
-                        try writeChanges(tag: "skipbridge", to: destPath, contents: content, readOnly: true)
-                        shouldLink = false
-                    case .appendToSource:
-                        var generatedSwiftContent = try fs.readFileContents(path).withData { String(data: $0, encoding: .utf8) ?? "" }
-                        generatedSwiftContent += "\n\n" + matchingBridge.output.content
-                        info("writing bridge appended swift contents (\(generatedSwiftContent.count.byteCount)) to \(destPath)")
-                        try writeChanges(tag: "skipbridgeappend", to: destPath, contents: generatedSwiftContent.data(using: .utf8)!, readOnly: true)
-                        shouldLink = false // we are overriding the contents, so do not create a link
-                    }
-                }
-
-                return shouldLink
             }
         }
 
@@ -845,10 +847,15 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 await out.yield(message)
             }
 
-            // bridging types are handled separately when we link the derived swift package in createMirroredLinkTree
-            if transpilation.output.file.isBridgeOutputFile || transpilation.outputType == .appendToSource {
+            if [.bridgeToSwift, .bridgeToKotlin, .appendToSource].contains(transpilation.outputType) || transpilation.output.file.isBridgeOutputFile {
+                //warn("bridge transpilation \(transpilation.outputType): \(transpilation.output.file.name) source: \(transpilation.output.content.count.byteCount)")
                 skipBridgeTranspilations.append(transpilation)
-                info("bridge transpilation \(transpilation.outputType): \(transpilation.output.file.path) source: \(transpilation.output.content.count.byteCount)")
+                return
+            }
+
+            // when we are running with SKIP_BRIDGE, we don't write need to write out the Kotlin (which has already been generated in the first pass of the plugin)
+            if transpileOptions.skipBridgeOutput != nil {
+                //warn("suppressing transpiled Kotlin due to transpileOptions.skipBridgeOutput")
                 return
             }
 
@@ -967,7 +974,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 info("indexed \(resourcesIndex.count) resources at \(indexPath.pathString)", sourceFile: indexPath.sourceFile)
             } else {
                 // remove the resources file if it should be empty
-                try? fs.removeFileTree(indexPath)
+                removePath(indexPath)
             }
 
             func convertStrings(resourceSourceURL: URL, sourcePath: AbsolutePath) throws {
@@ -1022,7 +1029,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             for (linkModuleName, relativeLinkPath) in linkNamePaths {
                 let linkModulePath = try moduleBasePath.appending(RelativePath(validating: linkModuleName))
                 trace("relativeLinkPath: \(relativeLinkPath) moduleBasePath: \(moduleBasePath) linkModuleName: \(linkModuleName) -> linkModulePath: \(linkModulePath)")
-                try createMergedRelativeLinkTree(from: linkModulePath, to: relativeLinkPath)
+                try createMergedRelativeLinkTree(from: linkModulePath, to: relativeLinkPath, shallow: false)
                 dependentModules.append(linkModuleName)
             }
 
@@ -1031,7 +1038,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         /// Attempts to make a link from the `fromPath` to the given relative path.
         /// If `fromPath` already exists and is a directory, attempt to create links for each of the contents of the directory to the updated relative folder
-        func createMergedRelativeLinkTree(from fromPath: AbsolutePath, to relative: String) throws {
+        func createMergedRelativeLinkTree(from fromPath: AbsolutePath, to relative: String, shallow: Bool) throws {
             let destPath = try AbsolutePath(validating: relative, relativeTo: fromPath.parentDirectory)
             if !fs.isDirectory(destPath) {
                 // skip over anything that is not a destination folder
@@ -1043,26 +1050,25 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             }
             trace("creating merged link tree from: \(fromPath) to: \(relative)")
             if fs.isSymlink(fromPath) {
-                try fs.removeFileTree(fromPath) // clear any pre-existing symlink
+                removePath(fromPath) // clear any pre-existing symlink
             }
 
             // the folder is a directory; recurse into the destination paths in order to link to the local paths
-            if fs.isDirectory(fromPath) {
+            if !shallow && fs.isDirectory(fromPath) {
                 for fsEntry in try fs.getDirectoryContents(destPath) {
                     let fromSubPath = fromPath.appending(try RelativePath(validating: fsEntry))
                     // bump up all the relative links to account for the folder we just recursed into.
                     // e.g.: ../SomeSharedRoot/OtherModule/
                     // becomes: ../../SomeSharedRoot/OtherModule/someFolder/
-                    try createMergedRelativeLinkTree(from: fromSubPath, to: "../" + relative + "/" + fsEntry)
+                    try createMergedRelativeLinkTree(from: fromSubPath, to: "../" + relative + "/" + fsEntry, shallow: shallow)
                 }
             } else {
                 try addLink(fromPath, pointingAt: destPath, relative: true)
             }
         }
 
-
         /// Create a mirror hierarchy of the directory structure at `from` in the folder specified by `to`, and link each individual file in the hierarchy
-        func createMirroredLinkTree(from fromPath: AbsolutePath, to destPath: AbsolutePath, excluding excludePaths: Set<String> = [], contentHandler: ((_ fromPath: AbsolutePath, _ destPath: AbsolutePath) throws -> Bool)? = nil) throws {
+        func createMirroredLinkTree(_ destPath: AbsolutePath, pointingAt fromPath: AbsolutePath, shallow: Bool, excluding excludePaths: Set<String> = [], contentHandler: ((_ destPath: AbsolutePath, _ fromPath: AbsolutePath) throws -> Bool)? = nil) throws {
             trace("creating absolute merged link tree from: \(fromPath) to: \(destPath)")
             // the folder is a directory; recurse into the destination paths in order to link to the local paths
             if fs.isDirectory(fromPath) {
@@ -1073,17 +1079,37 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                         continue
                     }
                     let rel = try RelativePath(validating: fsEntry)
-                    let destDir = destPath.appending(rel)
-                    let srcDir = fromPath.appending(rel)
-                    try createMirroredLinkTree(from: srcDir, to: destDir, contentHandler: contentHandler)
+                    let childDestPath = destPath.appending(rel)
+                    let childFromPath = fromPath.appending(rel)
+                    if shallow {
+                        if try contentHandler?(childDestPath, childFromPath) != false {
+                            try addLink(childDestPath, pointingAt: childFromPath, relative: false)
+                        }
+                    } else {
+                        try createMirroredLinkTree(childDestPath, pointingAt: childFromPath, shallow: shallow, contentHandler: contentHandler)
+                    }
                 }
             } else if fs.isFile(fromPath) {
                 // check whether the contentHandler want to override linking the file
-                if try contentHandler?(fromPath, destPath) != false {
+                if try contentHandler?(destPath, fromPath) != false {
                     try addLink(destPath, pointingAt: fromPath, relative: false)
+                } else {
+                    warn("unknown file type encountered when creating links: \(fromPath)")
                 }
-            } else {
-                warn("unknown file type encountered when creating links: \(fromPath)")
+            }
+        }
+
+        @discardableResult
+        func removePath(_ path: AbsolutePath) -> Bool {
+            do {
+                if !fs.exists(path, followSymlink: false) {
+                    return false
+                }
+                try fs.removeFileTree(path)
+                return true
+            } catch {
+                warn("unable to remove entry \(path): \(error)", sourceFile: path.sourceFile)
+                return false
             }
         }
     }
@@ -1131,6 +1157,9 @@ struct TranspileCommandOptions: ParsableArguments {
 
     @Option(name: [.customLong("dependency")], help: ArgumentHelp("id:path", valueName: "dependency"))
     var dependencies: [String] = [] // --dependency id:path
+
+    @Option(name: [.long], help: ArgumentHelp("Folder for SkipBridge generated Swift files", valueName: "suffix"))
+    var skipBridgeOutput: String? = nil
 }
 
 struct TranspileResult {

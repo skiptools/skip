@@ -126,7 +126,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         // Getter
         let isInstance = classDeclaration != nil && !variableDeclaration.isStatic
         let getterArguments = isInstance ? "(Swift_peer)" : "()"
-        let getterParameters = isInstance ? "(Swift_peer: skip.bridge.SwiftObjectPointer)" : "()"
+        let getterParameters = isInstance ? "(Swift_peer: skip.bridge.kt.SwiftObjectPointer)" : "()"
         let getterSref: String
         if let onUpdate = variableDeclaration.onUpdate?(), !onUpdate.isEmpty {
             getterSref = ".sref(\(onUpdate))"
@@ -165,7 +165,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         // Setter
         if variableDeclaration.apiFlags.options.contains(.writeable) {
             let setterArguments = isInstance ? "Swift_peer, newValue" : "newValue"
-            let setterInstanceParameter = isInstance ? "Swift_peer: skip.bridge.SwiftObjectPointer, " : ""
+            let setterInstanceParameter = isInstance ? "Swift_peer: skip.bridge.kt.SwiftObjectPointer, " : ""
             let setterBody = [
                 externalName + "_set(" + setterArguments + ")"
             ]
@@ -421,7 +421,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         var externalFunctionDeclaration = "private external fun \(externalName)("
         var externalParametersString: String
         if classDeclaration != nil, functionDeclaration.type != .constructorDeclaration && !functionDeclaration.isStatic {
-            externalParametersString = "Swift_peer: skip.bridge.SwiftObjectPointer"
+            externalParametersString = "Swift_peer: skip.bridge.kt.SwiftObjectPointer"
         } else {
             externalParametersString = ""
         }
@@ -442,7 +442,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         externalFunctionDeclaration += externalParametersString
         externalFunctionDeclaration += ")"
         if functionDeclaration.type == .constructorDeclaration {
-            externalFunctionDeclaration += ": skip.bridge.SwiftObjectPointer"
+            externalFunctionDeclaration += ": skip.bridge.kt.SwiftObjectPointer"
         } else if functionType.returnType != .void && !isAsync {
             var returnType = functionType.returnType
             if functionDeclaration.apiFlags.throwsType != .none {
@@ -502,7 +502,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         equals.ensureLeadingNewlines(1)
         equals.isGenerated = true
         let sourceCode: [String] = [
-            "if (other !is skip.bridge.SwiftPeerBridged) return false",
+            "if (other !is skip.bridge.kt.SwiftPeerBridged) return false",
             "return Swift_peer == other.Swift_bridgedPeer()"
         ]
         equals.body = KotlinCodeBlock(statements: sourceCode.map { KotlinRawStatement(sourceCode: $0) })
@@ -515,7 +515,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             "hasher.value.combine(Swift_hashvalue(Swift_peer))"
         ].map { KotlinRawStatement(sourceCode: $0) })
 
-        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_hashvalue(Swift_peer: skip.bridge.SwiftObjectPointer): Long")
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_hashvalue(Swift_peer: skip.bridge.kt.SwiftObjectPointer): Long")
         classDeclaration.insert(statements: [externalFunctionDeclaration], after: functionDeclaration)
 
         let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: "Swift_hashvalue", translator: translator)
@@ -599,7 +599,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         }
         classDeclaration.extras = nil
         classDeclaration.inherits = classDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.isNamed("MutableStruct") || $0.checkBridgable(codebaseInfo: codebaseInfo) != nil }
-        classDeclaration.inherits.append(.named("skip.bridge.SwiftPeerBridged", []))
+        classDeclaration.inherits.append(.named("skip.bridge.kt.SwiftPeerBridged", []))
 
         var insertStatements: [KotlinStatement] = []
         let swiftPeer = KotlinVariableDeclaration(names: ["Swift_peer"], variableTypes: [.swiftObjectPointer(java: true)])
@@ -612,7 +612,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
 
         let swiftPeerConstructor = KotlinFunctionDeclaration(name: "constructor")
         swiftPeerConstructor.modifiers.visibility = .public
-        swiftPeerConstructor.parameters = [Parameter<KotlinExpression>(externalLabel: "Swift_peer", declaredType: .swiftObjectPointer(java: true)), Parameter<KotlinExpression>(externalLabel: "marker", declaredType: .named("skip.bridge.SwiftPeerMarker", []).asOptional(true))]
+        swiftPeerConstructor.parameters = [Parameter<KotlinExpression>(externalLabel: "Swift_peer", declaredType: .swiftObjectPointer(java: true)), Parameter<KotlinExpression>(externalLabel: "marker", declaredType: .named("skip.bridge.kt.SwiftPeerMarker", []).asOptional(true))]
         swiftPeerConstructor.body = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: "this.Swift_peer = Swift_peer")])
         swiftPeerConstructor.ensureLeadingNewlines(1)
         swiftPeerConstructor.isGenerated = true
@@ -622,13 +622,13 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         finalize.modifiers.visibility = .public
         finalize.body = KotlinCodeBlock(statements: [
             "Swift_release(Swift_peer)",
-            "Swift_peer = skip.bridge.SwiftObjectNil"
+            "Swift_peer = skip.bridge.kt.SwiftObjectNil"
         ].map { KotlinRawStatement(sourceCode: $0) })
         finalize.ensureLeadingNewlines(1)
         finalize.isGenerated = true
         insertStatements.append(finalize)
 
-        let release = KotlinRawStatement(sourceCode: "private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)")
+        let release = KotlinRawStatement(sourceCode: "private external fun Swift_release(Swift_peer: skip.bridge.kt.SwiftObjectPointer)")
         insertStatements.append(release)
 
         if !classDeclaration.members.contains(where: { $0.type == .constructorDeclaration }) {
@@ -638,7 +638,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
             constructor.ensureLeadingNewlines(1)
             constructor.isGenerated = true
             insertStatements.append(constructor)
-            let externalConstructor = KotlinRawStatement(sourceCode: "private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer")
+            let externalConstructor = KotlinRawStatement(sourceCode: "private external fun Swift_constructor(): skip.bridge.kt.SwiftObjectPointer")
             insertStatements.append(externalConstructor)
 
             let constructorCdecl = cdecl(for: classDeclaration, name: "Swift_constructor", translator: translator)
@@ -737,7 +737,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         }
         swift.append(2, "return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])")
         swift.append(1, "}")
-        swift.append(1, "private static let Java_constructor_methodID = Java_class.getMethodID(name: \"<init>\", sig: \"(JLskip/bridge/SwiftPeerMarker;)V\")!")
+        swift.append(1, "private static let Java_constructor_methodID = Java_class.getMethodID(name: \"<init>\", sig: \"(JLskip/bridge/kt/SwiftPeerMarker;)V\")!")
         swift.append("}")
 
         let swiftDefinition = SwiftDefinition(swift: swift)

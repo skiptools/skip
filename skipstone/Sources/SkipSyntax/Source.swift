@@ -75,7 +75,7 @@ public struct Source : Encodable {
     public struct FilePath: Hashable, Codable {
         public private(set) var path: String
         /// The suffix of a file that indicates it is a bridging file
-        private static let bridgeFileSuffix = "_Bridge.swift"
+        public static let bridgeFileSuffix = "_Bridge.swift"
 
         public init(path: String) {
             self.path = path

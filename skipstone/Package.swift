@@ -44,6 +44,7 @@ let package = Package(
             .target(name: "SkipDriveExternal", condition: .when(platforms: [.macOS])),
             .product(name: "SwiftParser", package: "swift-syntax"),
             .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            //.product(name: "SwiftPMDataModel-auto", package: "swift-package-manager"),
             .product(name: "SwiftToolsSupport-auto", package: "swift-tools-support-core"),
             .product(name: "Universal", package: "universal"),
             .product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.linux])),

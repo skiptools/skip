@@ -101,7 +101,7 @@ extension TypeSignature {
     static let javaObjectPointer: TypeSignature = .named("JavaObjectPointer", [])
     static let javaString: TypeSignature = .named("JavaString", [])
     static func swiftObjectPointer(java: Bool) -> TypeSignature {
-        return java ? .named("skip.bridge.SwiftObjectPointer", []) : .named("SwiftObjectPointer", [])
+        return java ? .named("skip.bridge.kt.SwiftObjectPointer", []) : .named("SwiftObjectPointer", [])
     }
 
     /// The generated native type when the bridging strategy is unknown - e.g. for protocols.

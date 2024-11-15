@@ -22,7 +22,7 @@ struct AndroidCommand: AsyncParsableCommand {
             AndroidRunCommand.self,
             AndroidTestCommand.self,
             AndroidSDKCommand.self,
-        ], aliases: ["toolchain"])
+        ])
 }
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
@@ -178,9 +178,9 @@ fileprivate extension AndroidOperationCommand {
             env["SDKROOT"] = nil
 
             // manually disable the skipstone plugin from being run again in the derived build; we don't need to transpile and bridge the code a second time, we only need to build the native libraries with the Android toolchain
-            env["SKIP_PLUGIN_DISABLED"] = "1"
+            //env["SKIP_PLUGIN_DISABLED"] = "1"
             // set the SKIP_BRIDGE flag, which is transferred through to a build #define in SkipBridge and can be used to check whether the current build mode is targetting JNI
-            env["SKIP_BRIDGE"] = "1"
+            //env["SKIP_BRIDGE"] = "1"
 
             let swiftCmd = toolchainBin.appendingPathComponent("swift", isDirectory: false).path
             if !FileManager.default.fileExists(atPath: swiftCmd) {

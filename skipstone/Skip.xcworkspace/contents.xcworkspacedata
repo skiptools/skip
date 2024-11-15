@@ -35,6 +35,9 @@
       location = "group:../skip-bridge">
    </FileRef>
    <FileRef
+      location = "group:../skip-android-bridge">
+   </FileRef>
+   <FileRef
       location = "group:../skip-kit">
    </FileRef>
    <FileRef

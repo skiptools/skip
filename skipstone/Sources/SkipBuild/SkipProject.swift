@@ -181,6 +181,7 @@ class FrameworkProjectLayout {
 
                 // a sample of bridging Kotlin back into Swift
                 let nativeModuleKotlinBridge = sourceHeader + """
+                #if !SKIP_BRIDGE
                 // SKIP @BridgeToSwift
                 func getJavaSystemProperty(_ name: String) -> String? {
                     #if SKIP
@@ -189,6 +190,7 @@ class FrameworkProjectLayout {
                     return nil
                     #endif
                 }
+                #endif
 
                 """
 

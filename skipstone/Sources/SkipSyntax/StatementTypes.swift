@@ -1,5 +1,7 @@
 import SwiftSyntax
 
+import Foundation
+
 /// Supported Swift statement types.
 ///
 /// - Note: `Codable` for use in `CodebaseInfo`.
@@ -628,9 +630,10 @@ final class IfDefined: Statement {
                     hasParens = true
                     symbol = symbol.dropLast()
                 }
+                let isSkipBridgeSymbol = symbol == "SKIP_BRIDGE" // we process blocks inside "#if !SKIP_BRIDGE", which contain @BridgeToSwift
                 let isSymbol = symbol == "SKIP" || symbol == "os(Android)" || preprocessorSymbols.contains(String(symbol))
-                let isTrue = (isSymbol && !isNot) || (!isSymbol && isNot)
-                hasSymbol = hasSymbol || isSymbol
+                let isTrue = (isSkipBridgeSymbol && isNot) || (isSymbol && !isNot) || (!isSymbol && isNot)
+                hasSymbol = isSkipBridgeSymbol || hasSymbol || isSymbol
                 hasTrue = hasTrue == true || isTrue
                 hasFalse = hasFalse == true || !isTrue
             }
