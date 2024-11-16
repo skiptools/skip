@@ -282,12 +282,23 @@ extension Accessor where B: CodeBlock {
 }
 
 extension Attributes {
+    var isBridgeToKotlin: Bool {
+        return attributes.contains { $0 == .bridgeToKotlin }
+    }
+
+    var isBridgeToSwift: Bool {
+        return attributes.contains { $0 == .bridgeToSwift }
+    }
+
     func append(to output: OutputGenerator, indentation: Indentation) {
         attributes.forEach { $0.append(to: output, indentation: indentation) }
     }
 }
 
 extension Attribute {
+    static let bridgeToKotlin = Attribute(signature: .named("BridgeToKotlin", []))
+    static let bridgeToSwift = Attribute(signature: .named("BridgeToSwift", []))
+
     func append(to output: OutputGenerator, indentation: Indentation) {
         switch kind {
         case .deprecated:

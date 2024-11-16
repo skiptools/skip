@@ -1,37 +1,46 @@
 /// Generate compiled Swift to Kotlin bridging code.
-final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
-    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
-        guard syntaxTree.isBridgeFile, let codebaseInfo = translator.codebaseInfo else {
-            return []
-        }
+final class KotlinBridgeToKotlinVisitor {
+    private let syntaxTree: KotlinSyntaxTree
+    private let translator: KotlinTranslator
+    private let codebaseInfo: CodebaseInfo.Context
+    private var swiftDefinitions: [SwiftDefinition] = []
+    private var cdeclFunctions: [CDeclFunction] = []
 
-        var swiftDefinitions: [SwiftDefinition] = []
-        var cdeclFunctions: [CDeclFunction] = []
-        var nonKotlinImports: [KotlinStatement] = []
+    init?(for syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) {
+        guard syntaxTree.isBridgeFile, let codebaseInfo = translator.codebaseInfo else {
+            return nil
+        }
+        self.syntaxTree = syntaxTree
+        self.translator = translator
+        self.codebaseInfo = codebaseInfo
+    }
+
+    func visit() -> [KotlinTransformerOutput] {
         var globalFunctionCount = 0
         var hasBridgedObservables = false
+        var nonKotlinImports: [KotlinStatement] = []
         syntaxTree.root.visit { node in
             if let importDeclaration = node as? KotlinImportDeclaration {
                 // Filter compiled-only imports from the transpiled output
-                if !isKotlinImport(importDeclaration, codebaseInfo: codebaseInfo) {
+                if !isKotlinImport(importDeclaration) {
                     nonKotlinImports.append(importDeclaration)
                 }
                 return .skip
             } else if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global {
-                updateVariableDeclaration(variableDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
+                updateVariableDeclaration(variableDeclaration)
                 return .skip
             } else if let functionDeclaration = node as? KotlinFunctionDeclaration, functionDeclaration.role == .global {
-                updateFunctionDeclaration(functionDeclaration, uniquifier: globalFunctionCount, cdeclFunctions: &cdeclFunctions, translator: translator)
+                updateFunctionDeclaration(functionDeclaration, uniquifier: globalFunctionCount)
                 globalFunctionCount += 1
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
-                if updateClassDeclaration(classDeclaration, swiftDefinitions: &swiftDefinitions, cdeclFunctions: &cdeclFunctions, translator: translator) {
+                if updateClassDeclaration(classDeclaration) {
                     hasBridgedObservables = hasBridgedObservables || classDeclaration.attributes.contains(.observable)
                 }
                 return .recurse(nil)
             } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
-                if updateInterfaceDeclaration(interfaceDeclaration, translator: translator) {
-                    if let bridgeImplDefinition = KotlinBridgeToSwiftTransformer.unknownBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, codebaseInfo: codebaseInfo) {
+                if updateInterfaceDeclaration(interfaceDeclaration) {
+                    if let bridgeImplDefinition = KotlinBridgeToSwiftVisitor.unknownBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, codebaseInfo: codebaseInfo) {
                         swiftDefinitions.append(bridgeImplDefinition)
                     }
                 }
@@ -43,16 +52,16 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         nonKotlinImports.forEach { syntaxTree.root.remove(statement: $0) }
 
         var outputs: [KotlinTransformerOutput] = []
-        if let bridgeOutput = bridgeOutput(for: syntaxTree, swiftDefinitions: swiftDefinitions, cdeclFunctions: cdeclFunctions, translator: translator) {
+        if let bridgeOutput = bridgeOutput() {
             outputs.append(bridgeOutput)
         }
         if hasBridgedObservables {
-            outputs.append(importObservationOutput(for: syntaxTree))
+            outputs.append(importObservationOutput())
         }
         return outputs
     }
 
-    private func bridgeOutput(for syntaxTree: KotlinSyntaxTree, swiftDefinitions: [SwiftDefinition], cdeclFunctions: [CDeclFunction], translator: KotlinTranslator) -> KotlinTransformerOutput? {
+    private func bridgeOutput() -> KotlinTransformerOutput? {
         guard !swiftDefinitions.isEmpty || !cdeclFunctions.isEmpty else {
             return nil
         }
@@ -61,6 +70,8 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         }
 
         let importDeclarations = translator.syntaxTree.root.statements.compactMap { $0 as? ImportDeclaration }
+        let swiftDefinitions = self.swiftDefinitions
+        let cdeclFunctions = self.cdeclFunctions
         let outputNode = SwiftDefinition { output, indentation, _ in
             output.append("import SkipBridge\n\n")
             for importDeclaration in importDeclarations {
@@ -73,12 +84,12 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         return KotlinTransformerOutput(file: outputFile, node: outputNode, type: .bridgeToKotlin)
     }
 
-    private func importObservationOutput(for syntaxTree: KotlinSyntaxTree) -> KotlinTransformerOutput {
+    private func importObservationOutput() -> KotlinTransformerOutput {
         let outputNode = SwiftDefinition(swift: ["import struct SkipBridge.Observation"])
         return KotlinTransformerOutput(file: syntaxTree.source.file, node: outputNode, type: .appendToSource)
     }
 
-    private func isKotlinImport(_ importDeclaration: KotlinImportDeclaration, codebaseInfo: CodebaseInfo.Context) -> Bool {
+    private func isKotlinImport(_ importDeclaration: KotlinImportDeclaration) -> Bool {
         guard !importDeclaration.isKotlinImport else {
             return true
         }
@@ -94,12 +105,8 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         return codebaseInfo.global.dependentModules.contains { moduleName == $0.moduleName }
     }
 
-    private func updateVariableDeclaration(_ variableDeclaration: KotlinVariableDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+    private func updateVariableDeclaration(_ variableDeclaration: KotlinVariableDeclaration, in classDeclaration: KotlinClassDeclaration? = nil) {
         guard !variableDeclaration.isGenerated else {
-            return
-        }
-        guard classDeclaration != nil || !variableDeclaration.attributes.isBridgeToSwift else {
-            variableDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(variableDeclaration, source: translator.syntaxTree.source))
             return
         }
         guard let bridgable = variableDeclaration.checkBridgable(translator: translator) else {
@@ -222,12 +229,8 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         }
     }
 
-    private func updateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, uniquifier: Int, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+    private func updateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, uniquifier: Int) {
         guard !functionDeclaration.isGenerated || functionDeclaration.type == .constructorDeclaration else {
-            return
-        }
-        guard classDeclaration != nil || !functionDeclaration.attributes.isBridgeToSwift else {
-            functionDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(functionDeclaration, source: translator.syntaxTree.source))
             return
         }
         let isMutableStructCopyConstructor = classDeclaration != nil && functionDeclaration.isMutableStructCopyConstructor
@@ -473,7 +476,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         return true
     }
 
-    private func updateEqualsDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+    private func updateEqualsDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration) {
         functionDeclaration.extras = nil
         functionDeclaration.body = KotlinCodeBlock(statements: [
             "return Swift_isequal(lhs, rhs)"
@@ -509,7 +512,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         return equals
     }
 
-    private func updateHashDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+    private func updateHashDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration) {
         functionDeclaration.extras = nil
         functionDeclaration.body = KotlinCodeBlock(statements: [
             "hasher.value.combine(Swift_hashvalue(Swift_peer))"
@@ -547,7 +550,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         return hash
     }
 
-    private func updateLessThanDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration, cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) {
+    private func updateLessThanDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration) {
         functionDeclaration.extras = nil
         functionDeclaration.body = KotlinCodeBlock(statements: [
             "return Swift_islessthan(lhs, rhs)"
@@ -567,11 +570,7 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         cdeclFunctions.append(cdeclFunction)
     }
 
-    @discardableResult private func updateInterfaceDeclaration(_ interfaceDeclaration: KotlinInterfaceDeclaration, translator: KotlinTranslator) -> Bool {
-        guard !interfaceDeclaration.attributes.isBridgeToSwift else {
-            interfaceDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(interfaceDeclaration, source: translator.syntaxTree.source))
-            return false
-        }
+    @discardableResult private func updateInterfaceDeclaration(_ interfaceDeclaration: KotlinInterfaceDeclaration) -> Bool {
         guard interfaceDeclaration.checkBridgable(translator: translator) else {
             return false
         }
@@ -583,12 +582,8 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         return true
     }
 
-    @discardableResult private func updateClassDeclaration(_ classDeclaration: KotlinClassDeclaration, swiftDefinitions: inout [SwiftDefinition], cdeclFunctions: inout [CDeclFunction], translator: KotlinTranslator) -> Bool {
+    @discardableResult private func updateClassDeclaration(_ classDeclaration: KotlinClassDeclaration) -> Bool {
         guard !classDeclaration.isGenerated else {
-            return false
-        }
-        guard !classDeclaration.attributes.isBridgeToSwift else {
-            classDeclaration.messages.append(Message.kotlinBridgeSwiftToSwift(classDeclaration, source: translator.syntaxTree.source))
             return false
         }
         guard classDeclaration.checkBridgable(translator: translator) else {
@@ -678,22 +673,22 @@ final class KotlinBridgeToKotlinTransformer: KotlinTransformer {
         var functionCount = 0
         for member in classDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
-                updateVariableDeclaration(variableDeclaration, in: classDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
+                updateVariableDeclaration(variableDeclaration, in: classDeclaration)
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
                 if functionDeclaration.isEqualImplementation {
-                    updateEqualsDeclaration(functionDeclaration, in: classDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
+                    updateEqualsDeclaration(functionDeclaration, in: classDeclaration)
                     hasEqualsDeclaration = true
                 } else if functionDeclaration.isHashImplementation {
-                    updateHashDeclaration(functionDeclaration, in: classDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
+                    updateHashDeclaration(functionDeclaration, in: classDeclaration)
                     hasHashDeclaration = true
                 } else if functionDeclaration.isLessThanImplementation {
-                    updateLessThanDeclaration(functionDeclaration, in: classDeclaration, cdeclFunctions: &cdeclFunctions, translator: translator)
+                    updateLessThanDeclaration(functionDeclaration, in: classDeclaration)
                 } else if functionDeclaration.type == .constructorDeclaration, functionDeclaration.attributes.isBridgeIgnored {
                     // The decoder includes all constructors so that we can detect whether the class needs a default
                     // constructor generated, but it marks constructors that shouldn't be bridged
                     classDeclaration.remove(statement: functionDeclaration)
                 } else {
-                    updateFunctionDeclaration(functionDeclaration, in: classDeclaration, uniquifier: functionCount, cdeclFunctions: &cdeclFunctions, translator: translator)
+                    updateFunctionDeclaration(functionDeclaration, in: classDeclaration, uniquifier: functionCount)
                     functionCount += 1
                 }
             }

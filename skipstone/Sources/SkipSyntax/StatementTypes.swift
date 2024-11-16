@@ -846,7 +846,7 @@ final class EnumCaseDeclaration: Statement {
     let name: String
     private(set) var associatedValues: [Parameter<Expression>]
     let rawValue: Expression?
-    let attributes: Attributes
+    var attributes: Attributes // Allow additions by transformers
     private(set) var modifiers: Modifiers
     var signature: TypeSignature {
         guard let owningTypeDeclaration else {
@@ -990,7 +990,7 @@ final class FunctionDeclaration: Statement {
     private(set) var parameters: [Parameter<Expression>]
     private(set) var asyncBehavior: AsyncBehavior
     private(set) var throwsType: TypeSignature
-    let attributes: Attributes
+    var attributes: Attributes // Allow additions by transformers
     private(set) var modifiers: Modifiers
     private(set) var generics: Generics
     let body: CodeBlock?
@@ -1209,7 +1209,7 @@ final class SubscriptDeclaration: Statement {
     private(set) var parameters: [Parameter<Expression>]
     private(set) var asyncBehavior: AsyncBehavior
     private(set) var throwsType: TypeSignature
-    let attributes: Attributes
+    var attributes: Attributes // Allow additions by transformers
     private(set) var modifiers: Modifiers
     private(set) var generics: Generics
     let getter: Accessor<CodeBlock>?
@@ -1339,7 +1339,7 @@ final class SubscriptDeclaration: Statement {
 /// `typealias ...`
 final class TypealiasDeclaration: Statement {
     let name: String
-    let attributes: Attributes
+    var attributes: Attributes // Allow additions by transformers
     private(set) var modifiers: Modifiers
     private(set) var generics: Generics
     private(set) var aliasedType: TypeSignature
@@ -1411,7 +1411,7 @@ final class TypealiasDeclaration: Statement {
 class TypeDeclaration: Statement {
     let name: String
     private(set) var inherits: [TypeSignature]
-    let attributes: Attributes
+    var attributes: Attributes // Allow additions by transformers
     private(set) var modifiers: Modifiers
     private(set) var generics: Generics
     let members: [Statement]
@@ -1631,7 +1631,7 @@ final class VariableDeclaration: Statement {
     let isLet: Bool // True for async let local OR async get property
     private(set) var asyncBehavior: AsyncBehavior
     private(set) var throwsType: TypeSignature
-    var attributes: Attributes
+    var attributes: Attributes // Allow additions by transformers
     private(set) var modifiers: Modifiers
     let value: Expression?
     let getter: Accessor<CodeBlock>?

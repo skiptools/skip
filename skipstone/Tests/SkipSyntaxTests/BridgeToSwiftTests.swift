@@ -1,129 +1,101 @@
+import SkipSyntax
 import XCTest
 
 final class BridgeToSwiftTests: XCTestCase {
-    func testWrongBridgeType() async throws {
-        try await checkProducesMessage(swift: """
-        @BridgeToKotlin var i = 1
-        """)
-        
-        try await checkProducesMessage(swift: """
-        // SKIP @BridgeToKotlin
-        var i = 1
-        """)
+    private var transformers: [KotlinTransformer] {
+        return builtinKotlinTransformers() + [KotlinBridgeTransformer()]
     }
 
     func testLetSupportedLiteral() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        let b = true
-        """, kotlin: """
-        internal val b = true
-        """, swiftBridgeSupport: """
-        let b = true
-        """)
-
-        try await check(swift: """
-        @BridgeToSwift
-        let i = 1
-        """, kotlin: """
-        internal val i = 1
-        """, swiftBridgeSupport: """
-        let i: Int = 1
-        """)
-        
-        try await check(swift: """
-        @BridgeToSwift
-        let i: Int32 = 1
-        """, kotlin: """
-        internal val i: Int = 1
-        """, swiftBridgeSupport: """
-        let i: Int32 = 1
-        """)
-        
-        try await check(swift: """
-        @BridgeToSwift
-        let d = 5.0
-        """, kotlin: """
-        internal val d = 5.0
-        """, swiftBridgeSupport: """
-        let d: Double = 5.0
-        """)
-        
-        try await check(swift: """
-        @BridgeToSwift
-        let d: Double = 5
-        """, kotlin: """
-        internal val d: Double = 5.0
-        """, swiftBridgeSupport: """
-        let d: Double = 5
-        """)
-        
-        try await check(swift: """
-        @BridgeToSwift
-        let d: Double? = nil
-        """, kotlin: """
-        internal val d: Double? = null
-        """, swiftBridgeSupport: """
-        let d: Double? = nil
-        """)
-        
-        try await check(swift: """
-        @BridgeToSwift
-        let d: Double? = 5
-        """, kotlin: """
-        internal val d: Double? = 5.0
-        """, swiftBridgeSupport: """
-        let d: Double? = 5
-        """)
-
-        try await check(swift: """
-        @BridgeToSwift
-        let f = Float(1)
-        """, kotlin: """
-        internal val f = 1f
-        """, swiftBridgeSupport: """
-        let f: Float = 1
-        """)
-
-        try await check(swift: """
-        @BridgeToSwift
-        let s = "Hello"
-        """, kotlin: """
-        internal val s = "Hello"
-        """, swiftBridgeSupport: """
-        let s = "Hello"
-        """)
-
-        try await check(swift: """
-        @BridgeToSwift
-        let l = Int64(1)
-        """, kotlin: """
-        internal val l = 1L
-        """, swiftBridgeSupport: """
-        let l: Int64 = 1
-        """)
-    }
-
-    func testPublicLetSupportedLiteral() async throws {
-        try await check(swift: """
-        @BridgeToSwift
         public let b = true
         """, kotlin: """
         val b = true
         """, swiftBridgeSupport: """
         public let b = true
-        """)
+        """, transformers: transformers)
+
+        try await check(swift: """
+        public let i = 1
+        """, kotlin: """
+        val i = 1
+        """, swiftBridgeSupport: """
+        public let i: Int = 1
+        """, transformers: transformers)
+
+        try await check(swift: """
+        public let i: Int32 = 1
+        """, kotlin: """
+        val i: Int = 1
+        """, swiftBridgeSupport: """
+        public let i: Int32 = 1
+        """, transformers: transformers)
+
+        try await check(swift: """
+        public let d = 5.0
+        """, kotlin: """
+        val d = 5.0
+        """, swiftBridgeSupport: """
+        public let d: Double = 5.0
+        """, transformers: transformers)
+
+        try await check(swift: """
+        public let d: Double = 5
+        """, kotlin: """
+        val d: Double = 5.0
+        """, swiftBridgeSupport: """
+        public let d: Double = 5
+        """, transformers: transformers)
+
+        try await check(swift: """
+        public let d: Double? = nil
+        """, kotlin: """
+        val d: Double? = null
+        """, swiftBridgeSupport: """
+        public let d: Double? = nil
+        """, transformers: transformers)
+
+        try await check(swift: """
+        public let d: Double? = 5
+        """, kotlin: """
+        val d: Double? = 5.0
+        """, swiftBridgeSupport: """
+        public let d: Double? = 5
+        """, transformers: transformers)
+
+        try await check(swift: """
+        public let f = Float(1)
+        """, kotlin: """
+        val f = 1f
+        """, swiftBridgeSupport: """
+        public let f: Float = 1
+        """, transformers: transformers)
+
+        try await check(swift: """
+        public let s = "Hello"
+        """, kotlin: """
+        val s = "Hello"
+        """, swiftBridgeSupport: """
+        public let s = "Hello"
+        """, transformers: transformers)
+
+        try await check(swift: """
+        public let l = Int64(1)
+        """, kotlin: """
+        val l = 1L
+        """, swiftBridgeSupport: """
+        public let l: Int64 = 1
+        """, transformers: transformers)
     }
 
     func testLetUnsupportedLiteral() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        let s = "ab\\(1 + 1)c"
+        public let s = "ab\\(1 + 1)c"
         """, kotlin: """
-        internal val s = "ab${1 + 1}c"
+        val s = "ab${1 + 1}c"
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        var s: String {
+        public var s: String {
             get {
                 return jniContext {
                     let value_java: String = try! Java_SourceKt.callStatic(method: Java_get_s_methodID, args: [])
@@ -132,16 +104,15 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_get_s_methodID = Java_SourceKt.getStaticMethodID(name: "getS", sig: "()Ljava/lang/String;")!
-        """)
+        """, transformers: transformers)
 
         try await check(swift: """
-        @BridgeToSwift
-        let b: Bool? = true
+        public let b: Bool? = true
         """, kotlin: """
-        internal val b: Boolean? = true
+        val b: Boolean? = true
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        var b: Bool? {
+        public var b: Bool? {
             get {
                 return jniContext {
                     let value_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_get_b_methodID, args: [])
@@ -150,18 +121,17 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_get_b_methodID = Java_SourceKt.getStaticMethodID(name: "getB", sig: "()Ljava/lang/Boolean;")!
-        """)
+        """, transformers: transformers)
     }
 
     func testLetNonLiteral() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        let i = 1 + 1
+        public let i = 1 + 1
         """, kotlin: """
-        internal val i = 1 + 1
+        val i = 1 + 1
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        var i: Int {
+        public var i: Int {
             get {
                 return jniContext {
                     let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
@@ -170,16 +140,15 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!
-        """)
+        """, transformers: transformers)
 
         try await check(swift: """
-        @BridgeToSwift
-        let i = Int64(1 + 1)
+        public let i = Int64(1 + 1)
         """, kotlin: """
-        internal val i = Long(1 + 1)
+        val i = Long(1 + 1)
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        var i: Int64 {
+        public var i: Int64 {
             get {
                 return jniContext {
                     let value_java: Int64 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
@@ -188,39 +157,11 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()J")!
-        """)
+        """, transformers: transformers)
     }
 
     func testStoredVar() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        var i = 1
-        """, kotlin: """
-        internal var i = 1
-        """, swiftBridgeSupport: """
-        private let Java_SourceKt = try! JClass(name: "SourceKt")
-        var i: Int {
-            get {
-                return jniContext {
-                    let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
-                    return Int(value_java)
-                }
-            }
-            set {
-                jniContext {
-                    let value_java = Int32(newValue).toJavaParameter()
-                    try! Java_SourceKt.callStatic(method: Java_set_i_methodID, args: [value_java])
-                }
-            }
-        }
-        private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!
-        private let Java_set_i_methodID = Java_SourceKt.getStaticMethodID(name: "setI", sig: "(I)V")!
-        """)
-    }
-
-    func testPublicVar() async throws {
-        try await check(swift: """
-        @BridgeToSwift
         public var i = 1
         """, kotlin: """
         var i = 1
@@ -242,31 +183,48 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!
         private let Java_set_i_methodID = Java_SourceKt.getStaticMethodID(name: "setI", sig: "(I)V")!
-        """)
+        """, transformers: transformers)
+    }
+
+    func testBridgeIgnoredVar() async throws {
+        try await check(swift: """
+        @BridgeIgnored
+        public var i = 1
+        // SKIP @BridgeIgnored
+        public var j = 1
+        public let s = ""
+        """, kotlin: """
+        var i = 1
+        var j = 1
+        val s = ""
+        """, swiftBridgeSupport: """
+        public let s = ""
+        """, transformers: transformers)
     }
 
     func testPrivateVar() async throws {
-        try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        private let i = 1
-        """)
-
-        try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        fileprivate let i = 1
-        """)
+        try await check(swift: """
+        private var i = 1
+        private var j = 1
+        public let s = ""
+        """, kotlin: """
+        private var i = 1
+        private var j = 1
+        val s = ""
+        """, swiftBridgeSupport: """
+        public let s = ""
+        """, transformers: transformers)
     }
 
     func testPrivateSetVar() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        private(set) var i = 1
+        private(set) public var i = 1
         """, kotlin: """
-        internal var i = 1
+        var i = 1
             private set
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        var i: Int {
+        public var i: Int {
             get {
                 return jniContext {
                     let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
@@ -275,11 +233,10 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!
-        """)
+        """, transformers: transformers)
 
         try await check(swift: """
-        @BridgeToSwift
-        private(set) var d: Double {
+        public private(set) var d: Double {
             get {
                 return 1.0
             }
@@ -288,14 +245,14 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal var d: Double
+        var d: Double
             get() = 1.0
             private set(newValue) {
                 print("set")
             }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        var d: Double {
+        public var d: Double {
             get {
                 return jniContext {
                     let value_java: Double = try! Java_SourceKt.callStatic(method: Java_get_d_methodID, args: [])
@@ -304,13 +261,12 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_get_d_methodID = Java_SourceKt.getStaticMethodID(name: "getD", sig: "()D")!
-        """)
+        """, transformers: transformers)
     }
 
     func testWillSetDidSet() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        private(set) var i: Int32 = 1 {
+        public private(set) var i: Int32 = 1 {
             willSet {
                 print("willSet")
             }
@@ -319,7 +275,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal var i: Int = 1
+        var i: Int = 1
             private set(newValue) {
                 print("willSet")
                 field = newValue
@@ -327,7 +283,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        var i: Int32 {
+        public var i: Int32 {
             get {
                 return jniContext {
                     let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
@@ -336,13 +292,12 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!
-        """)
+        """, transformers: transformers)
     }
 
     func testComputedVar() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        var i: Int64 {
+        public var i: Int64 {
             get {
                 return 1
             }
@@ -350,13 +305,13 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, kotlin: """
-        internal var i: Long
+        var i: Long
             get() = 1
             set(newValue) {
             }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        var i: Int64 {
+        public var i: Int64 {
             get {
                 return jniContext {
                     let value_java: Int64 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
@@ -372,12 +327,11 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()J")!
         private let Java_set_i_methodID = Java_SourceKt.getStaticMethodID(name: "setI", sig: "(J)V")!
-        """)
+        """, transformers: transformers)
     }
 
     func testKeywordVar() async throws {
         try await check(swift: """
-        @BridgeToSwift
         public var object = ""
         """, kotlin: """
         var object_ = ""
@@ -399,40 +353,37 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         private let Java_get_object__methodID = Java_SourceKt.getStaticMethodID(name: "getObject_", sig: "()Ljava/lang/String;")!
         private let Java_set_object__methodID = Java_SourceKt.getStaticMethodID(name: "setObject_", sig: "(Ljava/lang/String;)V")!
-        """)
+        """, transformers: transformers)
     }
 
     func testThrowsVar() async throws {
         try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        var i: Int {
+        public var i: Int {
             get throws {
                 return 0
             }
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testAsyncVar() async throws {
         try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        var i: Int {
+        public var i: Int {
             get async {
                 return 0
             }
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testOptionalVar() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        var i: Int? = 1
+        public var i: Int? = 1
         """, kotlin: """
-        internal var i: Int? = 1
+        var i: Int? = 1
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        var i: Int? {
+        public var i: Int? {
             get {
                 return jniContext {
                     let value_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
@@ -448,57 +399,58 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()Ljava/lang/Integer;")!
         private let Java_set_i_methodID = Java_SourceKt.getStaticMethodID(name: "setI", sig: "(Ljava/lang/Integer;)V")!
-        """)
+        """, transformers: transformers)
     }
 
     func testUnwrappedOptionalVar() async throws {
         try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        var s: String!
-        """)
+        public var s: String!
+        """, transformers: transformers)
     }
 
     func testLazyVar() async throws {
         try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        lazy var s: String = createString()
-        """)
+        public lazy var s: String = createString()
+        """, transformers: transformers)
     }
 
     func testTranspiledBridgedTypeVar() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C {
+        public class C {
         }
-        @BridgeToSwift
-        var c = C()
+        public var c = C()
         """, kotlin: """
-        internal open class C {
+        open class C {
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
         }
-        internal var c = C()
+        var c = C()
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
-        var c: C {
+        public var c: C {
             get {
                 return jniContext {
                     let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
@@ -514,43 +466,46 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         private let Java_get_c_methodID = Java_SourceKt.getStaticMethodID(name: "getC", sig: "()LC;")!
         private let Java_set_c_methodID = Java_SourceKt.getStaticMethodID(name: "setC", sig: "(LC;)V")!
-        """)
+        """, transformers: transformers)
     }
 
     func testOptionalTranspiledBridgedTypeVar() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C {
+        public class C {
         }
-        @BridgeToSwift
-        var c: C? = C()
+        public var c: C? = C()
         """, kotlin: """
-        internal open class C {
+        open class C {
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
         }
-        internal var c: C? = C()
+        var c: C? = C()
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
-        var c: C? {
+        public var c: C? {
             get {
                 return jniContext {
                     let value_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
@@ -566,19 +521,17 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         private let Java_get_c_methodID = Java_SourceKt.getStaticMethodID(name: "getC", sig: "()LC;")!
         private let Java_set_c_methodID = Java_SourceKt.getStaticMethodID(name: "setC", sig: "(LC;)V")!
-        """)
+        """, transformers: transformers)
     }
 
     func testCompiledBridgedTypeVar() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        var c = C()
+        public var c = C()
         """, swiftBridge: """
-        @BridgeToKotlin
-        class C {
+        public class C {
         }
         """, kotlins: ["""
-        internal open class C: skip.bridge.kt.SwiftPeerBridged {
+        open class C: skip.bridge.kt.SwiftPeerBridged {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -604,17 +557,22 @@ final class BridgeToSwiftTests: XCTestCase {
             }
 
             override fun hashCode(): Int = Swift_peer.hashCode()
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
         }
         """, """
-        internal var c = C()
+        var c = C()
         """], swiftBridgeSupports: ["""
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 let ptr = SwiftObjectPointer.peer(of: obj!)
                 return ptr.pointee()!
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
                 return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
             }
@@ -631,7 +589,7 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         """, """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        var c: C {
+        public var c: C {
             get {
                 return jniContext {
                     let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
@@ -647,32 +605,30 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         private let Java_get_c_methodID = Java_SourceKt.getStaticMethodID(name: "getC", sig: "()LC;")!
         private let Java_set_c_methodID = Java_SourceKt.getStaticMethodID(name: "setC", sig: "(LC;)V")!
-        """])
+        """], transformers: transformers)
     }
 
     func testUnbridgableTypeVar() async throws {
         try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        var c: C = C()
-        """)
+        public var c: C = C()
+        """, transformers: transformers)
 
         try await checkProducesMessage(swift: """
-        class C {
+        // SKIP @BridgeIgnored
+        public class C {
         }
-        @BridgeToSwift
-        var c = C()
-        """)
+        public var c = C()
+        """, transformers: transformers)
     }
 
     func testClosureTypeVar() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        var c: (Int) -> String = { _ in "" }
+        public var c: (Int) -> String = { _ in "" }
         """, kotlin: """
-        internal var c: (Int) -> String = { _ -> "" }
+        var c: (Int) -> String = { _ -> "" }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        var c: (Int) -> String {
+        public var c: (Int) -> String {
             get {
                 return jniContext {
                     let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
@@ -688,18 +644,17 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         private let Java_get_c_methodID = Java_SourceKt.getStaticMethodID(name: "getC", sig: "()Lkotlin/jvm/functions/Function1;")!
         private let Java_set_c_methodID = Java_SourceKt.getStaticMethodID(name: "setC", sig: "(Lkotlin/jvm/functions/Function1;)V")!
-        """)
+        """, transformers: transformers)
     }
 
     func testVoidClosureTypeVar() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        var c: () -> Void = { }
+        public var c: () -> Void = { }
         """, kotlin: """
-        internal var c: () -> Unit = { ->  }
+        var c: () -> Unit = { ->  }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        var c: () -> Void {
+        public var c: () -> Void {
             get {
                 return jniContext {
                     let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
@@ -715,34 +670,11 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         private let Java_get_c_methodID = Java_SourceKt.getStaticMethodID(name: "getC", sig: "()Lkotlin/jvm/functions/Function0;")!
         private let Java_set_c_methodID = Java_SourceKt.getStaticMethodID(name: "setC", sig: "(Lkotlin/jvm/functions/Function0;)V")!
-        """)
+        """, transformers: transformers)
     }
 
     func testFunction() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        func f(i: Int, s: String) -> Int {
-            return i + (Int(s) ?? 0)
-        }
-        """, kotlin: """
-        internal fun f(i: Int, s: String): Int = i + (Int(s) ?: 0)
-        """, swiftBridgeSupport: """
-        private let Java_SourceKt = try! JClass(name: "SourceKt")
-        func f(i p_0: Int, s p_1: String) -> Int {
-            return jniContext {
-                let p_0_java = Int32(p_0).toJavaParameter()
-                let p_1_java = p_1.toJavaParameter()
-                let f_return_java: Int32 = try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [p_0_java, p_1_java])
-                return Int(f_return_java)
-            }
-        }
-        private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "(ILjava/lang/String;)I")!
-        """)
-    }
-
-    func testPublicFunction() async throws {
-        try await check(swift: """
-        @BridgeToSwift
         public func f(i: Int, s: String) -> Int {
             return i + (Int(s) ?? 0)
         }
@@ -759,31 +691,50 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "(ILjava/lang/String;)I")!
-        """)
+        """, transformers: transformers)
+    }
+
+    func testBridgeIgnoredFunction() async throws {
+        try await check(swift: """
+        @BridgeIgnored
+        public func f(i: Int, s: String) -> Int {
+            return i + (Int(s) ?? 0)
+        }
+        // SKIP @BridgeIgnored
+        public func g(i: Int, s: String) -> Int {
+            return i + (Int(s) ?? 0)
+        }
+        """, kotlin: """
+        fun f(i: Int, s: String): Int = i + (Int(s) ?: 0)
+        fun g(i: Int, s: String): Int = i + (Int(s) ?: 0)
+        """, swiftBridgeSupport: """
+        """, transformers: transformers)
     }
 
     func testPrivateFunction() async throws {
-        try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        private func f() { }
-        """)
-
-        try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        fileprivate func f() { }
-        """)
+        try await check(swift: """
+        private func f(i: Int, s: String) -> Int {
+            return i + (Int(s) ?? 0)
+        }
+        private func g(i: Int, s: String) -> Int {
+            return i + (Int(s) ?? 0)
+        }
+        """, kotlin: """
+        private fun f(i: Int, s: String): Int = i + (Int(s) ?: 0)
+        private fun g(i: Int, s: String): Int = i + (Int(s) ?: 0)
+        """, swiftBridgeSupport: """
+        """, transformers: transformers)
     }
 
     func testThrowsFunction() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        func f() throws {
+        public func f() throws {
         }
         """, kotlin: """
-        internal fun f() = Unit
+        fun f() = Unit
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        func f() throws {
+        public func f() throws {
             try jniContext {
                 do {
                     try Java_SourceKt.callStatic(method: Java_f_methodID, args: [])
@@ -795,39 +746,37 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "()V")!
-        """)
+        """, transformers: transformers)
     }
 
     func testFunctionParameterLabel() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        func nolabel(_ i: Int) {
+        public func nolabel(_ i: Int) {
         }
         """, kotlin: """
-        internal fun nolabel(i: Int) = Unit
+        fun nolabel(i: Int) = Unit
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        func nolabel(_ p_0: Int) {
+        public func nolabel(_ p_0: Int) {
             jniContext {
                 let p_0_java = Int32(p_0).toJavaParameter()
                 try! Java_SourceKt.callStatic(method: Java_nolabel_methodID, args: [p_0_java])
             }
         }
         private let Java_nolabel_methodID = Java_SourceKt.getStaticMethodID(name: "nolabel", sig: "(I)V")!
-        """)
+        """, transformers: transformers)
     }
 
     func testFunctionParameterDefaultValue() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        func f(i: Int = 0) -> Int {
+        public func f(i: Int = 0) -> Int {
             return i
         }
         """, kotlin: """
-        internal fun f(i: Int = 0): Int = i
+        fun f(i: Int = 0): Int = i
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        func f(i p_0: Int = 0) -> Int {
+        public func f(i p_0: Int = 0) -> Int {
             return jniContext {
                 let p_0_java = Int32(p_0).toJavaParameter()
                 let f_return_java: Int32 = try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [p_0_java])
@@ -835,25 +784,23 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "(I)I")!
-        """)
+        """, transformers: transformers)
     }
 
     func testFunctionParameterLabelOverload() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        func f(i: Int) -> Int {
+        public func f(i: Int) -> Int {
             return i
         }
-        @BridgeToSwift
-        func f(value: Int) -> Int {
+        public func f(value: Int) -> Int {
             return value
         }
         """, kotlin: """
-        internal fun f(i: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null): Int = i
-        internal fun f(value: Int): Int = value
+        fun f(i: Int, @Suppress("UNUSED_PARAMETER") unusedp_0: Nothing? = null): Int = i
+        fun f(value: Int): Int = value
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        func f(i p_0: Int) -> Int {
+        public func f(i p_0: Int) -> Int {
             return jniContext {
                 let p_0_java = Int32(p_0).toJavaParameter()
                 let p_1_java = JavaParameter(l: nil)
@@ -862,7 +809,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "(ILjava/lang/Void;)I")!
-        func f(value p_0: Int) -> Int {
+        public func f(value p_0: Int) -> Int {
             return jniContext {
                 let p_0_java = Int32(p_0).toJavaParameter()
                 let f_return_java: Int32 = try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [p_0_java])
@@ -870,39 +817,37 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "(I)I")!
-        """)
+        """, transformers: transformers)
     }
 
     func testKeywordFunction() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        func object(object: Int) {
+        public func object(object: Int) {
         }
         """, kotlin: """
-        internal fun object_(object_: Int) = Unit
+        fun object_(object_: Int) = Unit
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        func object(object p_0: Int) {
+        public func object(object p_0: Int) {
             jniContext {
                 let p_0_java = Int32(p_0).toJavaParameter()
                 try! Java_SourceKt.callStatic(method: Java_object__methodID, args: [p_0_java])
             }
         }
         private let Java_object__methodID = Java_SourceKt.getStaticMethodID(name: "object_", sig: "(I)V")!
-        """)
+        """, transformers: transformers)
     }
 
     func testOptionalFunction() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        func f(i: Int?) -> Int? {
+        public func f(i: Int?) -> Int? {
             return nil
         }
         """, kotlin: """
-        internal fun f(i: Int?): Int? = null
+        fun f(i: Int?): Int? = null
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        func f(i p_0: Int?) -> Int? {
+        public func f(i p_0: Int?) -> Int? {
             return jniContext {
                 let p_0_java = p_0.toJavaParameter()
                 let f_return_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [p_0_java])
@@ -910,44 +855,47 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "(Ljava/lang/Integer;)Ljava/lang/Integer;")!
-        """)
+        """, transformers: transformers)
     }
 
     func testBridgedObjectFunction() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C {
+        public class C {
         }
-        @BridgeToSwift
-        func f(c: C) -> C {
+        public func f(c: C) -> C {
         }
         """, kotlin: """
-        internal open class C {
+        open class C {
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
         }
-        internal fun f(c: C): C = Unit
+        fun f(c: C): C = Unit
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
-        func f(c p_0: C) -> C {
+        public func f(c p_0: C) -> C {
             return jniContext {
                 let p_0_java = p_0.toJavaObject()!.toJavaParameter()
                 let f_return_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [p_0_java])
@@ -955,34 +903,32 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "(LC;)LC;")!
-        """)
+        """, transformers: transformers)
     }
 
     func testVariadicFunction() async throws {
         try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        func f(i: Int...) { }
-        """)
+        public func f(i: Int...) { }
+        """, transformers: transformers)
     }
 
     func testAsyncFunction() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        func f(i: Int) async -> Int {
+        public func f(i: Int) async -> Int {
             return i
         }
         """, kotlin: """
-        internal suspend fun f(i: Int): Int = Async.run l@{
+        suspend fun f(i: Int): Int = Async.run l@{
             return@l i
         }
-        internal fun callback_f(i: Int, f_return_callback: (Int) -> Unit) {
+        fun callback_f(i: Int, f_return_callback: (Int) -> Unit) {
             Task {
                 f_return_callback(f(i = i))
             }
         }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        func f(i p_0: Int) async -> Int {
+        public func f(i p_0: Int) async -> Int {
             return await withCheckedContinuation { f_continuation in
                 let f_return_callback: (Int) -> Void = { f_return in
                     f_continuation.resume(returning: f_return)
@@ -995,27 +941,27 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "callback_f", sig: "(ILkotlin/jvm/functions/Function1;)V")!
-        """)
+        """, transformers: transformers)
     }
 
     func testMainActorAsyncFunction() async throws {
         try await check(swift: """
-        @MainActor @BridgeToSwift
-        func f(i: Int) async -> Int {
+        @MainActor
+        public func f(i: Int) async -> Int {
             return i
         }
         """, kotlin: """
-        internal suspend fun f(i: Int): Int = MainActor.run l@{
+        suspend fun f(i: Int): Int = MainActor.run l@{
             return@l i
         }
-        internal fun callback_f(i: Int, f_return_callback: (Int) -> Unit) {
+        fun callback_f(i: Int, f_return_callback: (Int) -> Unit) {
             Task {
                 f_return_callback(f(i = i))
             }
         }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        func f(i p_0: Int) async -> Int {
+        public func f(i p_0: Int) async -> Int {
             return await withCheckedContinuation { f_continuation in
                 let f_return_callback: (Int) -> Void = { f_return in
                     f_continuation.resume(returning: f_return)
@@ -1028,17 +974,16 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "callback_f", sig: "(ILkotlin/jvm/functions/Function1;)V")!
-        """)
+        """, transformers: transformers)
     }
 
     func testAsyncVoidFunction() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        func f() async {
+        public func f() async {
         }
         """, kotlin: """
-        internal suspend fun f(): Unit = Unit
-        internal fun callback_f(f_return_callback: () -> Unit) {
+        suspend fun f(): Unit = Unit
+        fun callback_f(f_return_callback: () -> Unit) {
             Task {
                 f()
                 f_return_callback()
@@ -1046,7 +991,7 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        func f() async {
+        public func f() async {
             await withCheckedContinuation { f_continuation in
                 let f_return_callback: () -> Void = {
                     f_continuation.resume()
@@ -1058,20 +1003,19 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "callback_f", sig: "(Lkotlin/jvm/functions/Function0;)V")!
-        """)
+        """, transformers: transformers)
     }
 
     func testAsyncThrowsFunction() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        func f() async throws -> Int {
+        public func f() async throws -> Int {
             return 1
         }
         """, kotlin: """
-        internal suspend fun f(): Int = Async.run l@{
+        suspend fun f(): Int = Async.run l@{
             return@l 1
         }
-        internal fun callback_f(f_return_callback: (Int?, Throwable?) -> Unit) {
+        fun callback_f(f_return_callback: (Int?, Throwable?) -> Unit) {
             Task {
                 try {
                     f_return_callback(f(), null)
@@ -1082,7 +1026,7 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        func f() async throws -> Int {
+        public func f() async throws -> Int {
             return try await withCheckedThrowingContinuation { f_continuation in
                 let f_return_callback: (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
                     if let f_error {
@@ -1098,17 +1042,16 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "callback_f", sig: "(Lkotlin/jvm/functions/Function2;)V")!
-        """)
+        """, transformers: transformers)
     }
 
     func testAsyncThrowsVoidFunction() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        func f(i: Int) async throws {
+        public func f(i: Int) async throws {
         }
         """, kotlin: """
-        internal suspend fun f(i: Int): Unit = Unit
-        internal fun callback_f(i: Int, f_return_callback: (Throwable?) -> Unit) {
+        suspend fun f(i: Int): Unit = Unit
+        fun callback_f(i: Int, f_return_callback: (Throwable?) -> Unit) {
             Task {
                 try {
                     f(i = i)
@@ -1120,7 +1063,7 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        func f(i p_0: Int) async throws {
+        public func f(i p_0: Int) async throws {
             return try await withCheckedThrowingContinuation { f_continuation in
                 let f_return_callback: (JavaObjectPointer?) -> Void = { f_error in
                     if let f_error {
@@ -1137,41 +1080,45 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "callback_f", sig: "(ILkotlin/jvm/functions/Function1;)V")!
-        """)
+        """, transformers: transformers)
     }
 
     func testClass() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C {
-            var i = 1
+        public class C {
+            public var i = 1
         }
         """, kotlin: """
-        internal open class C {
-            internal open var i = 1
+        open class C {
+            open var i = 1
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
         }
         """, swiftBridgeSupport: """
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
-            var i: Int {
+            public var i: Int {
                 get {
                     return jniContext {
                         let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
@@ -1188,12 +1135,11 @@ final class BridgeToSwiftTests: XCTestCase {
             private static let Java_get_i_methodID = Java_class.getMethodID(name: "getI", sig: "()I")!
             private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testOpenClass() async throws {
         try await check(swift: """
-        @BridgeToSwift
         open class C {
             open func f() {
             }
@@ -1235,90 +1181,124 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             private static let Java_f_methodID = Java_class.getMethodID(name: "f", sig: "()V")!
         }
-        """)
+        """, transformers: transformers)
+    }
+
+    func testBridgeIgnoredClass() async throws {
+        try await check(swift: """
+        @BridgeIgnored 
+        public class C {
+        }
+        // SKIP @BridgeIgnored 
+        public class D {
+        }
+        """, kotlin: """
+        open class C {
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
+        }
+        open class D {
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
+        }
+        """, swiftBridgeSupport: """
+        """, transformers: transformers)
     }
 
     func testPrivateClass() async throws {
-        try await checkProducesMessage(swift: """
-        @BridgeToSwift
+        try await check(swift: """
         private class C {
         }
-        """)
-
-        try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        fileprivate class C {
+        class D {
         }
-        """)
+        """, kotlin: """
+        private open class C {
+        }
+        internal open class D {
+        }
+        """, swiftBridgeSupport: """
+        """, transformers: transformers)
     }
 
     func testInnerClass() async throws {
         try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        class D {
-            @BridgeToSwift
-            class C {
+        public class D {
+            public class C {
             }
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testPrivateConstructor() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C {
+        public class C {
             private init(i: Int) {
             }
         }
         """, kotlin: """
-        internal open class C {
+        open class C {
             private constructor(i: Int) {
+            }
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
             }
         }
         """, swiftBridgeSupport: """
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testConstructor() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C {
-            init(i: Int) {
+        public class C {
+            public init(i: Int) {
             }
         }
         """, kotlin: """
-        internal open class C {
-            internal constructor(i: Int) {
+        open class C {
+            constructor(i: Int) {
+            }
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
             }
         }
         """, swiftBridgeSupport: """
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
-            init(i p_0: Int) {
+            public init(i p_0: Int) {
                 Java_peer = jniContext {
                     let p_0_java = Int32(p_0).toJavaParameter()
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [p_0_java])
@@ -1327,36 +1307,40 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(I)V")!
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testThrowsConstructor() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C {
-            init(i: Int) throws {
+        public class C {
+            public init(i: Int) throws {
             }
         }
         """, kotlin: """
-        internal open class C {
-            internal constructor(i: Int) {
+        open class C {
+            constructor(i: Int) {
+            }
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
             }
         }
         """, swiftBridgeSupport: """
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
-            init(i p_0: Int) throws {
+            public init(i p_0: Int) throws {
                 Java_peer = try jniContext {
                     let p_0_java = Int32(p_0).toJavaParameter()
                     let ptr = try Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [p_0_java])
@@ -1365,122 +1349,133 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(I)V")!
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testOptionalConstructor() async throws {
         try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        class C {
-            init?(i: Int) {
+        public class C {
+            public init?(i: Int) {
             }
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testDestructor() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C {
+        public class C {
             deinit {
             }
         }
         """, kotlin: """
-        internal open class C {
+        open class C {
             open fun finalize() = Unit
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
         }
         """, swiftBridgeSupport: """
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testMemberConstant() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C {
-            let i = 0
+        public class C {
+            public let i = 0
         }
         """, kotlin: """
-        internal open class C {
-            internal val i = 0
+        open class C {
+            val i = 0
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
         }
         """, swiftBridgeSupport: """
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
-            let i: Int = 0
+            public let i: Int = 0
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testMemberVar() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C {
-            var i = 0
+        public class C {
+            public var i = 0
         }
         """, kotlin: """
-        internal open class C {
-            internal open var i = 0
+        open class C {
+            open var i = 0
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
         }
         """, swiftBridgeSupport: """
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
-            var i: Int {
+            public var i: Int {
                 get {
                     return jniContext {
                         let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
@@ -1497,43 +1492,47 @@ final class BridgeToSwiftTests: XCTestCase {
             private static let Java_get_i_methodID = Java_class.getMethodID(name: "getI", sig: "()I")!
             private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testMemberFunction() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C {
-            func add(a: Int, b: Int) -> Int {
+        public class C {
+            public func add(a: Int, b: Int) -> Int {
                 return a + b
             }
         }
         """, kotlin: """
-        internal open class C {
-            internal open fun add(a: Int, b: Int): Int = a + b
+        open class C {
+            open fun add(a: Int, b: Int): Int = a + b
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
         }
         """, swiftBridgeSupport: """
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
-            func add(a p_0: Int, b p_1: Int) -> Int {
+            public func add(a p_0: Int, b p_1: Int) -> Int {
                 return jniContext {
                     let p_0_java = Int32(p_0).toJavaParameter()
                     let p_1_java = Int32(p_1).toJavaParameter()
@@ -1543,50 +1542,54 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             private static let Java_add_methodID = Java_class.getMethodID(name: "add", sig: "(II)I")!
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testAsyncMemberFunction() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C {
-            func add() async -> Int {
+        public class C {
+            public func add() async -> Int {
                 return 1
             }
         }
         """, kotlin: """
-        internal open class C {
-            internal open suspend fun add(): Int = Async.run l@{
+        open class C {
+            open suspend fun add(): Int = Async.run l@{
                 return@l 1
             }
-            internal fun callback_add(f_return_callback: (Int) -> Unit) {
+            fun callback_add(f_return_callback: (Int) -> Unit) {
                 Task {
                     f_return_callback(add())
                 }
             }
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
         }
         """, swiftBridgeSupport: """
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
-            func add() async -> Int {
+            public func add() async -> Int {
                 return await withCheckedContinuation { f_continuation in
                     let f_return_callback: (Int) -> Void = { f_return in
                         f_continuation.resume(returning: f_return)
@@ -1599,69 +1602,78 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             private static let Java_add_methodID = Java_class.getMethodID(name: "callback_add", sig: "(Lkotlin/jvm/functions/Function1;)V")!
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testStaticConstant() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C {
-            static let i = 0
+        public class C {
+            public static let i = 0
         }
         """, kotlin: """
-        internal open class C {
+        open class C {
 
-            companion object {
-                internal val i = 0
+            companion object: CompanionClass() {
+                override val i = 0
+            }
+            open class CompanionClass {
+                open val i
+                    get() = C.i
             }
         }
         """, swiftBridgeSupport: """
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
-            static let i: Int = 0
+            public static let i: Int = 0
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testStaticVar() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C {
-            static var i = 0
+        public class C {
+            public static var i = 0
         }
         """, kotlin: """
-        internal open class C {
+        open class C {
 
-            companion object {
-                internal var i = 0
+            companion object: CompanionClass() {
+                override var i = 0
+            }
+            open class CompanionClass {
+                open var i
+                    get() = C.i
+                    set(newValue) {
+                        C.i = newValue
+                    }
             }
         }
         """, swiftBridgeSupport: """
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
@@ -1670,14 +1682,14 @@ final class BridgeToSwiftTests: XCTestCase {
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
             private static let Java_Companion_class = try! JClass(name: "C$Companion")
             private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: "Companion", sig: "LC$Companion;")!))
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
-            static var i: Int {
+            public static var i: Int {
                 get {
                     return jniContext {
                         let value_java: Int32 = try! Java_Companion.call(method: Java_Companion_get_i_methodID, args: [])
@@ -1694,32 +1706,34 @@ final class BridgeToSwiftTests: XCTestCase {
             private static let Java_Companion_get_i_methodID = Java_Companion_class.getMethodID(name: "getI", sig: "()I")!
             private static let Java_Companion_set_i_methodID = Java_Companion_class.getMethodID(name: "setI", sig: "(I)V")!
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testStaticFunction() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C {
-            static func add(a: Int, b: Int) -> Int {
+        public class C {
+            public static func add(a: Int, b: Int) -> Int {
                 return a + b
             }
         }
         """, kotlin: """
-        internal open class C {
+        open class C {
 
-            companion object {
-                internal fun add(a: Int, b: Int): Int = a + b
+            companion object: CompanionClass() {
+                override fun add(a: Int, b: Int): Int = a + b
+            }
+            open class CompanionClass {
+                open fun add(a: Int, b: Int): Int = C.add(a = a, b = b)
             }
         }
         """, swiftBridgeSupport: """
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
@@ -1728,14 +1742,14 @@ final class BridgeToSwiftTests: XCTestCase {
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
             private static let Java_Companion_class = try! JClass(name: "C$Companion")
             private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: "Companion", sig: "LC$Companion;")!))
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
-            static func add(a p_0: Int, b p_1: Int) -> Int {
+            public static func add(a p_0: Int, b p_1: Int) -> Int {
                 return jniContext {
                     let p_0_java = Int32(p_0).toJavaParameter()
                     let p_1_java = Int32(p_1).toJavaParameter()
@@ -1745,62 +1759,65 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             private static let Java_Companion_add_methodID = Java_Companion_class.getMethodID(name: "add", sig: "(II)I")!
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testUnbridgedMember() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C {
+        public class C {
             @BridgeIgnored
-            var i = 1
+            public var i = 1
         }
         """, kotlin: """
-        internal open class C {
-            internal open var i = 1
+        open class C {
+            open var i = 1
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
         }
         """, swiftBridgeSupport: """
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testCommonProtocols() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C: Equatable, Hashable, Comparable {
-            var i = 1
-            static func ==(lhs: C, rhs: C) -> Bool {
+        public class C: Equatable, Hashable, Comparable {
+            public var i = 1
+            public static func ==(lhs: C, rhs: C) -> Bool {
                 return lhs.i == rhs.i
             }
-            func hash(into hasher: inout Hasher) {
+            public func hash(into hasher: inout Hasher) {
                 hasher.combine(i)
             }
-            static func <(lhs: C, rhs: C) -> Bool {
+            public static func <(lhs: C, rhs: C) -> Bool {
                 return lhs.i < rhs.i
             }
         }
         """, kotlin: """
-        internal open class C: Comparable<C> {
-            internal open var i = 1
+        open class C: Comparable<C> {
+            open var i = 1
             override fun equals(other: Any?): Boolean {
                 if (other !is C) {
                     return false
@@ -1814,7 +1831,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 hash(into = InOut<Hasher>({ hasher }, { hasher = it }))
                 return hasher.finalize()
             }
-            internal open fun hash(into: InOut<Hasher>) {
+            open fun hash(into: InOut<Hasher>) {
                 val hasher = into
                 hasher.value.combine(i)
             }
@@ -1825,29 +1842,34 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
                 return if (islessthan(this, other)) -1 else 1
             }
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
         }
         """, swiftBridgeSupport: """
-        class C: Equatable, Hashable, Comparable, BridgedFromKotlin {
+        public class C: Equatable, Hashable, Comparable, BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
-            var i: Int {
+            public var i: Int {
                 get {
                     return jniContext {
                         let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
@@ -1864,7 +1886,7 @@ final class BridgeToSwiftTests: XCTestCase {
             private static let Java_get_i_methodID = Java_class.getMethodID(name: "getI", sig: "()I")!
             private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
 
-            static func ==(lhs: C, rhs: C) -> Bool {
+            public static func ==(lhs: C, rhs: C) -> Bool {
                 return jniContext {
                     let lhs_java = lhs.toJavaObject()!
                     let rhs_java = rhs.toJavaObject()!
@@ -1873,7 +1895,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             private static let Java_isequal_methodID = Java_class.getMethodID(name: "equals", sig: "(Ljava/lang/Object;)Z")!
 
-            func hash(into hasher: inout Hasher) {
+            public func hash(into hasher: inout Hasher) {
                 let hashCode: Int32 = jniContext {
                     return try! Java_peer.call(method: Self.Java_hashCode_methodID, args: [])
                 }
@@ -1881,7 +1903,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             private static let Java_hashCode_methodID = Java_class.getMethodID(name: "hashCode", sig: "()I")!
 
-            static func <(lhs: C, rhs: C) -> Bool {
+            public static func <(lhs: C, rhs: C) -> Bool {
                 return jniContext {
                     let lhs_java = lhs.toJavaObject()!
                     let rhs_java = rhs.toJavaObject()!
@@ -1891,28 +1913,27 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             private static let Java_compareTo_methodID = Java_class.getMethodID(name: "compareTo", sig: "(Ljava/lang/Object;)I")!
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testCodable() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        class C: Codable {
-            var i = 1
+        public class C: Codable {
+            public var i = 1
         
             private enum CK: CodingKey {
                 case i
             }
 
-            func encode(to encoder: Encoder) {
+            public func encode(to encoder: Encoder) {
             }
 
-            init(from decoder: Decoder) {
+            public init(from decoder: Decoder) {
             }
         }
         """, kotlin: """
-        internal open class C: Codable {
-            internal open var i = 1
+        open class C: Codable {
+            open var i = 1
 
             private enum class CK(override val rawValue: String, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): CodingKey, RawRepresentable<String> {
                 i("i");
@@ -1927,38 +1948,40 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
 
-            internal open fun encode(to: Encoder) = Unit
+            open fun encode(to: Encoder) = Unit
 
-            internal constructor(from: Decoder) {
+            constructor(from: Decoder) {
             }
 
-            companion object {
+            companion object: CompanionClass() {
 
                 private fun CK(rawValue: String): C.CK? = CK.init(rawValue = rawValue)
             }
+            open class CompanionClass {
+            }
         }
         """, swiftBridgeSupport: """
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
-            var i: Int {
+            public var i: Int {
                 get {
                     return jniContext {
                         let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
@@ -1975,44 +1998,41 @@ final class BridgeToSwiftTests: XCTestCase {
             private static let Java_get_i_methodID = Java_class.getMethodID(name: "getI", sig: "()I")!
             private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testSubclass() async throws {
         try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        class Base {
+        public class Base {
         }
-        @BridgeToSwift
-        class Sub: Base {
+        public class Sub: Base {
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testStruct() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        struct S {
-            var i = 1
-            init(_ s: String) {
+        public struct S {
+            public var i = 1
+            public init(_ s: String) {
                 self.i = Int(s) ?? 0
             }
-            mutating func inc() {
+            public mutating func inc() {
                 i += 1
             }
         }
         """, kotlin: """
-        internal class S: MutableStruct {
-            internal var i = 1
+        class S: MutableStruct {
+            var i = 1
                 set(newValue) {
                     willmutate()
                     field = newValue
                     didmutate()
                 }
-            internal constructor(s: String) {
+            constructor(s: String) {
                 this.i = Int(s) ?: 0
             }
-            internal fun inc() {
+            fun inc() {
                 willmutate()
                 try {
                     i += 1
@@ -2029,23 +2049,26 @@ final class BridgeToSwiftTests: XCTestCase {
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
             override fun scopy(): MutableStruct = S(this as MutableStruct)
+
+            companion object {
+            }
         }
         """, swiftBridgeSupport: """
-        struct S: BridgedFromKotlin {
+        public struct S: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "S")
-            var Java_peer: JObject
-            init(Java_ptr: JavaObjectPointer) {
+            public var Java_peer: JObject
+            public init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             private static let Java_scopy_methodID = Java_class.getMethodID(name: "scopy", sig: "()Lskip/lib/MutableStruct;")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
-            var i: Int {
+            public var i: Int {
                 get {
                     return jniContext {
                         let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
@@ -2063,7 +2086,7 @@ final class BridgeToSwiftTests: XCTestCase {
             private static let Java_get_i_methodID = Java_class.getMethodID(name: "getI", sig: "()I")!
             private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
 
-            init(_ p_0: String) {
+            public init(_ p_0: String) {
                 Java_peer = jniContext {
                     let p_0_java = p_0.toJavaParameter()
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [p_0_java])
@@ -2072,7 +2095,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(Ljava/lang/String;)V")!
 
-            mutating func inc() {
+            public mutating func inc() {
                 jniContext {
                     Java_peer = try! JObject(Java_peer.call(method: Self.Java_scopy_methodID, args: []))
                     try! Java_peer.call(method: Self.Java_inc_methodID, args: [])
@@ -2080,48 +2103,52 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             private static let Java_inc_methodID = Java_class.getMethodID(name: "inc", sig: "()V")!
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testProtocolConformance() async throws {
         try await check(swift: """
-        protocol Unbridged {
+        @BridgeIgnored
+        public protocol Unbridged {
         }
-        @BridgeToSwift
-        protocol P: Unbridged {
+        public protocol P: Unbridged {
             var i: Int { get set }
             func f() -> Int
         }
-        @BridgeToSwift
-        class C: P {
-            func f() {
+        public class C: P {
+            public func f() {
                 return 1
             }
         }
         """, kotlin: """
-        internal interface Unbridged {
+        interface Unbridged {
         }
-        internal interface P: Unbridged {
+        interface P: Unbridged {
             var i: Int
             fun f(): Int
         }
-        internal open class C: P {
+        open class C: P {
             override fun f(): Unit = 1
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
         }
         """, swiftBridgeSupport: """
-        protocol P {
+        public protocol P {
 
             var i: Int { get set }
 
             func f() -> Int
         }
-        final class P_BridgeImpl: P, BridgedFromKotlin {
+        public final class P_BridgeImpl: P, BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "P")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            var i: Int {
+            public var i: Int {
                 get {
                     return jniContext {
                         let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
@@ -2137,110 +2164,113 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             private static let Java_get_i_methodID = Java_class.getMethodID(name: "getI", sig: "()I")!
             private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
-            func f() -> Int {
+            public func f() -> Int {
                 return jniContext {
                     let f_return_java: Int32 = try! Java_peer.call(method: Self.Java_f_methodID, args: [])
                     return Int(f_return_java)
                 }
             }
             private static let Java_f_methodID = Java_class.getMethodID(name: "f", sig: "()I")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
-        class C: P, BridgedFromKotlin {
+        public class C: P, BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
-            func f() {
+            public func f() {
                 jniContext {
                     try! Java_peer.call(method: Self.Java_f_methodID, args: [])
                 }
             }
             private static let Java_f_methodID = Java_class.getMethodID(name: "f", sig: "()V")!
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testProtocolTypeMembers() async throws {
         try await check(swift: """
-        @BridgeToSwift
-        protocol P {
+        public protocol P {
         }
-        @BridgeToSwift
-        class C {
-            var p: (any P)?
-            func f(p: any P) -> (any P)? {
+        public class C {
+            public var p: (any P)?
+            public func f(p: any P) -> (any P)? {
                 return nil
             }
         }
         """, kotlin: """
-        internal interface P {
+        interface P {
         }
-        internal open class C {
-            internal open var p: P? = null
+        open class C {
+            open var p: P? = null
                 get() = field.sref({ this.p = it })
                 set(newValue) {
                     field = newValue.sref()
                 }
-            internal open fun f(p: P): P? = null
+            open fun f(p: P): P? = null
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
         }
         """, swiftBridgeSupport: """
-        protocol P {
+        public protocol P {
         }
-        final class P_BridgeImpl: P, BridgedFromKotlin {
+        public final class P_BridgeImpl: P, BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "P")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
-        class C: BridgedFromKotlin {
+        public class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
-            let Java_peer: JObject
-            required init(Java_ptr: JavaObjectPointer) {
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            init() {
+            public init() {
                 Java_peer = jniContext {
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
                     return JObject(ptr)
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject() -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
-            var p: (any P)? {
+            public var p: (any P)? {
                 get {
                     return jniContext {
                         let value_java: JavaObjectPointer? = try! Java_peer.call(method: Self.Java_get_p_methodID, args: [])
@@ -2257,7 +2287,7 @@ final class BridgeToSwiftTests: XCTestCase {
             private static let Java_get_p_methodID = Java_class.getMethodID(name: "getP", sig: "()LP;")!
             private static let Java_set_p_methodID = Java_class.getMethodID(name: "setP", sig: "(LP;)V")!
 
-            func f(p p_0: (any P)) -> (any P)? {
+            public func f(p p_0: (any P)) -> (any P)? {
                 return jniContext {
                     let p_0_java = ((p_0 as? JConvertible)?.toJavaObject())!.toJavaParameter()
                     let f_return_java: JavaObjectPointer? = try! Java_peer.call(method: Self.Java_f_methodID, args: [p_0_java])
@@ -2266,7 +2296,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             private static let Java_f_methodID = Java_class.getMethodID(name: "f", sig: "(LP;)LP;")!
         }
-        """)
+        """, transformers: transformers)
     }
 
     func testEnum() async throws {
@@ -2307,19 +2337,18 @@ final class BridgeToSwiftTests: XCTestCase {
     func testImports() async throws {
         try await check(swift: """
         import Foundation
-        @BridgeToSwift
-        var i: Int {
+        public var i: Int {
             return 1
         }
         """, kotlin: """
         import skip.foundation.*
-        internal val i: Int
+        val i: Int
             get() = 1
         """, swiftBridgeSupport: """
 
         import Foundation
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        var i: Int {
+        public var i: Int {
             get {
                 return jniContext {
                     let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
@@ -2328,6 +2357,6 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!
-        """)
+        """, transformers: transformers)
     }
 }

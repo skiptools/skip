@@ -232,17 +232,16 @@ extension XCTestCase {
     }
 
     /// Checks that the given Swift generates a message when transpiled.
-    public func checkProducesMessage(preflight: Bool = false, swift: String, isSwiftBridge: Bool = false) async throws {
+    public func checkProducesMessage(preflight: Bool = false, swift: String, isSwiftBridge: Bool = false, transformers: [KotlinTransformer] = builtinKotlinTransformers()) async throws {
         let tmpFile = try tmpFile(named: "Source.swift", contents: swift)
-        let messages = try await transpile(preflight: preflight, files: [tmpFile], isSwiftBridge: isSwiftBridge)
+        let messages = try await transpile(preflight: preflight, files: [tmpFile], isSwiftBridge: isSwiftBridge, transformers: transformers)
         XCTAssertTrue(!messages.isEmpty)
         messages.forEach { print("Received expected message: \($0)") }
     }
 
     /// Transpiles the code without performing checks, e.g. for performance profiling.
-    @discardableResult public func transpile(preflight: Bool = false, files: [URL], isSwiftBridge: Bool = false, dependentModules: [CodebaseInfo.ModuleExport] = []) async throws -> [Message] {
+    @discardableResult public func transpile(preflight: Bool = false, files: [URL], isSwiftBridge: Bool = false, dependentModules: [CodebaseInfo.ModuleExport] = [], transformers: [KotlinTransformer] = builtinKotlinTransformers()) async throws -> [Message] {
         let srcFiles = files.map { Source.FilePath(path: $0.absoluteURL.path) }
-        let transformers = builtinKotlinTransformers()
         var messages: [Message] = []
         if preflight {
             for srcFile in srcFiles {

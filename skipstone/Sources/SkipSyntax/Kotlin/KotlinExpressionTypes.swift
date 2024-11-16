@@ -2576,17 +2576,21 @@ final class KotlinStringLiteral: KotlinExpression {
         let kexpression = KotlinStringLiteral(expression: expression)
         var segments: [StringLiteralSegment<KotlinExpression>] = []
         var swiftString: String? = nil
-        for segment in expression.segments {
-            switch segment {
-            case .string(let string):
-                let kstring = translateStringSegment(string)
-                if kstring == string, expression.segments.count == 1 {
-                    swiftString = string
+        if expression.segments.isEmpty {
+            swiftString = ""
+        } else {
+            for segment in expression.segments {
+                switch segment {
+                case .string(let string):
+                    let kstring = translateStringSegment(string)
+                    if kstring == string, expression.segments.count == 1 {
+                        swiftString = string
+                    }
+                    segments.append(.string(kstring))
+                case .expression(let expression):
+                    let kexpression = translator.translateExpression(expression)
+                    segments.append(.expression(kexpression))
                 }
-                segments.append(.string(kstring))
-            case .expression(let expression):
-                let kexpression = translator.translateExpression(expression)
-                segments.append(.expression(kexpression))
             }
         }
         kexpression.segments = segments

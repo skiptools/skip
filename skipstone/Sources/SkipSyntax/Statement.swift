@@ -32,13 +32,13 @@ class Statement: SyntaxNode {
         guard syntaxTree.isBridgeFile else {
             return .full
         }
-        if context.memberOf != nil, !(self is TypeDeclaration.Type) {
-            guard !attributes.isBridgeIgnored else {
-                return .none
-            }
-            return visibility > .fileprivate ? .api : .none
+        guard !attributes.isBridgeIgnored else {
+            return .none
+        }
+        if context.memberOf == .protocolDeclaration && !(self is TypeDeclaration.Type) {
+            return visibility == .default || visibility >= .public ? .api : .none
         } else {
-            return attributes.isBridgeToKotlin || attributes.isBridgeToSwift ? .api : .none
+            return visibility >= .public ? .api : .none
         }
     }
 }

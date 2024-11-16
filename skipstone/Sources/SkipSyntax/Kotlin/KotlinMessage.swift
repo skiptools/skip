@@ -50,24 +50,12 @@ extension Message {
         return Message(kind: .warning, message: "Shadowing a SwiftUI Binding parameter with a variable of the same name may produce incorrect Kotlin. Consider using a different variable name", sourceDerived: sourceDerived, source: source)
     }
 
-    static func kotlinBridgeKotlinToKotlin(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "This entity will already be transpiled to Kotlin; it cannot be bridged to Kotlin too. Did you mean to use @BridgeToSwift?", sourceDerived: sourceDerived, source: source)
-    }
-
     static func kotlinBridgeMissingInfo(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Skip is missing bridging metadata for this declaration", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinBridgeNeedsTypeDeclaration(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Skip is unable to determine the type of this property for bridging. Add an explicit type to the declaration", sourceDerived: sourceDerived, source: source)
-    }
-
-    static func kotlinBridgePrivate(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Private members cannot be bridged", sourceDerived: sourceDerived, source: source)
-    }
-
-    static func kotlinBridgeSwiftToSwift(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "This entity will already be compiled to native Swift; it cannot be bridged to Swift too. Did you mean to use @BridgeToKotlin?", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinBridgeTypedThrows(_ sourceDerived: SourceDerived, source: Source) -> Message {
@@ -83,7 +71,7 @@ extension Message {
     }
 
     static func kotlinBridgeUnsupportedFeature(_ sourceDerived: SourceDerived, feature: String, source: Source) -> Message {
-        return Message(kind: .error, message: "This preview does not yet support bridging \(feature)", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "This release does not yet support bridging \(feature)", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinCatchCaseCast(_ sourceDerived: SourceDerived, source: Source) -> Message {
