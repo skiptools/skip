@@ -519,7 +519,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                         .appending(try RelativePath(validating: relativeLinkPath))
                     let linkModuleSrcMainSwift = linkModuleRoot.appending(components: "src", "main", "swift")
                     if fs.exists(linkModuleSrcMainSwift) {
-                        trace("override link path for \(targetName) from \(packagePath) to \(linkModuleSrcMainSwift.pathString)")
+                        info("override link path for \(targetName) from \(packagePath) to \(linkModuleSrcMainSwift.pathString)")
                         packagePath = linkModuleSrcMainSwift.pathString
                     }
                 }
@@ -534,11 +534,11 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 """
             }
 
-
             // The source of the link tree needs to be the root project for the module in question, which we don't have access to (it can't be the `rootPath`, since that will be the topmost package that resulted in the transpiler invocation, which may not be the module in question).
             // So we need to guess from the projectFolderPath, which will be something like `/path/to/project-name/Sources/TargetName` by tacking `../..` to the end of the path.
             // WARNING: this is delicate, because there is nothing guaranteeing that the project follows the convention of `Sources/TargetName` for their modules!
-            let mirrorSource = rootPath // projectFolderPath.appending(components: "..", "..")
+            //let mirrorSource = rootPath
+            let mirrorSource = projectFolderPath.appending(components: "..", "..")
 
             //warn("creating absolute merged link tree from: swiftLinkFolder=\(swiftLinkFolder) to mirrorSource=\(mirrorSource) (rootPath=\(rootPath)) with dependencyIdPaths=\(dependencyIdPaths)")
             try createMirroredLinkTree(swiftLinkFolder, pointingAt: mirrorSource, shallow: true, excluding: ["Packages", "Package.resolved", ".build", ".swiftpm"]) { destPath, path in

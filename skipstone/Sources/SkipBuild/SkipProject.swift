@@ -148,6 +148,8 @@ class FrameworkProjectLayout {
                 # this is a natively-compiled module
                 skip:
                   mode: swift
+                  bridging: true
+
                 """
             }
 
@@ -168,9 +170,14 @@ class FrameworkProjectLayout {
                 moduleCode += """
                 import Foundation
                 import Observation
+                #if canImport(SkipAndroidBridge)
                 import SkipAndroidBridge
+                #endif
+                #if canImport(OSLog)
+                import OSLog
+                #endif
 
-                fileprivate let logger: Logger = Logger(subsystem: "AppDroid", category: "NativeViewModel")
+                fileprivate let logger: Logger = Logger(subsystem: "\(moduleName)", category: "\(moduleName)")
                 
                 @Observable public class ViewModel {
                     public var name = "Skipper"
@@ -179,8 +186,8 @@ class FrameworkProjectLayout {
                     }
                 
                     public func flipName() {
-                        logger.info("called flipName: \\(name)")
                         name = String(name.reversed())
+                        logger.info("called flipName: \\(self.name)")
                     }
                 }
                 
@@ -679,7 +686,7 @@ class FrameworkProjectLayout {
                 if isModelModule {
                     modDeps.append(PackageModule(repositoryName: "skip-model", moduleName: "SkipModel"))
                     if native {
-                        modDeps.append(PackageModule(repositoryName: "skip-android-bridge", moduleName: "SkipAndroidBridge"))
+                        modDeps.append(PackageModule(repositoryName: "skip-android-bridge", moduleName: "SkipAndroidBridgeKt"))
                     }
                 }
             }
