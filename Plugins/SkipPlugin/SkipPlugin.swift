@@ -285,12 +285,17 @@ import PackagePlugin
         }), uniquingKeysWith: { $1 })
 
         // pass dependencies ids to local paths through to skipstone so that it can set up local links for native swift builds from one bridged swift package to another bridged swift package
+        var dependencyParameters = Set<String>()
         for targetDep in context.package.targets.flatMap(\.recursiveTargetDependencies) {
             guard let package = targetsToPackage[targetDep.id] else {
                 continue
             }
             //Diagnostics.remark("recursiveTargetDependencies: \(target.name):\(package.id):\(package.directory)")
-            buildArguments += ["--dependency", [targetDep.name, package.id, package.directory.string].joined(separator: ":")]
+            let dependencyParameter = [targetDep.name, package.id, package.directory.string].joined(separator: ":")
+            // only add the dependency parameter if we have not already specified it (duplicates are possible because we may visit the same target multiple times)
+            if dependencyParameters.insert(dependencyParameter).inserted {
+                buildArguments += ["--dependency", dependencyParameter]
+            }
         }
 
         for pack in packageDeps {
