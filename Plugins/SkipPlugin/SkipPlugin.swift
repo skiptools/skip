@@ -39,7 +39,7 @@ import PackagePlugin
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         if skipDisabled {
-            Diagnostics.remark("Skip plugin disabled through SKIP_PLUGIN_DISABLED envrionment variable")
+            Diagnostics.remark("Skip plugin disabled through SKIP_PLUGIN_DISABLED environment variable")
             return []
         }
 
