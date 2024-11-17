@@ -98,7 +98,7 @@ final class BridgeToSwiftTests: XCTestCase {
         public var s: String {
             get {
                 return jniContext {
-                    let value_java: String = try! Java_SourceKt.callStatic(method: Java_get_s_methodID, args: [])
+                    let value_java: String = try! Java_SourceKt.callStatic(method: Java_get_s_methodID, options: [], args: [])
                     return value_java
                 }
             }
@@ -115,8 +115,8 @@ final class BridgeToSwiftTests: XCTestCase {
         public var b: Bool? {
             get {
                 return jniContext {
-                    let value_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_get_b_methodID, args: [])
-                    return Bool?.fromJavaObject(value_java)
+                    let value_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_get_b_methodID, options: [], args: [])
+                    return Bool?.fromJavaObject(value_java, options: [])
                 }
             }
         }
@@ -134,7 +134,7 @@ final class BridgeToSwiftTests: XCTestCase {
         public var i: Int {
             get {
                 return jniContext {
-                    let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
+                    let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, options: [], args: [])
                     return Int(value_java)
                 }
             }
@@ -151,7 +151,7 @@ final class BridgeToSwiftTests: XCTestCase {
         public var i: Int64 {
             get {
                 return jniContext {
-                    let value_java: Int64 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
+                    let value_java: Int64 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, options: [], args: [])
                     return value_java
                 }
             }
@@ -170,14 +170,14 @@ final class BridgeToSwiftTests: XCTestCase {
         public var i: Int {
             get {
                 return jniContext {
-                    let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
+                    let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, options: [], args: [])
                     return Int(value_java)
                 }
             }
             set {
                 jniContext {
-                    let value_java = Int32(newValue).toJavaParameter()
-                    try! Java_SourceKt.callStatic(method: Java_set_i_methodID, args: [value_java])
+                    let value_java = Int32(newValue).toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_set_i_methodID, options: [], args: [value_java])
                 }
             }
         }
@@ -227,7 +227,7 @@ final class BridgeToSwiftTests: XCTestCase {
         public var i: Int {
             get {
                 return jniContext {
-                    let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
+                    let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, options: [], args: [])
                     return Int(value_java)
                 }
             }
@@ -255,7 +255,7 @@ final class BridgeToSwiftTests: XCTestCase {
         public var d: Double {
             get {
                 return jniContext {
-                    let value_java: Double = try! Java_SourceKt.callStatic(method: Java_get_d_methodID, args: [])
+                    let value_java: Double = try! Java_SourceKt.callStatic(method: Java_get_d_methodID, options: [], args: [])
                     return value_java
                 }
             }
@@ -286,7 +286,7 @@ final class BridgeToSwiftTests: XCTestCase {
         public var i: Int32 {
             get {
                 return jniContext {
-                    let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
+                    let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, options: [], args: [])
                     return value_java
                 }
             }
@@ -314,14 +314,14 @@ final class BridgeToSwiftTests: XCTestCase {
         public var i: Int64 {
             get {
                 return jniContext {
-                    let value_java: Int64 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
+                    let value_java: Int64 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, options: [], args: [])
                     return value_java
                 }
             }
             set {
                 jniContext {
-                    let value_java = newValue.toJavaParameter()
-                    try! Java_SourceKt.callStatic(method: Java_set_i_methodID, args: [value_java])
+                    let value_java = newValue.toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_set_i_methodID, options: [], args: [value_java])
                 }
             }
         }
@@ -340,14 +340,14 @@ final class BridgeToSwiftTests: XCTestCase {
         public var object: String {
             get {
                 return jniContext {
-                    let value_java: String = try! Java_SourceKt.callStatic(method: Java_get_object__methodID, args: [])
+                    let value_java: String = try! Java_SourceKt.callStatic(method: Java_get_object__methodID, options: [], args: [])
                     return value_java
                 }
             }
             set {
                 jniContext {
-                    let value_java = newValue.toJavaParameter()
-                    try! Java_SourceKt.callStatic(method: Java_set_object__methodID, args: [value_java])
+                    let value_java = newValue.toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_set_object__methodID, options: [], args: [value_java])
                 }
             }
         }
@@ -386,14 +386,14 @@ final class BridgeToSwiftTests: XCTestCase {
         public var i: Int? {
             get {
                 return jniContext {
-                    let value_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
-                    return Int?.fromJavaObject(value_java)
+                    let value_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, options: [], args: [])
+                    return Int?.fromJavaObject(value_java, options: [])
                 }
             }
             set {
                 jniContext {
-                    let value_java = newValue.toJavaParameter()
-                    try! Java_SourceKt.callStatic(method: Java_set_i_methodID, args: [value_java])
+                    let value_java = newValue.toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_set_i_methodID, options: [], args: [value_java])
                 }
             }
         }
@@ -443,24 +443,24 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
         public var c: C {
             get {
                 return jniContext {
-                    let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
-                    return C.fromJavaObject(value_java)
+                    let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, options: [], args: [])
+                    return C.fromJavaObject(value_java, options: [])
                 }
             }
             set {
                 jniContext {
-                    let value_java = newValue.toJavaObject()!.toJavaParameter()
-                    try! Java_SourceKt.callStatic(method: Java_set_c_methodID, args: [value_java])
+                    let value_java = newValue.toJavaObject(options: [])!.toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_set_c_methodID, options: [], args: [value_java])
                 }
             }
         }
@@ -498,24 +498,24 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
         public var c: C? {
             get {
                 return jniContext {
-                    let value_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
-                    return C?.fromJavaObject(value_java)
+                    let value_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, options: [], args: [])
+                    return C?.fromJavaObject(value_java, options: [])
                 }
             }
             set {
                 jniContext {
-                    let value_java = newValue.toJavaObject().toJavaParameter()
-                    try! Java_SourceKt.callStatic(method: Java_set_c_methodID, args: [value_java])
+                    let value_java = newValue.toJavaObject(options: []).toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_set_c_methodID, options: [], args: [value_java])
                 }
             }
         }
@@ -568,13 +568,13 @@ final class BridgeToSwiftTests: XCTestCase {
         """], swiftBridgeSupports: ["""
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -592,14 +592,14 @@ final class BridgeToSwiftTests: XCTestCase {
         public var c: C {
             get {
                 return jniContext {
-                    let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
-                    return C.fromJavaObject(value_java)
+                    let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, options: [], args: [])
+                    return C.fromJavaObject(value_java, options: [])
                 }
             }
             set {
                 jniContext {
-                    let value_java = newValue.toJavaObject()!.toJavaParameter()
-                    try! Java_SourceKt.callStatic(method: Java_set_c_methodID, args: [value_java])
+                    let value_java = newValue.toJavaObject(options: [])!.toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_set_c_methodID, options: [], args: [value_java])
                 }
             }
         }
@@ -631,14 +631,14 @@ final class BridgeToSwiftTests: XCTestCase {
         public var c: (Int) -> String {
             get {
                 return jniContext {
-                    let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
-                    return { let closure_swift = JavaBackedClosure<String>(value_java); return { p0 in try! closure_swift.invoke(p0) } }()
+                    let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, options: [], args: [])
+                    return { let closure_swift = JavaBackedClosure<String>(value_java, options: []); return { p0 in try! closure_swift.invoke(p0) } }()
                 }
             }
             set {
                 jniContext {
-                    let value_java = SwiftClosure1.javaObject(for: newValue).toJavaParameter()
-                    try! Java_SourceKt.callStatic(method: Java_set_c_methodID, args: [value_java])
+                    let value_java = SwiftClosure1.javaObject(for: newValue, options: []).toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_set_c_methodID, options: [], args: [value_java])
                 }
             }
         }
@@ -657,14 +657,14 @@ final class BridgeToSwiftTests: XCTestCase {
         public var c: () -> Void {
             get {
                 return jniContext {
-                    let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, args: [])
-                    return { let closure_swift = JavaBackedClosure<Void>(value_java); return { try! closure_swift.invoke() } }()
+                    let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, options: [], args: [])
+                    return { let closure_swift = JavaBackedClosure<Void>(value_java, options: []); return { try! closure_swift.invoke() } }()
                 }
             }
             set {
                 jniContext {
-                    let value_java = SwiftClosure0.javaObject(for: newValue).toJavaParameter()
-                    try! Java_SourceKt.callStatic(method: Java_set_c_methodID, args: [value_java])
+                    let value_java = SwiftClosure0.javaObject(for: newValue, options: []).toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_set_c_methodID, options: [], args: [value_java])
                 }
             }
         }
@@ -684,9 +684,9 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public func f(i p_0: Int, s p_1: String) -> Int {
             return jniContext {
-                let p_0_java = Int32(p_0).toJavaParameter()
-                let p_1_java = p_1.toJavaParameter()
-                let f_return_java: Int32 = try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [p_0_java, p_1_java])
+                let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                let p_1_java = p_1.toJavaParameter(options: [])
+                let f_return_java: Int32 = try! Java_SourceKt.callStatic(method: Java_f_methodID, options: [], args: [p_0_java, p_1_java])
                 return Int(f_return_java)
             }
         }
@@ -737,7 +737,7 @@ final class BridgeToSwiftTests: XCTestCase {
         public func f() throws {
             try jniContext {
                 do {
-                    try Java_SourceKt.callStatic(method: Java_f_methodID, args: [])
+                    try Java_SourceKt.callStatic(method: Java_f_methodID, options: [], args: [])
                 } catch let error as ThrowableError {
                     throw error
                 } catch {
@@ -759,8 +759,8 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public func nolabel(_ p_0: Int) {
             jniContext {
-                let p_0_java = Int32(p_0).toJavaParameter()
-                try! Java_SourceKt.callStatic(method: Java_nolabel_methodID, args: [p_0_java])
+                let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                try! Java_SourceKt.callStatic(method: Java_nolabel_methodID, options: [], args: [p_0_java])
             }
         }
         private let Java_nolabel_methodID = Java_SourceKt.getStaticMethodID(name: "nolabel", sig: "(I)V")!
@@ -778,8 +778,8 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public func f(i p_0: Int = 0) -> Int {
             return jniContext {
-                let p_0_java = Int32(p_0).toJavaParameter()
-                let f_return_java: Int32 = try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [p_0_java])
+                let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                let f_return_java: Int32 = try! Java_SourceKt.callStatic(method: Java_f_methodID, options: [], args: [p_0_java])
                 return Int(f_return_java)
             }
         }
@@ -802,17 +802,17 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public func f(i p_0: Int) -> Int {
             return jniContext {
-                let p_0_java = Int32(p_0).toJavaParameter()
+                let p_0_java = Int32(p_0).toJavaParameter(options: [])
                 let p_1_java = JavaParameter(l: nil)
-                let f_return_java: Int32 = try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [p_0_java, p_1_java])
+                let f_return_java: Int32 = try! Java_SourceKt.callStatic(method: Java_f_methodID, options: [], args: [p_0_java, p_1_java])
                 return Int(f_return_java)
             }
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "(ILjava/lang/Void;)I")!
         public func f(value p_0: Int) -> Int {
             return jniContext {
-                let p_0_java = Int32(p_0).toJavaParameter()
-                let f_return_java: Int32 = try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [p_0_java])
+                let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                let f_return_java: Int32 = try! Java_SourceKt.callStatic(method: Java_f_methodID, options: [], args: [p_0_java])
                 return Int(f_return_java)
             }
         }
@@ -830,8 +830,8 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public func object(object p_0: Int) {
             jniContext {
-                let p_0_java = Int32(p_0).toJavaParameter()
-                try! Java_SourceKt.callStatic(method: Java_object__methodID, args: [p_0_java])
+                let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                try! Java_SourceKt.callStatic(method: Java_object__methodID, options: [], args: [p_0_java])
             }
         }
         private let Java_object__methodID = Java_SourceKt.getStaticMethodID(name: "object_", sig: "(I)V")!
@@ -849,9 +849,9 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public func f(i p_0: Int?) -> Int? {
             return jniContext {
-                let p_0_java = p_0.toJavaParameter()
-                let f_return_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [p_0_java])
-                return Int?.fromJavaObject(f_return_java)
+                let p_0_java = p_0.toJavaParameter(options: [])
+                let f_return_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_f_methodID, options: [], args: [p_0_java])
+                return Int?.fromJavaObject(f_return_java, options: [])
             }
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "(Ljava/lang/Integer;)Ljava/lang/Integer;")!
@@ -888,18 +888,18 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
         public func f(c p_0: C) -> C {
             return jniContext {
-                let p_0_java = p_0.toJavaObject()!.toJavaParameter()
-                let f_return_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [p_0_java])
-                return C.fromJavaObject(f_return_java)
+                let p_0_java = p_0.toJavaObject(options: [])!.toJavaParameter(options: [])
+                let f_return_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_f_methodID, options: [], args: [p_0_java])
+                return C.fromJavaObject(f_return_java, options: [])
             }
         }
         private let Java_f_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "(LC;)LC;")!
@@ -934,9 +934,9 @@ final class BridgeToSwiftTests: XCTestCase {
                     f_continuation.resume(returning: f_return)
                 }
                 jniContext {
-                    let f_return_callback_java = SwiftClosure1.javaObject(for: f_return_callback).toJavaParameter()
-                    let p_0_java = Int32(p_0).toJavaParameter()
-                    try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [p_0_java, f_return_callback_java])
+                    let f_return_callback_java = SwiftClosure1.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
+                    let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_f_methodID, options: [], args: [p_0_java, f_return_callback_java])
                 }
             }
         }
@@ -967,9 +967,9 @@ final class BridgeToSwiftTests: XCTestCase {
                     f_continuation.resume(returning: f_return)
                 }
                 jniContext {
-                    let f_return_callback_java = SwiftClosure1.javaObject(for: f_return_callback).toJavaParameter()
-                    let p_0_java = Int32(p_0).toJavaParameter()
-                    try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [p_0_java, f_return_callback_java])
+                    let f_return_callback_java = SwiftClosure1.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
+                    let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_f_methodID, options: [], args: [p_0_java, f_return_callback_java])
                 }
             }
         }
@@ -997,8 +997,8 @@ final class BridgeToSwiftTests: XCTestCase {
                     f_continuation.resume()
                 }
                 jniContext {
-                    let f_return_callback_java = SwiftClosure0.javaObject(for: f_return_callback).toJavaParameter()
-                    try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [f_return_callback_java])
+                    let f_return_callback_java = SwiftClosure0.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_f_methodID, options: [], args: [f_return_callback_java])
                 }
             }
         }
@@ -1036,8 +1036,8 @@ final class BridgeToSwiftTests: XCTestCase {
                     }
                 }
                 jniContext {
-                    let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback).toJavaParameter()
-                    try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [f_return_callback_java])
+                    let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_f_methodID, options: [], args: [f_return_callback_java])
                 }
             }
         }
@@ -1073,9 +1073,9 @@ final class BridgeToSwiftTests: XCTestCase {
                     }
                 }
                 jniContext {
-                    let f_return_callback_java = SwiftClosure1.javaObject(for: f_return_callback).toJavaParameter()
-                    let p_0_java = Int32(p_0).toJavaParameter()
-                    try! Java_SourceKt.callStatic(method: Java_f_methodID, args: [p_0_java, f_return_callback_java])
+                    let f_return_callback_java = SwiftClosure1.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
+                    let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_f_methodID, options: [], args: [p_0_java, f_return_callback_java])
                 }
             }
         }
@@ -1111,24 +1111,24 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
             public var i: Int {
                 get {
                     return jniContext {
-                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, options: [], args: [])
                         return Int(value_java)
                     }
                 }
                 set {
                     jniContext {
-                        let value_java = Int32(newValue).toJavaParameter()
-                        try! Java_peer.call(method: Self.Java_set_i_methodID, args: [value_java])
+                        let value_java = Int32(newValue).toJavaParameter(options: [])
+                        try! Java_peer.call(method: Self.Java_set_i_methodID, options: [], args: [value_java])
                     }
                 }
             }
@@ -1167,16 +1167,16 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
             open func f() {
                 jniContext {
-                    try! Java_peer.call(method: Self.Java_f_methodID, args: [])
+                    try! Java_peer.call(method: Self.Java_f_methodID, options: [], args: [])
                 }
             }
             private static let Java_f_methodID = Java_class.getMethodID(name: "f", sig: "()V")!
@@ -1258,10 +1258,10 @@ final class BridgeToSwiftTests: XCTestCase {
             public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
@@ -1291,16 +1291,16 @@ final class BridgeToSwiftTests: XCTestCase {
             public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
             public init(i p_0: Int) {
                 Java_peer = jniContext {
-                    let p_0_java = Int32(p_0).toJavaParameter()
+                    let p_0_java = Int32(p_0).toJavaParameter(options: [])
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [p_0_java])
                     return JObject(ptr)
                 }
@@ -1333,16 +1333,16 @@ final class BridgeToSwiftTests: XCTestCase {
             public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
             public init(i p_0: Int) throws {
                 Java_peer = try jniContext {
-                    let p_0_java = Int32(p_0).toJavaParameter()
+                    let p_0_java = Int32(p_0).toJavaParameter(options: [])
                     let ptr = try Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [p_0_java])
                     return JObject(ptr)
                 }
@@ -1390,10 +1390,10 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
@@ -1428,10 +1428,10 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
@@ -1468,24 +1468,24 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
             public var i: Int {
                 get {
                     return jniContext {
-                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, options: [], args: [])
                         return Int(value_java)
                     }
                 }
                 set {
                     jniContext {
-                        let value_java = Int32(newValue).toJavaParameter()
-                        try! Java_peer.call(method: Self.Java_set_i_methodID, args: [value_java])
+                        let value_java = Int32(newValue).toJavaParameter(options: [])
+                        try! Java_peer.call(method: Self.Java_set_i_methodID, options: [], args: [value_java])
                     }
                 }
             }
@@ -1525,18 +1525,18 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
             public func add(a p_0: Int, b p_1: Int) -> Int {
                 return jniContext {
-                    let p_0_java = Int32(p_0).toJavaParameter()
-                    let p_1_java = Int32(p_1).toJavaParameter()
-                    let f_return_java: Int32 = try! Java_peer.call(method: Self.Java_add_methodID, args: [p_0_java, p_1_java])
+                    let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                    let p_1_java = Int32(p_1).toJavaParameter(options: [])
+                    let f_return_java: Int32 = try! Java_peer.call(method: Self.Java_add_methodID, options: [], args: [p_0_java, p_1_java])
                     return Int(f_return_java)
                 }
             }
@@ -1582,10 +1582,10 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
@@ -1595,8 +1595,8 @@ final class BridgeToSwiftTests: XCTestCase {
                         f_continuation.resume(returning: f_return)
                     }
                     jniContext {
-                        let f_return_callback_java = SwiftClosure1.javaObject(for: f_return_callback).toJavaParameter()
-                        try! Java_peer.call(method: Self.Java_add_methodID, args: [f_return_callback_java])
+                        let f_return_callback_java = SwiftClosure1.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
+                        try! Java_peer.call(method: Self.Java_add_methodID, options: [], args: [f_return_callback_java])
                     }
                 }
             }
@@ -1635,10 +1635,10 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
@@ -1681,25 +1681,25 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
             private static let Java_Companion_class = try! JClass(name: "C$Companion")
-            private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: "Companion", sig: "LC$Companion;")!))
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: "Companion", sig: "LC$Companion;")!, options: []))
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
             public static var i: Int {
                 get {
                     return jniContext {
-                        let value_java: Int32 = try! Java_Companion.call(method: Java_Companion_get_i_methodID, args: [])
+                        let value_java: Int32 = try! Java_Companion.call(method: Java_Companion_get_i_methodID, options: [], args: [])
                         return Int(value_java)
                     }
                 }
                 set {
                     jniContext {
-                        let value_java = Int32(newValue).toJavaParameter()
-                        try! Java_Companion.call(method: Java_Companion_set_i_methodID, args: [value_java])
+                        let value_java = Int32(newValue).toJavaParameter(options: [])
+                        try! Java_Companion.call(method: Java_Companion_set_i_methodID, options: [], args: [value_java])
                     }
                 }
             }
@@ -1741,19 +1741,19 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
             private static let Java_Companion_class = try! JClass(name: "C$Companion")
-            private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: "Companion", sig: "LC$Companion;")!))
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: "Companion", sig: "LC$Companion;")!, options: []))
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
             public static func add(a p_0: Int, b p_1: Int) -> Int {
                 return jniContext {
-                    let p_0_java = Int32(p_0).toJavaParameter()
-                    let p_1_java = Int32(p_1).toJavaParameter()
-                    let f_return_java: Int32 = try! Java_Companion.call(method: Java_Companion_add_methodID, args: [p_0_java, p_1_java])
+                    let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                    let p_1_java = Int32(p_1).toJavaParameter(options: [])
+                    let f_return_java: Int32 = try! Java_Companion.call(method: Java_Companion_add_methodID, options: [], args: [p_0_java, p_1_java])
                     return Int(f_return_java)
                 }
             }
@@ -1791,10 +1791,10 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
@@ -1862,24 +1862,24 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
             public var i: Int {
                 get {
                     return jniContext {
-                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, options: [], args: [])
                         return Int(value_java)
                     }
                 }
                 set {
                     jniContext {
-                        let value_java = Int32(newValue).toJavaParameter()
-                        try! Java_peer.call(method: Self.Java_set_i_methodID, args: [value_java])
+                        let value_java = Int32(newValue).toJavaParameter(options: [])
+                        try! Java_peer.call(method: Self.Java_set_i_methodID, options: [], args: [value_java])
                     }
                 }
             }
@@ -1888,16 +1888,16 @@ final class BridgeToSwiftTests: XCTestCase {
 
             public static func ==(lhs: C, rhs: C) -> Bool {
                 return jniContext {
-                    let lhs_java = lhs.toJavaObject()!
-                    let rhs_java = rhs.toJavaObject()!
-                    return try! Bool.call(Java_isequal_methodID, on: lhs_java, args: [rhs_java.toJavaParameter()])
+                    let lhs_java = lhs.toJavaObject(options: [])!
+                    let rhs_java = rhs.toJavaParameter(options: [])
+                    return try! Bool.call(Java_isequal_methodID, on: lhs_java, options: [], args: [rhs_java])
                 }
             }
             private static let Java_isequal_methodID = Java_class.getMethodID(name: "equals", sig: "(Ljava/lang/Object;)Z")!
 
             public func hash(into hasher: inout Hasher) {
                 let hashCode: Int32 = jniContext {
-                    return try! Java_peer.call(method: Self.Java_hashCode_methodID, args: [])
+                    return try! Java_peer.call(method: Self.Java_hashCode_methodID, options: [], args: [])
                 }
                 hasher.combine(hashCode)
             }
@@ -1905,9 +1905,9 @@ final class BridgeToSwiftTests: XCTestCase {
 
             public static func <(lhs: C, rhs: C) -> Bool {
                 return jniContext {
-                    let lhs_java = lhs.toJavaObject()!
-                    let rhs_java = rhs.toJavaObject()!
-                    let f_return_java = try! Int32.call(Java_compareTo_methodID, on: lhs_java, args: [rhs_java.toJavaParameter()])
+                    let lhs_java = lhs.toJavaObject(options: [])!
+                    let rhs_java = rhs.toJavaParameter(options: [])
+                    let f_return_java = try! Int32.call(Java_compareTo_methodID, on: lhs_java, options: [], args: [rhs_java])
                     return f_return_java < 0
                 }
             }
@@ -1974,24 +1974,24 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
             public var i: Int {
                 get {
                     return jniContext {
-                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, options: [], args: [])
                         return Int(value_java)
                     }
                 }
                 set {
                     jniContext {
-                        let value_java = Int32(newValue).toJavaParameter()
-                        try! Java_peer.call(method: Self.Java_set_i_methodID, args: [value_java])
+                        let value_java = Int32(newValue).toJavaParameter(options: [])
+                        try! Java_peer.call(method: Self.Java_set_i_methodID, options: [], args: [value_java])
                     }
                 }
             }
@@ -2061,25 +2061,25 @@ final class BridgeToSwiftTests: XCTestCase {
                 Java_peer = JObject(Java_ptr)
             }
             private static let Java_scopy_methodID = Java_class.getMethodID(name: "scopy", sig: "()Lskip/lib/MutableStruct;")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
             public var i: Int {
                 get {
                     return jniContext {
-                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, options: [], args: [])
                         return Int(value_java)
                     }
                 }
                 set {
                     jniContext {
-                        Java_peer = try! JObject(Java_peer.call(method: Self.Java_scopy_methodID, args: []))
-                        let value_java = Int32(newValue).toJavaParameter()
-                        try! Java_peer.call(method: Self.Java_set_i_methodID, args: [value_java])
+                        Java_peer = try! JObject(Java_peer.call(method: Self.Java_scopy_methodID, options: [], args: []))
+                        let value_java = Int32(newValue).toJavaParameter(options: [])
+                        try! Java_peer.call(method: Self.Java_set_i_methodID, options: [], args: [value_java])
                     }
                 }
             }
@@ -2088,7 +2088,7 @@ final class BridgeToSwiftTests: XCTestCase {
 
             public init(_ p_0: String) {
                 Java_peer = jniContext {
-                    let p_0_java = p_0.toJavaParameter()
+                    let p_0_java = p_0.toJavaParameter(options: [])
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [p_0_java])
                     return JObject(ptr)
                 }
@@ -2097,8 +2097,8 @@ final class BridgeToSwiftTests: XCTestCase {
 
             public mutating func inc() {
                 jniContext {
-                    Java_peer = try! JObject(Java_peer.call(method: Self.Java_scopy_methodID, args: []))
-                    try! Java_peer.call(method: Self.Java_inc_methodID, args: [])
+                    Java_peer = try! JObject(Java_peer.call(method: Self.Java_scopy_methodID, options: [], args: []))
+                    try! Java_peer.call(method: Self.Java_inc_methodID, options: [], args: [])
                 }
             }
             private static let Java_inc_methodID = Java_class.getMethodID(name: "inc", sig: "()V")!
@@ -2151,14 +2151,14 @@ final class BridgeToSwiftTests: XCTestCase {
             public var i: Int {
                 get {
                     return jniContext {
-                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, args: [])
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, options: [], args: [])
                         return Int(value_java)
                     }
                 }
                 set {
                     jniContext {
-                        let value_java = Int32(newValue).toJavaParameter()
-                        try! Java_peer.call(method: Self.Java_set_i_methodID, args: [value_java])
+                        let value_java = Int32(newValue).toJavaParameter(options: [])
+                        try! Java_peer.call(method: Self.Java_set_i_methodID, options: [], args: [value_java])
                     }
                 }
             }
@@ -2166,15 +2166,15 @@ final class BridgeToSwiftTests: XCTestCase {
             private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
             public func f() -> Int {
                 return jniContext {
-                    let f_return_java: Int32 = try! Java_peer.call(method: Self.Java_f_methodID, args: [])
+                    let f_return_java: Int32 = try! Java_peer.call(method: Self.Java_f_methodID, options: [], args: [])
                     return Int(f_return_java)
                 }
             }
             private static let Java_f_methodID = Java_class.getMethodID(name: "f", sig: "()I")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
@@ -2191,16 +2191,16 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
             public func f() {
                 jniContext {
-                    try! Java_peer.call(method: Self.Java_f_methodID, args: [])
+                    try! Java_peer.call(method: Self.Java_f_methodID, options: [], args: [])
                 }
             }
             private static let Java_f_methodID = Java_class.getMethodID(name: "f", sig: "()V")!
@@ -2243,10 +2243,10 @@ final class BridgeToSwiftTests: XCTestCase {
             public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
@@ -2263,24 +2263,24 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
 
             public var p: (any P)? {
                 get {
                     return jniContext {
-                        let value_java: JavaObjectPointer? = try! Java_peer.call(method: Self.Java_get_p_methodID, args: [])
-                        return P_BridgeImpl?.fromJavaObject(value_java)
+                        let value_java: JavaObjectPointer? = try! Java_peer.call(method: Self.Java_get_p_methodID, options: [], args: [])
+                        return P_BridgeImpl?.fromJavaObject(value_java, options: [])
                     }
                 }
                 set {
                     jniContext {
-                        let value_java = ((newValue as? JConvertible)?.toJavaObject()).toJavaParameter()
-                        try! Java_peer.call(method: Self.Java_set_p_methodID, args: [value_java])
+                        let value_java = ((newValue as? JConvertible)?.toJavaObject(options: [])).toJavaParameter(options: [])
+                        try! Java_peer.call(method: Self.Java_set_p_methodID, options: [], args: [value_java])
                     }
                 }
             }
@@ -2289,9 +2289,9 @@ final class BridgeToSwiftTests: XCTestCase {
 
             public func f(p p_0: (any P)) -> (any P)? {
                 return jniContext {
-                    let p_0_java = ((p_0 as? JConvertible)?.toJavaObject())!.toJavaParameter()
-                    let f_return_java: JavaObjectPointer? = try! Java_peer.call(method: Self.Java_f_methodID, args: [p_0_java])
-                    return P_BridgeImpl?.fromJavaObject(f_return_java)
+                    let p_0_java = ((p_0 as? JConvertible)?.toJavaObject(options: []))!.toJavaParameter(options: [])
+                    let f_return_java: JavaObjectPointer? = try! Java_peer.call(method: Self.Java_f_methodID, options: [], args: [p_0_java])
+                    return P_BridgeImpl?.fromJavaObject(f_return_java, options: [])
                 }
             }
             private static let Java_f_methodID = Java_class.getMethodID(name: "f", sig: "(LP;)LP;")!
@@ -2351,7 +2351,7 @@ final class BridgeToSwiftTests: XCTestCase {
         public var i: Int {
             get {
                 return jniContext {
-                    let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, args: [])
+                    let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, options: [], args: [])
                     return Int(value_java)
                 }
             }

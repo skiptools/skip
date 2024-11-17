@@ -1,4 +1,5 @@
 import Foundation
+import Universal
 
 /// A contents of a `skip.yml` config file
 struct SkipConfig : Codable {
@@ -20,10 +21,38 @@ struct TranspilationConfig : Codable {
     var package: String?
     /// Skip mode: kotlin|swift
     var mode: String?
-    /// Whether to bridge this module
-    var bridging: Bool?
-}
+    /// How to bridge this module
+    var bridging: Either<Bool>.Or<BridgeConfig>?
 
+    func isBridgingEnabled() -> Bool {
+        switch bridging {
+        case .a(let enabled):
+            return enabled
+        case .b(let config):
+            return config.enabled == true
+        case nil:
+            return false
+        }
+    }
+
+    func bridgingOptions() -> [String] {
+        switch bridging {
+        case .a:
+            return []
+        case .b(let config):
+            switch config.options {
+            case .a(let option):
+                return [option]
+            case .b(let options):
+                return options
+            case nil:
+                return []
+            }
+        case nil:
+            return []
+        }
+    }
+}
 
 struct SkipToolchain : Equatable, Codable {
     var architectures: [SkipArchitecture]?
@@ -33,3 +62,11 @@ struct SkipArchitecture : Equatable, Codable {
     var arch: String
 }
 
+struct BridgeConfig : Equatable, Codable {
+    var enabled: Bool?
+    var options: Either<String>.Or<[String]>?
+}
+
+enum BridgeOption: String {
+    case kotlincompat
+}

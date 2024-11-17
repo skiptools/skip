@@ -37,7 +37,6 @@ public struct Transpiler {
                     return try SyntaxTree(source: Source(file: transpileFile), preprocessorSymbols: preprocessorSymbols)
                 }
             }
-            //~~~ add bridge translator to system if bridging mode
             for bridgeFile in bridgeFiles {
                 group.addTask {
                     let bridgeSource = try Source(file: bridgeFile)
