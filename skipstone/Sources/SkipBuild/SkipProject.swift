@@ -168,35 +168,23 @@ class FrameworkProjectLayout {
                 moduleCode += """
                 import Foundation
                 import Observation
+                import SkipAndroidBridge
+
+                fileprivate let logger: Logger = Logger(subsystem: "AppDroid", category: "NativeViewModel")
                 
-                // SKIP @BridgeToKotlin
                 @Observable public class ViewModel {
                     public var name = "Skipper"
                 
                     public init() {
                     }
+                
+                    public func flipName() {
+                        logger.info("called flipName: \\(name)")
+                        name = String(name.reversed())
+                    }
                 }
                 
                 """
-
-                // a sample of bridging Kotlin back into Swift
-                let nativeModuleKotlinBridge = sourceHeader + """
-                #if !SKIP_BRIDGE
-                // SKIP @BridgeToSwift
-                func getJavaSystemProperty(_ name: String) -> String? {
-                    #if SKIP
-                    return java.lang.System.getProperty(name)
-                    #else
-                    return nil
-                    #endif
-                }
-                #endif
-
-                """
-
-                let kotlinBridgeDir = try sourceDir.append(path: "Kotlin", create: true)
-                let kotlinBridgeSourceFile = kotlinBridgeDir.appending(path: "\(moduleName)Kotlin.swift")
-                try nativeModuleKotlinBridge.write(to: kotlinBridgeSourceFile, atomically: false, encoding: .utf8)
             } else {
                 moduleCode += """
 
@@ -703,8 +691,11 @@ class FrameworkProjectLayout {
                     var depVersion = modDep.repositoryVersion ?? "1.0.0" // "1.2.3"..<"1.2.6"
                     // special-case skip modules that may not yet be stable by pinning to 0.0.0..<2.0.0
                     if repoName.hasPrefix("skip-") && !["skip", "skip-unit", "skip-lib", "skip-foundation", "skip-model", "skip-ui"].contains(repoName) {
-                        //depVersion = "0.0.0\"..<\"2.0.0"
+                        #if DEBUG
                         depVersion = "main"
+                        #else
+                        depVersion = "0.0.0\"..<\"2.0.0"
+                        #endif
                     }
                     let isRange = depVersion.contains("..")
                     let isSemanticVersion = !depVersion.split(separator: ".").map({ Int($0) }).contains(nil)
@@ -2513,8 +2504,7 @@ extension FrameworkProjectLayout {
             override fun onCreate() {
                 super.onCreate()
                 logger.info("starting app")
-                ProcessInfo.launch(applicationContext)
-                \(nativeLibrary == nil ? "" : "skip.android.bridge.AndroidBridge.initBridge(\"\(nativeLibrary!)\")")
+                \(nativeLibrary == nil ? "ProcessInfo.launch(applicationContext)" : "skip.android.bridge.kt.AndroidBridge.initBridge(this, \"\(nativeLibrary!)\")")
             }
 
             companion object {

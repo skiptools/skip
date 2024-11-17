@@ -467,8 +467,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 return
             }
 
-            // FIXME: What should we actually be testing here?
-            if baseSkipConfig.skip?.mode == nil {
+            // if the package is to be bridged, then create a src/main/swift folder that links to the source package
+            if baseSkipConfig.skip?.bridging != true {
                 return
             }
 
