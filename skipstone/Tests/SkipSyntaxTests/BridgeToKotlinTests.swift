@@ -100,7 +100,7 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1s")
         func BridgeKt_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
-            return s.toJavaObject()!
+            return s.toJavaObject(options: [])!
         }
         """, transformers: transformers)
     }
@@ -141,7 +141,7 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1s")
         func BridgeKt_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
-            return s.toJavaObject()!
+            return s.toJavaObject(options: [])!
         }
         """, transformers: transformers)
     }
@@ -181,11 +181,11 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1s")
         func BridgeKt_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
-            return s.toJavaObject()!
+            return s.toJavaObject(options: [])!
         }
         @_cdecl("Java_BridgeKt_Swift_1s_1set")
         func BridgeKt_Swift_s_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaString) {
-            s = String.fromJavaObject(value)
+            s = String.fromJavaObject(value, options: [])
         }
         """, transformers: transformers)
     }
@@ -271,11 +271,11 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1s")
         func BridgeKt_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
-            return s.toJavaObject()!
+            return s.toJavaObject(options: [])!
         }
         @_cdecl("Java_BridgeKt_Swift_1s_1set")
         func BridgeKt_Swift_s_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaString) {
-            s = String.fromJavaObject(value)
+            s = String.fromJavaObject(value, options: [])
         }
         """, transformers: transformers)
     }
@@ -326,11 +326,11 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1a")
         func BridgeKt_Swift_a(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
-            return a.toJavaObject()!
+            return a.toJavaObject(options: [])!
         }
         @_cdecl("Java_BridgeKt_Swift_1a_1set")
         func BridgeKt_Swift_a_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
-            a = [Int].fromJavaObject(value)
+            a = [Int].fromJavaObject(value, options: [])
         }
         """, transformers: transformers)
     }
@@ -349,7 +349,7 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1object")
         func BridgeKt_Swift_object(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
-            return object.toJavaObject()!
+            return object.toJavaObject(options: [])!
         }
         """, transformers: transformers)
     }
@@ -388,11 +388,11 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1i")
         func BridgeKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer? {
-            return i.toJavaObject()
+            return i.toJavaObject(options: [])
         }
         @_cdecl("Java_BridgeKt_Swift_1i_1set")
         func BridgeKt_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer?) {
-            i = Int?.fromJavaObject(value)
+            i = Int?.fromJavaObject(value, options: [])
         }
         """, transformers: transformers)
     }
@@ -434,11 +434,11 @@ final class BridgeToKotlinTests: XCTestCase {
         """], swiftBridgeSupports: ["""
         @_cdecl("Java_BridgeKt_Swift_1c")
         func BridgeKt_Swift_c(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
-            return c.toJavaObject()!
+            return c.toJavaObject(options: [])!
         }
         @_cdecl("Java_BridgeKt_Swift_1c_1set")
         func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
-            c = C.fromJavaObject(value)
+            c = C.fromJavaObject(value, options: [])
         }
         """, """
         public class C: BridgedFromKotlin {
@@ -454,10 +454,10 @@ final class BridgeToKotlinTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
@@ -489,11 +489,11 @@ final class BridgeToKotlinTests: XCTestCase {
         """], swiftBridgeSupports: ["""
         @_cdecl("Java_BridgeKt_Swift_1c")
         func BridgeKt_Swift_c(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer? {
-            return c.toJavaObject()
+            return c.toJavaObject(options: [])
         }
         @_cdecl("Java_BridgeKt_Swift_1c_1set")
         func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer?) {
-            c = C?.fromJavaObject(value)
+            c = C?.fromJavaObject(value, options: [])
         }
         """, """
         public class C: BridgedFromKotlin {
@@ -509,10 +509,10 @@ final class BridgeToKotlinTests: XCTestCase {
                 }
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
@@ -567,13 +567,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -588,11 +588,11 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_BridgeKt_Swift_1c")
         func BridgeKt_Swift_c(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
-            return c.toJavaObject()!
+            return c.toJavaObject(options: [])!
         }
         @_cdecl("Java_BridgeKt_Swift_1c_1set")
         func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
-            c = C.fromJavaObject(value)
+            c = C.fromJavaObject(value, options: [])
         }
         """, transformers: transformers)
     }
@@ -645,13 +645,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -666,11 +666,11 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_BridgeKt_Swift_1c")
         func BridgeKt_Swift_c(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer? {
-            return c.toJavaObject()
+            return c.toJavaObject(options: [])
         }
         @_cdecl("Java_BridgeKt_Swift_1c_1set")
         func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer?) {
-            c = C?.fromJavaObject(value)
+            c = C?.fromJavaObject(value, options: [])
         }
         """, transformers: transformers)
     }
@@ -697,11 +697,11 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1c")
         func BridgeKt_Swift_c(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
-            return SwiftClosure1.javaObject(for: c)!
+            return SwiftClosure1.javaObject(for: c, options: [])!
         }
         @_cdecl("Java_BridgeKt_Swift_1c_1set")
         func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
-            c = SwiftClosure1.closure(forJavaObject: value)!
+            c = SwiftClosure1.closure(forJavaObject: value, options: [])!
         }
         """, transformers: transformers)
     }
@@ -720,11 +720,11 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1c")
         func BridgeKt_Swift_c(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
-            return SwiftClosure0.javaObject(for: c)!
+            return SwiftClosure0.javaObject(for: c, options: [])!
         }
         @_cdecl("Java_BridgeKt_Swift_1c_1set")
         func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
-            c = SwiftClosure0.closure(forJavaObject: value)!
+            c = SwiftClosure0.closure(forJavaObject: value, options: [])!
         }
         """, transformers: transformers)
     }
@@ -741,7 +741,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_BridgeKt_Swift_1f_10")
         func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: Int32, _ p_1: JavaString) -> Int32 {
             let p_0_swift = Int(p_0)
-            let p_1_swift = String.fromJavaObject(p_1)
+            let p_1_swift = String.fromJavaObject(p_1, options: [])
             let f_return_swift = f(i: p_0_swift, s: p_1_swift)
             return Int32(f_return_swift)
         }
@@ -789,7 +789,7 @@ final class BridgeToKotlinTests: XCTestCase {
         func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer? {
             do {
                 let f_return_swift = try f()
-                return f_return_swift.toJavaObject()
+                return f_return_swift.toJavaObject(options: [])
             } catch {
                 JavaThrowError(error, env: Java_env)
                 return nil
@@ -908,9 +908,9 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1f_10")
         func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaObjectPointer?) -> JavaObjectPointer? {
-            let p_0_swift = Int?.fromJavaObject(p_0)
+            let p_0_swift = Int?.fromJavaObject(p_0, options: [])
             let f_return_swift = f(i: p_0_swift)
-            return f_return_swift.toJavaObject()
+            return f_return_swift.toJavaObject(options: [])
         }
         """, transformers: transformers)
     }
@@ -959,13 +959,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -980,9 +980,9 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_BridgeKt_Swift_1f_10")
         func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaObjectPointer) -> JavaObjectPointer {
-            let p_0_swift = C.fromJavaObject(p_0)
+            let p_0_swift = C.fromJavaObject(p_0, options: [])
             let f_return_swift = f(c: p_0_swift)
-            return f_return_swift.toJavaObject()!
+            return f_return_swift.toJavaObject(options: [])!
         }
         """, transformers: transformers)
     }
@@ -1011,7 +1011,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_BridgeKt_Swift_1callback_1f_10")
         func BridgeKt_Swift_callback_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: Int32, _ f_callback: JavaObjectPointer) {
             let p_0_swift = Int(p_0)
-            let f_callback_swift = SwiftClosure1.closure(forJavaObject: f_callback)! as (Int) -> Void
+            let f_callback_swift = SwiftClosure1.closure(forJavaObject: f_callback, options: [])! as (Int) -> Void
             Task {
                 let f_return_swift = await f(i: p_0_swift)
                 f_callback_swift(f_return_swift)
@@ -1039,7 +1039,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_BridgeKt_Swift_1callback_1f_10")
         func BridgeKt_Swift_callback_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: Int32, _ f_callback: JavaObjectPointer) {
             let p_0_swift = Int(p_0)
-            let f_callback_swift = SwiftClosure1.closure(forJavaObject: f_callback)! as (Int) -> Void
+            let f_callback_swift = SwiftClosure1.closure(forJavaObject: f_callback, options: [])! as (Int) -> Void
             Task {
                 let f_return_swift = await f(i: p_0_swift)
                 f_callback_swift(f_return_swift)
@@ -1064,7 +1064,7 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1callback_1f_10")
         func BridgeKt_Swift_callback_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ f_callback: JavaObjectPointer) {
-            let f_callback_swift = SwiftClosure0.closure(forJavaObject: f_callback)! as () -> Void
+            let f_callback_swift = SwiftClosure0.closure(forJavaObject: f_callback, options: [])! as () -> Void
             Task {
                 await f()
                 f_callback_swift()
@@ -1094,7 +1094,7 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1callback_1f_10")
         func BridgeKt_Swift_callback_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ f_callback: JavaObjectPointer) {
-            let f_callback_swift = SwiftClosure2.closure(forJavaObject: f_callback)! as (Int?, JavaObjectPointer?) -> Void
+            let f_callback_swift = SwiftClosure2.closure(forJavaObject: f_callback, options: [])! as (Int?, JavaObjectPointer?) -> Void
             Task {
                 do {
                     let f_return_swift = try await f()
@@ -1130,7 +1130,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_BridgeKt_Swift_1callback_1f_10")
         func BridgeKt_Swift_callback_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: Int32, _ f_callback: JavaObjectPointer) {
             let p_0_swift = Int(p_0)
-            let f_callback_swift = SwiftClosure1.closure(forJavaObject: f_callback)! as (JavaObjectPointer?) -> Void
+            let f_callback_swift = SwiftClosure1.closure(forJavaObject: f_callback, options: [])! as (JavaObjectPointer?) -> Void
             Task {
                 do {
                     try await f(i: p_0_swift)
@@ -1194,13 +1194,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -1275,13 +1275,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -1364,13 +1364,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -1423,13 +1423,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -1488,13 +1488,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -1568,13 +1568,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -1633,13 +1633,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -1704,13 +1704,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -1782,13 +1782,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -1864,13 +1864,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -1885,7 +1885,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_C_Swift_1callback_1add_10")
         func C_Swift_callback_add_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ f_callback: JavaObjectPointer) {
-            let f_callback_swift = SwiftClosure1.closure(forJavaObject: f_callback)! as (Int) -> Void
+            let f_callback_swift = SwiftClosure1.closure(forJavaObject: f_callback, options: [])! as (Int) -> Void
             let peer_swift: C = Swift_peer.pointee()!
             Task {
                 let f_return_swift = await peer_swift.add()
@@ -1940,13 +1940,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -2016,13 +2016,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -2093,13 +2093,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -2164,13 +2164,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -2264,13 +2264,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -2295,8 +2295,8 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_C_Swift_1isequal")
         func C_Swift_isequal(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ lhs: JavaObjectPointer, _ rhs: JavaObjectPointer) -> Bool {
-            let lhs_swift = C.fromJavaObject(lhs)
-            let rhs_swift = C.fromJavaObject(rhs)
+            let lhs_swift = C.fromJavaObject(lhs, options: [])
+            let rhs_swift = C.fromJavaObject(rhs, options: [])
             return lhs_swift == rhs_swift
         }
         @_cdecl("Java_C_Swift_1hashvalue")
@@ -2306,8 +2306,8 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_C_Swift_1islessthan")
         func C_Swift_islessthan(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ lhs: JavaObjectPointer, _ rhs: JavaObjectPointer) -> Bool {
-            let lhs_swift = C.fromJavaObject(lhs)
-            let rhs_swift = C.fromJavaObject(rhs)
+            let lhs_swift = C.fromJavaObject(lhs, options: [])
+            let rhs_swift = C.fromJavaObject(rhs, options: [])
             return lhs_swift < rhs_swift
         }
         """, transformers: transformers)
@@ -2372,13 +2372,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -2465,10 +2465,10 @@ final class BridgeToKotlinTests: XCTestCase {
             private external fun Swift_constructor_0(s: String): skip.bridge.kt.SwiftObjectPointer
             fun f(): Int = Swift_f_1(Swift_peer)
             private external fun Swift_f_1(Swift_peer: skip.bridge.kt.SwiftObjectPointer): Int
-            private constructor(copy: MutableStruct) {
+            private constructor(copy: skip.lib.MutableStruct) {
                 Swift_peer = Swift_constructor_2(copy)
             }
-            private external fun Swift_constructor_2(copy: MutableStruct): skip.bridge.kt.SwiftObjectPointer
+            private external fun Swift_constructor_2(copy: skip.lib.MutableStruct): skip.bridge.kt.SwiftObjectPointer
 
             override var supdate: ((Any) -> Unit)? = null
             override var smutatingcount = 0
@@ -2480,15 +2480,15 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension S: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "S")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 let box: SwiftValueTypeBox<Self> = ptr.pointee()!
                 return box.value
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let box = SwiftValueTypeBox(self)
                 let Swift_peer = SwiftObjectPointer.pointer(to: box, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -2508,7 +2508,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_S_Swift_1constructor_10")
         func S_Swift_constructor_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaString) -> SwiftObjectPointer {
-            let p_0_swift = String.fromJavaObject(p_0)
+            let p_0_swift = String.fromJavaObject(p_0, options: [])
             let f_return_swift = SwiftValueTypeBox(S(s: p_0_swift))
             return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
         }
@@ -2520,7 +2520,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_S_Swift_1constructor_12")
         func S_Swift_constructor_2(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaObjectPointer) -> SwiftObjectPointer {
-            let p_0_swift = S.fromJavaObject(p_0)
+            let p_0_swift = S.fromJavaObject(p_0, options: [])
             let f_return_swift = SwiftValueTypeBox(p_0_swift)
             return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
         }
@@ -2602,29 +2602,29 @@ final class BridgeToKotlinTests: XCTestCase {
             }
             public func a() {
                 jniContext {
-                    try! Java_peer.call(method: Self.Java_a_methodID, args: [])
+                    try! Java_peer.call(method: Self.Java_a_methodID, options: [], args: [])
                 }
             }
             private static let Java_a_methodID = Java_class.getMethodID(name: "a", sig: "()V")!
             public static func ==(lhs: Base_BridgeImpl, rhs: Base_BridgeImpl) -> Bool {
                 return jniContext {
-                    let lhs_java = lhs.toJavaObject()!
-                    let rhs_java = rhs.toJavaObject()!
-                    return try! Bool.call(Java_isequal_methodID, on: lhs_java, args: [rhs_java.toJavaParameter()])
+                    let lhs_java = lhs.toJavaObject(options: [])!
+                    let rhs_java = rhs.toJavaParameter(options: [])
+                    return try! Bool.call(Java_isequal_methodID, on: lhs_java, options: [], args: [rhs_java])
                 }
             }
             private static let Java_isequal_methodID = Java_class.getMethodID(name: "equals", sig: "(Ljava/lang/Object;)Z")!
             public func hash(into hasher: inout Hasher) {
                 let hashCode: Int32 = jniContext {
-                    return try! Java_peer.call(method: Self.Java_hashCode_methodID, args: [])
+                    return try! Java_peer.call(method: Self.Java_hashCode_methodID, options: [], args: [])
                 }
                 hasher.combine(hashCode)
             }
             private static let Java_hashCode_methodID = Java_class.getMethodID(name: "hashCode", sig: "()I")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
@@ -2636,48 +2636,48 @@ final class BridgeToKotlinTests: XCTestCase {
             }
             public func f() -> Int {
                 return jniContext {
-                    let f_return_java: Int32 = try! Java_peer.call(method: Self.Java_f_methodID, args: [])
+                    let f_return_java: Int32 = try! Java_peer.call(method: Self.Java_f_methodID, options: [], args: [])
                     return Int(f_return_java)
                 }
             }
             private static let Java_f_methodID = Java_class.getMethodID(name: "f", sig: "()I")!
             public func a() {
                 jniContext {
-                    try! Java_peer.call(method: Self.Java_a_methodID, args: [])
+                    try! Java_peer.call(method: Self.Java_a_methodID, options: [], args: [])
                 }
             }
             private static let Java_a_methodID = Java_class.getMethodID(name: "a", sig: "()V")!
             public static func ==(lhs: P_BridgeImpl, rhs: P_BridgeImpl) -> Bool {
                 return jniContext {
-                    let lhs_java = lhs.toJavaObject()!
-                    let rhs_java = rhs.toJavaObject()!
-                    return try! Bool.call(Java_isequal_methodID, on: lhs_java, args: [rhs_java.toJavaParameter()])
+                    let lhs_java = lhs.toJavaObject(options: [])!
+                    let rhs_java = rhs.toJavaParameter(options: [])
+                    return try! Bool.call(Java_isequal_methodID, on: lhs_java, options: [], args: [rhs_java])
                 }
             }
             private static let Java_isequal_methodID = Java_class.getMethodID(name: "equals", sig: "(Ljava/lang/Object;)Z")!
             public func hash(into hasher: inout Hasher) {
                 let hashCode: Int32 = jniContext {
-                    return try! Java_peer.call(method: Self.Java_hashCode_methodID, args: [])
+                    return try! Java_peer.call(method: Self.Java_hashCode_methodID, options: [], args: [])
                 }
                 hasher.combine(hashCode)
             }
             private static let Java_hashCode_methodID = Java_class.getMethodID(name: "hashCode", sig: "()I")!
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -2766,22 +2766,22 @@ final class BridgeToKotlinTests: XCTestCase {
             public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 return Java_peer.safePointer()
             }
         }
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -2797,19 +2797,19 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_C_Swift_1p")
         func C_Swift_p(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer? {
             let peer_swift: C = Swift_peer.pointee()!
-            return ((peer_swift.p as? JConvertible)?.toJavaObject())
+            return ((peer_swift.p as? JConvertible)?.toJavaObject(options: []))
         }
         @_cdecl("Java_C_Swift_1p_1set")
         func C_Swift_p_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: JavaObjectPointer?) {
             let peer_swift: C = Swift_peer.pointee()!
-            peer_swift.p = P_BridgeImpl?.fromJavaObject(value)
+            peer_swift.p = P_BridgeImpl?.fromJavaObject(value, options: [])
         }
         @_cdecl("Java_C_Swift_1f_10")
         func C_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ p_0: JavaObjectPointer) -> JavaObjectPointer? {
-            let p_0_swift = P_BridgeImpl.fromJavaObject(p_0)
+            let p_0_swift = P_BridgeImpl.fromJavaObject(p_0, options: [])
             let peer_swift: C = Swift_peer.pointee()!
             let f_return_swift = peer_swift.f(p: p_0_swift)
-            return ((f_return_swift as? JConvertible)?.toJavaObject())
+            return ((f_return_swift as? JConvertible)?.toJavaObject(options: []))
         }
         """, transformers: transformers)
     }
@@ -2889,13 +2889,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
-            public static func fromJavaObject(_ obj: JavaObjectPointer?) -> Self {
-                let ptr = SwiftObjectPointer.peer(of: obj!)
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
                 return ptr.pointee()!
             }
-            public func toJavaObject() -> JavaObjectPointer? {
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(), (nil as JavaObjectPointer?).toJavaParameter()])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -2920,6 +2920,126 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         """, appendToSource: """
         import struct SkipBridge.Observation
+        """, transformers: transformers)
+    }
+
+    func testKotlinCompatibilityOption() async throws {
+        let transformers = builtinKotlinTransformers() + [KotlinBridgeTransformer(options: .kotlincompat)]
+        try await check(supportingSwift: """
+        class URL: SwiftCustomBridged, KotlinConverting<java.net.URI> {
+        }
+        """, swiftBridge: """
+        public class C {
+            public var urls: [URL] = []
+            public var map = ["a": [1]]
+            public func perform(action: (URL) -> Int) {
+            }
+        }
+        """, kotlins: ["""
+        import skip.lib.Array
+
+        open class C: skip.bridge.kt.SwiftPeerBridged {
+            var Swift_peer: skip.bridge.kt.SwiftObjectPointer
+
+            constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.kt.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.kt.SwiftObjectPointer)
+
+            constructor() {
+                Swift_peer = Swift_constructor()
+            }
+            private external fun Swift_constructor(): skip.bridge.kt.SwiftObjectPointer
+
+            override fun Swift_bridgedPeer(): skip.bridge.kt.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.kt.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_bridgedPeer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            open var urls: kotlin.collections.List<java.net.URI>
+                get() = Swift_urls(Swift_peer)
+                set(newValue) {
+                    @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
+                    Swift_urls_set(Swift_peer, newValue)
+                }
+            private external fun Swift_urls(Swift_peer: skip.bridge.kt.SwiftObjectPointer): kotlin.collections.List<java.net.URI>
+            private external fun Swift_urls_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer, value: kotlin.collections.List<java.net.URI>)
+            open var map: kotlin.collections.Map<String, kotlin.collections.List<Int>>
+                get() = Swift_map(Swift_peer)
+                set(newValue) {
+                    @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
+                    Swift_map_set(Swift_peer, newValue)
+                }
+            private external fun Swift_map(Swift_peer: skip.bridge.kt.SwiftObjectPointer): kotlin.collections.Map<String, kotlin.collections.List<Int>>
+            private external fun Swift_map_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer, value: kotlin.collections.Map<String, kotlin.collections.List<Int>>)
+            open fun perform(action: (java.net.URI) -> Int): Unit = Swift_perform_0(Swift_peer, action)
+            private external fun Swift_perform_0(Swift_peer: skip.bridge.kt.SwiftObjectPointer, action: (java.net.URI) -> Int)
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
+        }
+        """, """
+        internal open class URL: SwiftCustomBridged, KotlinConverting<java.net.URI> {
+        }
+        """], swiftBridgeSupport: """
+        extension C: BridgedToKotlin {
+            private static let Java_class = try! JClass(name: "C")
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                return ptr.pointee()!
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
+        }
+        @_cdecl("Java_C_Swift_1constructor")
+        func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
+            let f_return_swift = C()
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_C_Swift_1release")
+        func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: C.self)
+        }
+        @_cdecl("Java_C_Swift_1urls")
+        func C_Swift_urls(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer {
+            let peer_swift: C = Swift_peer.pointee()!
+            return peer_swift.urls.toJavaObject(options: [.kotlincompat])!
+        }
+        @_cdecl("Java_C_Swift_1urls_1set")
+        func C_Swift_urls_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: JavaObjectPointer) {
+            let peer_swift: C = Swift_peer.pointee()!
+            peer_swift.urls = [URL].fromJavaObject(value, options: [.kotlincompat])
+        }
+        @_cdecl("Java_C_Swift_1map")
+        func C_Swift_map(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer {
+            let peer_swift: C = Swift_peer.pointee()!
+            return peer_swift.map.toJavaObject(options: [.kotlincompat])!
+        }
+        @_cdecl("Java_C_Swift_1map_1set")
+        func C_Swift_map_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: JavaObjectPointer) {
+            let peer_swift: C = Swift_peer.pointee()!
+            peer_swift.map = [String: [Int]].fromJavaObject(value, options: [.kotlincompat])
+        }
+        @_cdecl("Java_C_Swift_1perform_10")
+        func C_Swift_perform_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ p_0: JavaObjectPointer) {
+            let p_0_swift = SwiftClosure1.closure(forJavaObject: p_0, options: [.kotlincompat])!
+            let peer_swift: C = Swift_peer.pointee()!
+            peer_swift.perform(action: p_0_swift)
+        }
         """, transformers: transformers)
     }
 }

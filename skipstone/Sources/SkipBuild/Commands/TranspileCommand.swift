@@ -291,7 +291,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
 
         let isNativeModule = baseSkipConfig.skip?.mode?.lowercased() == "swift"
-        let isBridging = baseSkipConfig.skip?.bridging == true
+        let isBridgingEnabled = baseSkipConfig.skip?.isBridgingEnabled() == true
 
         // projects with a CMakeLists.txt file are built as a native Android library
         // these are only used for purely native code libraries, and so we short-circuit the build generation
@@ -345,7 +345,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         for sourceFile in sourceURLs.map(\.path).sorted() {
             if !isNativeModule {
                 transpileFiles.append(sourceFile)
-            } else if isBridging {
+            } else if isBridgingEnabled {
                 swiftFiles.append(sourceFile)
             }
         }
@@ -377,7 +377,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 let linkModuleRoot = moduleRootPath
                     .parentDirectory
                     .appending(try RelativePath(validating: relativeLinkPath))
-
 
                 let dependencyModuleExport = linkModuleRoot
                     .parentDirectory
@@ -468,9 +467,10 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             }
 
             // if the package is to be bridged, then create a src/main/swift folder that links to the source package
-            if baseSkipConfig.skip?.bridging != true {
-                return
-            }
+            // FIXME: This prevents SkipBridgeToKotlinSamples tests from building successfully
+//            if baseSkipConfig.skip?.isBridgingEnabled() != true {
+//                return
+//            }
 
             // Link src/main/swift/ to the absolute Swift project folder
             let swiftLinkFolder = try AbsolutePath(outputFolderPath, validating: "swift")
@@ -1105,8 +1105,10 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
     func createTransformers(for config: SkipConfig, with moduleMap: [String: SkipConfig]) throws -> [KotlinTransformer] {
         var transformers: [KotlinTransformer] = builtinKotlinTransformers()
 
-        if config.skip?.bridging == true {
-            transformers.append(KotlinBridgeTransformer())
+        if config.skip?.isBridgingEnabled() == true {
+            let configOptions = config.skip?.bridgingOptions() ?? []
+            let transformerOptions = KotlinBridgeOptions.parse(configOptions)
+            transformers.append(KotlinBridgeTransformer(options: transformerOptions))
         }
 
         //if let packageName = config.skip?.package {

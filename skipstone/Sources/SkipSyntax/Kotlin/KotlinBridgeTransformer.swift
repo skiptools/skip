@@ -1,8 +1,42 @@
 import Foundation
 
+/// Available bridge options.
+///
+/// - Seealso: `JConvertibleOptions` in `SkipBridge`.
+public struct KotlinBridgeOptions: OptionSet {
+    public static let kotlincompat = KotlinBridgeOptions(rawValue: 1 << 0)
+
+    public let rawValue: Int
+
+    public init(rawValue: Int) {
+        self.rawValue = rawValue
+    }
+
+    /// Create a set from a list of strings, e.g. `["kotlincompat"]`.
+    public static func parse(_ strings: [String]) -> KotlinBridgeOptions {
+        var options: KotlinBridgeOptions = []
+        for string in strings {
+            switch string {
+            case "kotlincompat":
+                options.insert(.kotlincompat)
+            default:
+                break
+            }
+        }
+        return options
+    }
+}
+
 /// Generate bridging code and transformations.
 public final class KotlinBridgeTransformer: KotlinTransformer {
+    private let options: KotlinBridgeOptions
+
+    public init(options: KotlinBridgeOptions) {
+        self.options = options
+    }
+
     public init() {
+        self.options = []
     }
 
     public func gather(from syntaxTree: SyntaxTree) {
@@ -32,12 +66,12 @@ public final class KotlinBridgeTransformer: KotlinTransformer {
 
     public func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         if syntaxTree.isBridgeFile {
-            guard let visitor = KotlinBridgeToKotlinVisitor(for: syntaxTree, translator: translator) else {
+            guard let visitor = KotlinBridgeToKotlinVisitor(for: syntaxTree, options: options, translator: translator) else {
                 return []
             }
             return visitor.visit()
         } else {
-            guard let visitor = KotlinBridgeToSwiftVisitor(for: syntaxTree, translator: translator) else {
+            guard let visitor = KotlinBridgeToSwiftVisitor(for: syntaxTree, options: options, translator: translator) else {
                 return []
             }
             return visitor.visit()
