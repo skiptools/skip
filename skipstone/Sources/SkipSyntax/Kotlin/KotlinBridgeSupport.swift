@@ -484,6 +484,16 @@ extension KotlinVariableDeclaration {
 }
 
 extension KotlinFunctionDeclaration {
+    /// Whether this function declaration matches the Kotlin `equals()` function.
+    var isKotlinEqualImplementation: Bool {
+        return name == "equals" && !modifiers.isStatic && parameters.count == 1 && parameters[0].declaredType == .optional(.any)
+    }
+
+    /// Whether this function declaration matches the Kotlin `hashCode()` function.
+    var isKotlinHashImplementation: Bool {
+        return name == "hashCode" && !modifiers.isStatic && parameters.isEmpty && returnType == .int
+    }
+
     /// Check that this function is bridgable.
     ///
     /// This function will add messages about invalid modifiers or types to this variable.

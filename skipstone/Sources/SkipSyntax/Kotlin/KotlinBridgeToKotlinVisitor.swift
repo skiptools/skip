@@ -481,9 +481,19 @@ final class KotlinBridgeToKotlinVisitor {
 
     private func updateEqualsDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration) {
         functionDeclaration.extras = nil
-        functionDeclaration.body = KotlinCodeBlock(statements: [
-            "return Swift_isequal(lhs, rhs)"
-        ].map { KotlinRawStatement(sourceCode: $0) })
+        let bodySourceCode: [String]
+        if functionDeclaration.isKotlinEqualImplementation {
+            // equals(other:)
+            bodySourceCode = [
+                "if (other === this) return true",
+                "if (other !is \(classDeclaration.signature.kotlin)) return false",
+                "return Swift_isequal(this, other)"
+            ]
+        } else {
+            // ==(lhs:, rhs:)
+            bodySourceCode = ["return Swift_isequal(lhs, rhs)"]
+        }
+        functionDeclaration.body = KotlinCodeBlock(statements: bodySourceCode.map { KotlinRawStatement(sourceCode: $0) })
 
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_isequal(lhs: \(classDeclaration.signature), rhs: \(classDeclaration.signature)): Boolean")
         classDeclaration.insert(statements: [externalFunctionDeclaration], after: functionDeclaration)
@@ -517,9 +527,15 @@ final class KotlinBridgeToKotlinVisitor {
 
     private func updateHashDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration) {
         functionDeclaration.extras = nil
-        functionDeclaration.body = KotlinCodeBlock(statements: [
-            "hasher.value.combine(Swift_hashvalue(Swift_peer))"
-        ].map { KotlinRawStatement(sourceCode: $0) })
+        let bodySourceCode: [String]
+        if functionDeclaration.isKotlinHashImplementation {
+            // hashCode()
+            bodySourceCode = ["return Swift_hashvalue(Swift_peer).hashCode()"]
+        } else {
+            // hash(into:)
+            bodySourceCode = ["hasher.value.combine(Swift_hashvalue(Swift_peer))"]
+        }
+        functionDeclaration.body = KotlinCodeBlock(statements: bodySourceCode.map { KotlinRawStatement(sourceCode: $0) })
 
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_hashvalue(Swift_peer: skip.bridge.kt.SwiftObjectPointer): Long")
         classDeclaration.insert(statements: [externalFunctionDeclaration], after: functionDeclaration)
@@ -678,10 +694,10 @@ final class KotlinBridgeToKotlinVisitor {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
                 updateVariableDeclaration(variableDeclaration, in: classDeclaration)
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
-                if functionDeclaration.isEqualImplementation {
+                if functionDeclaration.isEqualImplementation || functionDeclaration.isKotlinEqualImplementation {
                     updateEqualsDeclaration(functionDeclaration, in: classDeclaration)
                     hasEqualsDeclaration = true
-                } else if functionDeclaration.isHashImplementation {
+                } else if functionDeclaration.isHashImplementation || functionDeclaration.isKotlinHashImplementation {
                     updateHashDeclaration(functionDeclaration, in: classDeclaration)
                     hasHashDeclaration = true
                 } else if functionDeclaration.isLessThanImplementation {
