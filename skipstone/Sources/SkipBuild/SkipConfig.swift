@@ -19,9 +19,9 @@ struct SkipConfig : Codable {
 struct TranspilationConfig : Codable {
     /// The name of the package this module should be set to
     var package: String?
-    /// Skip mode: kotlin|swift
+    /// Skip mode: `native|transpiled`
     var mode: String?
-    /// How to bridge this module
+    /// Whether/how to bridge this module
     var bridging: Either<Bool>.Or<BridgeConfig>?
 
     func isBridgingEnabled() -> Bool {

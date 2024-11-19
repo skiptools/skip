@@ -290,7 +290,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         // load and merge each of the skip.yml files for the dependent modules
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
 
-        let isNativeModule = baseSkipConfig.skip?.mode?.lowercased() == "swift"
+        let isNativeModule = baseSkipConfig.skip?.mode?.lowercased() == "native"
         let isBridgingEnabled = baseSkipConfig.skip?.isBridgingEnabled() == true
 
         // projects with a CMakeLists.txt file are built as a native Android library
@@ -468,9 +468,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
             // if the package is to be bridged, then create a src/main/swift folder that links to the source package
             // FIXME: This prevents SkipBridgeToKotlinSamples tests from building successfully
-//            if baseSkipConfig.skip?.isBridgingEnabled() != true {
-//                return
-//            }
+            //if baseSkipConfig.skip?.isBridgingEnabled() != true {
+            //    return
+            //}
 
             // Link src/main/swift/ to the absolute Swift project folder
             let swiftLinkFolder = try AbsolutePath(outputFolderPath, validating: "swift")
