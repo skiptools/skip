@@ -260,7 +260,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         ]
 
         let sourcehashOutputPath = try AbsolutePath(validating: transpileOptions.sourcehash)
-        removePath(sourcehashOutputPath) // delete the build completion marker to force its re-creation (removeFileTree doesn't throw when the file doesn't exist)
+        // We no longer remove the path because the plugin doesn't seem to require it to know to run in dependency order
+        //removePath(sourcehashOutputPath) // delete the build completion marker to force its re-creation (removeFileTree doesn't throw when the file doesn't exist)
 
         // also add any files in the skipFolderFile to the list of sources (including the skip.yml and other metadata files)
         let skipFolderPathContents = try FileManager.default.enumeratedURLs(of: skipFolderPath.asURL)
@@ -338,8 +339,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         }
 
         // feed the transpiler the files to transpile and any compiled files to potentially bridge.
-        // we default the file mode based on skip.yml's mode, and anything in 'Swift/' is compiled
-        // and anything in 'Kotlin/' is transpiled
         var transpileFiles: [String] = []
         var swiftFiles: [String] = []
         for sourceFile in sourceURLs.map(\.path).sorted() {
@@ -468,9 +467,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
             // if the package is to be bridged, then create a src/main/swift folder that links to the source package
             // FIXME: This prevents SkipBridgeToKotlinSamples tests from building successfully
-            //if baseSkipConfig.skip?.isBridgingEnabled() != true {
-            //    return
-            //}
+            if baseSkipConfig.skip?.isBridgingEnabled() != true {
+                return
+            }
 
             // Link src/main/swift/ to the absolute Swift project folder
             let swiftLinkFolder = try AbsolutePath(outputFolderPath, validating: "swift")
@@ -586,17 +585,32 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
                 """
 
-                // always add the primary module include
-                if !sourceModules.contains(primaryModuleName) && !primaryModuleName.hasSuffix("Tests") {
+                var bridgedModules: [String] = []
+
+                func addIncludeModule(_ moduleName: String) {
                     settingsContents += """
-                    include(":\(primaryModuleName)")
+                    include(":\(moduleName)")
 
                     """
+
+                    if configMap[moduleName]?.skip?.isBridgingEnabled() == true {
+                        bridgedModules.append(moduleName)
+                    }
+                }
+
+                // always add the primary module include
+                if !sourceModules.contains(primaryModuleName) && !primaryModuleName.hasSuffix("Tests") {
+                    addIncludeModule(primaryModuleName)
                 }
 
                 for sourceModule in sourceModules {
+                    addIncludeModule(sourceModule)
+                }
+
+                if !bridgedModules.isEmpty {
                     settingsContents += """
-                    include(":\(sourceModule)")
+
+                    gradle.extra["bridgeModules"] = listOf("\(bridgedModules.joined(separator: "\", \""))")
 
                     """
                 }

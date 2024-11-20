@@ -154,16 +154,10 @@ fileprivate extension AndroidOperationCommand {
     /// Run `swift build` for the given Android architectures, optionally running the test cases on the device or copying all the files to the given `archiveOutputFolder`
     func runSwiftPM(cleanup: Bool? = nil, execute executable: String? = nil, commandEnvironment: [String] = [], remoteFolder: String? = nil, copy: [String] = [], archiveOutputFolder: URL? = nil, with out: MessageQueue) async throws {
         let packageDir = toolchainOptions.packagePath ?? "."
-        var architectures = toolchainOptions.arch
-        if architectures.isEmpty {
-            // pick the default architecture based on the current host; for running executables and tests, this will likely be the one that matches an attached emulator, but for an attached device, we don't know (e.g., an x86_64 host may be connecting to an aarch64 device).
-            if ProcessInfo.isARM {
-                architectures.append(.aarch64)
-            } else {
-                architectures.append(.x86_64)
-            }
-        }
+        let archs = !toolchainOptions.arch.isEmpty ? toolchainOptions.arch : [.automatic]
+        // pick the default architecture based on the current host; for running executables and tests, this will likely be the one that matches an attached emulator, but for an attached device, we don't know (e.g., an x86_64 host may be connecting to an aarch64 device).
 
+        let architectures = archs.flatMap(\.architectures).uniqueElements()
         for arch in architectures {
             let tc = try buildToolchainConfiguration(for: arch)
 
@@ -796,7 +790,7 @@ struct ToolchainOptions: ParsableArguments {
     var configuration: BuildConfiguration? = nil
 
     @Option(help: ArgumentHelp("Destination architectures"))
-    var arch: [AndroidArch] = []
+    var arch: [AndroidArchArgument] = []
 
     @Option(help: ArgumentHelp("Android API level", valueName: "level"))
     var androidAPILevel: Int = 24
@@ -813,7 +807,46 @@ public struct AndroidError : LocalizedError {
     public var errorDescription: String?
 }
 
-enum AndroidArch: String, CaseIterable, ExpressibleByArgument {
+
+enum AndroidArchArgument: String, ExpressibleByArgument, CaseIterable {
+    /// When `ONLY_ACTIVE_ARCH` is set, uses `current` otherwise uses the default supported architectures
+    case automatic
+    /// The host architecture, which is suitable for running on the current machine
+    case current
+    case `default`
+    case all
+    case aarch64
+    case armv7
+    case x86_64
+
+    var architectures: [AndroidArch] {
+        switch self {
+        case .automatic:
+            // For debug builds, just build for the current architecture.
+            // Ideally we would use `ONLY_ACTIVE_ARCH`, but that seems to be always set to "YES" even for Release builds.
+            if ProcessInfo.processInfo.environment["CONFIGURATION"]?.uppercased() == "DEBUG" {
+                return AndroidArchArgument.current.architectures
+            } else {
+                return AndroidArchArgument.`default`.architectures
+            }
+        case .current:
+            return ProcessInfo.isARM ? [.aarch64] : [.x86_64]
+        case .default:
+            return [.aarch64, .x86_64]
+        case .all:
+            return [.aarch64, .x86_64, .armv7]
+        case .aarch64:
+            return [.aarch64]
+        case .armv7:
+            return [.armv7]
+        case .x86_64:
+            return [.x86_64]
+        }
+
+    }
+}
+
+enum AndroidArch: String {
     case aarch64
     case armv7
     case x86_64
@@ -966,3 +999,19 @@ fileprivate extension URL {
     }
 }
 
+extension Collection where Element: Hashable {
+    /// Returns a new list of element removing duplicate elements.
+    ///
+    /// Note: The order of elements is preseved.
+    /// Complexity: O(n)
+    func uniqueElements() -> [Element] {
+        var set = Set<Element>()
+        var result = [Element]()
+        for element in self {
+            if set.insert(element).inserted {
+                result.append(element)
+            }
+        }
+        return result
+    }
+}
