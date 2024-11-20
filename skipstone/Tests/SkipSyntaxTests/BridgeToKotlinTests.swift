@@ -2135,9 +2135,8 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testSubscript() async throws {
         try await checkProducesMessage(swift: """
-        @BridgeToKotlin
-        class C {
-            subscript(index: Int) -> Int {
+        public class C {
+            public subscript(index: Int) -> Int {
                 get {
                     return 0
                 }
@@ -2145,7 +2144,7 @@ final class BridgeToKotlinTests: XCTestCase {
                 }
             }
         }
-        """, isSwiftBridge: true)
+        """, isSwiftBridge: true, transformers: transformers)
     }
 
     func testUnbridgedMember() async throws {
@@ -2961,12 +2960,11 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testStaticProtocolRequirements() async throws {
         try await checkProducesMessage(swift: """
-        @BridgeToKotlin
-        protocol P {
+        public protocol P {
             static var i: Int { get }
             var s: String { get }
         }
-        """, isSwiftBridge: true)
+        """, isSwiftBridge: true, transformers: transformers)
     }
 
     func testEnum() async throws {
@@ -2980,13 +2978,12 @@ final class BridgeToKotlinTests: XCTestCase {
     func testClassWithExtension() async throws {
         // TODO
 //        try await check(swiftBridge: """
-//        @BridgeToKotlin
-//        class C {
+//        public class C {
 //        }
 //        extension C {
-//            static func s() {
+//            public static func s() {
 //            }
-//            func f() {
+//            public func f() {
 //            }
 //        }
 //        """, kotlin: """
