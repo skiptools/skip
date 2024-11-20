@@ -463,6 +463,9 @@ extension KotlinVariableDeclaration {
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
     func checkBridgable(options: KotlinBridgeOptions, translator: KotlinTranslator) -> Bridgable? {
+        guard checkNonStaticProtocolRequirement(self, in: parent, modifiers: modifiers, translator: translator) else {
+            return nil
+        }
         guard !apiFlags.options.contains(.async) else {
             messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "async vars", source: translator.syntaxTree.source))
             return nil
@@ -501,8 +504,15 @@ extension KotlinFunctionDeclaration {
         guard type != .finalizerDeclaration else {
             return nil
         }
+        guard role != .operator else {
+            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "custom subscripts and operators", source: translator.syntaxTree.source))
+            return nil
+        }
         guard !isOptionalInit else {
             messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "optional inits", source: translator.syntaxTree.source))
+            return nil
+        }
+        guard checkNonStaticProtocolRequirement(self, in: parent, modifiers: modifiers, translator: translator) else {
             return nil
         }
         guard checkNonTypedThrows(self, apiFlags: apiFlags, source: translator.syntaxTree.source) else {
@@ -536,6 +546,9 @@ extension KotlinClassDeclaration {
         default:
             return false
         }
+        guard checkNonGeneric(self, generics: generics, translator: translator) else {
+            return false
+        }
         guard !(parent is KotlinClassDeclaration) && !(parent is KotlinInterfaceDeclaration) else {
             messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "inner types", source: translator.syntaxTree.source))
             return false
@@ -557,6 +570,9 @@ extension KotlinInterfaceDeclaration {
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
     func checkBridgable(options: KotlinBridgeOptions, translator: KotlinTranslator) -> Bool {
+        guard checkNonGeneric(self, generics: generics, translator: translator) else {
+            return false
+        }
         return true
     }
 }
@@ -797,12 +813,28 @@ extension TypeSignature {
     }
 }
 
+private func checkNonGeneric(_ sourceDerived: SourceDerived, generics: Generics, translator: KotlinTranslator) -> Bool {
+    guard !generics.isEmpty else {
+        return true
+    }
+    sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: "generic types", source: translator.syntaxTree.source))
+    return false
+}
+
+private func checkNonStaticProtocolRequirement(_ sourceDerived: SourceDerived, in parent: KotlinSyntaxNode?, modifiers: Modifiers, translator: KotlinTranslator) -> Bool {
+    guard modifiers.isStatic, parent is KotlinInterfaceDeclaration else {
+        return true
+    }
+    sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: "static protocol requirements", source: translator.syntaxTree.source))
+    return false
+}
+
 private func checkNonTypedThrows(_ sourceDerived: SourceDerived?, apiFlags: APIFlags, source: Source?) -> Bool {
     guard apiFlags.throwsType != .none && apiFlags.throwsType != .any else {
         return true
     }
     if let sourceDerived, let source {
-        sourceDerived.messages.append(Message.kotlinBridgeTypedThrows(sourceDerived, source: source))
+        sourceDerived.messages.append(.kotlinBridgeTypedThrows(sourceDerived, source: source))
     }
     return false
 }

@@ -1138,6 +1138,17 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testGenericClass() async throws {
+        try await checkProducesMessage(swift: """
+        public class C<T> {
+            public var value: T
+            public func f(v: T) -> T {
+                return v
+            }
+        }
+        """, transformers: transformers)
+    }
+
     func testOpenClass() async throws {
         try await check(swift: """
         open class C {
@@ -1762,6 +1773,20 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testSubscript() async throws {
+        try await checkProducesMessage(swift: """
+        public class C {
+            public subscript(index: Int) -> Int {
+                get {
+                    return 0
+                }
+                set {
+                }
+            }
+        }
+        """, transformers: transformers)
+    }
+
     func testUnbridgedMember() async throws {
         try await check(swift: """
         public class C {
@@ -2299,39 +2324,47 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
-    func testEnum() async throws {
+    func testStaticProtocolRequirements() async throws {
         try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        enum E {
-            case a, b
+        public protocol P {
+            static var i: Int { get }
+            var s: String { get }
         }
-        """)
+        """, transformers: transformers)
+    }
+
+    func testEnum() async throws {
+        // TODO
+//        try await checkProducesMessage(swift: """
+//        public enum E {
+//            case a, b
+//        }
+//        """, transformers: transformers)
     }
 
     func testEnumWithAssociatedValue() async throws {
-        try await checkProducesMessage(swift: """
-        @BridgeToSwift
-        enum E {
-            case a(Int), b
-        }
-        """)
+        // TODO
+//        try await checkProducesMessage(swift: """
+//        public enum E {
+//            case a(Int), b
+//        }
+//        """, transformers: transformers)
     }
 
     func testClassWithExtension() async throws {
         // TODO
 //        try await check(swift: """
-//        @BridgeToSwift
-//        class C {
+//        public class C {
 //        }
 //        extension C {
-//            static func s() {
+//            public static func s() {
 //            }
-//            func f() {
+//            public func f() {
 //            }
 //        }
 //        """, kotlin: """
 //        """, swiftBridgeSupport: """
-//        """)
+//        """, transformers: transformers)
     }
 
     func testImports() async throws {

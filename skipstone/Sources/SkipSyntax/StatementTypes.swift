@@ -630,7 +630,7 @@ final class IfDefined: Statement {
                     hasParens = true
                     symbol = symbol.dropLast()
                 }
-                let isSkipBridgeSymbol = symbol == "SKIP_BRIDGE" // we process blocks inside "#if !SKIP_BRIDGE", which contain @BridgeToSwift
+                let isSkipBridgeSymbol = symbol == "SKIP_BRIDGE" // we process blocks inside "#if !SKIP_BRIDGE", which contain types bridged to Swift
                 let isSymbol = symbol == "SKIP" || symbol == "os(Android)" || preprocessorSymbols.contains(String(symbol))
                 let isTrue = (isSkipBridgeSymbol && isNot) || (isSymbol && !isNot) || (!isSymbol && isNot)
                 hasSymbol = isSkipBridgeSymbol || hasSymbol || isSymbol
