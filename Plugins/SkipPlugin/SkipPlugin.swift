@@ -322,7 +322,7 @@ import PackagePlugin
 
         buildArguments += buildModuleArgs
 
-        Diagnostics.remark("invoke skip \(buildArguments.joined(separator: " "))")
+        //Diagnostics.remark("invoke skip \(buildArguments.joined(separator: " "))")
         return [
             .buildCommand(displayName: "Skip \(target.name)", executable: skipToolPath, arguments: buildArguments,
                 inputFiles: inputFiles,
