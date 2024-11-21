@@ -1221,7 +1221,7 @@ SDKROOT = auto
 SUPPORTED_PLATFORMS = iphoneos iphonesimulator macosx
 SWIFT_EMIT_LOC_STRINGS = YES
 
-SWIFT_VERSION = \(swiftVersion)
+//SWIFT_VERSION = \(swiftVersion)
 
 // Development team ID for on-device testing
 CODE_SIGNING_REQUIRED = NO
