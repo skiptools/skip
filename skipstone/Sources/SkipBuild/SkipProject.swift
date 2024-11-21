@@ -249,6 +249,18 @@ class FrameworkProjectLayout {
 
             if shouldOutputModel {
                 try viewModelCode.write(to: viewModelSourceFile, atomically: false, encoding: .utf8)
+            } else {
+                let moduleSwiftFile = sourceDir.appending(path: "\(moduleName).swift")
+
+                let moduleCode = """
+                \(sourceHeader)import Foundation
+                
+                public class \(moduleName)Module {
+                }
+                
+                """
+
+                try moduleCode.write(to: moduleSwiftFile, atomically: false, encoding: .utf8)
             }
 
             var resourcesAttribute: String = ""
@@ -747,11 +759,11 @@ class FrameworkProjectLayout {
                     var depVersion = modDep.repositoryVersion ?? "1.0.0" // "1.2.3"..<"1.2.6"
                     // special-case skip modules that may not yet be stable by pinning to 0.0.0..<2.0.0
                     if repoName.hasPrefix("skip-") && !["skip", "skip-unit", "skip-lib", "skip-foundation", "skip-model", "skip-ui"].contains(repoName) {
-                        #if DEBUG
-                        depVersion = "main"
-                        #else
+                        //#if DEBUG
+                        //depVersion = "main"
+                        //#else
                         depVersion = "0.0.0\"..<\"2.0.0"
-                        #endif
+                        //#endif
                     }
                     let isRange = depVersion.contains("..")
                     let isSemanticVersion = !depVersion.split(separator: ".").map({ Int($0) }).contains(nil)

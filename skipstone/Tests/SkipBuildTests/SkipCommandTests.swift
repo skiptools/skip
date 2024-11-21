@@ -64,7 +64,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "zero-project",
             defaultLocalization: "en",
-            platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
+            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
             products: [
                 .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
             ],
@@ -112,7 +112,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "tiny-project",
             defaultLocalization: "en",
-            platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
+            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
             products: [
                 .library(name: "TeenyModule", type: .dynamic, targets: ["TeenyModule"]),
             ],
@@ -170,7 +170,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "basic-project",
             defaultLocalization: "en",
-            platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
+            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
             products: [
                 .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
             ],
@@ -237,7 +237,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "free-project",
             defaultLocalization: "en",
-            platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
+            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
             products: [
                 .library(name: "FreeModule", type: .dynamic, targets: ["FreeModule"]),
             ],
@@ -297,15 +297,15 @@ final class SkipCommandTests: XCTestCase {
         ├─ Skip.env
         ├─ Sources
         │  └─ APPNAME
-        │     ├─ APPNAME.swift
         │     ├─ APPNAMEApp.swift
         │     ├─ ContentView.swift
         │     ├─ Resources
         │     │  ├─ Localizable.xcstrings
         │     │  └─ Module.xcassets
         │     │     └─ Contents.json
-        │     └─ Skip
-        │        └─ skip.yml
+        │     ├─ Skip
+        │     │  └─ skip.yml
+        │     └─ ViewModel.swift
         └─ Tests
            └─ APPNAMETests
               ├─ APPNAMETests.swift
@@ -390,15 +390,15 @@ final class SkipCommandTests: XCTestCase {
         ├─ Skip.env
         ├─ Sources
         │  └─ APPNAME
-        │     ├─ APPNAME.swift
         │     ├─ APPNAMEApp.swift
         │     ├─ ContentView.swift
         │     ├─ Resources
         │     │  ├─ Localizable.xcstrings
         │     │  └─ Module.xcassets
         │     │     └─ Contents.json
-        │     └─ Skip
-        │        └─ skip.yml
+        │     ├─ Skip
+        │     │  └─ skip.yml
+        │     └─ ViewModel.swift
         └─ Tests
            └─ APPNAMETests
               ├─ APPNAMETests.swift
@@ -486,15 +486,15 @@ final class SkipCommandTests: XCTestCase {
         ├─ Skip.env
         ├─ Sources
         │  └─ APPNAME
-        │     ├─ APPNAME.swift
         │     ├─ APPNAMEApp.swift
         │     ├─ ContentView.swift
         │     ├─ Resources
         │     │  ├─ Localizable.xcstrings
         │     │  └─ Module.xcassets
         │     │     └─ Contents.json
-        │     └─ Skip
-        │        └─ skip.yml
+        │     ├─ Skip
+        │     │  └─ skip.yml
+        │     └─ ViewModel.swift
         └─ Tests
            └─ APPNAMETests
               ├─ APPNAMETests.swift
@@ -520,6 +520,119 @@ final class SkipCommandTests: XCTestCase {
 
         #endif
     }
+
+    func testLibInitAppNativeCommand() async throws {
+        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: false, native: true, tests: false, fastlane: false, appid: "some.cool.app", moduleNames: "APP_MODULE", "MODEL_MODULE")
+        XCTAssertEqual(projectTree ?? "", """
+        .
+        ├─ Android
+        │  ├─ app
+        │  │  ├─ build.gradle.kts
+        │  │  ├─ proguard-rules.pro
+        │  │  └─ src
+        │  │     └─ main
+        │  │        ├─ AndroidManifest.xml
+        │  │        └─ kotlin
+        │  │           └─ app_
+        │  │              └─ module
+        │  │                 └─ Main.kt
+        │  ├─ gradle
+        │  │  └─ wrapper
+        │  │     └─ gradle-wrapper.properties
+        │  ├─ gradle.properties
+        │  └─ settings.gradle.kts
+        ├─ Darwin
+        │  ├─ APP_MODULE.xcconfig
+        │  ├─ APP_MODULE.xcodeproj
+        │  │  └─ project.pbxproj
+        │  ├─ Assets.xcassets
+        │  │  ├─ AccentColor.colorset
+        │  │  │  └─ Contents.json
+        │  │  ├─ AppIcon.appiconset
+        │  │  │  └─ Contents.json
+        │  │  └─ Contents.json
+        │  ├─ Entitlements.plist
+        │  ├─ Info.plist
+        │  └─ Sources
+        │     └─ APP_MODULEAppMain.swift
+        ├─ Package.swift
+        ├─ README.md
+        ├─ Skip.env
+        └─ Sources
+           ├─ APP_MODULE
+           │  ├─ APP_MODULE.swift
+           │  ├─ APP_MODULEApp.swift
+           │  ├─ ContentView.swift
+           │  ├─ Resources
+           │  │  ├─ Localizable.xcstrings
+           │  │  └─ Module.xcassets
+           │  │     └─ Contents.json
+           │  └─ Skip
+           │     └─ skip.yml
+           └─ MODEL_MODULE
+              ├─ Resources
+              │  └─ Localizable.xcstrings
+              ├─ Skip
+              │  └─ skip.yml
+              └─ ViewModel.swift
+
+        """)
+
+        let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
+        let AndroidManifest = try load("Android/app/src/main/AndroidManifest.xml")
+        XCTAssertTrue(AndroidManifest.contains("android.intent.category.LAUNCHER"))
+
+        let SkipYML = try load("Sources/MODEL_MODULE/Skip/skip.yml")
+        XCTAssertEqual(SkipYML, """
+        # Configuration file for https://skip.tools project
+        #
+        # Kotlin dependencies and Gradle build options for this module can be configured here
+        #build:
+        #  contents:
+        #    - block: 'dependencies'
+        #      contents:
+        #        - 'implementation("androidx.compose.runtime:runtime")'
+
+        # this is a natively-compiled module
+        skip:
+          mode: native
+          bridging: true
+        
+        """)
+
+        let PackageSwift = try load("Package.swift")
+        XCTAssertEqual(PackageSwift, """
+        // swift-tools-version: 5.9
+        // This is a Skip (https://skip.tools) package,
+        // containing a Swift Package Manager project
+        // that will use the Skip build plugin to transpile the
+        // Swift Package, Sources, and Tests into an
+        // Android Gradle Project with Kotlin sources and JUnit tests.
+        import PackageDescription
+
+        let package = Package(
+            name: "cool-app",
+            defaultLocalization: "en",
+            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            products: [
+                .library(name: "APP_MODULEApp", type: .dynamic, targets: ["APP_MODULE"]),
+                .library(name: "MODEL_MODULE", type: .dynamic, targets: ["MODEL_MODULE"]),
+            ],
+            dependencies: [
+                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-ui.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-fuse.git", "0.0.0"..<"2.0.0")
+            ],
+            targets: [
+                .target(name: "APP_MODULE", dependencies: ["MODEL_MODULE", .product(name: "SkipUI", package: "skip-ui")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "MODEL_MODULE", dependencies: [.product(name: "SkipFoundation", package: "skip-foundation"), .product(name: "SkipFuse", package: "skip-fuse")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+            ]
+        )
+        
+        """)
+    }
+
 
     func testLibInitApp3ModuleCommand() async throws {
         let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: true, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "TOP_MODULE", "MIDDLE_MODULE", "BOTTOM_MODULE")
@@ -566,11 +679,11 @@ final class SkipCommandTests: XCTestCase {
         │  │  └─ Skip
         │  │     └─ skip.yml
         │  ├─ MIDDLE_MODULE
-        │  │  ├─ MIDDLE_MODULE.swift
         │  │  ├─ Resources
         │  │  │  └─ Localizable.xcstrings
-        │  │  └─ Skip
-        │  │     └─ skip.yml
+        │  │  ├─ Skip
+        │  │  │  └─ skip.yml
+        │  │  └─ ViewModel.swift
         │  └─ TOP_MODULE
         │     ├─ ContentView.swift
         │     ├─ Resources
@@ -627,7 +740,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "cool-app",
             defaultLocalization: "en",
-            platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
+            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
             products: [
                 .library(name: "TOP_MODULEApp", type: .dynamic, targets: ["TOP_MODULE"]),
                 .library(name: "MIDDLE_MODULE", type: .dynamic, targets: ["MIDDLE_MODULE"]),
@@ -701,11 +814,11 @@ final class SkipCommandTests: XCTestCase {
            │  └─ Skip
            │     └─ skip.yml
            ├─ M2
-           │  ├─ M2.swift
            │  ├─ Resources
            │  │  └─ Localizable.xcstrings
-           │  └─ Skip
-           │     └─ skip.yml
+           │  ├─ Skip
+           │  │  └─ skip.yml
+           │  └─ ViewModel.swift
            ├─ M3
            │  ├─ M3.swift
            │  ├─ Resources
@@ -743,7 +856,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "cool-app",
             defaultLocalization: "en",
-            platforms: [.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)],
+            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
             products: [
                 .library(name: "M1App", type: .dynamic, targets: ["M1"]),
                 .library(name: "M2", type: .dynamic, targets: ["M2"]),
@@ -769,7 +882,7 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
-    func libInitComand(projectName: String, free: Bool? = nil, zero: Bool? = nil, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, resourcePath: String? = "Resources", iconColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
+    func libInitComand(projectName: String, free: Bool? = nil, zero: Bool? = nil, native: Bool? = nil, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, resourcePath: String? = "Resources", iconColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["lib", "init", "-jA", "--no-build", "--no-test", "--show-tree"]
@@ -783,6 +896,12 @@ final class SkipCommandTests: XCTestCase {
             cmd += ["--zero"]
         } else if zero == false {
             cmd += ["--no-zero"]
+        }
+
+        if native == true {
+            cmd += ["--native"]
+        } else if native == false {
+            cmd += ["--no-native"]
         }
 
         if moduleTests == true {
