@@ -20,7 +20,7 @@ struct StatementExtras {
         /// Marker for a file whose purpose is to provide Swift symbols. Symbols files are not transpiled, and warnings are suppressed.
         case symbolFile
         /// Marker for a statement in a `#if SKIP` block.
-        case skipBlock
+        case ifSkipBlock(IfSkipBlockType)
     }
 
     var directives: [Directive]

@@ -747,6 +747,14 @@ struct IdentifierPattern {
     var isVar = false
 }
 
+/// Types of recognize `#if SKIP` blocks.
+enum IfSkipBlockType {
+    /// `#if SKIP`
+    case ifSkip
+    /// `#if !SKIP_BRIDGE`
+    case ifNotSkipBridge
+}
+
 /// A labeled value, as used in function call parameters.
 struct LabeledValue<V> {
     var label: String?

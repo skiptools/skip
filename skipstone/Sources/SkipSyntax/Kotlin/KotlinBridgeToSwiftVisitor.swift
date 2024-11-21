@@ -28,21 +28,25 @@ final class KotlinBridgeToSwiftVisitor {
             if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global {
                 if variableDeclaration.modifiers.visibility >= .public, !variableDeclaration.attributes.isBridgeIgnored {
                     needsGlobalsJavaClass = update(global: variableDeclaration, swiftDefinitions: &swiftDefinitions, globalsClassRef: globalsClassRef) || needsGlobalsJavaClass
+                    checkIfNotSkipBridge(variableDeclaration)
                 }
                 return .skip
             } else if let functionDeclaration = node as? KotlinFunctionDeclaration, functionDeclaration.role == .global {
                 if functionDeclaration.modifiers.visibility >= .public, !functionDeclaration.attributes.isBridgeIgnored {
                     needsGlobalsJavaClass = update(global: functionDeclaration, swiftDefinitions: &swiftDefinitions, globalsClassRef: globalsClassRef) || needsGlobalsJavaClass
+                    checkIfNotSkipBridge(functionDeclaration)
                 }
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
                 if classDeclaration.modifiers.visibility >= .public, !classDeclaration.attributes.isBridgeIgnored {
                     update(classDeclaration, swiftDefinitions: &swiftDefinitions)
+                    checkIfNotSkipBridge(classDeclaration)
                 }
                 return .recurse(nil)
             } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
                 if interfaceDeclaration.modifiers.visibility >= .public, !interfaceDeclaration.attributes.isBridgeIgnored {
                     update(interfaceDeclaration, swiftDefinitions: &swiftDefinitions)
+                    checkIfNotSkipBridge(interfaceDeclaration)
                 }
                 return .recurse(nil)
             } else {
@@ -72,6 +76,13 @@ final class KotlinBridgeToSwiftVisitor {
         }
         let output = KotlinTransformerOutput(file: outputFile, node: outputNode, type: .bridgeToSwift)
         return [output]
+    }
+
+    private func checkIfNotSkipBridge(_ statement: KotlinStatement) {
+        guard !statement.isInIfNotSkipBridgeBlock else {
+            return
+        }
+        statement.messages.append(.kotlinBridgeMissingIfNotSkipBridge(statement, source: syntaxTree.source))
     }
 
     private func update(global variableDeclaration: KotlinVariableDeclaration, swiftDefinitions: inout [SwiftDefinition], globalsClassRef: JavaClassRef) -> Bool {

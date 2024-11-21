@@ -411,8 +411,10 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testTranspiledBridgedTypeVar() async throws {
         try await check(swift: """
+        #if !SKIP_BRIDGE
         public class C {
         }
+        #endif
         """, swiftBridge: """
         public var c = C()
         """, kotlins: ["""
@@ -466,8 +468,10 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testOptionalTranspiledBridgedTypeVar() async throws {
         try await check(swift: """
+        #if !SKIP_BRIDGE
         public class C {
         }
+        #endif
         """, swiftBridge: """
         public var c: C? = C()
         """, kotlins: ["""
@@ -2993,6 +2997,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testObservable() async throws {
         try await check(swiftBridge: """
+        import SkipFuse
         @Observable
         public class C {
             public var i = 1
@@ -3039,6 +3044,7 @@ final class BridgeToKotlinTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
+        import SkipFuse
         extension C: BridgedToKotlin {
             private static let Java_class = try! JClass(name: "C")
             public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
@@ -3070,9 +3076,14 @@ final class BridgeToKotlinTests: XCTestCase {
             let peer_swift: C = Swift_peer.pointee()!
             peer_swift.i = Int(value)
         }
-        """, appendToSource: """
-        import struct SkipBridge.Observation
         """, transformers: transformers)
+
+        try await checkProducesMessage(swift: """
+        @Observable
+        public class C {
+            public var i = 1
+        }
+        """, isSwiftBridge: true, transformers: transformers)
     }
 
     func testKotlinCompatibilityOption() async throws {

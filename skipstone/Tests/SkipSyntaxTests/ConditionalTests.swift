@@ -2006,6 +2006,16 @@ final class ConditionalTests: XCTestCase {
         """)
 
         try await check(swift: """
+        #if !DEBUG
+        doSomething()
+        #else
+        doSomethingElse()
+        #endif
+        """, kotlin: """
+        doSomethingElse()
+        """)
+
+        try await check(swift: """
         #if !SKIP
         doSomething()
         #endif
