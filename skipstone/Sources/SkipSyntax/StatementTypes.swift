@@ -510,12 +510,14 @@ final class IfDefined: Statement {
                 statements.append(Empty(extras: trailingExtras))
             }
         }
-        if match?.isSkipBlock == true {
-            for statement in statements {
-                if statement.extras != nil {
-                    statement.extras?.directives.append(.skipBlock)
-                } else {
-                    statement.extras = StatementExtras(directives: [.skipBlock], leadingTrivia: [], trailingTrivia: [])
+        if let ifSkipBlockTypes = match?.ifSkipBlockTypes {
+            for ifSkipBlockType in ifSkipBlockTypes {
+                for statement in statements {
+                    if statement.extras != nil {
+                        statement.extras?.directives.append(.ifSkipBlock(ifSkipBlockType))
+                    } else {
+                        statement.extras = StatementExtras(directives: [.ifSkipBlock(ifSkipBlockType)], leadingTrivia: [], trailingTrivia: [])
+                    }
                 }
             }
         }
@@ -569,27 +571,29 @@ final class IfDefined: Statement {
         return expression
     }
 
-    private static func extractClause(from syntax: IfConfigDeclSyntax, in syntaxTree: SyntaxTree) -> (clause: IfConfigClauseSyntax, isSkipBlock: Bool, endSyntax: SyntaxProtocol)? {
+    private static func extractClause(from syntax: IfConfigDeclSyntax, in syntaxTree: SyntaxTree) -> (clause: IfConfigClauseSyntax, ifSkipBlockTypes: [IfSkipBlockType], endSyntax: SyntaxProtocol)? {
         // Look for a clause that matches a defined symbol, or an 'else'. Return it along with the pound keyword *after* it,
         // which we use to look for ending statement extras
         var trueClause: IfConfigClauseSyntax? = nil
+        var ifSkipBlockTypes: [IfSkipBlockType] = []
         var hasNotSkipClause = false
-        var isSkipClause = false
         for ifConfigClause in syntax.clauses {
             if let trueClause {
-                return (trueClause, isSkipClause, ifConfigClause.poundKeyword)
+                return (trueClause, ifSkipBlockTypes, ifConfigClause.poundKeyword)
             }
             if ifConfigClause.poundKeyword.text == "#else" {
                 // If we reach an else, all previous clauses must have been false
                 trueClause = ifConfigClause
-                isSkipClause = hasNotSkipClause
+                if hasNotSkipClause {
+                    ifSkipBlockTypes.append(.ifSkip)
+                }
                 continue
             }
 
             let clauseSymbol = ifConfigClause.condition?.description ?? ""
-            let (isSupported, isTrue, isSkip) = processConditions(symbol: clauseSymbol, preprocessorSymbols: syntaxTree.preprocessorSymbols)
-            isSkipClause = isSkip == true
-            hasNotSkipClause = hasNotSkipClause || isSkip == false
+            let (isSupported, isTrue, ifSkipBlocks, negatedIfSkipBlocks) = processConditions(symbol: clauseSymbol, preprocessorSymbols: syntaxTree.preprocessorSymbols)
+            ifSkipBlockTypes = ifSkipBlocks
+            hasNotSkipClause = hasNotSkipClause || negatedIfSkipBlocks.contains(.ifSkip)
 
             if !isSupported && !syntaxTree.isBridgeFile {
                 syntaxTree.root.messages.append(.preprocessorTooComplex(ifConfigClause, source: syntaxTree.source))
@@ -600,17 +604,18 @@ final class IfDefined: Statement {
             }
         }
         if let trueClause {
-            return (trueClause, isSkipClause, syntax.poundEndif)
+            return (trueClause, ifSkipBlockTypes, syntax.poundEndif)
         } else {
             return nil
         }
     }
 
-    private static func processConditions(symbol: String, preprocessorSymbols: Set<String>) -> (isSupported: Bool, isTrue: Bool, isSkip: Bool?) {
+    private static func processConditions(symbol: String, preprocessorSymbols: Set<String>) -> (isSupported: Bool, isTrue: Bool, ifSkipBlocks: [IfSkipBlockType], negatedIfSkipBlocks: [IfSkipBlockType]) {
         let symbols = symbol.split(separator: " ", omittingEmptySubsequences: true)
+        var ifSkipBlocks: [IfSkipBlockType] = []
+        var negatedIfSkipBlocks: [IfSkipBlockType] = []
         var hasTrue: Bool? = nil
         var hasFalse: Bool? = nil
-        var hasSymbol = false
         var hasAnd = false
         var hasOr = false
         var hasParens = false
@@ -630,27 +635,50 @@ final class IfDefined: Statement {
                     hasParens = true
                     symbol = symbol.dropLast()
                 }
-                let isSkipBridgeSymbol = symbol == "SKIP_BRIDGE" // we process blocks inside "#if !SKIP_BRIDGE", which contain types bridged to Swift
-                let isSymbol = symbol == "SKIP" || symbol == "os(Android)" || preprocessorSymbols.contains(String(symbol))
-                let isTrue = (isSkipBridgeSymbol && isNot) || (isSymbol && !isNot) || (!isSymbol && isNot)
-                hasSymbol = isSkipBridgeSymbol || hasSymbol || isSymbol
+                let ifSkipBlockType: IfSkipBlockType?
+                let negated: Bool
+                let isTrue: Bool
+                if symbol == "SKIP" || symbol == "os(Android)" {
+                    ifSkipBlockType = .ifSkip
+                    negated = isNot
+                    isTrue = !isNot
+                } else if symbol == "SKIP_BRIDGE" {
+                    ifSkipBlockType = .ifNotSkipBridge
+                    negated = !isNot
+                    isTrue = isNot
+                } else if preprocessorSymbols.contains(String(symbol)) {
+                    ifSkipBlockType = nil
+                    negated = isNot
+                    isTrue = !isNot
+                } else {
+                    // Unrecognized symbol
+                    ifSkipBlockType = nil
+                    negated = isNot
+                    isTrue = isNot
+                }
+                if let ifSkipBlockType {
+                    if negated {
+                        negatedIfSkipBlocks.append(ifSkipBlockType)
+                    } else {
+                        ifSkipBlocks.append(ifSkipBlockType)
+                    }
+                }
                 hasTrue = hasTrue == true || isTrue
                 hasFalse = hasFalse == true || !isTrue
             }
         }
-        if !hasSymbol {
+        if ifSkipBlocks.isEmpty && negatedIfSkipBlocks.isEmpty {
             // Don't process Skip-less preprocessor directives at all
-            return (true, false, nil)
+            return (true, false, [], [])
         } else if hasParens || (hasAnd && hasOr) {
             // Unsupported
-            return (false, false, nil)
+            return (false, false, [], [])
         } else if hasAnd {
-            return (true, hasFalse != true, nil)
+            return (true, hasFalse != true, ifSkipBlocks, negatedIfSkipBlocks)
         } else if hasOr {
-            return (true, hasTrue == true, nil)
+            return (true, hasTrue == true, [], [])
         } else {
-            let isSkip: Bool? = symbols == ["SKIP"] ? true : symbols == ["!SKIP"] ? false : nil
-            return (true, hasTrue == true, isSkip)
+            return (true, hasTrue == true, ifSkipBlocks, negatedIfSkipBlocks)
         }
     }
 

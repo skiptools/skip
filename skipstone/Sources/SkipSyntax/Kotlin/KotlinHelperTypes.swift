@@ -156,7 +156,7 @@ extension KotlinStatement {
     /// Return supported attributes and add warnings for unsupported attributes.
     func processAttributes(_ attributes: Attributes, from statement: Statement, translator: KotlinTranslator) -> Attributes {
         // Keep Kotlin attributes that devs may use within SKIP blocks
-        guard !statement.isInSkipBlock else {
+        guard !statement.isInIfSkipBlock else {
             return attributes
         }
         let supported: [Attribute] = attributes.attributes.filter { $0.kind != .unknown }

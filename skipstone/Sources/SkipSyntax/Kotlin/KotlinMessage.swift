@@ -50,12 +50,20 @@ extension Message {
         return Message(kind: .warning, message: "Shadowing a SwiftUI Binding parameter with a variable of the same name may produce incorrect Kotlin. Consider using a different variable name", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinBridgeMissingIfNotSkipBridge(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "When bridging API from a transpiled module, place all code within a `#if !SKIP_BRIDGE` condition", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinBridgeMissingInfo(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Skip is missing bridging metadata for this declaration", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinBridgeNeedsTypeDeclaration(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Skip is unable to determine the type of this property for bridging. Add an explicit type to the declaration", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinBridgeObservableMissingImport(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "This bridged @Observable will not be able to power your Android UI unless you 'import SkipFuse'", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinBridgeTypedThrows(_ sourceDerived: SourceDerived, source: Source) -> Message {

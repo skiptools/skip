@@ -577,6 +577,23 @@ extension KotlinInterfaceDeclaration {
     }
 }
 
+extension KotlinSyntaxNode {
+    final var isInIfNotSkipBridgeBlock: Bool {
+        var node: KotlinSyntaxNode? = self
+        while node != nil {
+            if let directives = (node as? KotlinStatement)?.extras?.directives {
+                for directive in directives {
+                    if case .ifSkipBlock(let blockType) = directive, blockType == .ifNotSkipBridge {
+                        return true
+                    }
+                }
+            }
+            node = node?.parent
+        }
+        return false
+    }
+}
+
 extension TypeSignature {
     func callbackClosureType(apiFlags: APIFlags, kotlin: Bool) -> TypeSignature {
         let isThrows = apiFlags.throwsType != .none

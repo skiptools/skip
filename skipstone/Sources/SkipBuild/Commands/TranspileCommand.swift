@@ -848,7 +848,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 await out.yield(message)
             }
 
-            if [.bridgeToSwift, .bridgeToKotlin, .appendToSource].contains(transpilation.outputType) || transpilation.output.file.isBridgeOutputFile {
+            if [.bridgeToSwift, .bridgeToKotlin].contains(transpilation.outputType) || transpilation.output.file.isBridgeOutputFile {
                 //warn("bridge transpilation \(transpilation.outputType): \(transpilation.output.file.name) source: \(transpilation.output.content.count.byteCount)")
                 skipBridgeTranspilations.append(transpilation)
                 return

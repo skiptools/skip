@@ -19,10 +19,14 @@ final class KotlinBridgeToKotlinVisitor {
 
     func visit() -> [KotlinTransformerOutput] {
         var globalFunctionCount = 0
-        var hasBridgedObservables = false
+        var bridgedObservables: [KotlinStatement] = []
+        var hasSkipFuseImport = false
         var nonKotlinImports: [KotlinStatement] = []
         syntaxTree.root.visit { node in
             if let importDeclaration = node as? KotlinImportDeclaration {
+                if importDeclaration.unmappedModulePath.first == "SkipFuse" {
+                    hasSkipFuseImport = true
+                }
                 // Filter compiled-only imports from the transpiled output
                 if !isKotlinImport(importDeclaration) {
                     nonKotlinImports.append(importDeclaration)
@@ -37,7 +41,9 @@ final class KotlinBridgeToKotlinVisitor {
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
                 if updateClassDeclaration(classDeclaration) {
-                    hasBridgedObservables = hasBridgedObservables || classDeclaration.attributes.contains(.observable)
+                    if classDeclaration.attributes.contains(.observable) {
+                        bridgedObservables.append(classDeclaration)
+                    }
                 }
                 return .recurse(nil)
             } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
@@ -53,12 +59,15 @@ final class KotlinBridgeToKotlinVisitor {
         }
         nonKotlinImports.forEach { syntaxTree.root.remove(statement: $0) }
 
+        if !hasSkipFuseImport {
+            for statement in bridgedObservables {
+                statement.messages.append(.kotlinBridgeObservableMissingImport(statement, source: syntaxTree.source))
+            }
+        }
+
         var outputs: [KotlinTransformerOutput] = []
         if let bridgeOutput = bridgeOutput() {
             outputs.append(bridgeOutput)
-        }
-        if hasBridgedObservables {
-            outputs.append(importObservationOutput())
         }
         return outputs
     }
@@ -84,11 +93,6 @@ final class KotlinBridgeToKotlinVisitor {
             cdeclFunctions.forEach { $0.append(to: output, indentation: indentation) }
         }
         return KotlinTransformerOutput(file: outputFile, node: outputNode, type: .bridgeToKotlin)
-    }
-
-    private func importObservationOutput() -> KotlinTransformerOutput {
-        let outputNode = SwiftDefinition(swift: ["import struct SkipBridge.Observation"])
-        return KotlinTransformerOutput(file: syntaxTree.source.file, node: outputNode, type: .appendToSource)
     }
 
     private func isKotlinImport(_ importDeclaration: KotlinImportDeclaration) -> Bool {
