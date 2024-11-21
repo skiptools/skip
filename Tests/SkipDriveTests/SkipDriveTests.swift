@@ -165,14 +165,14 @@ class SkipCommandTests : XCTestCase {
         ├─ Sources
         │  └─ HelloSkip
         │     ├─ ContentView.swift
-        │     ├─ HelloSkip.swift
         │     ├─ HelloSkipApp.swift
         │     ├─ Resources
         │     │  ├─ Localizable.xcstrings
         │     │  └─ Module.xcassets
         │     │     └─ Contents.json
-        │     └─ Skip
-        │        └─ skip.yml
+        │     ├─ Skip
+        │     │  └─ skip.yml
+        │     └─ ViewModel.swift
         └─ Tests
            └─ HelloSkipTests
               ├─ HelloSkipTests.swift
