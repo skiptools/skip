@@ -117,6 +117,8 @@ class FrameworkProjectLayout {
             let isAppModule = app == true && moduleIndex == modules.startIndex
             // the model module is the second in the chain
             let isModelModule = app == true && moduleIndex == modules.startIndex + 1
+            // we output the model when it is the second module, or when there is only a single top-level app module
+            let shouldOutputModel = isModelModule || (app == true && modules.count == 1)
             // this is the final module in the chain, which will add a dependency on SkipFoundation
             let isFinalModule = moduleIndex == modules.endIndex - 1
 
@@ -147,7 +149,7 @@ class FrameworkProjectLayout {
                 
                 # this is a natively-compiled module
                 skip:
-                  mode: swift
+                  mode: native
                   bridging: true
 
                 """
@@ -162,46 +164,92 @@ class FrameworkProjectLayout {
 
             try (isAppModule ? skipYamlApp : skipYamlModule).write(to: sourceSkipYamlFile, atomically: false, encoding: .utf8)
 
-            let sourceSwiftFile = sourceDir.appending(path: "\(moduleName).swift")
-
-            var moduleCode = sourceHeader
-
-            if native && isModelModule {
-                moduleCode += """
-                import Foundation
-                import Observation
-                #if canImport(SkipAndroidBridge)
-                import SkipAndroidBridge
-                #endif
-                #if canImport(OSLog)
-                import OSLog
-                #endif
-
-                fileprivate let logger: Logger = Logger(subsystem: "\(moduleName)", category: "\(moduleName)")
-                
-                @Observable public class ViewModel {
-                    public var name = "Skipper"
-                
-                    public init() {
-                    }
-                
-                    public func flipName() {
-                        name = String(name.reversed())
-                        logger.info("called flipName: \\(self.name)")
-                    }
+            let viewModelSourceFile = sourceDir.appending(path: "ViewModel.swift")
+            let viewModelCode = """
+            \(sourceHeader)import Foundation
+            import Observation
+            #if canImport(OSLog)
+            import OSLog
+            #endif
+            #if canImport(\(native ? "SkipFuse" : "SkipModel"))
+            import \(native ? "SkipFuse" : "SkipModel")
+            #endif
+            
+            fileprivate let logger: Logger = Logger(subsystem: "\(moduleName)", category: "\(moduleName)")
+            
+            /// An individual item held by the ViewModel
+            public struct Item : Identifiable, Hashable, Codable {
+                public let id: UUID
+                public var date: Date
+                public var title: String?
+                public var notes: String?
+            
+                public init(id: UUID = UUID(), date: Date = .now, title: String? = nil, notes: String? = nil) {
+                    self.id = id
+                    self.date = date
+                    self.title = title
+                    self.notes = notes
                 }
-                
-                """
-            } else {
-                moduleCode += """
-
-                public class \(moduleName)Module {
+            
+                public var linkTitle: String {
+                    title ?? date.formatted()
                 }
-                
-                """
             }
+            
+            /// The Observable ViewModel used by the application.
+            @Observable public class ViewModel {
+                public var name = "Skipper"
+                public var items: [Item] = loadItems() {
+                    didSet { saveItems() }
+                }
+            
+                public init() {
+                }
+            
+                public func shuffle() {
+                    items.shuffle()
+                }
+            }
+            
+            /// Utilities for defaulting and persising the items in the list
+            extension ViewModel {
+                private static let savePath = URL.applicationSupportDirectory.appendingPathComponent("appdata.json")
+            
+                fileprivate static func loadItems() -> [Item] {
+                    do {
+                        let start = Date.now
+                        let data = try Data(contentsOf: savePath)
+                        defer {
+                            let end = Date.now
+                            logger.info("loaded \\(data.count) bytes from \\(Self.savePath.path) in \\(end.timeIntervalSince(start)) seconds")
+                        }
+                        return try JSONDecoder().decode([Item].self, from: data)
+                    } catch {
+                        // perhaps the first launch, or the data was corrupted
+                        logger.warning("failed to load data from \\(Self.savePath), using defaultItems: \\(error)")
+                        let defaultItems = (0...100).map { Date(timeIntervalSinceReferenceDate: Double($0 + (365 * 24)) * 60 * 60 * 24) }
+                        return defaultItems.map({ Item(date: $0) })
+                    }
+                }
+            
+                fileprivate func saveItems() {
+                    do {
+                        let start = Date.now
+                        let data = try JSONEncoder().encode(items)
+                        try data.write(to: Self.savePath)
+                        let end = Date.now
+                        logger.info("saved \\(data.count) bytes to \\(Self.savePath.path) in \\(end.timeIntervalSince(start)) seconds")
+                    } catch {
+                        logger.error("error saving data: \\(error)")
+                    }
+                }
+            }
+            
+            """
 
-            try moduleCode.write(to: sourceSwiftFile, atomically: false, encoding: .utf8)
+            if shouldOutputModel {
+                try viewModelCode.write(to: viewModelSourceFile, atomically: false, encoding: .utf8)
+            }
 
             var resourcesAttribute: String = ""
             if let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
@@ -684,9 +732,10 @@ class FrameworkProjectLayout {
 
                 // in addition to a top-level dependency on SkipUI and a bottom-level dependency on SkipFoundation, a secondary module will also have a dependency on SkipModel for observability
                 if isModelModule {
-                    modDeps.append(PackageModule(repositoryName: "skip-model", moduleName: "SkipModel"))
                     if native {
-                        modDeps.append(PackageModule(repositoryName: "skip-android-bridge", moduleName: "SkipAndroidBridgeKt"))
+                        modDeps.append(PackageModule(repositoryName: "skip-fuse", moduleName: "SkipFuse"))
+                    } else {
+                        modDeps.append(PackageModule(repositoryName: "skip-model", moduleName: "SkipModel"))
                     }
                 }
             }
@@ -769,17 +818,12 @@ class FrameworkProjectLayout {
 
         let dependencies = "    dependencies: [\n        " + packageDependencies.joined(separator: ",\n        ") + "\n    ]"
 
-        // native projects use @Observable, which is only available in iOS 17+/macOS 14+
-        let platforms = !native
-            ? "[.iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9), .macCatalyst(.v16)]"
-            : "[.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)]"
-
         let packageSource = """
         \(packageHeader)
         let package = Package(
             name: "\(projectName)",
             defaultLocalization: "en",
-            platforms: \(platforms),
+            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
         \(products),
         \(dependencies),
         \(targets)
@@ -1021,8 +1065,8 @@ class AppProjectLayout : FrameworkProjectLayout {
 
         let projectURL = try createSkipLibrary(projectName: projectName, productName: productName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: appid != nil, native: native, moduleTests: moduleTests, packageResolved: packageResolvedURL)
 
-        // the second module is the native module
-        let nativeModule = !native ? nil : modules.dropFirst().first
+        // the second module should always be imported
+        let secondModule = modules.dropFirst().first
 
         let projectPath = try projectURL.absolutePath
 
@@ -1112,9 +1156,9 @@ ANDROID_PACKAGE_NAME = \(appModulePackage)
         let skipEnvBaseName = "Skip.env"
         let skipEnvFileName = "../\(skipEnvBaseName)"
 
-        let iOSMinVersion = !native ? "16.0" : "17.0"
-        let macOSMinVersion = !native ? "13.0" : "14.0"
-        let swiftVersion = !native ? "5.0" : "6.0"
+        let iOSMinVersion = "17.0"
+        let macOSMinVersion = "14.0"
+        let swiftVersion = "6.0"
 
         // create the top-level ModuleName.xcconfig which is the source or truth for the iOS and Android builds
         let configContents = """
@@ -1509,7 +1553,7 @@ New features and better performance.
 import OSLog
 import SwiftUI
 
-let logger: Logger = Logger(subsystem: "\(appid)", category: "\(primaryModuleName)")
+fileprivate let logger: Logger = Logger(subsystem: "\(appid)", category: "\(primaryModuleName)")
 
 /// The Android SDK number we are running against, or `nil` if not running on Android
 let androidSDK = ProcessInfo.processInfo.environment["android.os.Build.VERSION.SDK_INT"].flatMap({ Int($0) })
@@ -1554,18 +1598,15 @@ public extension \(primaryModuleAppTarget) {
         try FileManager.default.createDirectory(at: appModuleApplicationStubFileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try appExtContents.write(to: appModuleApplicationStubFileURL, atomically: false, encoding: .utf8)
 
-        // when we are using a native module, then we will generate a ViewModel with a @name parameter, otherwise we use @AppStorage
-        let nativeImport = nativeModule.flatMap({ "\nimport \($0.moduleName)" }) ?? ""
-        let nameState = native ? "@State var viewModel = ViewModel()" : "@AppStorage(\"name\") var name = \"Skipper\""
-        let nameVar = native ? "viewModel.name" : "name"
+        let secondImport = secondModule.flatMap({ "\nimport \($0.moduleName)" }) ?? ""
 
         // Sources/Playground/PlaygroundApp.swift
         let contentViewContents = """
-\(sourceHeader)import SwiftUI\(nativeImport)
+\(sourceHeader)import SwiftUI\(secondImport)
 
 public struct ContentView: View {
     @AppStorage("tab") var tab = Tab.welcome
-    \(nameState)
+    @State var viewModel = ViewModel()
     @State var appearance = ""
     @State var isBeating = false
 
@@ -1575,7 +1616,7 @@ public struct ContentView: View {
     public var body: some View {
         TabView(selection: $tab) {
             VStack(spacing: 0) {
-                Text("Hello [\\(\(nameVar))](https://skip.tools)!")
+                Text("Hello [\\(viewModel.name)](https://skip.tools)!")
                     .padding()
                 Image(systemName: "heart.fill")
                     .foregroundStyle(.red)
@@ -1589,15 +1630,21 @@ public struct ContentView: View {
 
             NavigationStack {
                 List {
-                    ForEach(1..<1_000) { i in
-                        NavigationLink("Item \\(i)", value: i)
+                    ForEach(viewModel.items) { item in
+                        NavigationLink(item.linkTitle, value: item)
+                    }
+                    .onDelete { offsets in
+                        viewModel.items.remove(atOffsets: offsets)
+                    }
+                    .onMove { fromOffsets, toOffset in
+                        viewModel.items.move(fromOffsets: fromOffsets, toOffset: toOffset)
                     }
                 }
-                .navigationTitle("Home")
-                .navigationDestination(for: Int.self) { i in
-                    Text("Item \\(i)")
+                .navigationTitle(Text("Items: \\(viewModel.items.count)"))
+                .navigationDestination(for: Item.self) { i in
+                    Text("Item \\(i.linkTitle)")
                         .font(.title)
-                        .navigationTitle("Screen \\(i)")
+                        .navigationTitle("Item: \\(i.linkTitle)")
                 }
             }
             .tabItem { Label("Home", systemImage: "house.fill") }
@@ -1605,7 +1652,7 @@ public struct ContentView: View {
 
             NavigationStack {
                 Form {
-                    TextField("Name", text: $\(nameVar))
+                    TextField("Name", text: $viewModel.name)
                     Picker("Appearance", selection: $appearance) {
                         Text("System").tag("")
                         Text("Light").tag("light")
@@ -2222,7 +2269,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 
         let sourceMainKotlinPackage = appProject.androidAppSrcMainKotlin.appendingPathComponent(appModulePackage.split(separator: ".").joined(separator: "/"), isDirectory: true)
         let sourceMainKotlinSourceFile = sourceMainKotlinPackage.appendingPathComponent("Main.kt")
-        try createKotlinMain(appModulePackage: appModulePackage, appModuleName: appModuleName, nativeLibrary: nativeModule?.moduleName).write(to: sourceMainKotlinSourceFile.createParentDirectory(), atomically: false, encoding: .utf8)
+        try createKotlinMain(appModulePackage: appModulePackage, appModuleName: appModuleName, nativeLibrary: secondModule?.moduleName).write(to: sourceMainKotlinSourceFile.createParentDirectory(), atomically: false, encoding: .utf8)
 
         // create the .gitignore file; https://github.com/orgs/skiptools/discussions/208#discussioncomment-10505250
         let gitignore = """
