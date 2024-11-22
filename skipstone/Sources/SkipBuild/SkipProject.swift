@@ -32,7 +32,7 @@ class FrameworkProjectLayout {
     }
 
 
-    static func createSkipLibrary(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, native: Bool, moduleTests: Bool, packageResolved packageResolvedURL: URL?) throws -> URL {
+    static func createSkipLibrary(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, native: Bool, moduleTests createModuleTests: Bool, packageResolved packageResolvedURL: URL?) throws -> URL {
         var isDir: Foundation.ObjCBool = false
         if !FileManager.default.fileExists(atPath: outputFolder.path, isDirectory: &isDir) {
             throw InitError(errorDescription: "Specified output folder does not exist: \(outputFolder)")
@@ -127,42 +127,48 @@ class FrameworkProjectLayout {
             let nextModuleName = nextModule?.moduleName
 
             let sourceDir = try sourcesURL.append(path: moduleName, create: true)
-            let sourceSkipDir = try sourceDir.append(path: "Skip", create: true)
 
-            let sourceSkipYamlFile = sourceSkipDir.appending(path: "skip.yml")
+            // modules that are dependent on the native module do not run the skipstone plugin or have resources
+            let isDependentNativeModule = native && moduleIndex > 1
 
-            let skipYamlGeneric = """
-            # Configuration file for https://skip.tools project
-            #
-            # Kotlin dependencies and Gradle build options for this module can be configured here
-            #build:
-            #  contents:
-            #    - block: 'dependencies'
-            #      contents:
-            #        - 'implementation("androidx.compose.runtime:runtime")'
+            if !isDependentNativeModule {
+                let sourceSkipDir = try sourceDir.append(path: "Skip", create: true)
 
-            """
+                let sourceSkipYamlFile = sourceSkipDir.appending(path: "skip.yml")
 
-            var skipYamlModule = skipYamlGeneric
-            if native && isModelModule {
-                skipYamlModule += """
-                
-                # this is a natively-compiled module
-                skip:
-                  mode: native
-                  bridging: true
+                let skipYamlGeneric = """
+                # Configuration file for https://skip.tools project
+                #
+                # Kotlin dependencies and Gradle build options for this module can be configured here
+                #build:
+                #  contents:
+                #    - block: 'dependencies'
+                #      contents:
+                #        - 'implementation("androidx.compose.runtime:runtime")'
 
                 """
+
+                var skipYamlModule = skipYamlGeneric
+                if native && isModelModule {
+                    skipYamlModule += """
+                    
+                    # this is a natively-compiled module
+                    skip:
+                      mode: native
+                      bridging: true
+
+                    """
+                }
+
+                let skipYamlApp = """
+                # Configuration file for https://skip.tools project
+                build:
+                  contents:
+
+                """
+
+                try (isAppModule ? skipYamlApp : skipYamlModule).write(to: sourceSkipYamlFile, atomically: false, encoding: .utf8)
             }
-
-            let skipYamlApp = """
-            # Configuration file for https://skip.tools project
-            build:
-              contents:
-
-            """
-
-            try (isAppModule ? skipYamlApp : skipYamlModule).write(to: sourceSkipYamlFile, atomically: false, encoding: .utf8)
 
             let viewModelSourceFile = sourceDir.appending(path: "ViewModel.swift")
             let viewModelCode = """
@@ -279,7 +285,7 @@ class FrameworkProjectLayout {
             }
 
             var resourcesAttribute: String = ""
-            if let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
+            if !isDependentNativeModule, let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
                 let sourceResourcesDir = try sourceDir.append(path: resourceFolder, create: true)
                 let sourceResourcesFile = sourceResourcesDir.appending(path: "Localizable.xcstrings")
                 try """
@@ -629,6 +635,9 @@ class FrameworkProjectLayout {
             }
 
 
+            // only create tests if we have specified to do so, and we are not a dependent native module
+            let moduleTests = createModuleTests && !isDependentNativeModule
+
             if moduleTests {
                 let testsURL = try projectFolderURL.append(path: "Tests", create: true)
                 let testDir = try testsURL.append(path: moduleName + "Tests", create: true)
@@ -752,7 +761,7 @@ class FrameworkProjectLayout {
                 // add implicit dependency on SkipUI (for app target), SkipModel, and SkipFoundation, based in their position in the chain
                 if isAppModule {
                     modDeps.append(PackageModule(repositoryName: "skip-ui", moduleName: "SkipUI"))
-                } else if isFinalModule || chain == false {
+                } else if (isFinalModule || chain == false) && !isDependentNativeModule {
                     // only add SkipFoundation to the innermost module, or else
                     modDeps.append(PackageModule(repositoryName: "skip-foundation", moduleName: "SkipFoundation"))
                 }
@@ -805,21 +814,23 @@ class FrameworkProjectLayout {
             }
 
             // if we are using the SKIP_ZERO conditional, then split up the dependencies and only include the skip dependencies conditionally
-            let bracket = { "[" + $0 + "]" }
-            let interModuleDep = moduleDeps.joined(separator: ", ")
-            let skipModuleDep = skipModuleDeps.joined(separator: ", ")
+            let bracket = { $0.isEmpty ? "[]" : "[\n            " + $0 + "\n        ]" }
+            let interModuleDep = moduleDeps.joined(separator: ",\n            ")
+            let skipModuleDep = skipModuleDeps.joined(separator: ",\n            ")
             let zeroSkipModuleCondition = skipZeroSupport && !skipModuleDeps.isEmpty ? "(zero ? [] : " + bracket(skipModuleDep) + ")" : bracket(skipModuleDep)
 
             let moduleDep = !interModuleDep.isEmpty && !skipModuleDep.isEmpty
                 ? (!skipZeroSupport
-                   ? bracket(interModuleDep + ", " + skipModuleDep)
+                   ? bracket(interModuleDep + ",\n            " + skipModuleDep)
                    : bracket(interModuleDep) + " + " + zeroSkipModuleCondition)
                 : !skipModuleDep.isEmpty 
                     ? (skipZeroSupport ? zeroSkipModuleCondition : bracket(skipModuleDep))
                 : bracket(interModuleDep)
 
+            let pluginSuffix = isDependentNativeModule ? "" : ", plugins: \(skipPluginArray)"
+
             targets += """
-                    .target(name: "\(moduleName)", dependencies: \(moduleDep)\(resourcesAttribute), plugins: \(skipPluginArray)),
+                    .target(name: "\(moduleName)", dependencies: \(moduleDep)\(resourcesAttribute)\(pluginSuffix)),
 
             """
 
@@ -827,10 +838,11 @@ class FrameworkProjectLayout {
                 let skipTestProduct = #".product(name: "SkipTest", package: "skip")"#
                 let skipTestDependency = skipZeroSupport
                     ? "] + (zero ? [] : [\(skipTestProduct)])"
-                    : ", \(skipTestProduct)]"
+                    : ",\n            \(skipTestProduct)\n        ]"
 
                 targets += """
-                        .testTarget(name: "\(moduleName)Tests", dependencies: ["\(moduleName)"\(skipTestDependency)\(resourcesAttribute), plugins: \(skipPluginArray)),
+                        .testTarget(name: "\(moduleName)Tests", dependencies: [
+                            "\(moduleName)"\(skipTestDependency)\(resourcesAttribute), plugins: \(skipPluginArray)),
 
                 """
             }

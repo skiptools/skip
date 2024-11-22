@@ -73,8 +73,11 @@ final class SkipCommandTests: XCTestCase {
                 .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
-                .target(name: "SomeModule", dependencies: (zero ? [] : [.product(name: "SkipFoundation", package: "skip-foundation")]), resources: [.process("Resources")], plugins: skipstone),
-                .testTarget(name: "SomeModuleTests", dependencies: ["SomeModule"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
+                .target(name: "SomeModule", dependencies: (zero ? [] : [
+                    .product(name: "SkipFoundation", package: "skip-foundation")
+                ]), resources: [.process("Resources")], plugins: skipstone),
+                .testTarget(name: "SomeModuleTests", dependencies: [
+                    "SomeModule"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
             ]
         )
 
@@ -121,7 +124,9 @@ final class SkipCommandTests: XCTestCase {
                 .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
-                .target(name: "TeenyModule", dependencies: [.product(name: "SkipFoundation", package: "skip-foundation")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "TeenyModule", dependencies: [
+                    .product(name: "SkipFoundation", package: "skip-foundation")
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
 
@@ -179,8 +184,13 @@ final class SkipCommandTests: XCTestCase {
                 .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
-                .target(name: "SomeModule", dependencies: [.product(name: "SkipFoundation", package: "skip-foundation")], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .testTarget(name: "SomeModuleTests", dependencies: ["SomeModule", .product(name: "SkipTest", package: "skip")], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "SomeModule", dependencies: [
+                    .product(name: "SkipFoundation", package: "skip-foundation")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .testTarget(name: "SomeModuleTests", dependencies: [
+                    "SomeModule",
+                    .product(name: "SkipTest", package: "skip")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
 
@@ -246,8 +256,13 @@ final class SkipCommandTests: XCTestCase {
                 .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
-                .target(name: "FreeModule", dependencies: [.product(name: "SkipFoundation", package: "skip-foundation")], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .testTarget(name: "FreeModuleTests", dependencies: ["FreeModule", .product(name: "SkipTest", package: "skip")], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "FreeModule", dependencies: [
+                    .product(name: "SkipFoundation", package: "skip-foundation")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .testTarget(name: "FreeModuleTests", dependencies: [
+                    "FreeModule",
+                    .product(name: "SkipTest", package: "skip")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
 
@@ -624,8 +639,14 @@ final class SkipCommandTests: XCTestCase {
                 .package(url: "https://source.skip.tools/skip-fuse.git", "0.0.0"..<"2.0.0")
             ],
             targets: [
-                .target(name: "APP_MODULE", dependencies: ["MODEL_MODULE", .product(name: "SkipUI", package: "skip-ui")], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .target(name: "MODEL_MODULE", dependencies: [.product(name: "SkipFoundation", package: "skip-foundation"), .product(name: "SkipFuse", package: "skip-fuse")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "APP_MODULE", dependencies: [
+                    "MODEL_MODULE",
+                    .product(name: "SkipUI", package: "skip-ui")
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "MODEL_MODULE", dependencies: [
+                    .product(name: "SkipFoundation", package: "skip-foundation"),
+                    .product(name: "SkipFuse", package: "skip-fuse")
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
         
@@ -751,12 +772,25 @@ final class SkipCommandTests: XCTestCase {
                 .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
-                .target(name: "TOP_MODULE", dependencies: ["MIDDLE_MODULE"] + (zero ? [] : [.product(name: "SkipUI", package: "skip-ui")]), resources: [.process("Resources")], plugins: skipstone),
-                .testTarget(name: "TOP_MODULETests", dependencies: ["TOP_MODULE"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
-                .target(name: "MIDDLE_MODULE", dependencies: ["BOTTOM_MODULE"] + (zero ? [] : [.product(name: "SkipModel", package: "skip-model")]), resources: [.process("Resources")], plugins: skipstone),
-                .testTarget(name: "MIDDLE_MODULETests", dependencies: ["MIDDLE_MODULE"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
-                .target(name: "BOTTOM_MODULE", dependencies: (zero ? [] : [.product(name: "SkipFoundation", package: "skip-foundation")]), resources: [.process("Resources")], plugins: skipstone),
-                .testTarget(name: "BOTTOM_MODULETests", dependencies: ["BOTTOM_MODULE"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
+                .target(name: "TOP_MODULE", dependencies: [
+                    "MIDDLE_MODULE"
+                ] + (zero ? [] : [
+                    .product(name: "SkipUI", package: "skip-ui")
+                ]), resources: [.process("Resources")], plugins: skipstone),
+                .testTarget(name: "TOP_MODULETests", dependencies: [
+                    "TOP_MODULE"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
+                .target(name: "MIDDLE_MODULE", dependencies: [
+                    "BOTTOM_MODULE"
+                ] + (zero ? [] : [
+                    .product(name: "SkipModel", package: "skip-model")
+                ]), resources: [.process("Resources")], plugins: skipstone),
+                .testTarget(name: "MIDDLE_MODULETests", dependencies: [
+                    "MIDDLE_MODULE"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
+                .target(name: "BOTTOM_MODULE", dependencies: (zero ? [] : [
+                    .product(name: "SkipFoundation", package: "skip-foundation")
+                ]), resources: [.process("Resources")], plugins: skipstone),
+                .testTarget(name: "BOTTOM_MODULETests", dependencies: [
+                    "BOTTOM_MODULE"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
             ]
         )
 
@@ -868,11 +902,159 @@ final class SkipCommandTests: XCTestCase {
                 .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
-                .target(name: "M1", dependencies: ["M2", .product(name: "SkipUI", package: "skip-ui")], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .target(name: "M2", dependencies: ["M3", .product(name: "SkipModel", package: "skip-model")], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .target(name: "M3", dependencies: ["M4"], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .target(name: "M4", dependencies: ["M5"], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .target(name: "M5", dependencies: [.product(name: "SkipFoundation", package: "skip-foundation")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "M1", dependencies: [
+                    "M2",
+                    .product(name: "SkipUI", package: "skip-ui")
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "M2", dependencies: [
+                    "M3",
+                    .product(name: "SkipModel", package: "skip-model")
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "M3", dependencies: [
+                    "M4"
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "M4", dependencies: [
+                    "M5"
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "M5", dependencies: [
+                    .product(name: "SkipFoundation", package: "skip-foundation")
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+            ]
+        )
+
+        """)
+    }
+
+    func testLibInitApp5NativeoduleCommand() async throws {
+        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: false, native: true, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "M1", "M2", "M3", "M4", "M5")
+        XCTAssertEqual(projectTree ?? "", """
+        .
+        ├─ Android
+        │  ├─ app
+        │  │  ├─ build.gradle.kts
+        │  │  ├─ proguard-rules.pro
+        │  │  └─ src
+        │  │     └─ main
+        │  │        ├─ AndroidManifest.xml
+        │  │        └─ kotlin
+        │  │           └─ m1
+        │  │              └─ module
+        │  │                 └─ Main.kt
+        │  ├─ gradle
+        │  │  └─ wrapper
+        │  │     └─ gradle-wrapper.properties
+        │  ├─ gradle.properties
+        │  └─ settings.gradle.kts
+        ├─ Darwin
+        │  ├─ Assets.xcassets
+        │  │  ├─ AccentColor.colorset
+        │  │  │  └─ Contents.json
+        │  │  ├─ AppIcon.appiconset
+        │  │  │  └─ Contents.json
+        │  │  └─ Contents.json
+        │  ├─ Entitlements.plist
+        │  ├─ Info.plist
+        │  ├─ M1.xcconfig
+        │  ├─ M1.xcodeproj
+        │  │  └─ project.pbxproj
+        │  └─ Sources
+        │     └─ M1AppMain.swift
+        ├─ Package.swift
+        ├─ README.md
+        ├─ Skip.env
+        ├─ Sources
+        │  ├─ M1
+        │  │  ├─ ContentView.swift
+        │  │  ├─ M1App.swift
+        │  │  ├─ Resources
+        │  │  │  ├─ Localizable.xcstrings
+        │  │  │  └─ Module.xcassets
+        │  │  │     └─ Contents.json
+        │  │  └─ Skip
+        │  │     └─ skip.yml
+        │  ├─ M2
+        │  │  ├─ Resources
+        │  │  │  └─ Localizable.xcstrings
+        │  │  ├─ Skip
+        │  │  │  └─ skip.yml
+        │  │  └─ ViewModel.swift
+        │  ├─ M3
+        │  │  └─ M3.swift
+        │  ├─ M4
+        │  │  └─ M4.swift
+        │  └─ M5
+        │     └─ M5.swift
+        └─ Tests
+           ├─ M1Tests
+           │  ├─ M1Tests.swift
+           │  ├─ Resources
+           │  │  └─ TestData.json
+           │  ├─ Skip
+           │  │  └─ skip.yml
+           │  └─ XCSkipTests.swift
+           └─ M2Tests
+              ├─ M2Tests.swift
+              ├─ Resources
+              │  └─ TestData.json
+              ├─ Skip
+              │  └─ skip.yml
+              └─ XCSkipTests.swift
+
+        """)
+
+        let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
+        let AndroidManifest = try load("Android/app/src/main/AndroidManifest.xml")
+        XCTAssertTrue(AndroidManifest.contains("android.intent.category.LAUNCHER"))
+        let PackageSwift = try load("Package.swift")
+        XCTAssertEqual(PackageSwift, """
+        // swift-tools-version: 5.9
+        // This is a Skip (https://skip.tools) package,
+        // containing a Swift Package Manager project
+        // that will use the Skip build plugin to transpile the
+        // Swift Package, Sources, and Tests into an
+        // Android Gradle Project with Kotlin sources and JUnit tests.
+        import PackageDescription
+
+        let package = Package(
+            name: "cool-app",
+            defaultLocalization: "en",
+            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            products: [
+                .library(name: "M1App", type: .dynamic, targets: ["M1"]),
+                .library(name: "M2", type: .dynamic, targets: ["M2"]),
+                .library(name: "M3", type: .dynamic, targets: ["M3"]),
+                .library(name: "M4", type: .dynamic, targets: ["M4"]),
+                .library(name: "M5", type: .dynamic, targets: ["M5"]),
+            ],
+            dependencies: [
+                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-ui.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-fuse.git", "0.0.0"..<"2.0.0")
+            ],
+            targets: [
+                .target(name: "M1", dependencies: [
+                    "M2",
+                    .product(name: "SkipUI", package: "skip-ui")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .testTarget(name: "M1Tests", dependencies: [
+                    "M1",
+                    .product(name: "SkipTest", package: "skip")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "M2", dependencies: [
+                    "M3",
+                    .product(name: "SkipFuse", package: "skip-fuse")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .testTarget(name: "M2Tests", dependencies: [
+                    "M2",
+                    .product(name: "SkipTest", package: "skip")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "M3", dependencies: [
+                    "M4"
+                ]),
+                .target(name: "M4", dependencies: [
+                    "M5"
+                ]),
+                .target(name: "M5", dependencies: []),
             ]
         )
 
