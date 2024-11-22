@@ -295,15 +295,15 @@ extension ToolOptionsCommand {
             }
             
             // add all the additional environment settings to the dictionary
-            var env = environment
+            var env = ProcessEnvironmentBlock(environment)
             for (key, value) in additionalEnvironment {
-                env[key] = value
+                env[ProcessEnvironmentKey(key)] = value
             }
 
             // Process has a constructor with a non-optional working dirctory, and another constructor without one, but no constructor that acceps an optional, so we have to create it in one of two separate paths
             let process = workingDirectory != nil
-                ? Process(arguments: args, environment: env, workingDirectory: try workingDirectory!.absolutePath, outputRedirection: .stream(stdout: addBuffer(err: false), stderr: addBuffer(err: true)), loggingHandler: nil)
-                : Process(arguments: args, environment: env, outputRedirection: .stream(stdout: addBuffer(err: false), stderr: addBuffer(err: true)), loggingHandler: nil)
+                ? Process(arguments: args, environmentBlock: env, workingDirectory: try workingDirectory!.absolutePath, outputRedirection: .stream(stdout: addBuffer(err: false), stderr: addBuffer(err: true)), loggingHandler: nil)
+                : Process(arguments: args, environmentBlock: env, outputRedirection: .stream(stdout: addBuffer(err: false), stderr: addBuffer(err: true)), loggingHandler: nil)
 
 
             try process.launch()

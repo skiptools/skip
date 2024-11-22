@@ -560,7 +560,6 @@ final class SkipCommandTests: XCTestCase {
         ├─ Skip.env
         └─ Sources
            ├─ APP_MODULE
-           │  ├─ APP_MODULE.swift
            │  ├─ APP_MODULEApp.swift
            │  ├─ ContentView.swift
            │  ├─ Resources
@@ -692,7 +691,6 @@ final class SkipCommandTests: XCTestCase {
         │     │     └─ Contents.json
         │     ├─ Skip
         │     │  └─ skip.yml
-        │     ├─ TOP_MODULE.swift
         │     └─ TOP_MODULEApp.swift
         └─ Tests
            ├─ BOTTOM_MODULETests
@@ -805,7 +803,6 @@ final class SkipCommandTests: XCTestCase {
         └─ Sources
            ├─ M1
            │  ├─ ContentView.swift
-           │  ├─ M1.swift
            │  ├─ M1App.swift
            │  ├─ Resources
            │  │  ├─ Localizable.xcstrings

@@ -168,49 +168,62 @@ class FrameworkProjectLayout {
             let viewModelCode = """
             \(sourceHeader)import Foundation
             import Observation
-            #if canImport(OSLog)
-            import OSLog
-            #endif
-            #if canImport(\(native ? "SkipFuse" : "SkipModel"))
-            import \(native ? "SkipFuse" : "SkipModel")
-            #endif
-            
+            import \(native ? "SkipFuse" : "OSLog")
+
             fileprivate let logger: Logger = Logger(subsystem: "\(moduleName)", category: "\(moduleName)")
-            
-            /// An individual item held by the ViewModel
-            public struct Item : Identifiable, Hashable, Codable {
-                public let id: UUID
-                public var date: Date
-                public var title: String?
-                public var notes: String?
-            
-                public init(id: UUID = UUID(), date: Date = .now, title: String? = nil, notes: String? = nil) {
-                    self.id = id
-                    self.date = date
-                    self.title = title
-                    self.notes = notes
-                }
-            
-                public var linkTitle: String {
-                    title ?? date.formatted()
-                }
-            }
-            
+
             /// The Observable ViewModel used by the application.
             @Observable public class ViewModel {
                 public var name = "Skipper"
                 public var items: [Item] = loadItems() {
                     didSet { saveItems() }
                 }
-            
+
                 public init() {
                 }
-            
+
+                public func clear() {
+                    items.removeAll()
+                }
+
                 public func shuffle() {
                     items.shuffle()
                 }
             }
             
+            /// An individual item held by the ViewModel
+            public struct Item : Identifiable, Hashable, Codable {
+                public let id: UUID
+                public var date: Date
+                public var favorite: Bool
+                public var title: String
+                public var notes: String
+
+                public init(id: UUID = UUID(), date: Date = .now, favorite: Bool = false, title: String = "", notes: String = "") {
+                    self.id = id
+                    self.date = date
+                    self.favorite = favorite
+                    self.title = title
+                    self.notes = notes
+                }
+
+                public var linkTitle: String {
+                    (favorite ? "⭐️ " : "") + itemTitle
+                }
+
+                public var itemTitle: String {
+                    !title.isEmpty ? title : dateString
+                }
+
+                public var dateString: String {
+                    date.formatted(date: .complete, time: .omitted)
+                }
+
+                public var dateTimeString: String {
+                    date.formatted(date: .abbreviated, time: .shortened)
+                }
+            }
+
             /// Utilities for defaulting and persising the items in the list
             extension ViewModel {
                 private static let savePath = URL.applicationSupportDirectory.appendingPathComponent("appdata.json")
@@ -225,9 +238,9 @@ class FrameworkProjectLayout {
                         }
                         return try JSONDecoder().decode([Item].self, from: data)
                     } catch {
-                        // perhaps the first launch, or the data was corrupted
+                        // perhaps the first launch, or the data could not be read
                         logger.warning("failed to load data from \\(Self.savePath), using defaultItems: \\(error)")
-                        let defaultItems = (0...100).map { Date(timeIntervalSinceReferenceDate: Double($0 + (365 * 24)) * 60 * 60 * 24) }
+                        let defaultItems = (1...365).map { Date(timeIntervalSinceNow: Double($0 * 60 * 60 * 24 * -1)) }
                         return defaultItems.map({ Item(date: $0) })
                     }
                 }
@@ -236,6 +249,7 @@ class FrameworkProjectLayout {
                     do {
                         let start = Date.now
                         let data = try JSONEncoder().encode(items)
+                        try FileManager.default.createDirectory(at: URL.applicationSupportDirectory, withIntermediateDirectories: true)
                         try data.write(to: Self.savePath)
                         let end = Date.now
                         logger.info("saved \\(data.count) bytes to \\(Self.savePath.path) in \\(end.timeIntervalSince(start)) seconds")
@@ -249,7 +263,8 @@ class FrameworkProjectLayout {
 
             if shouldOutputModel {
                 try viewModelCode.write(to: viewModelSourceFile, atomically: false, encoding: .utf8)
-            } else {
+            } else if !isAppModule {
+                // we need to output *something*, so just make an empty class
                 let moduleSwiftFile = sourceDir.appending(path: "\(moduleName).swift")
 
                 let moduleCode = """
@@ -257,7 +272,7 @@ class FrameworkProjectLayout {
                 
                 public class \(moduleName)Module {
                 }
-                
+
                 """
 
                 try moduleCode.write(to: moduleSwiftFile, atomically: false, encoding: .utf8)
@@ -1069,6 +1084,10 @@ class AppProjectLayout : FrameworkProjectLayout {
             throw InitError(errorDescription: "ModuleName and project-name must be different: \(projectName)")
         }
 
+        if native && modules.count < 2 {
+            throw InitError(errorDescription: "skip init --native requires at least two modules")
+        }
+
         if let appid = appid {
             if !appid.contains(".") {
                 throw InitError(errorDescription: "Appid must be a valid bundle identifier containing at least one dot: \(appid)")
@@ -1170,7 +1189,7 @@ ANDROID_PACKAGE_NAME = \(appModulePackage)
 
         let iOSMinVersion = "17.0"
         let macOSMinVersion = "14.0"
-        let swiftVersion = "6.0"
+        let swiftVersion = "5"
 
         // create the top-level ModuleName.xcconfig which is the source or truth for the iOS and Android builds
         let configContents = """
@@ -1221,7 +1240,7 @@ SDKROOT = auto
 SUPPORTED_PLATFORMS = iphoneos iphonesimulator macosx
 SWIFT_EMIT_LOC_STRINGS = YES
 
-//SWIFT_VERSION = \(swiftVersion)
+SWIFT_VERSION = \(swiftVersion)
 
 // Development team ID for on-device testing
 CODE_SIGNING_REQUIRED = NO
@@ -1616,8 +1635,12 @@ public extension \(primaryModuleAppTarget) {
         let contentViewContents = """
 \(sourceHeader)import SwiftUI\(secondImport)
 
+public enum ContentTab: String, Hashable {
+    case welcome, home, settings
+}
+
 public struct ContentView: View {
-    @AppStorage("tab") var tab = Tab.welcome
+    @AppStorage("tab") var tab = ContentTab.welcome
     @State var viewModel = ViewModel()
     @State var appearance = ""
     @State var isBeating = false
@@ -1638,12 +1661,35 @@ public struct ContentView: View {
             }
             .font(.largeTitle)
             .tabItem { Label("Welcome", systemImage: "heart.fill") }
-            .tag(Tab.welcome)
+            .tag(ContentTab.welcome)
 
             NavigationStack {
                 List {
-                    ForEach(viewModel.items) { item in
-                        NavigationLink(item.linkTitle, value: item)
+                    ForEach($viewModel.items) { $item in
+                        NavigationLink(item.linkTitle) {
+                            Form {
+                                TextField("Title", text: $item.title)
+                                    .textFieldStyle(.roundedBorder)
+                                Text("Notes").font(.title3)
+                                TextEditor(text: $item.notes)
+                                    .border(Color.secondary, width: 1.0)
+                                Text("Created: \\(item.dateTimeString)")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .navigationTitle(item.itemTitle)
+                            .toolbar {
+                                ToolbarItemGroup {
+                                    Button {
+                                        item.favorite = !item.favorite
+                                    } label: {
+                                        Image(systemName: "star.fill")
+                                            .foregroundStyle(item.favorite ? .yellow : .gray)
+                                    }
+                                    .accessibilityLabel(Text("Favorite"))
+                                }
+                            }
+                        }
                     }
                     .onDelete { offsets in
                         viewModel.items.remove(atOffsets: offsets)
@@ -1654,13 +1700,24 @@ public struct ContentView: View {
                 }
                 .navigationTitle(Text("Items: \\(viewModel.items.count)"))
                 .navigationDestination(for: Item.self) { i in
-                    Text("Item \\(i.linkTitle)")
-                        .font(.title)
-                        .navigationTitle("Item: \\(i.linkTitle)")
+                    Text(i.id.uuidString)
+                        .font(.title3.monospaced())
+                        .navigationTitle("Item: \\(i.date.formatted(date: .numeric, time: .omitted))")
+                }
+                .toolbar {
+                    ToolbarItemGroup {
+                        Button {
+                            withAnimation {
+                                viewModel.items.insert(Item(), at: 0)
+                            }
+                        } label: {
+                            Label("Add", systemImage: "plus")
+                        }
+                    }
                 }
             }
             .tabItem { Label("Home", systemImage: "house.fill") }
-            .tag(Tab.home)
+            .tag(ContentTab.home)
 
             NavigationStack {
                 Form {
@@ -1685,14 +1742,10 @@ public struct ContentView: View {
                 .navigationTitle("Settings")
             }
             .tabItem { Label("Settings", systemImage: "gearshape.fill") }
-            .tag(Tab.settings)
+            .tag(ContentTab.settings)
         }
         .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
     }
-}
-
-enum Tab : String, Hashable {
-    case welcome, home, settings
 }
 
 """
@@ -2281,7 +2334,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 
         let sourceMainKotlinPackage = appProject.androidAppSrcMainKotlin.appendingPathComponent(appModulePackage.split(separator: ".").joined(separator: "/"), isDirectory: true)
         let sourceMainKotlinSourceFile = sourceMainKotlinPackage.appendingPathComponent("Main.kt")
-        try createKotlinMain(appModulePackage: appModulePackage, appModuleName: appModuleName, nativeLibrary: secondModule?.moduleName).write(to: sourceMainKotlinSourceFile.createParentDirectory(), atomically: false, encoding: .utf8)
+        try createKotlinMain(appModulePackage: appModulePackage, appModuleName: appModuleName, nativeLibrary: native ? secondModule?.moduleName : nil).write(to: sourceMainKotlinSourceFile.createParentDirectory(), atomically: false, encoding: .utf8)
 
         // create the .gitignore file; https://github.com/orgs/skiptools/discussions/208#discussioncomment-10505250
         let gitignore = """
