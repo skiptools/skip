@@ -337,6 +337,40 @@ class SkipCommandTests : XCTestCase {
         XCTAssertTrue(fileTree.contains("Demo-project.zip"), "missing expected Demo-project.zip in \(fileTree)")
     }
 
+    /// This works, but it is very slow, and also required installing the Android toolchain on the Skip CI host
+    func DISABLEDtestSkipExportAppNative() async throws {
+        let tempDir = try mktmp()
+        let name = "demo-app-native"
+        // create a three-module native app
+        let out = try await skip("init", "-jA", "--show-tree", "--native", "--free", "-v", "-d", tempDir, "--appid", "demo.app.App", name, "Demo", "DemoModel", "DemoLogic")
+        let msgs = try out.out.parseJSONMessages()
+
+        XCTAssertEqual("Initializing Skip application \(name)", msgs.first)
+
+        let dir = tempDir + "/" + name + "/"
+        for path in ["Package.swift", "Sources/Demo", "Tests", "Tests/DemoTests/Skip/skip.yml"] {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
+        }
+
+        let project = try await loadProjectPackage(dir)
+        XCTAssertEqual(name, project.name)
+
+        let exportPath = try mktmp()
+        let exported = try await skip("export", "-jA", "-v", "--show-tree", "--project", tempDir + "/" + name, "-d", exportPath)
+        let exportedJSON = try exported.out.parseJSONMessages()
+        let fileTree = exportedJSON.dropLast(1).last ?? ""
+
+        XCTAssertTrue(fileTree.contains("Demo-debug.apk"), "missing expected Demo-debug.apk in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-release.apk"), "missing expected Demo-release.apk in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-debug.aab"), "missing expected Demo-debug.aab in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-release.aab"), "missing expected Demo-release.aab in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-debug.ipa"), "missing expected Demo-debug.ipa in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-release.ipa"), "missing expected Demo-release.ipa in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-debug.xcarchive.zip"), "missing expected Demo-debug.xcarchive.zip in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-release.xcarchive.zip"), "missing expected Demo-release.xcarchive.zip in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("Demo-project.zip"), "missing expected Demo-project.zip in \(fileTree)")
+    }
+
     func DISABLEDtestSkipTestReport() async throws {
         // hangs when running from the CLI
         let xunit = try mktmpFile(contents: Data(xunitResults.utf8))
