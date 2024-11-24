@@ -540,7 +540,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             let mirrorSource = projectFolderPath.appending(components: "..", "..")
 
             //warn("creating absolute merged link tree from: swiftLinkFolder=\(swiftLinkFolder) to mirrorSource=\(mirrorSource) (rootPath=\(rootPath)) with dependencyIdPaths=\(dependencyIdPaths)")
-            try createMirroredLinkTree(swiftLinkFolder, pointingAt: mirrorSource, shallow: true, excluding: ["Packages", "Package.resolved", ".build", ".swiftpm"]) { destPath, path in
+            try createMirroredLinkTree(swiftLinkFolder, pointingAt: mirrorSource, shallow: true, excluding: ["Packages", "Package.resolved", ".build", ".swiftpm", "skip-export", "build"]) { destPath, path in
                 trace("createMirroredLinkTree for \(path.pathString)->\(destPath)")
 
                 // manually add the packageAddendum the Package.swift

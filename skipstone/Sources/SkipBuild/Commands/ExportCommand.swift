@@ -51,6 +51,10 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Perform debug build", valueName: "debug"))
     var debug: Bool = true
 
+    // TODO: immediately fail when any of the steps fail
+    //@Flag(inversion: .prefixedNo, help: ArgumentHelp("Stop the process on the first error"))
+    //var failFast: Bool = true
+
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Export project sources", valueName: "source"))
     var exportProject: Bool = true
 
@@ -242,7 +246,7 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
                 }
                 try fs.createDirectory(projectOutputFolder.parentDirectory, recursive: true)
 
-                try FileManager.default.copyItem(at: skipOutputFolder.asURL, to: projectOutputFolder.asURL, traverseLinks: true, excludeNames: ["build"])
+                try FileManager.default.copyItem(at: skipOutputFolder.asURL, to: projectOutputFolder.asURL, traverseLinks: true, excludeNames: ["build", ".build", "skip-export"])
             }
 
             let projectExportZip = outputFolderAbsolute.appending(components: ["\(moduleName)-project.zip"])

@@ -443,7 +443,7 @@ extension StreamingCommand {
         dateFormatter.formatOptions = [.withInternetDateTime]
         let dateString = dateFormatter.string(from: startTime)
 
-        let logPath = "/tmp/skip-\(cmdname)-\(dateString).txt"
+        let logPath = outputOptions.logFile ?? "/tmp/skip-\(cmdname)-\(dateString).txt"
 
         outputOptions.streams.logFile = try? .init(AbsolutePath(validating: logPath))
         defer {

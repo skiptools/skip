@@ -32,6 +32,9 @@ public struct OutputOptions: ParsableArguments {
     @Flag(name: [.customShort("M"), .long], help: ArgumentHelp("Show console messages as plain text rather than JSON"))
     var messagePlain: Bool = false
 
+    @Option(name: [.long], help: ArgumentHelp("Send log output to the file", valueName: "path"))
+    var logFile: String?
+
     @Flag(name: [.customShort("A"), .long], help: ArgumentHelp("Wrap and delimit JSON output as an array"))
     var jsonArray: Bool = false
 

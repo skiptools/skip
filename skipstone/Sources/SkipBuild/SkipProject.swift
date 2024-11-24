@@ -2572,6 +2572,10 @@ extension FrameworkProjectLayout {
                 buildConfig = true
             }
 
+            lintOptions {
+                disable.add("Instantiatable")
+            }
+
             // default signing configuration tries to load from keystore.properties
             signingConfigs {
                 val keystorePropertiesFile = file("keystore.properties")
