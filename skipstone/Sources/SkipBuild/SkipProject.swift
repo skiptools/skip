@@ -172,100 +172,104 @@ class FrameworkProjectLayout {
 
             let viewModelSourceFile = sourceDir.appending(path: "ViewModel.swift")
             let viewModelCode = """
-            \(sourceHeader)import Foundation
-            import Observation
-            import \(native ? "SkipFuse" : "OSLog")
+\(sourceHeader)import Foundation
+import Observation
+import \(native ? "SkipFuse" : "OSLog")
 
-            fileprivate let logger: Logger = Logger(subsystem: "\(moduleName)", category: "\(moduleName)")
+fileprivate let logger: Logger = Logger(subsystem: "HiyaSkipModel", category: "HiyaSkipModel")
 
-            /// The Observable ViewModel used by the application.
-            @Observable public class ViewModel {
-                public var name = "Skipper"
-                public var items: [Item] = loadItems() {
-                    didSet { saveItems() }
-                }
+/// The Observable ViewModel used by the application.
+@Observable public class ViewModel {
+    public var name = "Skipper"
+    public var items: [Item] = loadItems() {
+        didSet { saveItems() }
+    }
 
-                public init() {
-                }
+    public init() {
+    }
 
-                public func clear() {
-                    items.removeAll()
-                }
+    public func clear() {
+        items.removeAll()
+    }
 
-                public func shuffle() {
-                    items.shuffle()
-                }
+    public func isUpdated(_ item: Item) -> Bool {
+        item != items.first { i in
+            i.id == item.id
+        }
+    }
+
+    public func save(item: Item) {
+        items = items.map { i in
+            i.id == item.id ? item : i
+        }
+    }
+}
+
+/// An individual item held by the ViewModel
+public struct Item : Identifiable, Hashable, Codable {
+    public let id: UUID
+    public var date: Date
+    public var favorite: Bool
+    public var title: String
+    public var notes: String
+
+    public init(id: UUID = UUID(), date: Date = .now, favorite: Bool = false, title: String = "", notes: String = "") {
+        self.id = id
+        self.date = date
+        self.favorite = favorite
+        self.title = title
+        self.notes = notes
+    }
+
+    public var itemTitle: String {
+        !title.isEmpty ? title : dateString
+    }
+
+    public var dateString: String {
+        date.formatted(date: .complete, time: .omitted)
+    }
+
+    public var dateTimeString: String {
+        date.formatted(date: .abbreviated, time: .shortened)
+    }
+}
+
+/// Utilities for defaulting and persising the items in the list
+extension ViewModel {
+    private static let savePath = URL.applicationSupportDirectory.appendingPathComponent("appdata.json")
+
+    fileprivate static func loadItems() -> [Item] {
+        do {
+            let start = Date.now
+            let data = try Data(contentsOf: savePath)
+            defer {
+                let end = Date.now
+                logger.info("loaded \\(data.count) bytes from \\(Self.savePath.path) in \\(end.timeIntervalSince(start)) seconds")
             }
+            return try JSONDecoder().decode([Item].self, from: data)
+        } catch {
+            // perhaps the first launch, or the data could not be read
+            logger.warning("failed to load data from \\(Self.savePath), using defaultItems: \\(error)")
+            let defaultItems = (1...365).map { Date(timeIntervalSinceNow: Double($0 * 60 * 60 * 24 * -1)) }
+            return defaultItems.map({ Item(date: $0) })
+        }
+    }
+
+    fileprivate func saveItems() {
+        do {
+            let start = Date.now
+            let data = try JSONEncoder().encode(items)
+            try FileManager.default.createDirectory(at: URL.applicationSupportDirectory, withIntermediateDirectories: true)
+            try data.write(to: Self.savePath)
+            let end = Date.now
+            logger.info("saved \\(data.count) bytes to \\(Self.savePath.path) in \\(end.timeIntervalSince(start)) seconds")
+        } catch {
+            logger.error("error saving data: \\(error)")
+        }
+    }
+}
             
-            /// An individual item held by the ViewModel
-            public struct Item : Identifiable, Hashable, Codable {
-                public let id: UUID
-                public var date: Date
-                public var favorite: Bool
-                public var title: String
-                public var notes: String
-
-                public init(id: UUID = UUID(), date: Date = .now, favorite: Bool = false, title: String = "", notes: String = "") {
-                    self.id = id
-                    self.date = date
-                    self.favorite = favorite
-                    self.title = title
-                    self.notes = notes
-                }
-
-                public var linkTitle: String {
-                    (favorite ? "⭐️ " : "") + itemTitle
-                }
-
-                public var itemTitle: String {
-                    !title.isEmpty ? title : dateString
-                }
-
-                public var dateString: String {
-                    date.formatted(date: .complete, time: .omitted)
-                }
-
-                public var dateTimeString: String {
-                    date.formatted(date: .abbreviated, time: .shortened)
-                }
-            }
-
-            /// Utilities for defaulting and persising the items in the list
-            extension ViewModel {
-                private static let savePath = URL.applicationSupportDirectory.appendingPathComponent("appdata.json")
-            
-                fileprivate static func loadItems() -> [Item] {
-                    do {
-                        let start = Date.now
-                        let data = try Data(contentsOf: savePath)
-                        defer {
-                            let end = Date.now
-                            logger.info("loaded \\(data.count) bytes from \\(Self.savePath.path) in \\(end.timeIntervalSince(start)) seconds")
-                        }
-                        return try JSONDecoder().decode([Item].self, from: data)
-                    } catch {
-                        // perhaps the first launch, or the data could not be read
-                        logger.warning("failed to load data from \\(Self.savePath), using defaultItems: \\(error)")
-                        let defaultItems = (1...365).map { Date(timeIntervalSinceNow: Double($0 * 60 * 60 * 24 * -1)) }
-                        return defaultItems.map({ Item(date: $0) })
-                    }
-                }
-            
-                fileprivate func saveItems() {
-                    do {
-                        let start = Date.now
-                        let data = try JSONEncoder().encode(items)
-                        try FileManager.default.createDirectory(at: URL.applicationSupportDirectory, withIntermediateDirectories: true)
-                        try data.write(to: Self.savePath)
-                        let end = Date.now
-                        logger.info("saved \\(data.count) bytes to \\(Self.savePath.path) in \\(end.timeIntervalSince(start)) seconds")
-                    } catch {
-                        logger.error("error saving data: \\(error)")
-                    }
-                }
-            }
-            
-            """
+"""
 
             if shouldOutputModel {
                 try viewModelCode.write(to: viewModelSourceFile, atomically: false, encoding: .utf8)
@@ -404,34 +408,6 @@ class FrameworkProjectLayout {
         }
       }
     },
-    "Item %lld" : {
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elemento %lld"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Élément %lld"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アイテム %lld"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "项目 %lld"
-          }
-        }
-      }
-    },
     "Light" : {
       "localizations" : {
         "es" : {
@@ -488,7 +464,7 @@ class FrameworkProjectLayout {
         }
       }
     },
-    "Powered by %@" : {
+    "Powered by Skip and %@" : {
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -512,34 +488,6 @@ class FrameworkProjectLayout {
           "stringUnit" : {
             "state" : "translated",
             "value" : "由%@提供动力"
-          }
-        }
-      }
-    },
-    "Screen %lld" : {
-      "localizations" : {
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pantalla %lld"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Écran %lld"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "画面 %lld"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "屏幕 %lld"
           }
         }
       }
@@ -1677,28 +1625,14 @@ public struct ContentView: View {
 
             NavigationStack {
                 List {
-                    ForEach($viewModel.items) { $item in
-                        NavigationLink(item.linkTitle) {
-                            Form {
-                                TextField("Title", text: $item.title)
-                                    .textFieldStyle(.roundedBorder)
-                                Text("Notes").font(.title3)
-                                TextEditor(text: $item.notes)
-                                    .border(Color.secondary, width: 1.0)
-                                Text("Created: \\(item.dateTimeString)")
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .navigationTitle(item.itemTitle)
-                            .toolbar {
-                                ToolbarItemGroup {
-                                    Button {
-                                        item.favorite = !item.favorite
-                                    } label: {
-                                        Image(systemName: "star.fill")
-                                            .foregroundStyle(item.favorite ? .yellow : .gray)
-                                    }
-                                    .accessibilityLabel(Text("Favorite"))
+                    ForEach(viewModel.items) { item in
+                        NavigationLink(value: item) {
+                            Label {
+                                Text(item.itemTitle)
+                            } icon: {
+                                if item.favorite {
+                                    Image(systemName: "star.fill")
+                                        .foregroundStyle(.yellow)
                                 }
                             }
                         }
@@ -1710,11 +1644,10 @@ public struct ContentView: View {
                         viewModel.items.move(fromOffsets: fromOffsets, toOffset: toOffset)
                     }
                 }
-                .navigationTitle(Text("Items: \\(viewModel.items.count)"))
-                .navigationDestination(for: Item.self) { i in
-                    Text(i.id.uuidString)
-                        .font(.title3.monospaced())
-                        .navigationTitle("Item: \\(i.date.formatted(date: .numeric, time: .omitted))")
+                .navigationTitle(Text("\\(viewModel.items.count) Items"))
+                .navigationDestination(for: Item.self) { item in
+                    ItemView(item: item, viewModel: $viewModel)
+                        .navigationTitle(item.itemTitle)
                 }
                 .toolbar {
                     ToolbarItemGroup {
@@ -1747,7 +1680,7 @@ public struct ContentView: View {
                         #else
                         Text(verbatim: "💙")
                         #endif
-                        Text("Powered by \\(androidSDK != nil ? "Jetpack Compose" : "SwiftUI")")
+                        Text("Powered by Skip and \\(androidSDK != nil ? "Jetpack Compose" : "SwiftUI")")
                     }
                     .foregroundStyle(.gray)
                 }
@@ -1757,6 +1690,39 @@ public struct ContentView: View {
             .tag(ContentTab.settings)
         }
         .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
+    }
+}
+
+struct ItemView : View {
+    @State var item: Item
+    @Binding var viewModel: ViewModel
+    @Environment(\\.dismiss) var dismiss
+
+    var body: some View {
+        Form {
+            TextField("Title", text: $item.title)
+                .textFieldStyle(.roundedBorder)
+            Toggle("Favorite", isOn: $item.favorite)
+            DatePicker("Date", selection: $item.date)
+            Text("Notes").font(.title3)
+            TextEditor(text: $item.notes)
+                .border(Color.secondary, width: 1.0)
+        }
+        .navigationBarBackButtonHidden()
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") {
+                    dismiss()
+                }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") {
+                    viewModel.save(item: item)
+                    dismiss()
+                }
+                .disabled(!viewModel.isUpdated(item))
+            }
+        }
     }
 }
 
@@ -2639,7 +2605,7 @@ extension FrameworkProjectLayout {
             override fun onCreate() {
                 super.onCreate()
                 logger.info("starting app")
-                \(nativeLibrary == nil ? "ProcessInfo.launch(applicationContext)" : "skip.android.bridge.kt.AndroidBridge.initBridge(this, \"\(nativeLibrary!)\")")
+                ProcessInfo.launch(applicationContext)
             }
 
             companion object {
