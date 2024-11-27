@@ -874,6 +874,7 @@ final class EnumCaseDeclaration: Statement {
     let name: String
     private(set) var associatedValues: [Parameter<Expression>]
     let rawValue: Expression?
+    let rawValueSwift: String?
     var attributes: Attributes // Allow additions by transformers
     private(set) var modifiers: Modifiers
     var signature: TypeSignature {
@@ -889,10 +890,11 @@ final class EnumCaseDeclaration: Statement {
         return .function(parameters, owningTypeDeclaration.signature, APIFlags(), nil)
     }
 
-    init(name: String, associatedValues: [Parameter<Expression>], rawValue: Expression? = nil, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(name: String, associatedValues: [Parameter<Expression>], rawValue: Expression? = nil, rawValueSwift: String? = nil, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         self.associatedValues = associatedValues
         self.rawValue = rawValue
+        self.rawValueSwift = rawValueSwift
         self.attributes = attributes
         self.modifiers = modifiers
         super.init(type: .enumCaseDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
@@ -912,7 +914,8 @@ final class EnumCaseDeclaration: Statement {
             let name = element.name.text.removingBacktickEscaping
             let (associatedValues, messages) = element.parameterClause?.parameters(in: syntaxTree) ?? ([], [])
             let rawValue = element.rawValue.map { ExpressionDecoder.decode(syntax: $0.value, in: syntaxTree) }
-            let statement = EnumCaseDeclaration(name: name, associatedValues: associatedValues, rawValue: rawValue, attributes: attributes, modifiers: modifiers, syntax: element, sourceFile: syntaxTree.source.file, sourceRange: element.range(in: syntaxTree.source), extras: index == 0 ? extras : nil)
+            let rawValueSwift = element.rawValue?.value.trimmedDescription
+            let statement = EnumCaseDeclaration(name: name, associatedValues: associatedValues, rawValue: rawValue, rawValueSwift: rawValueSwift, attributes: attributes, modifiers: modifiers, syntax: element, sourceFile: syntaxTree.source.file, sourceRange: element.range(in: syntaxTree.source), extras: index == 0 ? extras : nil)
             statement.messages = messages
             return statement
         }

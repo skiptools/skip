@@ -2462,21 +2462,82 @@ final class BridgeToSwiftTests: XCTestCase {
     }
 
     func testEnum() async throws {
-        // TODO
-//        try await checkProducesMessage(swift: """
-//        public enum E {
-//            case a, b
-//        }
-//        """, transformers: transformers)
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public enum E: Int {
+            case a = 100, `b`
+        
+            func negate() -> Int {
+                return self.rawValue * -1
+            }
+        }
+        #endif
+        """, kotlin: """
+        enum class E(override val rawValue: Int, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): RawRepresentable<Int> {
+            a(100),
+            b(101);
+
+            internal fun negate(): Int = this.rawValue * -1
+
+            companion object {
+                fun init(rawValue: Int): E? {
+                    return when (rawValue) {
+                        100 -> E.a
+                        101 -> E.b
+                        else -> null
+                    }
+                }
+            }
+        }
+
+        fun E(rawValue: Int): E? = E.init(rawValue = rawValue)
+        """, swiftBridgeSupport: """
+        public enum E: Int, BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "E")
+            private var Java_peer: JavaObjectPointer {
+                return toJavaObject(options: [])!
+            }
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let name: String = try! obj!.call(method: Java_name_methodID, options: options, args: [])
+                return switch name {
+                case "a": .a
+                case "b": .b
+                default: fatalError()
+                }
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let name = switch self {
+                case .a: "a"
+                case .b: "b"
+                }
+                return try! Self.Java_class.callStatic(method: Self.Java_valueOf_methodID, options: options, args: [name.toJavaParameter(options: options)])
+            }
+            private static let Java_name_methodID = Java_class.getMethodID(name: "name", sig: "()Ljava/lang/String;")!
+            private static let Java_valueOf_methodID = Java_class.getStaticMethodID(name: "valueOf", sig: "(Ljava/lang/String;)LE;")!
+
+            case `a` = 100
+
+            case `b`
+
+            func negate() -> Int {
+                return jniContext {
+                    let f_return_java: Int32 = try! Java_peer.call(method: Self.Java_negate_0_methodID, options: [], args: [])
+                    return Int(f_return_java)
+                }
+            }
+            private static let Java_negate_0_methodID = Java_class.getMethodID(name: "negate", sig: "()I")!
+        }
+        """, transformers: transformers)
     }
 
     func testEnumWithAssociatedValue() async throws {
-        // TODO
-//        try await checkProducesMessage(swift: """
-//        public enum E {
-//            case a(Int), b
-//        }
-//        """, transformers: transformers)
+        try await checkProducesMessage(swift: """
+        #if !SKIP_BRIDGE
+        public enum E {
+            case a(Int), b
+        }
+        #endif
+        """, transformers: transformers)
     }
 
     func testClassWithExtension() async throws {
