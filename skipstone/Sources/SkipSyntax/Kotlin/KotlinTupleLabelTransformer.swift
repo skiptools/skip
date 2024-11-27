@@ -20,7 +20,7 @@ final class KotlinTupleLabelTransformer: KotlinTransformer {
     }
 
     func gather(from syntaxTree: SyntaxTree) {
-        guard Self.gatherLabelsFromTypeSignatures else {
+        guard !syntaxTree.isBridgeFile, Self.gatherLabelsFromTypeSignatures else {
             return
         }
         syntaxTree.root.visit { node in

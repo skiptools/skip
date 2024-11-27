@@ -2750,10 +2750,10 @@ final class BridgeToKotlinTests: XCTestCase {
             }
             public func a() {
                 jniContext {
-                    try! Java_peer.call(method: Self.Java_a_methodID, options: [], args: [])
+                    try! Java_peer.call(method: Self.Java_a_0_methodID, options: [], args: [])
                 }
             }
-            private static let Java_a_methodID = Java_class.getMethodID(name: "a", sig: "()V")!
+            private static let Java_a_0_methodID = Java_class.getMethodID(name: "a", sig: "()V")!
             public static func ==(lhs: Base_BridgeImpl, rhs: Base_BridgeImpl) -> Bool {
                 return jniContext {
                     let lhs_java = lhs.toJavaObject(options: [])!
@@ -2784,17 +2784,17 @@ final class BridgeToKotlinTests: XCTestCase {
             }
             public func f() -> Int {
                 return jniContext {
-                    let f_return_java: Int32 = try! Java_peer.call(method: Self.Java_f_methodID, options: [], args: [])
+                    let f_return_java: Int32 = try! Java_peer.call(method: Self.Java_f_0_methodID, options: [], args: [])
                     return Int(f_return_java)
                 }
             }
-            private static let Java_f_methodID = Java_class.getMethodID(name: "f", sig: "()I")!
+            private static let Java_f_0_methodID = Java_class.getMethodID(name: "f", sig: "()I")!
             public func a() {
                 jniContext {
-                    try! Java_peer.call(method: Self.Java_a_methodID, options: [], args: [])
+                    try! Java_peer.call(method: Self.Java_a_1_methodID, options: [], args: [])
                 }
             }
-            private static let Java_a_methodID = Java_class.getMethodID(name: "a", sig: "()V")!
+            private static let Java_a_1_methodID = Java_class.getMethodID(name: "a", sig: "()V")!
             public static func ==(lhs: P_BridgeImpl, rhs: P_BridgeImpl) -> Bool {
                 return jniContext {
                     let lhs_java = lhs.toJavaObject(options: [])!
