@@ -535,6 +535,11 @@ extension KotlinClassDeclaration {
     /// This function will add messages about invalid modifiers or types to this variable.
     func checkBridgable(options: KotlinBridgeOptions, translator: KotlinTranslator) -> Bool {
         switch declarationType {
+        case .enumDeclaration:
+            guard !isSealedClassesEnum else {
+                messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "enums with additional state", source: translator.syntaxTree.source))
+                return false
+            }
         case .classDeclaration:
             guard !isSubclass(translator: translator) else {
                 messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "subclasses", source: translator.syntaxTree.source))
@@ -544,6 +549,7 @@ extension KotlinClassDeclaration {
         case .structDeclaration:
             break
         default:
+            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: String(describing: declarationType), source: translator.syntaxTree.source))
             return false
         }
         guard checkNonGeneric(self, generics: generics, translator: translator) else {

@@ -89,6 +89,16 @@ final class KotlinBridgeToSwiftVisitor {
         statement.messages.append(.kotlinBridgeMissingIfNotSkipBridge(statement, source: syntaxTree.source))
     }
 
+    @discardableResult private func update(member enumCaseDeclaration: KotlinEnumCaseDeclaration, swiftDefinitions: inout [SwiftDefinition]) -> Bool {
+        let name = enumCaseDeclaration.preEscapedName ?? enumCaseDeclaration.name
+        var swift = "case `\(name)`"
+        if let value = enumCaseDeclaration.rawValueSwift {
+            swift += " = " + value
+        }
+        swiftDefinitions.append(SwiftDefinition(statement: enumCaseDeclaration, swift: [swift]))
+        return true
+    }
+
     private func update(global variableDeclaration: KotlinVariableDeclaration, swiftDefinitions: inout [SwiftDefinition], globalsClassRef: JavaClassRef) -> Bool {
         guard let bridgable = variableDeclaration.checkBridgable(options: options, translator: translator) else {
             return false
@@ -584,6 +594,7 @@ final class KotlinBridgeToSwiftVisitor {
         }
         let classRef = JavaClassRef(for: classDeclaration.signature, packageName: translator.packageName)
 
+        let isEnum = classDeclaration.declarationType == .enumDeclaration
         let isStruct = classDeclaration.declarationType == .structDeclaration
         let visibilityString = primaryTypeInfo.modifiers.visibility.swift(suffix: " ")
         let inherits = typeInfos.flatMap(\.inherits).compactMap {
@@ -596,39 +607,51 @@ final class KotlinBridgeToSwiftVisitor {
         }
         inheritsString += "BridgedFromKotlin"
         var swift: [String] = []
-        swift.append("\(visibilityString)\(isStruct ? "struct" : "class") \(classDeclaration.name): \(inheritsString) {")
+        swift.append("\(visibilityString)\(isEnum ? "enum" : isStruct ? "struct" : "class") \(classDeclaration.name): \(inheritsString) {")
 
         let finalMemberVisibility = primaryTypeInfo.modifiers.visibility > .public ? .public : primaryTypeInfo.modifiers.visibility
         let finalMemberVisibilityString = finalMemberVisibility.swift(suffix: " ")
         swift.append(1, classRef.declaration)
-        swift.append(1, "\(finalMemberVisibilityString)\(isStruct ? "var" : "let") Java_peer: JObject")
-        swift.append(1, "\(finalMemberVisibilityString)\(isStruct ? "" : "required ")init(Java_ptr: JavaObjectPointer) {")
-        swift.append(2, "Java_peer = JObject(Java_ptr)")
-        swift.append(1, "}")
 
-        if !classDeclaration.members.contains(where: { $0.type == .constructorDeclaration && ($0 as? KotlinFunctionDeclaration)?.isDecodableConstructor == false }) {
-            swift.append(1, "\(finalMemberVisibilityString)init() {")
-            swift.append(2, "Java_peer = jniContext {")
-            swift.append(3, [
-                "let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])",
-                "return JObject(ptr)"
-            ])
-            swift.append(2, "}")
-            swift.append(1, [
-                "}",
-                "private static let Java_constructor_methodID = Java_class.getMethodID(name: \"<init>\", sig: \"()V\")!"
-            ])
+        if isEnum {
+            swift.append(1, "private var Java_peer: JavaObjectPointer {")
+            swift.append(2, "return toJavaObject(options: \(options.jconvertibleOptions))!")
+            swift.append(1, "}")
+        } else {
+            swift.append(1, "\(finalMemberVisibilityString)\(isStruct ? "var" : "let") Java_peer: JObject")
+            swift.append(1, "\(finalMemberVisibilityString)\(isStruct ? "" : "required ")init(Java_ptr: JavaObjectPointer) {")
+            swift.append(2, "Java_peer = JObject(Java_ptr)")
+            swift.append(1, "}")
+
+            if !classDeclaration.members.contains(where: { $0.type == .constructorDeclaration && ($0 as? KotlinFunctionDeclaration)?.isDecodableConstructor == false }) {
+                swift.append(1, "\(finalMemberVisibilityString)init() {")
+                swift.append(2, "Java_peer = jniContext {")
+                swift.append(3, [
+                    "let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])",
+                    "return JObject(ptr)"
+                ])
+                swift.append(2, "}")
+                swift.append(1, [
+                    "}",
+                    "private static let Java_constructor_methodID = Java_class.getMethodID(name: \"<init>\", sig: \"()V\")!"
+                ])
+            }
         }
 
         var memberDefinitions: [SwiftDefinition] = []
         var hasBridgedStaticMembers = false
         var functionCount = 0
+        var enumCases: [KotlinEnumCaseDeclaration] = []
         for member in classDeclaration.members {
-            if let variableDeclaration = member as? KotlinVariableDeclaration {
+            if let enumCaseDeclaration = member as? KotlinEnumCaseDeclaration {
+                if update(member: enumCaseDeclaration, swiftDefinitions: &memberDefinitions) {
+                    enumCases.append(enumCaseDeclaration)
+                }
+            } else if let variableDeclaration = member as? KotlinVariableDeclaration {
                 guard variableDeclaration.modifiers.visibility > .fileprivate, !variableDeclaration.isGenerated, !variableDeclaration.attributes.isBridgeIgnored else {
                     continue
                 }
-                let info = typeInfos.flatMap({ $0.variables }).first(where: { $0.name == variableDeclaration.propertyName && $0.modifiers.visibility > .fileprivate })
+                let info = typeInfos.flatMap({ $0.variables }).first(where: { $0.name == (variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName) && $0.modifiers.visibility > .fileprivate })
                 if update(member: variableDeclaration, info: info, swiftDefinitions: &memberDefinitions), variableDeclaration.isStatic {
                     hasBridgedStaticMembers = true
                 }
@@ -639,7 +662,7 @@ final class KotlinBridgeToSwiftVisitor {
                 guard !functionDeclaration.isEncode && !functionDeclaration.isDecodableConstructor else {
                     continue
                 }
-                let info = typeInfos.flatMap({ $0.functions }).first(where: { $0.name == functionDeclaration.name && $0.signature == functionDeclaration.functionType && $0.modifiers.visibility >= .fileprivate })
+                let info = typeInfos.flatMap({ $0.functions }).first(where: { $0.name == (functionDeclaration.preEscapedName ?? functionDeclaration.name) && $0.signature == functionDeclaration.functionType && $0.modifiers.visibility >= .fileprivate })
                 if functionDeclaration.isEqualImplementation {
                     updateEqualsDeclaration(functionDeclaration, in: classDeclaration, info: info, swiftDefinitions: &memberDefinitions)
                 } else if functionDeclaration.isHashImplementation {
@@ -664,7 +687,11 @@ final class KotlinBridgeToSwiftVisitor {
             swift.append(1, "private static let Java_Companion_class = try! JClass(name: \"\(classRef.className)$Companion\")")
             swift.append(1, "private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: \"Companion\", sig: \"L\(classRef.className)$Companion;\")!, options: \(options.jconvertibleOptions)))")
         }
-        swift.append(1, Self.swiftForJConvertibleContract(visibility: finalMemberVisibility))
+        if isEnum {
+            swift.append(1, Self.swiftForEnumJConvertibleContract(name: classRef.className, caseDeclarations: enumCases, visibility: finalMemberVisibility))
+        } else {
+            swift.append(1, Self.swiftForJConvertibleContract(visibility: finalMemberVisibility))
+        }
 
         let definition = SwiftDefinition(statement: classDeclaration, children: memberDefinitions) { output, indentation, children in
             swift.forEach { output.append(indentation).append($0).append("\n") }
@@ -684,6 +711,33 @@ final class KotlinBridgeToSwiftVisitor {
         swift.append(visibilityString + "func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {")
         swift.append(1, "return Java_peer.safePointer()")
         swift.append("}")
+        return swift
+    }
+
+    private static func swiftForEnumJConvertibleContract(name enumName: String, caseDeclarations: [KotlinEnumCaseDeclaration], visibility: Modifiers.Visibility) -> [String] {
+        let visibilityString = visibility.swift(suffix: " ")
+        var swift: [String] = []
+        swift.append(visibilityString + "static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {")
+        swift.append(1, "let name: String = try! obj!.call(method: Java_name_methodID, options: options, args: [])")
+        swift.append(1, "return switch name {")
+        for enumCaseDeclaration in caseDeclarations {
+            swift.append(1, "case \"\(enumCaseDeclaration.name)\": .\(enumCaseDeclaration.preEscapedName ?? enumCaseDeclaration.name)")
+        }
+        swift.append(1, "default: fatalError()")
+        swift.append(1, "}")
+        swift.append("}")
+
+        swift.append(visibilityString + "func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {")
+        swift.append(1, "let name = switch self {")
+        for enumCaseDeclaration in caseDeclarations {
+            swift.append(1, "case .\(enumCaseDeclaration.preEscapedName ?? enumCaseDeclaration.name): \"\(enumCaseDeclaration.name)\"")
+        }
+        swift.append(1, "}")
+        swift.append(1, "return try! Self.Java_class.callStatic(method: Self.Java_valueOf_methodID, options: options, args: [name.toJavaParameter(options: options)])")
+        swift.append("}")
+
+        swift.append("private static let Java_name_methodID = Java_class.getMethodID(name: \"name\", sig: \"()Ljava/lang/String;\")!")
+        swift.append("private static let Java_valueOf_methodID = Java_class.getStaticMethodID(name: \"valueOf\", sig: \"(Ljava/lang/String;)L\(enumName);\")!")
         return swift
     }
 

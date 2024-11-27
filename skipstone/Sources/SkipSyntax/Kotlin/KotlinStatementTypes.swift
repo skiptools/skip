@@ -1339,6 +1339,7 @@ final class KotlinEnumCaseDeclaration: KotlinStatement {
     var enumGenerics: Generics = Generics()
     var associatedValues: [Parameter<KotlinExpression>] = []
     var rawValue: KotlinExpression?
+    var rawValueSwift: String?
     var isLastDeclaration = false
     var members: [KotlinStatement] = []
 
@@ -1363,6 +1364,7 @@ final class KotlinEnumCaseDeclaration: KotlinStatement {
         kstatement.associatedValues = statement.associatedValues.map { $0.translate(translator: translator) }
         kstatement.associatedValues.forEach { $0.declaredType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
         kstatement.rawValue = statement.rawValue.map { translator.translateExpression($0) }
+        kstatement.rawValueSwift = statement.rawValueSwift
         if let owningTypeDeclaration = statement.owningTypeDeclaration {
             let genericsEntries = owningTypeDeclaration.generics.resolvingSelf(in: statement).entries.map { entry in
                 if kstatement.associatedValues.contains(where: { $0.declaredType.referencesType(entry.namedType) }) {
