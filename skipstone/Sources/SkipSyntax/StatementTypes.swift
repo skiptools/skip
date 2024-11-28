@@ -907,9 +907,6 @@ final class EnumCaseDeclaration: Statement {
         var attributes = Attributes.for(syntax: enumCaseDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         let modifiers = Modifiers.for(syntax: enumCaseDecl.modifiers)
-        guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
-            return []
-        }
         return enumCaseDecl.elements.enumerated().map { (index, element) in
             let name = element.name.text.removingBacktickEscaping
             let (associatedValues, messages) = element.parameterClause?.parameters(in: syntaxTree) ?? ([], [])

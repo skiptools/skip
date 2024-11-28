@@ -454,8 +454,8 @@ struct Bridgable {
 
 /// Information used to bridge functions.
 struct FunctionBridgable {
-    let parameters: [Bridgable]
-    let `return`: Bridgable
+    var parameters: [Bridgable]
+    var `return`: Bridgable
 }
 
 extension KotlinVariableDeclaration {
