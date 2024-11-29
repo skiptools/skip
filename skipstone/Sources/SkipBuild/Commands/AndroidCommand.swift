@@ -53,8 +53,11 @@ struct AndroidSDKInstallCommand: MessageCommand, ToolOptionsCommand {
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
 
+    @Flag(help: ArgumentHelp("Reinstall the Android SDK"))
+    var reinstall: Bool = false
+
     func performCommand(with out: MessageQueue) async {
-        await run(with: out, "Install Swift Android SDK", ["brew", "install", "skiptools/skip/swift-android-toolchain@\(version)"], additionalEnvironment: ["HOMEBREW_AUTO_UPDATE_SECS": "0"])
+        await run(with: out, "Install Swift Android SDK", ["brew", reinstall ? "reinstall" : "install", "skiptools/skip/swift-android-toolchain@\(version)"], additionalEnvironment: ["HOMEBREW_AUTO_UPDATE_SECS": "0"])
     }
 }
 
