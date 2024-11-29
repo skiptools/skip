@@ -2467,7 +2467,21 @@ final class BridgeToSwiftTests: XCTestCase {
         public enum E: Int {
             case a = 100, `b`
         
-            func negate() -> Int {
+            public init(string: String) {
+                switch string {
+                case "a": self = .a
+                default: self = .b
+                }
+            }
+        
+            public var string: String {
+                switch self {
+                case .a: return "a"
+                case .b: return "b"
+                }
+            }
+        
+            public func negate() -> Int {
                 return self.rawValue * -1
             }
         }
@@ -2477,7 +2491,15 @@ final class BridgeToSwiftTests: XCTestCase {
             a(100),
             b(101);
 
-            internal fun negate(): Int = this.rawValue * -1
+            val string: String
+                get() {
+                    when (this) {
+                        E.a -> return "a"
+                        E.b -> return "b"
+                    }
+                }
+
+            fun negate(): Int = this.rawValue * -1
 
             companion object {
                 fun init(rawValue: Int): E? {
@@ -2487,8 +2509,16 @@ final class BridgeToSwiftTests: XCTestCase {
                         else -> null
                     }
                 }
+
+                fun init(string: String): E {
+                    when (string) {
+                        "a" -> return E.a
+                        else -> return E.b
+                    }
+                }
             }
         }
+        fun E(string: String): E = E.init(string = string)
 
         fun E(rawValue: Int): E? = E.init(rawValue = rawValue)
         """, swiftBridgeSupport: """
@@ -2497,8 +2527,13 @@ final class BridgeToSwiftTests: XCTestCase {
             private var Java_peer: JavaObjectPointer {
                 return toJavaObject(options: [])!
             }
+            private static let Java_Companion_class = try! JClass(name: "E$Companion")
+            private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: "Companion", sig: "LE$Companion;")!, options: []))
             public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 let name: String = try! obj!.call(method: Java_name_methodID, options: options, args: [])
+                return fromJavaName(name)
+            }
+            fileprivate static func fromJavaName(_ name: String) -> Self {
                 return switch name {
                 case "a": .a
                 case "b": .b
@@ -2519,13 +2554,32 @@ final class BridgeToSwiftTests: XCTestCase {
 
             case `b`
 
-            func negate() -> Int {
+            public var string: String {
+                get {
+                    return jniContext {
+                        let value_java: String = try! Java_peer.call(method: Self.Java_get_string_methodID, options: [], args: [])
+                        return value_java
+                    }
+                }
+            }
+            private static let Java_get_string_methodID = Java_class.getMethodID(name: "getString", sig: "()Ljava/lang/String;")!
+
+            public func negate() -> Int {
                 return jniContext {
                     let f_return_java: Int32 = try! Java_peer.call(method: Self.Java_negate_0_methodID, options: [], args: [])
                     return Int(f_return_java)
                 }
             }
             private static let Java_negate_0_methodID = Java_class.getMethodID(name: "negate", sig: "()I")!
+
+            public init(string p_0: String) {
+                self = jniContext {
+                    let p_0_java = p_0.toJavaParameter(options: [])
+                    let f_return_java: JavaObjectPointer = try! Self.Java_Companion.call(method: Self.Java_Companion_init_1_methodID, options: [], args: [p_0_java])
+                    return Self.fromJavaObject(f_return_java, options: [])
+                }
+            }
+            private static let Java_Companion_init_1_methodID = Java_Companion_class.getMethodID(name: "init", sig: "(Ljava/lang/String;)LE;")!
         }
         """, transformers: transformers)
     }

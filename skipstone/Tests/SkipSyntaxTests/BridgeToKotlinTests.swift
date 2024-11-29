@@ -2972,11 +2972,109 @@ final class BridgeToKotlinTests: XCTestCase {
     }
 
     func testEnum() async throws {
-        // TODO
+        try await check(swiftBridge: """
+        public enum E: Int {
+            case a = 100, `b`
+        
+            public init(string: String) {
+                switch string {
+                case "a": self = .a
+                default: self = .b
+                }
+            }
+        
+            public var string: String {
+                switch self {
+                case .a: return "a"
+                case .b: return "b"
+                }
+            }
+        
+            public func negate() -> Int {
+                return self.rawValue * -1
+            }
+        }
+        """, kotlin: """
+        enum class E(override val rawValue: Int, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null) {
+
+            a(100),
+            b(101);
+            val string: String
+                get() = Swift_string(name)
+            private external fun Swift_string(name: String): String
+            fun negate(): Int = Swift_negate_0(name)
+            private external fun Swift_negate_0(name: String): Int
+
+            companion object {
+                fun init(rawValue: Int): E? {
+                    return when (rawValue) {
+                        100 -> E.a
+                        101 -> E.b
+                        else -> null
+                    }
+                }
+                fun init(string: String): E = Swift_Companion_init_2(string)
+                private external fun Swift_Companion_init_2(string: String): E
+            }
+        }
+        fun E(string: String): E = E.init(string = string)
+
+        fun E(rawValue: Int): E? = E.init(rawValue = rawValue)
+        """, swiftBridgeSupport: """
+        extension E: BridgedToKotlin {
+            private static let Java_class = try! JClass(name: "E")
+            private static let Java_Companion_class = try! JClass(name: "E$Companion")
+            private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: "Companion", sig: "LE$Companion;")!, options: []))
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let name: String = try! obj!.call(method: Java_name_methodID, options: options, args: [])
+                return fromJavaName(name)
+            }
+            fileprivate static func fromJavaName(_ name: String) -> Self {
+                return switch name {
+                case "a": .a
+                case "b": .b
+                default: fatalError()
+                }
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let name = switch self {
+                case .a: "a"
+                case .b: "b"
+                }
+                return try! Self.Java_class.callStatic(method: Self.Java_valueOf_methodID, options: options, args: [name.toJavaParameter(options: options)])
+            }
+            private static let Java_name_methodID = Java_class.getMethodID(name: "name", sig: "()Ljava/lang/String;")!
+            private static let Java_valueOf_methodID = Java_class.getStaticMethodID(name: "valueOf", sig: "(Ljava/lang/String;)LE;")!
+        }
+        @_cdecl("Java_E_Swift_1string")
+        func E_Swift_string(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ name: JavaString) -> JavaString {
+            let name_swift = String.fromJavaObject(name, options: [])
+            let peer_swift = E.fromJavaName(name_swift)
+            return peer_swift.string.toJavaObject(options: [])!
+        }
+        @_cdecl("Java_E_Swift_1negate_10")
+        func E_Swift_negate_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ name: JavaString) -> Int32 {
+            let name_swift = String.fromJavaObject(name, options: [])
+            let peer_swift = E.fromJavaName(name_swift)
+            let f_return_swift = peer_swift.negate()
+            return Int32(f_return_swift)
+        }
+        @_cdecl("Java_E_00024Companion_Swift_1Companion_1init_12")
+        func E_Swift_Companion_init_2(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaString) -> JavaObjectPointer {
+            let p_0_swift = String.fromJavaObject(p_0, options: [])
+            let f_return_swift = E.init(string: p_0_swift)
+            return f_return_swift.toJavaObject(options: [])!
+        }
+        """, transformers: transformers)
     }
 
     func testEnumWithAssociatedValue() async throws {
         // TODO
+        try await checkProducesMessage(swift: """
+        public enum E {
+            case a(Int), b
+        }
+        """, isSwiftBridge: true, transformers: transformers)
     }
 
     func testClassWithExtension() async throws {
