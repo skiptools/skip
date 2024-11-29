@@ -401,22 +401,46 @@ final class BridgeToSwiftTests: XCTestCase {
     }
 
     func testThrowsVar() async throws {
-        try await checkProducesMessage(swift: """
+        try await check(swift: """
+        #if !SKIP_BRIDGE
         public var i: Int {
             get throws {
                 return 0
             }
         }
+        #endif
+        """, kotlin: """
+        val i: Int
+            get() = 0
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        public var i: Int {
+            get throws {
+                return try jniContext {
+                    do {
+                        let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, options: [], args: [])
+                        return Int(value_java)
+                    } catch let error as ThrowableError {
+                        throw error
+                    } catch {
+                        fatalError(String(describing: error))
+                    }
+                }
+            }
+        }
+        private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!
         """, transformers: transformers)
     }
 
     func testAsyncVar() async throws {
         try await checkProducesMessage(swift: """
+        #if !SKIP_BRIDGE
         public var i: Int {
             get async {
                 return 0
             }
         }
+        #endif
         """, transformers: transformers)
     }
 

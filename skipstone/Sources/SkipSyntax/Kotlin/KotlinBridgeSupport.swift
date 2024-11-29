@@ -470,8 +470,7 @@ extension KotlinVariableDeclaration {
             messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "async vars", source: translator.syntaxTree.source))
             return nil
         }
-        guard apiFlags.throwsType == .none else {
-            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "throws vars", source: translator.syntaxTree.source))
+        guard checkNonTypedThrows(self, apiFlags: apiFlags, source: translator.syntaxTree.source) else {
             return nil
         }
         guard !modifiers.isLazy else {

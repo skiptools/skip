@@ -164,12 +164,25 @@ final class KotlinBridgeToSwiftVisitor {
         // Getter
         let callType = inType == nil ? "callStatic" : "call"
         let callGet = inType == nil || modifiers.isStatic ? getMethodIdentifier : "Self." + getMethodIdentifier
-        swift.append(1, "get {")
-        swift.append(2, "return jniContext {")
-        swift.append(3, [
+        let getterBody = [
             "let value_java: " + bridgable.type.java(strategy: bridgable.strategy, options: options).description + " = try! \(targetIdentifier).\(callType)(method: \(callGet), options: \(options.jconvertibleOptions), args: [])",
             "return " + bridgable.type.convertFromJava(value: "value_java", strategy: bridgable.strategy, options: options)
-        ])
+        ]
+        if apiFlags.throwsType != .none {
+            swift.append(1, "get throws {")
+            swift.append(2, "return try jniContext {")
+            swift.append(3, "do {")
+            swift.append(4, getterBody)
+            swift.append(3, "} catch let error as ThrowableError {")
+            swift.append(4, "throw error")
+            swift.append(3, "} catch {")
+            swift.append(4, "fatalError(String(describing: error))")
+            swift.append(3, "}")
+        } else {
+            swift.append(1, "get {")
+            swift.append(2, "return jniContext {")
+            swift.append(3, getterBody)
+        }
         swift.append(2, "}")
         swift.append(1, "}")
 
@@ -282,7 +295,7 @@ final class KotlinBridgeToSwiftVisitor {
     }
 
     @discardableResult private func update(member functionDeclaration: KotlinFunctionDeclaration, info: CodebaseInfo.FunctionInfo?, uniquifier: Int, swiftDefinitions: inout [SwiftDefinition]) -> Bool {
-        guard var bridgable = functionDeclaration.checkBridgable(options: options, translator: translator) else {
+        guard let bridgable = functionDeclaration.checkBridgable(options: options, translator: translator) else {
             return false
         }
         let inType: StatementType = functionDeclaration.parent is KotlinInterfaceDeclaration ? .protocolDeclaration : (functionDeclaration.parent as? KotlinClassDeclaration)?.declarationType ?? .classDeclaration
