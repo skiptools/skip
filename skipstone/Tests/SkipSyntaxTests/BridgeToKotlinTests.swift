@@ -355,13 +355,28 @@ final class BridgeToKotlinTests: XCTestCase {
     }
 
     func testThrowsVar() async throws {
-        try await checkProducesMessage(swift: """
+        try await check(swiftBridge: """
         public var i: Int {
             get throws {
                 return 0
             }
         }
-        """, isSwiftBridge: true, transformers: transformers)
+        """, kotlin: """
+        val i: Int
+            get() = Swift_i()!!
+        private external fun Swift_i(): Int?
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1i")
+        func BridgeKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer? {
+            do {
+                let f_return_swift = try Int32(i)
+                return f_return_swift.toJavaObject(options: [])
+            } catch {
+                JavaThrowError(error, env: Java_env)
+                return nil
+            }
+        }
+        """, transformers: transformers)
     }
 
     func testAsyncVar() async throws {

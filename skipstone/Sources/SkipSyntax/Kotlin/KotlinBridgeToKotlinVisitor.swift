@@ -151,37 +151,55 @@ final class KotlinBridgeToKotlinVisitor {
         } else {
             getterSref = ""
         }
+        var asOptional = bridgable.type.isOptional
+        var forceUnwrapString = ""
+        if variableDeclaration.apiFlags.throwsType != .none && !bridgable.type.isOptional {
+            asOptional = true
+            forceUnwrapString = "!!"
+        }
         let getterBody = [
-            "return " + externalName + getterArguments + getterSref
+            "return " + externalName + getterArguments + forceUnwrapString + getterSref
         ]
         variableDeclaration.getter = Accessor(body: KotlinCodeBlock(statements: getterBody.map { KotlinRawStatement(sourceCode: $0) }))
-        externalFunctionDeclarations.append("private external fun \(externalName)\(getterParameters): \(bridgable.kotlinType.kotlin)")
+        externalFunctionDeclarations.append("private external fun \(externalName)\(getterParameters): \(bridgable.kotlinType.asOptional(asOptional).kotlin)")
 
         let cdeclInstanceParameters: [TypeSignature.Parameter]
         var cdeclGetterBody: [String] = []
+        let valueString: String
         if let classDeclaration {
             if isInstance {
                 if classDeclaration.declarationType == .classDeclaration {
                     cdeclGetterBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
-                    cdeclGetterBody.append("return " + bridgable.type.convertToCDecl(value: "peer_swift.\(propertyName)", strategy: bridgable.strategy, options: options))
+                    valueString = bridgable.type.convertToCDecl(value: "peer_swift.\(propertyName)", strategy: bridgable.strategy, options: options)
                 } else if classDeclaration.declarationType == .enumDeclaration {
                     cdeclGetterBody.append("let name_swift = String.fromJavaObject(name, options: \(options.jconvertibleOptions))")
                     cdeclGetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaName(name_swift)")
-                    cdeclGetterBody.append("return " + bridgable.type.convertToCDecl(value: "peer_swift.\(propertyName)", strategy: bridgable.strategy, options: options))
+                    valueString = bridgable.type.convertToCDecl(value: "peer_swift.\(propertyName)", strategy: bridgable.strategy, options: options)
                 } else {
                     cdeclGetterBody.append("let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!")
-                    cdeclGetterBody.append("return " + bridgable.type.convertToCDecl(value: "peer_swift.value.\(propertyName)", strategy: bridgable.strategy, options: options))
+                    valueString = bridgable.type.convertToCDecl(value: "peer_swift.value.\(propertyName)", strategy: bridgable.strategy, options: options)
                 }
                 cdeclInstanceParameters = [cdeclInstanceParameter(for: classDeclaration)]
             } else {
-                cdeclGetterBody.append("return " + bridgable.type.convertToCDecl(value: "\(classDeclaration.signature).\(propertyName)", strategy: bridgable.strategy, options: options))
+                valueString = bridgable.type.convertToCDecl(value: "\(classDeclaration.signature).\(propertyName)", strategy: bridgable.strategy, options: options)
                 cdeclInstanceParameters = []
             }
         } else {
-            cdeclGetterBody.append("return " + bridgable.type.convertToCDecl(value: propertyName, strategy: bridgable.strategy, options: options))
+            valueString = bridgable.type.convertToCDecl(value: propertyName, strategy: bridgable.strategy, options: options)
             cdeclInstanceParameters = []
         }
-        let cdeclGetter = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: .function(cdeclInstanceParameters, bridgable.type.cdecl(strategy: bridgable.strategy, options: options), APIFlags(), nil), body: cdeclGetterBody)
+        if variableDeclaration.apiFlags.throwsType == .none {
+            cdeclGetterBody.append("return " + valueString)
+        } else {
+            cdeclGetterBody.append("do {")
+            cdeclGetterBody.append(1, "let f_return_swift = try " + valueString)
+            cdeclGetterBody.append(1, "return f_return_swift.toJavaObject(options: \(options.jconvertibleOptions))")
+            cdeclGetterBody.append("} catch {")
+            cdeclGetterBody.append(1, "JavaThrowError(error, env: Java_env)")
+            cdeclGetterBody.append(1, "return nil")
+            cdeclGetterBody.append("}")
+        }
+        let cdeclGetter = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: .function(cdeclInstanceParameters, bridgable.type.asOptional(asOptional).cdecl(strategy: bridgable.strategy, options: options), APIFlags(), nil), body: cdeclGetterBody)
         cdeclFunctions.append(cdeclGetter)
 
         // Setter
