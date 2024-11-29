@@ -155,9 +155,9 @@ fileprivate extension AndroidOperationCommand {
     }
 
     /// Run `swift build` for the given Android architectures, optionally running the test cases on the device or copying all the files to the given `archiveOutputFolder`
-    func runSwiftPM(cleanup: Bool? = nil, execute executable: String? = nil, commandEnvironment: [String] = [], remoteFolder: String? = nil, copy: [String] = [], archiveOutputFolder: URL? = nil, with out: MessageQueue) async throws {
+    func runSwiftPM(cleanup: Bool? = nil, execute executable: String? = nil, commandEnvironment: [String] = [], defaultArch: AndroidArchArgument, remoteFolder: String? = nil, copy: [String] = [], archiveOutputFolder: URL? = nil, with out: MessageQueue) async throws {
         let packageDir = toolchainOptions.packagePath ?? "."
-        let archs = !toolchainOptions.arch.isEmpty ? toolchainOptions.arch : [.automatic]
+        let archs = !toolchainOptions.arch.isEmpty ? toolchainOptions.arch : [defaultArch]
         // pick the default architecture based on the current host; for running executables and tests, this will likely be the one that matches an attached emulator, but for an attached device, we don't know (e.g., an x86_64 host may be connecting to an aarch64 device).
 
         let architectures = archs.flatMap(\.architectures).uniqueElements()
@@ -684,7 +684,7 @@ struct AndroidBuildCommand: AndroidOperationCommand {
     var args: [String] = []
 
     func performCommand(with out: MessageQueue) async throws {
-        try await runSwiftPM(archiveOutputFolder: dir.flatMap(URL.init(fileURLWithPath:)), with: out)
+        try await runSwiftPM(defaultArch: .automatic, archiveOutputFolder: dir.flatMap(URL.init(fileURLWithPath:)), with: out)
     }
 }
 
@@ -720,7 +720,7 @@ struct AndroidRunCommand: AndroidOperationCommand {
     var args: [String] = []
 
     func performCommand(with out: MessageQueue) async throws {
-        try await runSwiftPM(cleanup: cleanup, execute: args.first, commandEnvironment: env, remoteFolder: remoteFolder, copy: copy, with: out)
+        try await runSwiftPM(cleanup: cleanup, execute: args.first, commandEnvironment: env, defaultArch: .current, remoteFolder: remoteFolder, copy: copy, with: out)
     }
 }
 
@@ -763,7 +763,7 @@ struct AndroidTestCommand: AndroidOperationCommand {
     var args: [String] = []
 
     func performCommand(with out: MessageQueue) async throws {
-        try await runSwiftPM(cleanup: cleanup, commandEnvironment: env, remoteFolder: remoteFolder, copy: copy, with: out)
+        try await runSwiftPM(cleanup: cleanup, commandEnvironment: env, defaultArch: .current, remoteFolder: remoteFolder, copy: copy, with: out)
     }
 }
 
