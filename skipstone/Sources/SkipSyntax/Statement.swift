@@ -29,10 +29,11 @@ class Statement: SyntaxNode {
 
     /// How to decode a declaration with the given attributes and visibility.
     static func decodeLevel(attributes: Attributes, visibility: Modifiers.Visibility, context: DecodeContext, in syntaxTree: SyntaxTree) -> DecodeLevel {
-        guard syntaxTree.isBridgeFile else {
-            return .full
+        // For full or none levels, no logic needed
+        guard syntaxTree.decodeLevel == .api else {
+            return syntaxTree.decodeLevel
         }
-        guard !attributes.isBridgeIgnored else {
+        guard !syntaxTree.isBridgeFile || !attributes.isBridgeIgnored else {
             return .none
         }
         if context.memberOf == .protocolDeclaration && !(self is TypeDeclaration.Type) {

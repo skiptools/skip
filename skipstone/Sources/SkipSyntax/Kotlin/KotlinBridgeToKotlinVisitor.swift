@@ -1,4 +1,6 @@
 /// Generate compiled Swift to Kotlin bridging code.
+///
+/// - Warning: This visitor assumes that the given syntax tree only contains bridged API.
 final class KotlinBridgeToKotlinVisitor {
     private let syntaxTree: KotlinSyntaxTree
     private let options: KotlinBridgeOptions
@@ -36,8 +38,9 @@ final class KotlinBridgeToKotlinVisitor {
                 updateVariableDeclaration(variableDeclaration)
                 return .skip
             } else if let functionDeclaration = node as? KotlinFunctionDeclaration, functionDeclaration.role == .global {
-                updateFunctionDeclaration(functionDeclaration, uniquifier: globalFunctionCount)
-                globalFunctionCount += 1
+                if updateFunctionDeclaration(functionDeclaration, uniquifier: globalFunctionCount) {
+                    globalFunctionCount += 1
+                }
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
                 if updateClassDeclaration(classDeclaration) {
@@ -273,9 +276,9 @@ final class KotlinBridgeToKotlinVisitor {
         }
     }
 
-    private func updateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, uniquifier: Int) {
+    private func updateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, uniquifier: Int) -> Bool {
         guard !functionDeclaration.isGenerated || functionDeclaration.type == .constructorDeclaration else {
-            return
+            return false
         }
         let isMutableStructCopyConstructor = classDeclaration != nil && functionDeclaration.isMutableStructCopyConstructor
         let bridgable: FunctionBridgable
@@ -284,7 +287,7 @@ final class KotlinBridgeToKotlinVisitor {
             bridgable = FunctionBridgable(parameters: [parameterBridgable], return: Bridgable(type: .void, kotlinType: .void, strategy: .direct))
         } else {
             guard let functionBridgable = functionDeclaration.checkBridgable(options: options, translator: translator) else {
-                return
+                return false
             }
             bridgable = functionBridgable
         }
@@ -522,6 +525,7 @@ final class KotlinBridgeToKotlinVisitor {
         } + callbackParameter, cdeclReturnType, APIFlags(), nil)
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
         cdeclFunctions.append(cdeclFunction)
+        return true
     }
 
     private func isGeneratedMemberwiseConstructor(_ functionDeclaration: KotlinFunctionDeclaration, for classDeclaration: KotlinClassDeclaration?) -> Bool {
@@ -654,9 +658,9 @@ final class KotlinBridgeToKotlinVisitor {
         interfaceDeclaration.extras = nil
         interfaceDeclaration.inherits = interfaceDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.checkBridgable(options: options, codebaseInfo: codebaseInfo) != nil }
         for member in interfaceDeclaration.members {
-            if let variableDeclaration = member as? KotlinVariableDeclaration, !variableDeclaration.attributes.isBridgeIgnored {
+            if let variableDeclaration = member as? KotlinVariableDeclaration {
                 _ = variableDeclaration.checkBridgable(options: options, translator: translator)
-            } else if let functionDeclaration = member as? KotlinFunctionDeclaration, !functionDeclaration.attributes.isBridgeIgnored {
+            } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
                 _ = functionDeclaration.checkBridgable(options: options, translator: translator)
             }
         }
@@ -775,8 +779,7 @@ final class KotlinBridgeToKotlinVisitor {
                     // The decoder includes all constructors so that we can detect whether the class needs a default
                     // constructor generated, but it marks constructors that shouldn't be bridged
                     classDeclaration.remove(statement: functionDeclaration)
-                } else {
-                    updateFunctionDeclaration(functionDeclaration, in: classDeclaration, uniquifier: functionCount)
+                } else if updateFunctionDeclaration(functionDeclaration, in: classDeclaration, uniquifier: functionCount) {
                     functionCount += 1
                 }
             }

@@ -28,7 +28,7 @@ extension XCTestCase {
     ///   - swiftBridgeSupports: multiple expected bridging swift outputs
     ///   - file: the file of the call site, expected to be `#file`
     ///   - line: the line of the call site, expected to be `#line`
-    public func check(expectFailure: Bool = false, expectMessages: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], dependentModules: [CodebaseInfo.ModuleExport] = [], supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, swiftBridge: String? = nil, kotlin: String? = nil, kotlins: [String] = [], fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, kotlinPackageSupport: String? = nil, swiftBridgeSupport: String? = nil, swiftBridgeSupports: [String] = [], transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
+    public func check(expectFailure: Bool = false, expectMessages: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], dependentModules: [CodebaseInfo.ModuleExport] = [], supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, swiftBridge: String? = nil, kotlin: String? = nil, kotlins: [String] = [], fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, kotlinPackageSupport: String? = nil, swiftBridgeSupport: String? = nil, swiftBridgeSupports: [String] = [], bridgeDecodeLevel: DecodeLevel = .api, transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
 
         func fixup(code: String) -> String {
             var code = fixupKotlinBlock(code)
@@ -98,7 +98,7 @@ extension XCTestCase {
         }
         let codebaseInfo = CodebaseInfo()
         codebaseInfo.dependentModules = dependentModules
-        let tp = Transpiler(transpileFiles: srcFiles, bridgeFiles: bridgeFiles, codebaseInfo: codebaseInfo, transformers: transformers)
+        let tp = Transpiler(transpileFiles: srcFiles, bridgeFiles: bridgeFiles, bridgeDecodeLevel: bridgeDecodeLevel, codebaseInfo: codebaseInfo, transformers: transformers)
         var transpilations: [Transpilation] = []
         try await tp.transpile { transpilations.append($0) }
         guard !transpilations.isEmpty else {

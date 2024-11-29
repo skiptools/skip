@@ -293,6 +293,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         let isNativeModule = baseSkipConfig.skip?.mode?.lowercased() == "native"
         let isBridgingEnabled = baseSkipConfig.skip?.isBridgingEnabled() == true
+        let dynamicRoot = baseSkipConfig.skip?.dynamicroot
+        let bridgeDecodeLevel: DecodeLevel = dynamicRoot == nil ? .api : .full
 
         // projects with a CMakeLists.txt file are built as a native Android library
         // these are only used for purely native code libraries, and so we short-circuit the build generation
@@ -344,11 +346,11 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         for sourceFile in sourceURLs.map(\.path).sorted() {
             if !isNativeModule {
                 transpileFiles.append(sourceFile)
-            } else if isBridgingEnabled {
+            } else if isBridgingEnabled || dynamicRoot != nil {
                 swiftFiles.append(sourceFile)
             }
         }
-        let transpiler = Transpiler(packageName: packageName, transpileFiles: transpileFiles.map(Source.FilePath.init(path:)), bridgeFiles: swiftFiles.map(Source.FilePath.init(path:)), codebaseInfo: codebaseInfo, preprocessorSymbols: Set(inputOptions.symbols), transformers: transformers)
+        let transpiler = Transpiler(packageName: packageName, transpileFiles: transpileFiles.map(Source.FilePath.init(path:)), bridgeFiles: swiftFiles.map(Source.FilePath.init(path:)), bridgeDecodeLevel: bridgeDecodeLevel, codebaseInfo: codebaseInfo, preprocessorSymbols: Set(inputOptions.symbols), transformers: transformers)
 
         try await transpiler.transpile(handler: handleTranspilation)
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json
@@ -466,7 +468,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             }
 
             // if the package is to be bridged, then create a src/main/swift folder that links to the source package
-            // FIXME: This prevents SkipBridgeToKotlinSamples tests from building successfully
+            //~~~
             if baseSkipConfig.skip?.isBridgingEnabled() != true {
                 return
             }
@@ -1123,6 +1125,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             let configOptions = config.skip?.bridgingOptions() ?? []
             let transformerOptions = KotlinBridgeOptions.parse(configOptions)
             transformers.append(KotlinBridgeTransformer(options: transformerOptions))
+        }
+        if let root = config.skip?.dynamicroot {
+            transformers.append(KotlinDynamicObjectTransformer(root: root))
         }
 
         //if let packageName = config.skip?.package {

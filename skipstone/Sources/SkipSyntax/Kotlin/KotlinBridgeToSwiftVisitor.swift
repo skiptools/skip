@@ -147,7 +147,7 @@ final class KotlinBridgeToSwiftVisitor {
             modifiers.visibility = .default
         }
         let modifierString = modifiers.swift(suffix: " ")
-        let hasSetter = apiFlags.options.contains(.writeable) && modifiers.setVisibility != .private && modifiers.setVisibility != .fileprivate
+        let hasSetter = apiFlags.options.contains(.writeable) && (modifiers.setVisibility == .default || modifiers.setVisibility >= .public)
         var declarationSuffix = " {"
         if inType == .protocolDeclaration {
             declarationSuffix += " get"
@@ -850,6 +850,9 @@ final class KotlinBridgeToSwiftVisitor {
             } else if protocolSignature.isComparable {
                 swift.append(1, self.swift(forLessThanDeclarationIn: bridgeImpl, options: options, modifiers: Modifiers(visibility: .public, isStatic: true)))
             } else if let protocolInfo = codebaseInfo.primaryTypeInfo(forNamed: protocolSignature) {
+                guard protocolInfo.modifiers.visibility >= .public, !protocolInfo.attributes.isBridgeIgnored else {
+                    continue
+                }
                 swift.append(1, self.swift(forUnknownBridgeImplMembers: protocolInfo, options: options, codebaseInfo: codebaseInfo, functionCount: &functionCount))
             }
         }

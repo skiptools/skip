@@ -7,15 +7,17 @@ public struct Transpiler {
     private let packageName: String?
     private let transpileFiles: [Source.FilePath]
     private let bridgeFiles: [Source.FilePath]
+    private let bridgeDecodeLevel: DecodeLevel
     private let codebaseInfo: CodebaseInfo
     public var preprocessorSymbols: Set<String>
     public var transformers: [KotlinTransformer]
 
     /// Supply files to transpile.
-    public init(packageName: String? = nil, transpileFiles: [Source.FilePath], bridgeFiles: [Source.FilePath] = [], codebaseInfo: CodebaseInfo, preprocessorSymbols: Set<String> = [], transformers: [KotlinTransformer] = []) {
+    public init(packageName: String? = nil, transpileFiles: [Source.FilePath], bridgeFiles: [Source.FilePath] = [], bridgeDecodeLevel: DecodeLevel = .api, codebaseInfo: CodebaseInfo, preprocessorSymbols: Set<String> = [], transformers: [KotlinTransformer] = []) {
         self.packageName = packageName
         self.transpileFiles = transpileFiles
         self.bridgeFiles = bridgeFiles
+        self.bridgeDecodeLevel = bridgeDecodeLevel
         self.codebaseInfo = codebaseInfo
         self.preprocessorSymbols = preprocessorSymbols
         self.transformers = transformers
@@ -41,10 +43,10 @@ public struct Transpiler {
                 group.addTask {
                     let bridgeSource = try Source(file: bridgeFile)
                     // Most compiled files may not contain any public code
-                    guard bridgeSource.content.contains("public") || bridgeSource.content.contains("open") else {
+                    guard bridgeDecodeLevel == .full || bridgeSource.content.contains("public") || bridgeSource.content.contains("open") else {
                         return nil
                     }
-                    return SyntaxTree(source: bridgeSource, isBridgeFile: true, preprocessorSymbols: preprocessorSymbols)
+                    return SyntaxTree(source: bridgeSource, isBridgeFile: true, decodeLevel: bridgeDecodeLevel, preprocessorSymbols: preprocessorSymbols)
                 }
             }
             for try await syntaxTree in group {
@@ -78,7 +80,9 @@ public struct Transpiler {
             for bridgeSource in bridgeSources {
                 group.addTask {
                     let start = Date().timeIntervalSinceReferenceDate
-                    let syntaxTree = SyntaxTree(source: bridgeSource, isBridgeFile: true, preprocessorSymbols: preprocessorSymbols, codebaseInfo: codebaseInfo)
+                    // Note that we do not use the `bridgeDecodeLevel` here. We use it in the first pass to allow the transformers
+                    // to gather needed information, but we always only transpile and bridge public API
+                    let syntaxTree = SyntaxTree(source: bridgeSource, isBridgeFile: true, decodeLevel: .api, preprocessorSymbols: preprocessorSymbols, codebaseInfo: codebaseInfo)
                     let translator = KotlinTranslator(syntaxTree: syntaxTree)
                     return translator.transpile(codebaseInfo: codebaseInfo, transformers: transformers, startTime: start)
                 }
