@@ -4,6 +4,6 @@ public enum OutputType : Encodable { // Encodable for use in Transpilation
     case `default`
     /// Swift generated to bridge a transpiled type to Swift.
     case bridgeToSwift
-    /// Swift generated to bridge a native Swift type to Kotlin.
-    case bridgeToKotlin
+    /// Swift generated to bridge a native Swift type to the target language.
+    case bridgeFromSwift
 }

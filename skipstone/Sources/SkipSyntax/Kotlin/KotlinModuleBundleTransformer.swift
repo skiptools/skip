@@ -26,9 +26,9 @@ final class KotlinModuleBundleTransformer: KotlinTransformer {
         return []
     }
 
-    func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> Bool {
+    func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         guard needsModuleBundle else {
-            return false
+            return []
         }
         
         let declarations = [
@@ -40,6 +40,6 @@ final class KotlinModuleBundleTransformer: KotlinTransformer {
         let statements = declarations.map { KotlinRawStatement(sourceCode: $0) }
         statements[0].extras = .singleNewline
         syntaxTree.root.insert(statements: statements, after: syntaxTree.root.statements.last)
-        return true
+        return []
     }
 }

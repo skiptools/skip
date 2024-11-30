@@ -19,12 +19,12 @@ public protocol KotlinTransformer {
     /// Apply this transformer to the given Kotlin syntax tree.
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput]
 
-    /// Apply this transformer to the package-level generated source file.
+    /// Apply this transformer to package-level constructs.
     ///
-    /// There is nothing in this tree except code added by the transfomer chain.
-    ///
-    /// - Returns: Whether any code was added to the tree.
-    func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> Bool
+    /// - Parameter syntaxTree: Package-level Kotlin support file. There is nothing in this tree
+    ///     except code added by the transfomer chain.
+    /// - Returns: Any additional package-level output files.
+    func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput]
 }
 
 public struct KotlinTransformerOutput {
@@ -97,7 +97,7 @@ extension KotlinTransformer {
         return []
     }
 
-    public func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> Bool {
-        return false
+    public func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
+        return []
     }
 }

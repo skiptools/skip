@@ -3028,8 +3028,8 @@ final class BridgeToKotlinTests: XCTestCase {
                         else -> null
                     }
                 }
-                fun init(string: String): E = Swift_Companion_init_2(string)
-                private external fun Swift_Companion_init_2(string: String): E
+                fun init(string: String): E = Swift_Companion_init_1(string)
+                private external fun Swift_Companion_init_1(string: String): E
             }
         }
         fun E(string: String): E = E.init(string = string)
@@ -3074,8 +3074,8 @@ final class BridgeToKotlinTests: XCTestCase {
             let f_return_swift = peer_swift.negate()
             return Int32(f_return_swift)
         }
-        @_cdecl("Java_E_00024Companion_Swift_1Companion_1init_12")
-        func E_Swift_Companion_init_2(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaString) -> JavaObjectPointer {
+        @_cdecl("Java_E_00024Companion_Swift_1Companion_1init_11")
+        func E_Swift_Companion_init_1(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaString) -> JavaObjectPointer {
             let p_0_swift = String.fromJavaObject(p_0, options: [])
             let f_return_swift = E.init(string: p_0_swift)
             return f_return_swift.toJavaObject(options: [])!

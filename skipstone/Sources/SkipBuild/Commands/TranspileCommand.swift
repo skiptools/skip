@@ -294,7 +294,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let isNativeModule = baseSkipConfig.skip?.mode?.lowercased() == "native"
         let isBridgingEnabled = baseSkipConfig.skip?.isBridgingEnabled() == true
         let dynamicRoot = baseSkipConfig.skip?.dynamicroot
-        let bridgeDecodeLevel: DecodeLevel = dynamicRoot == nil ? .api : .full
 
         // projects with a CMakeLists.txt file are built as a native Android library
         // these are only used for purely native code libraries, and so we short-circuit the build generation
@@ -350,7 +349,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 swiftFiles.append(sourceFile)
             }
         }
-        let transpiler = Transpiler(packageName: packageName, transpileFiles: transpileFiles.map(Source.FilePath.init(path:)), bridgeFiles: swiftFiles.map(Source.FilePath.init(path:)), bridgeDecodeLevel: bridgeDecodeLevel, codebaseInfo: codebaseInfo, preprocessorSymbols: Set(inputOptions.symbols), transformers: transformers)
+        let transpiler = Transpiler(packageName: packageName, transpileFiles: transpileFiles.map(Source.FilePath.init(path:)), bridgeFiles: swiftFiles.map(Source.FilePath.init(path:)), isBridgeEnabled: isBridgingEnabled, isBridgeGatherEnabled: dynamicRoot != nil, codebaseInfo: codebaseInfo, preprocessorSymbols: Set(inputOptions.symbols), transformers: transformers)
 
         try await transpiler.transpile(handler: handleTranspilation)
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json
@@ -445,31 +444,41 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             if let skipBridgeOutput = transpileOptions.skipBridgeOutput {
                 let skipBridgeOutputFolder = try AbsolutePath(validating: skipBridgeOutput)
 
-                let candidateBridgeFiles = skipBridgeTranspilations.map({ $0.output.file.name })
+                let swiftBridgeFileNameTranspilationMap = skipBridgeTranspilations.reduce(into: Dictionary<String, Transpilation>()) { result, transpilation in
+                    result[transpilation.output.file.name] = transpilation
+                }
 
                 for swiftSourceFile in sourceURLs.filter({ $0.pathExtension == "swift"}) {
                     let swiftFileBase = swiftSourceFile.deletingPathExtension().lastPathComponent
                     let swiftBridgeFileName = swiftFileBase.appending(Source.FilePath.bridgeFileSuffix)
                     let swiftBridgeOutputPath = skipBridgeOutputFolder.appending(components: [swiftBridgeFileName])
 
-                    var bridgeContents = ""
-
-                    if !candidateBridgeFiles.isEmpty {
-                        // FIXME: this doesn't handle the case where there are multiple files with the same name in a project (e.g., Folder1/Utils.swift and Folder2/Utils.swift). We would need to handle un-flattened project hierarchies to get past this
-                        if let bridgeMatch = skipBridgeTranspilations.first(where: { $0.output.file.name == swiftBridgeFileName }) {
-                            bridgeContents += bridgeMatch.output.content
-                        }
+                    // FIXME: this doesn't handle the case where there are multiple files with the same name in a project (e.g., Folder1/Utils.swift and Folder2/Utils.swift). We would need to handle un-flattened project hierarchies to get past this
+                    let bridgeContents: String
+                    if let bridgeTranspilation = swiftBridgeFileNameTranspilationMap[swiftBridgeFileName] {
+                        bridgeContents = bridgeTranspilation.output.content
+                    } else {
+                        bridgeContents = ""
                     }
-
                     try writeChanges(tag: "skipbridge", to: swiftBridgeOutputPath, contents: bridgeContents.utf8Data, readOnly: true)
                 }
+
+                // write support files
+                let dynamicSupportFileName = KotlinDynamicObjectTransformer.supportFileName
+                let dynamicSupportContents: String
+                if let dynamicSupportTranspilation = swiftBridgeFileNameTranspilationMap[dynamicSupportFileName] {
+                    dynamicSupportContents = dynamicSupportTranspilation.output.content
+                } else {
+                    dynamicSupportContents = ""
+                }
+                let dynamicSupportOutputPath = skipBridgeOutputFolder.appending(components: [dynamicSupportFileName])
+                try writeChanges(tag: "skipbridge", to: dynamicSupportOutputPath, contents: dynamicSupportContents.utf8Data, readOnly: true)
 
                 return
             }
 
             // if the package is to be bridged, then create a src/main/swift folder that links to the source package
-            //~~~
-            if baseSkipConfig.skip?.isBridgingEnabled() != true {
+            if baseSkipConfig.skip?.isBridgingEnabled() != true && baseSkipConfig.skip?.dynamicroot == nil {
                 return
             }
 
@@ -850,13 +859,15 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 await out.yield(message)
             }
 
-            if [.bridgeToSwift, .bridgeToKotlin].contains(transpilation.outputType) || transpilation.output.file.isBridgeOutputFile {
-                //warn("bridge transpilation \(transpilation.outputType): \(transpilation.output.file.name) source: \(transpilation.output.content.count.byteCount)")
+            switch transpilation.outputType {
+            case .bridgeToSwift, .bridgeFromSwift:
                 skipBridgeTranspilations.append(transpilation)
                 return
+            case .default:
+                break
             }
 
-            // when we are running with SKIP_BRIDGE, we don't write need to write out the Kotlin (which has already been generated in the first pass of the plugin)
+            // when we are running with SKIP_BRIDGE, we don't need to write out the Kotlin (which has already been generated in the first pass of the plugin)
             if transpileOptions.skipBridgeOutput != nil {
                 //warn("suppressing transpiled Kotlin due to transpileOptions.skipBridgeOutput")
                 return

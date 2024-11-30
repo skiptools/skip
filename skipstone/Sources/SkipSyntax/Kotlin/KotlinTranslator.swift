@@ -60,27 +60,28 @@ public final class KotlinTranslator {
         let outputs = transformers.flatMap { $0.apply(to: kotlinSyntaxTree, translator: self) }
         addPackageAndRequiredImportStatements(to: kotlinSyntaxTree)
 
-        return transpilations(for: kotlinSyntaxTree, codebaseInfo: codebaseInfo, transformers: transformers, outputs: outputs, startTime: startTime)
+        return transpilations(for: kotlinSyntaxTree, codebaseInfo: codebaseInfo, transformers: transformers, input: kotlinSyntaxTree.source, outputs: outputs, startTime: startTime)
     }
 
     /// Transpile the package support file containing any needed package-level code.
-    public static func transpilePackageSupport(sourceFile: Source.FilePath, codebaseInfo: CodebaseInfo, transformers: [KotlinTransformer]) -> Transpilation? {
+    public static func transpilePackageSupport(sourceFile: Source.FilePath, codebaseInfo: CodebaseInfo, transformers: [KotlinTransformer]) -> [Transpilation] {
         let startTime = Date().timeIntervalSinceReferenceDate
-        let syntaxTree = SyntaxTree(source: Source(file: sourceFile, content: ""))
+        let source = Source(file: sourceFile, content: "")
+        let syntaxTree = SyntaxTree(source: source)
         let translator = KotlinTranslator(syntaxTree: syntaxTree)
         let codebaseInfoContext = codebaseInfo.context(sourceFile: sourceFile)
         translator.codebaseInfo = codebaseInfoContext
         translator.packageName = codebaseInfo.kotlin?.packageName
 
         let kotlinSyntaxTree = translator.translateSyntaxTree()
-        let results = transformers.map { $0.apply(toPackage: kotlinSyntaxTree, translator: translator) }
-        guard results.contains(true) else {
-            return nil
+        let outputs = transformers.flatMap { $0.apply(toPackage: kotlinSyntaxTree, translator: translator) }
+        let packageSyntaxTree: KotlinSyntaxTree? = kotlinSyntaxTree.root.statements.isEmpty ? nil : kotlinSyntaxTree
+        if let packageSyntaxTree {
+            translator.addPackageAndRequiredImportStatements(to: packageSyntaxTree)
         }
-        translator.addPackageAndRequiredImportStatements(to: kotlinSyntaxTree)
 
-        let transpilations = translator.transpilations(for: kotlinSyntaxTree, codebaseInfo: codebaseInfo, transformers: transformers, outputs: [], startTime: startTime)
-        return transpilations.first
+        let transpilations = translator.transpilations(for: packageSyntaxTree, codebaseInfo: codebaseInfo, transformers: transformers, input: source, outputs: outputs, startTime: startTime)
+        return transpilations
     }
 
     /// Translate syntax trees only.
@@ -262,20 +263,23 @@ public final class KotlinTranslator {
         }
     }
 
-    private func transpilations(for kotlinSyntaxTree: KotlinSyntaxTree, codebaseInfo: CodebaseInfo, transformers: [KotlinTransformer], outputs: [KotlinTransformerOutput], startTime: TimeInterval) -> [Transpilation] {
-        let messages = kotlinSyntaxTree.messages + codebaseInfo.messages(for: syntaxTree.source.file) + transformers.flatMap { $0.messages(for: syntaxTree.source.file) }
-        let outputFile = syntaxTree.source.file.outputFile(withExtension: "kt")
-        let outputGenerator = OutputGenerator(root: kotlinSyntaxTree.root)
-        let (output, outputMap) = outputGenerator.generateOutput(file: outputFile)
-        let endTime = Date().timeIntervalSinceReferenceDate // track the duration for logging
-        let transpilation = Transpilation(input: kotlinSyntaxTree.source, output: output, outputType: .default, outputMap: outputMap, messages: messages, duration: endTime - startTime)
-
+    private func transpilations(for kotlinSyntaxTree: KotlinSyntaxTree?, codebaseInfo: CodebaseInfo, transformers: [KotlinTransformer], input: Source, outputs: [KotlinTransformerOutput], startTime: TimeInterval) -> [Transpilation] {
         var transpilations: [Transpilation] = []
-        transpilations.append(transpilation)
+        var startTime = startTime
+        if let kotlinSyntaxTree {
+            let messages = kotlinSyntaxTree.messages + codebaseInfo.messages(for: syntaxTree.source.file) + transformers.flatMap { $0.messages(for: syntaxTree.source.file) }
+            let outputFile = syntaxTree.source.file.outputFile(withExtension: "kt")
+            let outputGenerator = OutputGenerator(root: kotlinSyntaxTree.root)
+            let (output, outputMap) = outputGenerator.generateOutput(file: outputFile)
+            let endTime = Date().timeIntervalSinceReferenceDate // track the duration for logging
+            let transpilation = Transpilation(input: input, output: output, outputType: .default, outputMap: outputMap, messages: messages, duration: endTime - startTime)
+            transpilations.append(transpilation)
+            startTime = endTime
+        }
         for transformerOutput in outputs {
             let outputGenerator = OutputGenerator(root: transformerOutput.node)
             let (output, outputMap) = outputGenerator.generateOutput(file: transformerOutput.file)
-            let transpilation = Transpilation(input: syntaxTree.source, output: output, outputType: transformerOutput.type, outputMap: outputMap, messages: [], duration: Date().timeIntervalSinceReferenceDate - endTime)
+            let transpilation = Transpilation(input: input, output: output, outputType: transformerOutput.type, outputMap: outputMap, messages: [], duration: Date().timeIntervalSinceReferenceDate - startTime)
             transpilations.append(transpilation)
         }
         return transpilations

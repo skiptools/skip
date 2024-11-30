@@ -95,7 +95,7 @@ final class KotlinBridgeToKotlinVisitor {
             swiftDefinitions.forEach { $0.append(to: output, indentation: indentation) }
             cdeclFunctions.forEach { $0.append(to: output, indentation: indentation) }
         }
-        return KotlinTransformerOutput(file: outputFile, node: outputNode, type: .bridgeToKotlin)
+        return KotlinTransformerOutput(file: outputFile, node: outputNode, type: .bridgeFromSwift)
     }
 
     private func isKotlinImport(_ importDeclaration: KotlinImportDeclaration) -> Bool {

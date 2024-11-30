@@ -1,5 +1,7 @@
 /// Generate dynamic object types.
 public final class KotlinDynamicObjectTransformer: KotlinTransformer {
+    public static let supportFileName = "AnyDynamicObject_Support.swift"
+
     private let root: String
     private var generateClassNames: Set<String> = []
 
@@ -28,10 +30,71 @@ public final class KotlinDynamicObjectTransformer: KotlinTransformer {
     }
 
     public func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
-        let classNames = generateClassNames.sorted()
-        var namespaces: Set<String> = []
-        
         return []
+    }
+
+    public func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
+        let classNames = generateClassNames.sorted()
+        var generated: Set<String> = []
+        var swift: [String] = []
+        classNames.forEach { swift += generateDynamicClass(fullName: $0, generated: &generated) }
+        guard !swift.isEmpty else {
+            return []
+        }
+
+        var outputFile = syntaxTree.source.file
+        outputFile.name = Self.supportFileName
+        let outputNode = SwiftDefinition { output, indentation, _ in
+            output.append("import SkipBridge\n\n")
+            swift.forEach { output.append($0).append("\n") }
+        }
+        return [KotlinTransformerOutput(file: outputFile, node: outputNode, type: .bridgeToSwift)]
+    }
+
+    private func generateDynamicClass(fullName: String, generated: inout Set<String>) -> [String] {
+        let tokens = fullName.split(separator: ".")
+        var swift: [String] = []
+        for i in 0..<tokens.count {
+            let namespace = tokens[0..<i].joined(separator: ".")
+            if i > 0 && tokens[i].first?.isUppercase == true {
+                generateDynamicClass(name: String(tokens[i]), in: namespace, generated: &generated, swift: &swift)
+            } else {
+                generateNamespace(String(tokens[i]), in: namespace, generated: &generated, swift: &swift)
+            }
+        }
+        return swift
+    }
+
+    private func generateNamespace(_ namespace: String, in parent: String, generated: inout Set<String>, swift: inout [String]) {
+        if parent.isEmpty {
+            guard generated.insert(namespace).inserted else {
+                return
+            }
+            swift.append("enum \(namespace) {}")
+        } else {
+            guard generated.insert(parent + "." + namespace).inserted else {
+                return
+            }
+            swift.append("extension \(parent) { enum \(namespace) {} }")
+        }
+    }
+
+    private func generateDynamicClass(name: String, in namespace: String, generated: inout Set<String>, swift: inout [String]) {
+        let className = namespace.dropFirst(root.count + 1) + "." + name
+        guard generated.insert(className).inserted else {
+            return
+        }
+        swift.append("extension \(namespace) {")
+        swift.append(1, "final class \(name): AnyDynamicObject {")
+        swift.append(2, "init(_ arguments: Any?...) throws {")
+        swift.append(3, "try super.init(className: \"\(className)\", arguments: arguments)")
+        swift.append(2, "}")
+        swift.append(2, "required init(for object: JavaObjectPointer) throws {")
+        swift.append(3, "try super.init(for: object)")
+        swift.append(2, "}")
+        swift.append(2, "static let Companion = try! AnyDynamicObject(forStaticsOfClassName: \"\(className)\")")
+        swift.append(1, "}")
+        swift.append("}")
     }
 
     private func addDynamicClassNames(from signature: TypeSignature) {
@@ -49,47 +112,44 @@ public final class KotlinDynamicObjectTransformer: KotlinTransformer {
         guard !(memberAccess.parent is MemberAccess) else {
             return
         }
-        var string: String = ""
-        if memberAccessToString(memberAccess, string: &string) {
-            addDynamicClassNames(from: string)
-        }
+        let (string, _) = memberAccessToString(memberAccess)
+        addDynamicClassNames(from: string)
     }
 
     private func addDynamicClassNames(from string: String) {
         guard string.hasPrefix(root + ".") else {
             return
         }
-        // This might be a nested type, in which case we added it and its outer types
-        var tokens = string.dropFirst(root.count + 1).split(separator: ".")
+        // This might be a nested type, in which case we add it and its outer types
+        var tokens = string.split(separator: ".")
         while tokens.last?.first?.isUppercase == true {
             generateClassNames.insert(tokens.joined(separator: "."))
             tokens = tokens.dropLast()
         }
     }
 
-    private func memberAccessToString(_ memberAccess: MemberAccess, string: inout String) -> Bool {
+    private func memberAccessToString(_ memberAccess: MemberAccess) -> (string: String, append: Bool) {
         guard memberAccess.member != "self" && memberAccess.member != "Type" && memberAccess.member != "Companion" else {
             if let baseAccess = memberAccess.base as? MemberAccess {
-                return memberAccessToString(baseAccess, string: &string)
-            } else {
-                return false
+                let (string, _) = memberAccessToString(baseAccess)
+                return (string, false)
             }
+            return ("", false)
         }
         if let identifier = memberAccess.base as? Identifier {
-            if identifier.name != root {
-                return false
+            guard identifier.name == root else {
+                return ("", false)
             }
-            string = identifier.name + "." + memberAccess.member
-            return true
+            return (root + "." + memberAccess.member, true)
         } else if let baseAccess = memberAccess.base as? MemberAccess {
-            if memberAccessToString(baseAccess, string: &string) {
-                string = string + "." + memberAccess.member
-                return true
+            let (string, append) = memberAccessToString(baseAccess)
+            if append {
+                return (string + "." + memberAccess.member, true)
             } else {
-                return false
+                return (string, false)
             }
         } else {
-            return false
+            return ("", false)
         }
     }
 }
