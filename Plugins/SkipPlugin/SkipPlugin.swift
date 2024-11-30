@@ -317,6 +317,10 @@ import PackagePlugin
                 let bridgeName = swiftPath.stem + bridgeSuffix
                 return skipBridgeOutputDir.appending(subpath: bridgeName)
             })
+
+            // output an additional file for dynamic object code generation
+            outputFiles.append(skipBridgeOutputDir.appending(subpath: "AnyDynamicObject_Support.swift")) // SkipSyntax.KotlinDynamicObjectTransformer.supportFileName
+
             buildArguments += ["--skip-bridge-output", skipBridgeOutputDir.string]
         }
 
