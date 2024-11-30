@@ -217,6 +217,15 @@ fileprivate extension AndroidOperationCommand {
             for xswiftc in toolchainOptions.xswiftc {
                 cmd += ["-Xswiftc", xswiftc]
             }
+            for xcc in toolchainOptions.xcc {
+                cmd += ["-Xcc", xcc]
+            }
+            for xlinker in toolchainOptions.xlinker {
+                cmd += ["-Xlinker", xlinker]
+            }
+            for xcxx in toolchainOptions.xcxx {
+                cmd += ["-Xcxx", xcxx]
+            }
             // when executable is specified, then the arguments are the command to run;
             // otherwise, they are considered build arguments
             if executable == nil {
@@ -786,8 +795,19 @@ struct ToolchainOptions: ParsableArguments {
     @Option(help: ArgumentHelp("Custom scratch directory path", valueName: ".build"))
     var scratchPath: String? = nil
 
-    @Option(name: [.customLong("Xswiftc", withSingleDash: true)], parsing: .unconditionalSingleValue, help: ArgumentHelp("Swift compiler options to pass", valueName: "option"))
+    // Ideally, -Xswiftc, -Xcc, -Xlinker, and -Xcxx would be handled by the `@Argument(parsing: .allUnrecognized)` attribute of args, but the single dash seems to confuse it…
+
+    @Option(name: [.customLong("Xswiftc", withSingleDash: true)], parsing: .unconditionalSingleValue, help: ArgumentHelp("Pass flag through to all Swift compiler invocations"))
     var xswiftc: [String] = []
+
+    @Option(name: [.customLong("Xcc", withSingleDash: true)], parsing: .unconditionalSingleValue, help: ArgumentHelp("Pass flag through to all C compiler invocations"))
+    var xcc: [String] = []
+
+    @Option(name: [.customLong("Xlinker", withSingleDash: true)], parsing: .unconditionalSingleValue, help: ArgumentHelp("Pass flag through to all linker invocations"))
+    var xlinker: [String] = []
+
+    @Option(name: [.customLong("Xcxx", withSingleDash: true)], parsing: .unconditionalSingleValue, help: ArgumentHelp("Pass flag through to all C++ compiler invocations"))
+    var xcxx: [String] = []
 
     @Option(name: [.customShort("c"), .long], help: ArgumentHelp("Build with configuration", valueName: "debug"))
     var configuration: BuildConfiguration? = nil
