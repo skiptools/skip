@@ -131,19 +131,6 @@ public struct Source : Encodable {
             }
             return Source.FilePath(path: self.path.dropLast(".swift".count) + Self.bridgeFileSuffix)
         }
-
-        /// The source Swift file that corresponds to this bridge file, if it is a bridge.
-        public var bridgelessOutputFile: Source.FilePath? {
-            if !isBridgeOutputFile {
-                return nil
-            }
-            return Source.FilePath(path: self.path.dropLast(Self.bridgeFileSuffix.count) + ".swift")
-        }
-
-        /// Whether this is a bridging output file.
-        public var isBridgeOutputFile: Bool {
-            return path.hasSuffix(Self.bridgeFileSuffix)
-        }
     }
 
     /// A line and column-based range in the source, appropriate for Xcode reporting.

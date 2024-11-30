@@ -66,10 +66,10 @@ final class KotlinTupleLabelTransformer: KotlinTransformer {
         return []
     }
 
-    func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> Bool {
+    func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         // No need to lock here because this function is not invoked concurrently with any other
         guard !tupleLabels.isEmpty else {
-            return false
+            return []
         }
         packageSourceFile = syntaxTree.source.file
 
@@ -89,7 +89,7 @@ final class KotlinTupleLabelTransformer: KotlinTransformer {
             }
             duplicateLabels.forEach { packageMessages.append(.kotlinTupleConflictingLabel(label: $0, arity: tupleArity, sourceFile: syntaxTree.source.file)) }
         }
-        return true
+        return []
     }
 
     private func gatherTupleLabels(from type: TypeSignature, into tupleLabels: inout TupleLabels) {

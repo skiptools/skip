@@ -51,7 +51,7 @@ struct DecodeContext {
 }
 
 /// Levels of decoding.
-enum DecodeLevel {
+public enum DecodeLevel {
     case none
     case api
     case full

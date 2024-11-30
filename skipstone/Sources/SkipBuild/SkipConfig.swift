@@ -23,6 +23,8 @@ struct TranspilationConfig : Codable {
     var mode: String?
     /// Whether/how to bridge this module
     var bridging: Either<Bool>.Or<BridgeConfig>?
+    /// Namespace for code gen of dynamic types
+    var dynamicroot: String?
 
     func isBridgingEnabled() -> Bool {
         switch bridging {

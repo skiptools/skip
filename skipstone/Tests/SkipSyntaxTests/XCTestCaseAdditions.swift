@@ -28,7 +28,7 @@ extension XCTestCase {
     ///   - swiftBridgeSupports: multiple expected bridging swift outputs
     ///   - file: the file of the call site, expected to be `#file`
     ///   - line: the line of the call site, expected to be `#line`
-    public func check(expectFailure: Bool = false, expectMessages: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], dependentModules: [CodebaseInfo.ModuleExport] = [], supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, swiftBridge: String? = nil, kotlin: String? = nil, kotlins: [String] = [], fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, kotlinPackageSupport: String? = nil, swiftBridgeSupport: String? = nil, swiftBridgeSupports: [String] = [], transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
+    public func check(expectFailure: Bool = false, expectMessages: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], dependentModules: [CodebaseInfo.ModuleExport] = [], supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, swiftBridge: String? = nil, kotlin: String? = nil, kotlins: [String] = [], fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, kotlinPackageSupport: String? = nil, swiftBridgeSupport: String? = nil, swiftBridgeSupports: [String] = [], bridgeDecodeLevel: DecodeLevel = .api, transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
 
         func fixup(code: String) -> String {
             var code = fixupKotlinBlock(code)
@@ -98,7 +98,7 @@ extension XCTestCase {
         }
         let codebaseInfo = CodebaseInfo()
         codebaseInfo.dependentModules = dependentModules
-        let tp = Transpiler(transpileFiles: srcFiles, bridgeFiles: bridgeFiles, codebaseInfo: codebaseInfo, transformers: transformers)
+        let tp = Transpiler(transpileFiles: srcFiles, bridgeFiles: bridgeFiles, isBridgeEnabled: bridgeDecodeLevel == .api, isBridgeGatherEnabled: bridgeDecodeLevel == .full, codebaseInfo: codebaseInfo, transformers: transformers)
         var transpilations: [Transpilation] = []
         try await tp.transpile { transpilations.append($0) }
         guard !transpilations.isEmpty else {
@@ -133,7 +133,7 @@ extension XCTestCase {
                     }
                     kotlinMessagesString += messagesString
                 }
-            case .bridgeToSwift, .bridgeToKotlin:
+            case .bridgeToSwift, .bridgeFromSwift:
                 swiftBridgeTranspilations.append(transpilation)
                 if !swiftBridgeMessagesString.isEmpty {
                     swiftBridgeMessagesString += "\n"
@@ -248,7 +248,8 @@ extension XCTestCase {
         } else {
             let codebaseInfo = CodebaseInfo()
             codebaseInfo.dependentModules = dependentModules
-            let tp = Transpiler(transpileFiles: isSwiftBridge ? [] : srcFiles, bridgeFiles: isSwiftBridge ? srcFiles : [], codebaseInfo: codebaseInfo, transformers: transformers)
+            let isBridgeEnabled = transformers.contains { $0 is KotlinBridgeTransformer }
+            let tp = Transpiler(transpileFiles: isSwiftBridge ? [] : srcFiles, bridgeFiles: isSwiftBridge ? srcFiles : [], isBridgeEnabled: isBridgeEnabled, codebaseInfo: codebaseInfo, transformers: transformers)
             try await tp.transpile { transpilation in
                 messages += transpilation.messages
             }
