@@ -775,7 +775,7 @@ final class KotlinBridgeToKotlinVisitor {
                     hasHashDeclaration = true
                 } else if functionDeclaration.isLessThanImplementation {
                     updateLessThanDeclaration(functionDeclaration, in: classDeclaration)
-                } else if functionDeclaration.type == .constructorDeclaration, functionDeclaration.attributes.isBridgeIgnored {
+                } else if functionDeclaration.type == .constructorDeclaration, functionDeclaration.attributes.isNoBridge {
                     // The decoder includes all constructors so that we can detect whether the class needs a default
                     // constructor generated, but it marks constructors that shouldn't be bridged
                     classDeclaration.remove(statement: functionDeclaration)

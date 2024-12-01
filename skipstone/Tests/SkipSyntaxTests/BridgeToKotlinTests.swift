@@ -190,12 +190,12 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
-    func testBridgeIgnoredVar() async throws {
+    func testNoBridgeVar() async throws {
         try await check(swiftBridge: """
+        // SKIP @nobridge
+        public var s = ""
         @BridgeIgnored
         public var i = 1
-        // SKIP @BridgeIgnored
-        public var s = ""
         """, kotlin: """
         """, swiftBridgeSupport: """
         """, transformers: transformers)
@@ -767,9 +767,9 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
-    func testBridgeIgnoredFunction() async throws {
+    func testNoBridgeFunction() async throws {
         try await check(swiftBridge: """
-        // SKIP @BridgeIgnored
+        // SKIP @nobridge
         public func f(i: Int, s: String) -> Int {
             return i + (Int(s) ?? 0)
         }

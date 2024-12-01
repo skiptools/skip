@@ -216,12 +216,12 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
-    func testBridgeIgnoredVar() async throws {
+    func testNoBridgeVar() async throws {
         try await check(swift: """
         #if !SKIP_BRIDGE
-        @BridgeIgnored
+        // SKIP @nobridge
         public var i = 1
-        // SKIP @BridgeIgnored
+        @BridgeIgnored
         public var j = 1
         public let s = ""
         #endif
@@ -690,7 +690,7 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
 
         try await checkProducesMessage(swift: """
-        // SKIP @BridgeIgnored
+        // SKIP @nobridge
         public class C {
         }
         public var c = C()
@@ -776,14 +776,14 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
-    func testBridgeIgnoredFunction() async throws {
+    func testNoBridgeFunction() async throws {
         try await check(swift: """
         #if !SKIP_BRIDGE
-        @BridgeIgnored
+        // SKIP @nobridge
         public func f(i: Int, s: String) -> Int {
             return i + (Int(s) ?? 0)
         }
-        // SKIP @BridgeIgnored
+        @BridgeIgnored
         public func g(i: Int, s: String) -> Int {
             return i + (Int(s) ?? 0)
         }
@@ -1309,13 +1309,13 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
-    func testBridgeIgnoredClass() async throws {
+    func testNoBridgeClass() async throws {
         try await check(swift: """
         #if !SKIP_BRIDGE
-        @BridgeIgnored 
+        // SKIP @nobridge
         public class C {
         }
-        // SKIP @BridgeIgnored 
+        @BridgeIgnored
         public class D {
         }
         #endif

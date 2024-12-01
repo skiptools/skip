@@ -33,7 +33,7 @@ class Statement: SyntaxNode {
         guard syntaxTree.decodeLevel == .api else {
             return syntaxTree.decodeLevel
         }
-        guard !syntaxTree.isBridgeFile || !attributes.isBridgeIgnored else {
+        guard !syntaxTree.isBridgeFile || !attributes.isNoBridge else {
             return .none
         }
         if context.memberOf == .protocolDeclaration && !(self is TypeDeclaration.Type) {

@@ -43,7 +43,7 @@ public final class KotlinBridgeTransformer: KotlinTransformer {
         // Add attributes marking bridged types so that they're recorded in our codebase info
         syntaxTree.root.visit { node in
             if let typeDeclaration = node as? TypeDeclaration, typeDeclaration.type != .extensionDeclaration {
-                if typeDeclaration.modifiers.visibility >= .public, !typeDeclaration.attributes.isBridgeIgnored {
+                if typeDeclaration.modifiers.visibility >= .public, !typeDeclaration.attributes.isNoBridge {
                     if syntaxTree.isBridgeFile {
                         typeDeclaration.attributes.attributes.append(.bridgeToKotlin)
                     } else {
