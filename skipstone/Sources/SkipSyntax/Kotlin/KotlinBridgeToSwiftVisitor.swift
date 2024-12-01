@@ -27,13 +27,13 @@ final class KotlinBridgeToSwiftVisitor {
         var globalFunctionCount = 0
         syntaxTree.root.visit { node in
             if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global {
-                if variableDeclaration.modifiers.visibility >= .public, !variableDeclaration.attributes.isBridgeIgnored {
+                if variableDeclaration.modifiers.visibility >= .public, !variableDeclaration.attributes.isNoBridge {
                     needsGlobalsJavaClass = update(global: variableDeclaration, swiftDefinitions: &swiftDefinitions, globalsClassRef: globalsClassRef) || needsGlobalsJavaClass
                     checkIfNotSkipBridge(variableDeclaration)
                 }
                 return .skip
             } else if let functionDeclaration = node as? KotlinFunctionDeclaration, functionDeclaration.role == .global {
-                if functionDeclaration.modifiers.visibility >= .public, !functionDeclaration.attributes.isBridgeIgnored {
+                if functionDeclaration.modifiers.visibility >= .public, !functionDeclaration.attributes.isNoBridge {
                     if update(global: functionDeclaration, uniquifier: globalFunctionCount, swiftDefinitions: &swiftDefinitions, globalsClassRef: globalsClassRef) {
                         needsGlobalsJavaClass = true
                         globalFunctionCount += 1
@@ -42,13 +42,13 @@ final class KotlinBridgeToSwiftVisitor {
                 }
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
-                if classDeclaration.modifiers.visibility >= .public, !classDeclaration.attributes.isBridgeIgnored {
+                if classDeclaration.modifiers.visibility >= .public, !classDeclaration.attributes.isNoBridge {
                     update(classDeclaration, swiftDefinitions: &swiftDefinitions)
                     checkIfNotSkipBridge(classDeclaration)
                 }
                 return .recurse(nil)
             } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
-                if interfaceDeclaration.modifiers.visibility >= .public, !interfaceDeclaration.attributes.isBridgeIgnored {
+                if interfaceDeclaration.modifiers.visibility >= .public, !interfaceDeclaration.attributes.isNoBridge {
                     update(interfaceDeclaration, swiftDefinitions: &swiftDefinitions)
                     checkIfNotSkipBridge(interfaceDeclaration)
                 }
@@ -668,7 +668,7 @@ final class KotlinBridgeToSwiftVisitor {
                     enumCases.append(enumCaseDeclaration)
                 }
             } else if let variableDeclaration = member as? KotlinVariableDeclaration {
-                guard variableDeclaration.modifiers.visibility >= .public, !variableDeclaration.isGenerated, !variableDeclaration.attributes.isBridgeIgnored else {
+                guard variableDeclaration.modifiers.visibility >= .public, !variableDeclaration.isGenerated, !variableDeclaration.attributes.isNoBridge else {
                     continue
                 }
                 let info = typeInfos.flatMap({ $0.variables }).first(where: { $0.name == (variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName) && $0.modifiers.visibility >= .fileprivate })
@@ -676,7 +676,7 @@ final class KotlinBridgeToSwiftVisitor {
                     hasBridgedStaticMembers = true
                 }
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
-                guard functionDeclaration.modifiers.visibility >= .public, (!functionDeclaration.isGenerated || functionDeclaration.type == .constructorDeclaration), !functionDeclaration.attributes.isBridgeIgnored else {
+                guard functionDeclaration.modifiers.visibility >= .public, (!functionDeclaration.isGenerated || functionDeclaration.type == .constructorDeclaration), !functionDeclaration.attributes.isNoBridge else {
                     continue
                 }
                 guard !functionDeclaration.isEncode && !functionDeclaration.isDecodableConstructor else {
@@ -789,13 +789,13 @@ final class KotlinBridgeToSwiftVisitor {
         var functionCount = 0
         for member in interfaceDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
-                guard !variableDeclaration.attributes.isBridgeIgnored else {
+                guard !variableDeclaration.attributes.isNoBridge else {
                     continue
                 }
                 let info = primaryTypeInfo.variables.first(where: { $0.name == variableDeclaration.propertyName })
                 update(member: variableDeclaration, info: info, swiftDefinitions: &memberDefinitions)
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
-                guard !functionDeclaration.attributes.isBridgeIgnored else {
+                guard !functionDeclaration.attributes.isNoBridge else {
                     continue
                 }
                 let info = primaryTypeInfo.functions.first(where: { $0.name == functionDeclaration.name && $0.signature == functionDeclaration.functionType && $0.modifiers.visibility >= .fileprivate })
@@ -850,7 +850,7 @@ final class KotlinBridgeToSwiftVisitor {
             } else if protocolSignature.isComparable {
                 swift.append(1, self.swift(forLessThanDeclarationIn: bridgeImpl, options: options, modifiers: Modifiers(visibility: .public, isStatic: true)))
             } else if let protocolInfo = codebaseInfo.primaryTypeInfo(forNamed: protocolSignature) {
-                guard protocolInfo.modifiers.visibility >= .public, !protocolInfo.attributes.isBridgeIgnored else {
+                guard protocolInfo.modifiers.visibility >= .public, !protocolInfo.attributes.isNoBridge else {
                     continue
                 }
                 swift.append(1, self.swift(forUnknownBridgeImplMembers: protocolInfo, options: options, codebaseInfo: codebaseInfo, functionCount: &functionCount))
@@ -865,7 +865,7 @@ final class KotlinBridgeToSwiftVisitor {
     private static func swift(forUnknownBridgeImplMembers info: CodebaseInfo.TypeInfo, options: KotlinBridgeOptions, codebaseInfo: CodebaseInfo.Context, functionCount: inout Int) -> [String] {
         var swift: [String] = []
         for variableInfo in info.variables {
-            guard !variableInfo.attributes.isBridgeIgnored else {
+            guard !variableInfo.attributes.isNoBridge else {
                 continue
             }
             guard let bridgable = variableInfo.signature.checkBridgable(options: options, codebaseInfo: codebaseInfo) else {
@@ -876,7 +876,7 @@ final class KotlinBridgeToSwiftVisitor {
             swift += self.swift(forMemberVariableWithName: variableInfo.name, inType: .classDeclaration, bridgable: bridgable, options: options, modifiers: modifiers, attributes: variableInfo.attributes, apiFlags: variableInfo.apiFlags ?? APIFlags())
         }
         for functionInfo in info.functions {
-            guard !functionInfo.attributes.isBridgeIgnored else {
+            guard !functionInfo.attributes.isNoBridge else {
                 continue
             }
             guard let bridgable = functionInfo.signature.checkFunctionBridgable(isConstructor: functionInfo.declarationType == .initDeclaration, options: options, codebaseInfo: codebaseInfo) else {

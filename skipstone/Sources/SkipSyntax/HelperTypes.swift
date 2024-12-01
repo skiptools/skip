@@ -221,8 +221,8 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
     }
 
     /// Convenience to check whether this member is marked to ignore bridging.
-    var isBridgeIgnored: Bool {
-        return contains(directive: "BridgeIgnored") || contains(.bridgeIgnored)
+    var isNoBridge: Bool {
+        return contains(directive: "nobridge") || contains(.bridgeIgnored)
     }
 
     func resolved(in node: SyntaxNode? = nil, context: TypeResolutionContext) -> Attributes {
