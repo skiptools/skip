@@ -130,6 +130,8 @@ extension TypeSignature {
             return type == .string ? .optional(.javaString) : .optional(.javaObjectPointer)
         case .string:
             return .javaString
+        case .tuple:
+            return .javaObjectPointer
         case .unwrappedOptional(let type):
             return type.cdecl(strategy: strategy, options: options)
         default:
@@ -151,6 +153,9 @@ extension TypeSignature {
             }
         case .string:
             let converted = value + ".toJavaObject(options: \(options.jconvertibleOptions))"
+            return isOptional ? converted : converted + "!"
+        case .tuple:
+            let converted = "SwiftTuple.javaObject(for: \(value), options: \(options.jconvertibleOptions))"
             return isOptional ? converted : converted + "!"
         case .unwrappedOptional(let type):
             return type.convertToCDecl(value: value, strategy: strategy, options: options)
@@ -175,7 +180,7 @@ extension TypeSignature {
         switch self.asOptional(false) {
         case .function(let parameters, _, _, _):
             let converted = "SwiftClosure\(parameters.count).closure(forJavaObject: \(value), options: \(options.jconvertibleOptions))"
-            return isOptional ? converted : converted + "!"
+            return "\(converted)\(isOptional ? "" : "!") as \(self)\(isOptional ? "?" : "")"
         case .int:
             if isOptional {
                 return description + ".fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
@@ -184,6 +189,9 @@ extension TypeSignature {
             }
         case .string:
             return description + ".fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
+        case .tuple:
+            let converted = "SwiftTuple.tuple(forJavaObject: \(value), options: \(options.jconvertibleOptions))"
+            return "\(converted)\(isOptional ? "" : "!") as \(self)\(isOptional ? "?" : "")"
         case .unwrappedOptional(let type):
             return type.convertFromCDecl(value: value, strategy: strategy, options: options)
         default:
@@ -204,6 +212,8 @@ extension TypeSignature {
             return .int32
         case .optional:
             return .optional(.javaObjectPointer)
+        case .tuple:
+            return .javaObjectPointer
         case .unwrappedOptional(let type):
             return type.java(strategy: strategy, options: options)
         default:
@@ -218,6 +228,8 @@ extension TypeSignature {
             return "SwiftClosure\(parameters.count).javaObject(for: \(value), options: \(options.jconvertibleOptions))"
         case .int:
             return isOptional ? value : "Int32(\(value))"
+        case .tuple:
+            return "SwiftTuple.javaObject(for: \(value), options: \(options.jconvertibleOptions))"
         case .unwrappedOptional(let type):
             return type.convertToJava(value: value, strategy: strategy, options: options)
         default:
@@ -246,9 +258,13 @@ extension TypeSignature {
         case .optional(let type):
             if case .function = type {
                 return type.convertClosureFromJava(value: value, isOptional: true, options: options)
+            } else if case .tuple = type {
+                return "SwiftTuple.tuple(forJavaObject: \(value), options: \(options.jconvertibleOptions))"
             } else {
                 return description + ".fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
             }
+        case .tuple:
+            return "SwiftTuple.tuple(forJavaObject: \(value), options: \(options.jconvertibleOptions))!"
         case .unwrappedOptional(let type):
             return type.convertFromJava(value: value, strategy: strategy, options: options)
         default:
@@ -737,12 +753,25 @@ extension TypeSignature {
             }
         case .string:
             return Bridgable(type: self, kotlinType: self, strategy: .direct)
-        case .tuple:
-            // TODO
-            if let sourceDerived, let source {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))
+        case .tuple(_, let types):
+            let typeBridgables: [Bridgable] = types.compactMap { type in
+                guard let bridgable = type.checkBridgable(options: options, codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) else {
+                    return nil
+                }
+                return bridgable
             }
-            return nil
+            guard typeBridgables.count == types.count else {
+                return nil
+            }
+            if types.count == 2 && options.contains(.kotlincompat) {
+                let pairType: TypeSignature = .named("kotlin.Pair", typeBridgables.map(\.kotlinType))
+                return Bridgable(type: self, kotlinType: pairType, strategy: .direct)
+            } else if types.count == 3 && options.contains(.kotlincompat) {
+                let tripleType: TypeSignature = .named("kotlin.Triple", typeBridgables.map(\.kotlinType))
+                return Bridgable(type: self, kotlinType: tripleType, strategy: .direct)
+            } else {
+                return Bridgable(type: self, kotlinType: self, strategy: .direct)
+            }
         case .typealiased(_, let type):
             return type.checkBridgable(options: options, codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source)
         case .uint, .uint8, .uint16, .uint32, .uint64:

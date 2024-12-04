@@ -313,7 +313,7 @@ final class KotlinBridgeToKotlinVisitor {
 
         if isAsync {
             let callbackType = bridgable.return.type.callbackClosureType(apiFlags: functionDeclaration.apiFlags, kotlin: false)
-            cdeclBody.append("let f_callback_swift = " + callbackType.convertFromCDecl(value: "f_callback", strategy: .direct, options: options) + " as " + callbackType.description)
+            cdeclBody.append("let f_callback_swift = " + callbackType.convertFromCDecl(value: "f_callback", strategy: .direct, options: options))
         }
 
         let swiftCallTarget: String
