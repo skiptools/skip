@@ -725,12 +725,16 @@ extension TypeSignature {
                 sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))
             }
             return nil
-        case .set:
-            // TODO
-            if let sourceDerived, let source {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))
+        case .set(let elementType):
+            guard let elementBridgable = elementType?.checkBridgable(options: options, codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) else {
+                return nil
             }
-            return nil
+            if options.contains(.kotlincompat) {
+                let setType: TypeSignature = .module("kotlin.collections", .named("Set", [elementBridgable.kotlinType]))
+                return Bridgable(type: self, kotlinType: setType, strategy: .convertible)
+            } else {
+                return Bridgable(type: self, kotlinType: self, strategy: .convertible)
+            }
         case .string:
             return Bridgable(type: self, kotlinType: self, strategy: .direct)
         case .tuple:

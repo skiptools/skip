@@ -3208,11 +3208,13 @@ final class BridgeToKotlinTests: XCTestCase {
         public class C {
             public var urls: [URL] = []
             public var map = ["a": [1]]
+            public var set: Set<Int> = [1, 2, 3]
             public func perform(action: (URL) -> Int) {
             }
         }
         """, kotlins: ["""
         import skip.lib.Array
+        import skip.lib.Set
 
         open class C: skip.bridge.kt.SwiftPeerBridged {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
@@ -3257,6 +3259,14 @@ final class BridgeToKotlinTests: XCTestCase {
                 }
             private external fun Swift_map(Swift_peer: skip.bridge.kt.SwiftObjectPointer): kotlin.collections.Map<String, kotlin.collections.List<Int>>
             private external fun Swift_map_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer, value: kotlin.collections.Map<String, kotlin.collections.List<Int>>)
+            open var set: kotlin.collections.Set<Int>
+                get() = Swift_set(Swift_peer)
+                set(newValue) {
+                    @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
+                    Swift_set_set(Swift_peer, newValue)
+                }
+            private external fun Swift_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer): kotlin.collections.Set<Int>
+            private external fun Swift_set_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer, value: kotlin.collections.Set<Int>)
             open fun perform(action: (java.net.URI) -> Int): Unit = Swift_perform_0(Swift_peer, action)
             private external fun Swift_perform_0(Swift_peer: skip.bridge.kt.SwiftObjectPointer, action: (java.net.URI) -> Int)
 
@@ -3309,6 +3319,16 @@ final class BridgeToKotlinTests: XCTestCase {
         func C_Swift_map_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: JavaObjectPointer) {
             let peer_swift: C = Swift_peer.pointee()!
             peer_swift.map = [String: [Int]].fromJavaObject(value, options: [.kotlincompat])
+        }
+        @_cdecl("Java_C_Swift_1set")
+        func C_Swift_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer {
+            let peer_swift: C = Swift_peer.pointee()!
+            return peer_swift.set.toJavaObject(options: [.kotlincompat])!
+        }
+        @_cdecl("Java_C_Swift_1set_1set")
+        func C_Swift_set_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: JavaObjectPointer) {
+            let peer_swift: C = Swift_peer.pointee()!
+            peer_swift.set = Set<Int>.fromJavaObject(value, options: [.kotlincompat])
         }
         @_cdecl("Java_C_Swift_1perform_10")
         func C_Swift_perform_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ p_0: JavaObjectPointer) {
