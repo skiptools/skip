@@ -180,7 +180,7 @@ extension TypeSignature {
         switch self.asOptional(false) {
         case .function(let parameters, _, _, _):
             let converted = "SwiftClosure\(parameters.count).closure(forJavaObject: \(value), options: \(options.jconvertibleOptions))"
-            return "\(converted)\(isOptional ? "" : "!") as \(self)\(isOptional ? "?" : "")"
+            return "\(converted)\(isOptional ? "" : "!") as \(self)"
         case .int:
             if isOptional {
                 return description + ".fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
@@ -191,7 +191,7 @@ extension TypeSignature {
             return description + ".fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
         case .tuple:
             let converted = "SwiftTuple.tuple(forJavaObject: \(value), options: \(options.jconvertibleOptions))"
-            return "\(converted)\(isOptional ? "" : "!") as \(self)\(isOptional ? "?" : "")"
+            return "\(converted)\(isOptional ? "" : "!") as \(self)"
         case .unwrappedOptional(let type):
             return type.convertFromCDecl(value: value, strategy: strategy, options: options)
         default:
