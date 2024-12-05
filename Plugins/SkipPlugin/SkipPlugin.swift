@@ -291,7 +291,8 @@ import PackagePlugin
                 continue
             }
             //Diagnostics.remark("recursiveTargetDependencies: \(target.name):\(package.id):\(package.directory)")
-            let dependencyParameter = [targetDep.name, package.id, package.directory.string].joined(separator: ":")
+            // package.id is the lower-cased version of the name, whereas package.displayName preserves the case
+            let dependencyParameter = [targetDep.name, package.displayName, package.directory.string].joined(separator: ":")
             // only add the dependency parameter if we have not already specified it (duplicates are possible because we may visit the same target multiple times)
             if dependencyParameters.insert(dependencyParameter).inserted {
                 buildArguments += ["--dependency", dependencyParameter]
