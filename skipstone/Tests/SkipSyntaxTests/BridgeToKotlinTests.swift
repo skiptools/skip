@@ -335,6 +335,29 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testTupleVar() async throws {
+        try await check(swiftBridge: """
+        public var t = ("s", 1)
+        """, kotlin: """
+        var t: Tuple2<String, Int>
+            get() = Swift_t()
+            set(newValue) {
+                Swift_t_set(newValue)
+            }
+        private external fun Swift_t(): Tuple2<String, Int>
+        private external fun Swift_t_set(value: Tuple2<String, Int>)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1t")
+        func BridgeKt_Swift_t(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
+            return SwiftTuple.javaObject(for: t, options: [])!
+        }
+        @_cdecl("Java_BridgeKt_Swift_1t_1set")
+        func BridgeKt_Swift_t_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
+            t = SwiftTuple.tuple(forJavaObject: value, options: [])! as (String, Int)
+        }
+        """, transformers: transformers)
+    }
+
     func testKeywordVar() async throws {
         try await check(swiftBridge: """
         public var object: String {
@@ -720,7 +743,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_BridgeKt_Swift_1c_1set")
         func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
-            c = SwiftClosure1.closure(forJavaObject: value, options: [])!
+            c = SwiftClosure1.closure(forJavaObject: value, options: [])! as (Int) -> String
         }
         """, transformers: transformers)
     }
@@ -743,7 +766,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_BridgeKt_Swift_1c_1set")
         func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
-            c = SwiftClosure0.closure(forJavaObject: value, options: [])!
+            c = SwiftClosure0.closure(forJavaObject: value, options: [])! as () -> Void
         }
         """, transformers: transformers)
     }
@@ -3332,9 +3355,125 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_C_Swift_1perform_10")
         func C_Swift_perform_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ p_0: JavaObjectPointer) {
-            let p_0_swift = SwiftClosure1.closure(forJavaObject: p_0, options: [.kotlincompat])!
+            let p_0_swift = SwiftClosure1.closure(forJavaObject: p_0, options: [.kotlincompat])! as (URL) -> Int
             let peer_swift: C = Swift_peer.pointee()!
             peer_swift.perform(action: p_0_swift)
+        }
+        """, transformers: transformers)
+    }
+
+    func testTupleKotlinCompatibilityOption() async throws {
+        let transformers = builtinKotlinTransformers() + [KotlinBridgeTransformer(options: .kotlincompat)]
+        try await check(supportingSwift: """
+        class URL: SwiftCustomBridged, KotlinConverting<java.net.URI> {
+        }
+        """, swiftBridge: """
+        public class C {
+            public var t2: (URL, Int)
+            public var t3: (String, Int, Bool)
+            public func f() -> (String, Int, Bool, Double) {
+            }
+        }
+        """, kotlins: ["""
+        open class C: skip.bridge.kt.SwiftPeerBridged {
+            var Swift_peer: skip.bridge.kt.SwiftObjectPointer
+
+            constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.kt.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.kt.SwiftObjectPointer)
+
+            constructor() {
+                Swift_peer = Swift_constructor()
+            }
+            private external fun Swift_constructor(): skip.bridge.kt.SwiftObjectPointer
+
+            override fun Swift_bridgedPeer(): skip.bridge.kt.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.kt.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_bridgedPeer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            open var t2: kotlin.Pair<java.net.URI, Int>
+                get() = Swift_t2(Swift_peer)
+                set(newValue) {
+                    Swift_t2_set(Swift_peer, newValue)
+                }
+            private external fun Swift_t2(Swift_peer: skip.bridge.kt.SwiftObjectPointer): kotlin.Pair<java.net.URI, Int>
+            private external fun Swift_t2_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer, value: kotlin.Pair<java.net.URI, Int>)
+            open var t3: kotlin.Triple<String, Int, Boolean>
+                get() = Swift_t3(Swift_peer)
+                set(newValue) {
+                    Swift_t3_set(Swift_peer, newValue)
+                }
+            private external fun Swift_t3(Swift_peer: skip.bridge.kt.SwiftObjectPointer): kotlin.Triple<String, Int, Boolean>
+            private external fun Swift_t3_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer, value: kotlin.Triple<String, Int, Boolean>)
+            open fun f(): Tuple4<String, Int, Boolean, Double> = Swift_f_0(Swift_peer)
+            private external fun Swift_f_0(Swift_peer: skip.bridge.kt.SwiftObjectPointer): Tuple4<String, Int, Boolean, Double>
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
+        }
+        """, """
+        internal open class URL: SwiftCustomBridged, KotlinConverting<java.net.URI> {
+        }
+        """], swiftBridgeSupport: """
+        extension C: BridgedToKotlin {
+            private static let Java_class = try! JClass(name: "C")
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                return ptr.pointee()!
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
+        }
+        @_cdecl("Java_C_Swift_1constructor")
+        func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
+            let f_return_swift = C()
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_C_Swift_1release")
+        func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: C.self)
+        }
+        @_cdecl("Java_C_Swift_1t2")
+        func C_Swift_t2(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer {
+            let peer_swift: C = Swift_peer.pointee()!
+            return SwiftTuple.javaObject(for: peer_swift.t2, options: [.kotlincompat])!
+        }
+        @_cdecl("Java_C_Swift_1t2_1set")
+        func C_Swift_t2_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: JavaObjectPointer) {
+            let peer_swift: C = Swift_peer.pointee()!
+            peer_swift.t2 = SwiftTuple.tuple(forJavaObject: value, options: [.kotlincompat])! as (URL, Int)
+        }
+        @_cdecl("Java_C_Swift_1t3")
+        func C_Swift_t3(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer {
+            let peer_swift: C = Swift_peer.pointee()!
+            return SwiftTuple.javaObject(for: peer_swift.t3, options: [.kotlincompat])!
+        }
+        @_cdecl("Java_C_Swift_1t3_1set")
+        func C_Swift_t3_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: JavaObjectPointer) {
+            let peer_swift: C = Swift_peer.pointee()!
+            peer_swift.t3 = SwiftTuple.tuple(forJavaObject: value, options: [.kotlincompat])! as (String, Int, Bool)
+        }
+        @_cdecl("Java_C_Swift_1f_10")
+        func C_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer {
+            let peer_swift: C = Swift_peer.pointee()!
+            let f_return_swift = peer_swift.f()
+            return SwiftTuple.javaObject(for: f_return_swift, options: [.kotlincompat])!
         }
         """, transformers: transformers)
     }
