@@ -51,11 +51,9 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
     var dependencyIdPaths: [(targetName: String, packageID: String, packagePath: String)] {
         transpileOptions.dependencies.compactMap({
-            let parts = $0.split(separator: ":")
-            guard let targetName: Substring = parts.dropFirst(0).first else { return nil }
-            guard let packageID: Substring = parts.dropFirst(1).first else { return nil }
-            guard let packagePath: Substring = parts.dropFirst(2).first else { return nil }
-            return (targetName: targetName.description, packageID: packageID.description, packagePath: packagePath.description)
+            let parts = $0.split(separator: ":").map(\.description)
+            if parts.count != 3 { return nil }
+            return (targetName: parts[0], packageID: parts[1], packagePath: parts[2])
         })
     }
 

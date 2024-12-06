@@ -24,6 +24,9 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
     @Flag(help: ArgumentHelp("Generate native module when running checkup", valueName: "native"))
     var native: Bool = false
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Fail immediately when an error occurs"))
+    var failFast: Bool = true
+
     func performCommand(with out: MessageQueue) async {
         await withLogStream(with: out) {
             try await runCheckup(with: out)
@@ -31,7 +34,7 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
     }
 
     func runCheckup(with out: MessageQueue) async throws {
-        await runDoctor(with: out)
+        try await runDoctor(with: out)
 
         @Sendable func buildSampleProject(packageResolvedURL: URL? = nil) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
             let primary = packageResolvedURL == nil

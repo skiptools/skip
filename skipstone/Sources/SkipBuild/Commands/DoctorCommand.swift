@@ -20,11 +20,15 @@ struct DoctorCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
 
+    // we do not fail fast by default for doctor since it is useful to see all the parts that failed
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Fail immediately when an error occurs"))
+    var failFast: Bool = false
+
     func performCommand(with out: MessageQueue) async {
         await withLogStream(with: out) {
             await out.yield(MessageBlock(status: nil, "Skip Doctor"))
 
-            await runDoctor(with: out)
+            try await runDoctor(with: out)
             let latestVersion = await checkSkipUpdates(with: out)
             if let latestVersion = latestVersion, latestVersion != skipVersion {
                 await out.yield(MessageBlock(status: .warn, "A new version is Skip (\(latestVersion)) is available to update with: skip upgrade"))
@@ -35,10 +39,10 @@ struct DoctorCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
 
 extension ToolOptionsCommand {
     /// Runs the `skip doctor` command and stream the results to the messenger
-    func runDoctor(with out: MessageQueue) async {
+    func runDoctor(with out: MessageQueue) async throws {
 
         /// Invokes the given command and attempts to parse the output against the given regular expression pattern to validate that it is a semantic version string
-        func checkVersion(title: String, cmd: [String], min: Version? = nil, pattern: String, watch: Bool = false, hint: String? = nil) async {
+        func checkVersion(title: String, cmd: [String], min: Version? = nil, pattern: String, watch: Bool = false, hint: String? = nil) async throws {
 
             func parseVersion(_ result: Result<ProcessOutput, Error>?) -> (result: Result<ProcessOutput, Error>?, message: MessageBlock?) {
                 guard let res = try? result?.get() else {
@@ -78,11 +82,11 @@ extension ToolOptionsCommand {
                 }
             }
 
-            await run(with: out, title, cmd, watch: watch, resultHandler: parseVersion)
+            try await run(with: out, title, cmd, watch: watch, resultHandler: parseVersion)
         }
 
         /// check for stale Intel Homebrew installations of tools (java, etc.) on ARM (https://github.com/skiptools/skip/issues/97)
-        func checkArchitecture() async {
+        func checkArchitecture() async throws {
 
             let arch = ProcessInfo.isARM ? "ARM" : "Intel"
 
@@ -98,23 +102,23 @@ extension ToolOptionsCommand {
                 }
             }
 
-            await run(with: out, "macOS architecture", ["sysctl", "-n", "sysctl.proc_translated"], watch: false, resultHandler: checkResult)
+            try await run(with: out, "macOS architecture", ["sysctl", "-n", "sysctl.proc_translated"], watch: false, resultHandler: checkResult)
         }
 
 
         //await checkVersion(title: "ECHO2 VERSION", cmd: ["sh", "-c", "echo ONE ; sleep 1; echo TWO ; sleep 1; echo THREE ; sleep 1; echo 3.2.1"], min: Version("1.2.3"), pattern: "([0-9.]+)", watch: true)
 
-        await checkVersion(title: "Skip version", cmd: ["skip", "version"], min: Version(skipVersion), pattern: "Skip version ([0-9.]+)")
-        await checkVersion(title: "macOS version", cmd: ["sw_vers", "--productVersion"], min: Version("13.5.0"), pattern: "([0-9.]+)")
-        await checkArchitecture()
-        await checkVersion(title: "Swift version", cmd: ["swift", "-version"], min: Version("5.9.0"), pattern: "Swift version ([0-9.]+)")
+        try await checkVersion(title: "Skip version", cmd: ["skip", "version"], min: Version(skipVersion), pattern: "Skip version ([0-9.]+)")
+        try await checkVersion(title: "macOS version", cmd: ["sw_vers", "--productVersion"], min: Version("13.5.0"), pattern: "([0-9.]+)")
+        try await checkArchitecture()
+        try await checkVersion(title: "Swift version", cmd: ["swift", "-version"], min: Version("5.9.0"), pattern: "Swift version ([0-9.]+)")
         // TODO: add advice to run `xcode-select -s /Applications/Xcode.app/Contents/Developer` to work around https://github.com/skiptools/skip/issues/18
-        await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)", hint: " (install from: https://developer.apple.com/xcode/)")
+        try await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)", hint: " (install from: https://developer.apple.com/xcode/)")
         await checkXcodeCommandLineTools(with: out)
-        await checkVersion(title: "Homebrew version", cmd: ["brew", "--version"], min: Version("4.1.0"), pattern: "Homebrew ([0-9.]+)", hint: " (install from: https://brew.sh)")
-        await checkVersion(title: "Gradle version", cmd: ["gradle", "-version"], min: Version("8.6.0"), pattern: "Gradle ([0-9.]+)", hint: " (install with: brew install gradle)")
-        await checkVersion(title: "Java version", cmd: ["java", "-version"], min: Version("21.0.0"), pattern: "version \"([0-9._]+)\"", hint: ProcessInfo.processInfo.environment["JAVA_HOME"] == nil ? nil : " (check JAVA_HOME environment: \(ProcessInfo.processInfo.environment["JAVA_HOME"] ?? "unset"))") // we don't necessarily need java in the path (which it doesn't seem to be by default with Homebrew)
-        await checkVersion(title: "Android Debug Bridge version", cmd: ["adb", "version"], min: Version("1.0.40"), pattern: "version ([0-9.]+)")
+        try await checkVersion(title: "Homebrew version", cmd: ["brew", "--version"], min: Version("4.1.0"), pattern: "Homebrew ([0-9.]+)", hint: " (install from: https://brew.sh)")
+        try await checkVersion(title: "Gradle version", cmd: ["gradle", "-version"], min: Version("8.6.0"), pattern: "Gradle ([0-9.]+)", hint: " (install with: brew install gradle)")
+        try await checkVersion(title: "Java version", cmd: ["java", "-version"], min: Version("21.0.0"), pattern: "version \"([0-9._]+)\"", hint: ProcessInfo.processInfo.environment["JAVA_HOME"] == nil ? nil : " (check JAVA_HOME environment: \(ProcessInfo.processInfo.environment["JAVA_HOME"] ?? "unset"))") // we don't necessarily need java in the path (which it doesn't seem to be by default with Homebrew)
+        try await checkVersion(title: "Android Debug Bridge version", cmd: ["adb", "version"], min: Version("1.0.40"), pattern: "version ([0-9.]+)")
         await checkAndroidStudioVersion(with: out)
 
     }

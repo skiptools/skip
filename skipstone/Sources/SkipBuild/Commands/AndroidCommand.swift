@@ -56,8 +56,8 @@ struct AndroidSDKInstallCommand: MessageCommand, ToolOptionsCommand {
     @Flag(help: ArgumentHelp("Reinstall the Android SDK"))
     var reinstall: Bool = false
 
-    func performCommand(with out: MessageQueue) async {
-        await run(with: out, "Install Swift Android SDK", ["brew", reinstall ? "reinstall" : "install", "skiptools/skip/swift-android-toolchain@\(version)"], additionalEnvironment: ["HOMEBREW_AUTO_UPDATE_SECS": "0"])
+    func performCommand(with out: MessageQueue) async throws {
+        try await run(with: out, "Install Swift Android SDK", ["brew", reinstall ? "reinstall" : "install", "skiptools/skip/swift-android-toolchain@\(version)"], additionalEnvironment: ["HOMEBREW_AUTO_UPDATE_SECS": "0"])
     }
 }
 
@@ -328,10 +328,10 @@ fileprivate extension AndroidOperationCommand {
             let stagingDir = remoteFolder ?? "/data/local/tmp/swift-android/" + packageName + "-" + UUID().uuidString + "/"
 
             // create the staging folder
-            await run(with: out, "Connecting to Android", [adb, "shell", "mkdir", "-p", stagingDir], additionalEnvironment: env)
+            try await run(with: out, "Connecting to Android", [adb, "shell", "mkdir", "-p", stagingDir], additionalEnvironment: env)
 
             // Note: one shortcoming of `adb push` is that it doesn't copy symbolic links as links, but instead pushes the underlying file; so, for example, the link libxml2.so -> libxml2.so.2.13.3 will be copied as two separate yet identical files, which increases the size of the transfer unnecessarily. In practice, this isn't a problem, since the linker will work, but it means that the directory of dependent shared objects will be bigger than it needs to be. One workaround to this might be to first archive all the files together (e.g., with tar), transfer the archive, and then unarchive them on the device, but this adds complexity to the process.
-            await run(with: out, "Copying \(runTests ? "test" : "executable") files", [adb, "push"] + transferFiles.map(\.path) + copy + [stagingDir], additionalEnvironment: env)
+            try await run(with: out, "Copying \(runTests ? "test" : "executable") files", [adb, "push"] + transferFiles.map(\.path) + copy + [stagingDir], additionalEnvironment: env)
 
             var runFailure: Error?
             do {

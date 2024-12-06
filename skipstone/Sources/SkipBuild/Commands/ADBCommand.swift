@@ -25,6 +25,9 @@ struct ADBCommand: MessageCommand, ToolOptionsCommand {
     @Argument(parsing: .allUnrecognized, help: ArgumentHelp("The arguments to pass to the adb command"))
     var arguments: [String]
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Fail immediately when an error occurs"))
+    var failFast: Bool = true
+
     func performCommand(with out: MessageQueue) async throws {
         // ADB itself doesn't ever exit with a non-zero exit code (https://issuetracker.google.com/issues/36908392?pli=1)
         // So we need to parse the output for known error patterns and translate them into Xcode-aware messages

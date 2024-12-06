@@ -21,12 +21,12 @@ struct UpgradeCommand: MessageCommand, ToolOptionsCommand {
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
 
-    func performCommand(with out: MessageQueue) async {
+    func performCommand(with out: MessageQueue) async throws {
         let latestSkipVersion = await checkSkipUpdates(with: out)
         if latestSkipVersion == skipVersion {
             await out.yield(MessageBlock(status: .pass, "Skip \(skipVersion) is up to date."))
         } else if let latestSkipVersion = latestSkipVersion {
-            await run(with: out, "Upgrade Skip to \(latestSkipVersion)", ["brew", "upgrade", "skip"], additionalEnvironment: ["HOMEBREW_AUTO_UPDATE_SECS": "0"])
+            try await run(with: out, "Upgrade Skip to \(latestSkipVersion)", ["brew", "upgrade", "skip"], additionalEnvironment: ["HOMEBREW_AUTO_UPDATE_SECS": "0"])
         }
     }
 }

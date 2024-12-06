@@ -45,11 +45,11 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary", valueName: "show"))
     var showTree: Bool = false
 
-    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Perform release build", valueName: "release"))
-    var release: Bool = true
+    @Flag(help: ArgumentHelp("Perform release build", valueName: "release"))
+    var release: Bool = false
 
-    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Perform debug build", valueName: "debug"))
-    var debug: Bool = true
+    @Flag(help: ArgumentHelp("Perform debug build", valueName: "debug"))
+    var debug: Bool = false
 
     // TODO: immediately fail when any of the steps fail
     //@Flag(inversion: .prefixedNo, help: ArgumentHelp("Stop the process on the first error"))
@@ -73,7 +73,8 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
     func runExport(with out: MessageQueue) async throws {
         let startTime = Date.now
         var createdURLs: [URL] = []
-        let variants: [BuildConfiguration] = [debug ? .debug : nil, release ? .release : nil].compactMap({ $0 })
+        let releaseDebugUnspecified = debug == false && release == false
+        let variants: [BuildConfiguration] = [((debug == true) || releaseDebugUnspecified) ? .debug : nil, ((release == true) || releaseDebugUnspecified) ? .release : nil].compactMap({ $0 })
         if variants.isEmpty {
             throw error("must specify at least one of --release or --debug")
         }
@@ -99,14 +100,14 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
             }
 
             if let sdk = try? await fetchSDKPath(), sdk != "legacy" {
-                await run(with: out, "Build project \(packageName)", ["xcrun", "swift", "build", "-v", "--package-path", project, "--triple", "arm64-apple-ios", "--sdk", sdk])
+                try await run(with: out, "Build project \(packageName)", ["xcrun", "swift", "build", "-v", "--package-path", project, "--triple", "arm64-apple-ios", "--sdk", sdk])
             } else {
                 // fallback to plain "swift build" for legacy build, which has the down-side that it will build against macOS (and thereby fail when there are iOS-only API calls): "Basics/Triple+Basics.swift:149: Fatal error: Cannot create dynamic libraries for os "ios".", also @availability annotations are required for everything
                 // however, it permits us to build and export against macOS-13/Xcode 15.2 (which is the OS version needed for GitHub CI to be able to run tests against the Android Emulator using the reactivecircus/android-emulator-runner action),
-                await run(with: out, "Build project \(packageName)", ["swift", "build", "-v", "--package-path", project])
+                try await run(with: out, "Build project \(packageName)", ["swift", "build", "-v", "--package-path", project])
             }
         } else {
-            await run(with: out, "Resolve dependencies", ["swift", "package", "resolve", "-v", "--package-path", project])
+            try await run(with: out, "Resolve dependencies", ["swift", "package", "resolve", "-v", "--package-path", project])
         }
 
         let fs = localFileSystem
@@ -158,10 +159,10 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
             gradleArgs += ["--project-dir", androidFolderAbsolute.pathString]
             gradleArgs += ["--console=plain"]
 
-            await run(with: out, "Assemble Android app \(appModuleName)", ["gradle", assembleAction] + gradleArgs, environment: env)
+            try await run(with: out, "Assemble Android app \(appModuleName)", ["gradle", assembleAction] + gradleArgs, environment: env)
             try await exportAndroidArtifact(type: "apk")
 
-            await run(with: out, "Bundle Android app \(appModuleName)", ["gradle", bundleAction] + gradleArgs, environment: env)
+            try await run(with: out, "Bundle Android app \(appModuleName)", ["gradle", bundleAction] + gradleArgs, environment: env)
             try await exportAndroidArtifact(type: "bundle")
 
             func exportAndroidArtifact(type: String) async throws {
@@ -201,7 +202,7 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
                 gradleArgs += ["--project-dir", skipOutputFolder.pathString]
                 gradleArgs += ["--console=plain"]
 
-                await run(with: out, "Assemble frameworks for \(moduleName)", ["gradle", assembleAction] + gradleArgs, environment: env)
+                try await run(with: out, "Assemble frameworks for \(moduleName)", ["gradle", assembleAction] + gradleArgs, environment: env)
 
                 for variant in variants {
                     let aarOutputFolder = !nested ? outputFolderAbsolute : outputFolderAbsolute.appending(components: [variant.rawValue, "aar"])
@@ -251,7 +252,7 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
 
             let projectExportZip = outputFolderAbsolute.appending(components: ["\(moduleName)-project.zip"])
 
-            await zipFolder(with: out, message: "Archive project source \(projectExportZip.asURL.lastPathComponent)", zipFile: projectExportZip.asURL, folder: projectOutputFolder.asURL)
+            try await zipFolder(with: out, message: "Archive project source \(projectExportZip.asURL.lastPathComponent)", zipFile: projectExportZip.asURL, folder: projectOutputFolder.asURL)
             createdURLs.append(projectExportZip.asURL)
 
             try fs.removeFileTree(projectOutputBaseFolder) // only export the zip file; remove the sources

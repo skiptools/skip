@@ -85,11 +85,11 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, Too
         await out.yield(MessageBlock(status: .pass, "Created module \(modules.map(\.moduleName).joined(separator: ", ")) in \(createdURL.path)"))
 
         if openXcode {
-            await run(with: out, "Opening Xcode project", ["open", project.darwinProjectFolder.path])
+            try await run(with: out, "Opening Xcode project", ["open", project.darwinProjectFolder.path])
         }
 
         if openGradle {
-            await run(with: out, "Opening Gradle project", ["open", project.androidGradleSettings.path])
+            try await run(with: out, "Opening Gradle project", ["open", project.androidGradleSettings.path])
         }
 
         // TODO: ensure the project was transpiled, find the settings.gradle.kts for the primary module, and open it
@@ -111,7 +111,7 @@ enum BuildConfiguration : String, ExpressibleByArgument {
 
 extension ToolOptionsCommand {
 
-    func createAPK(projectURL: URL, appModuleName: String, configuration: BuildConfiguration, out: MessageQueue, primaryModuleName: String, cfgSuffix: String, returnHashes: Bool, prefix re: String) async -> [URL : String?] {
+    func createAPK(projectURL: URL, appModuleName: String, configuration: BuildConfiguration, out: MessageQueue, primaryModuleName: String, cfgSuffix: String, returnHashes: Bool, prefix re: String) async throws -> [URL : String?] {
         // assemble the .apk
         let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths // environment that includes a default ANDROID_HOME
         
@@ -119,7 +119,7 @@ extension ToolOptionsCommand {
         let outputsPath = projectURL.path + "/" + androidBuildFolder + "/" + appModuleName + "/outputs"
         
         let action = "assemble" + configuration.rawValue.capitalized // turn "debug" into "Debug" and "release" into "Release"
-        await run(with: out, "Assembling Android apk", ["gradle", action, "--console=plain", "--project-dir", gradleProjectDir], environment: env)
+        try await run(with: out, "Assembling Android apk", ["gradle", action, "--console=plain", "--project-dir", gradleProjectDir], environment: env)
 
         // the expected path for the gradle output folder of the assemble action
 
@@ -147,7 +147,7 @@ extension ToolOptionsCommand {
     }
     
     /// Zip up the given folder.
-    @discardableResult func zipFolder(with out: MessageQueue, message msg: String, compressionLevel: Int = 9, zipFile: URL, folder: URL) async -> Result<ProcessOutput, Error> {
+    @discardableResult func zipFolder(with out: MessageQueue, message msg: String, compressionLevel: Int = 9, zipFile: URL, folder: URL) async throws -> Result<ProcessOutput, Error> {
         func returnFileSize(_ result: Result<ProcessOutput, Error>?) -> (result: Result<ProcessOutput, Error>?, message: MessageBlock?) {
             do {
                 return (result: result, message: MessageBlock(status: .pass, try "\(msg) \(zipFile.fileSizeString)"))
@@ -155,7 +155,7 @@ extension ToolOptionsCommand {
                 return (result: result, message: MessageBlock(status: .fail, msg))
             }
         }
-        return await run(with: out, msg, ["zip", "-\(compressionLevel)", "-r", zipFile.path, folder.lastPathComponent], in: folder.deletingLastPathComponent(), resultHandler: returnFileSize)
+        return try await run(with: out, msg, ["zip", "-\(compressionLevel)", "-r", zipFile.path, folder.lastPathComponent], in: folder.deletingLastPathComponent(), resultHandler: returnFileSize)
     }
 
     func createIPA(configuration: BuildConfiguration, primaryModuleName: String, sdk: String = "iphoneos", cfgSuffix: String, projectURL: URL, out: MessageQueue, prefix re: String, xcodeProjectURL: URL, ipaURL ipaOutputURL: URL? = nil, xcarchiveURL: URL? = nil, teamID: String? = nil, verifyFile: Bool = true, returnHashes: Bool) async throws -> [URL : String?] {
@@ -169,7 +169,7 @@ extension ToolOptionsCommand {
         let fullArchivePath = projectURL.path + "/" + archivePath
         let fullDerivedDataPath = projectURL.path + "/" + darwinBuildFolder + "/DerivedData"
 
-        await run(with: out, "\(re)Archive iOS ipa", [
+        try await run(with: out, "\(re)Archive iOS ipa", [
             "xcodebuild",
             "-project", xcodeProjectURL.path,
             "-derivedDataPath", fullDerivedDataPath,
@@ -224,11 +224,11 @@ extension ToolOptionsCommand {
         }
 
         // if no teamid is specified, then just zip up the output folder
-        await zipFolder(with: out, message: "\(re)Assemble \(ipaURL.lastPathComponent)", zipFile: ipaURL, folder: archiveAppPayloadURL)
+        try await zipFolder(with: out, message: "\(re)Assemble \(ipaURL.lastPathComponent)", zipFile: ipaURL, folder: archiveAppPayloadURL)
 
         // also zip up the .xcarchive path
         if let xcarchiveURL = xcarchiveURL {
-            await zipFolder(with: out, message: "\(re)Archive \(xcarchiveURL.lastPathComponent)", zipFile: xcarchiveURL, folder: URL(fileURLWithPath: fullArchivePath))
+            try await zipFolder(with: out, message: "\(re)Archive \(xcarchiveURL.lastPathComponent)", zipFile: xcarchiveURL, folder: URL(fileURLWithPath: fullArchivePath))
         }
 
         if verifyFile {
@@ -262,10 +262,10 @@ extension ToolOptionsCommand {
         let projectPath = try projectURL.absolutePath
 
         if build == true || apk == true {
-            await run(with: out, "\(re)Resolve dependencies", ["swift", "package", "resolve", "-v", "--package-path", projectURL.path])
+            try await run(with: out, "\(re)Resolve dependencies", ["swift", "package", "resolve", "-v", "--package-path", projectURL.path])
 
             // we need to build regardless of preference in order to build the apk
-            await run(with: out, "\(re)Build \(projectName)", ["swift", "build", "-v", "-c", debugConfiguration, "--package-path", projectURL.path])
+            try await run(with: out, "\(re)Build \(projectName)", ["swift", "build", "-v", "-c", debugConfiguration, "--package-path", projectURL.path])
         }
 
         if test == true {
@@ -287,7 +287,7 @@ extension ToolOptionsCommand {
         }
 
         if apk == true {
-            let apkFiles = await createAPK(projectURL: projectURL, appModuleName: appModuleName, configuration: configuration, out: out, primaryModuleName: primaryModuleName, cfgSuffix: cfgSuffix, returnHashes: returnHashes, prefix: re)
+            let apkFiles = try await createAPK(projectURL: projectURL, appModuleName: appModuleName, configuration: configuration, out: out, primaryModuleName: primaryModuleName, cfgSuffix: cfgSuffix, returnHashes: returnHashes, prefix: re)
             artifactHashes.merge(apkFiles, uniquingKeysWith: { $1 })
         }
 

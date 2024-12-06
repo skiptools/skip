@@ -203,7 +203,37 @@ public struct OutputOptions: ParsableArguments {
 }
 
 /// The result of a process, with a code, standard out, and standard error
-typealias ProcessOutput = (exitCode: Int32, stdout: String, stderr: String)
+struct ProcessOutput {
+    let exitCode: Int32
+    let stdout: String
+    let stderr: String
+
+    func throwOnFailure() throws {
+        if exitCode != 0 {
+            throw ProcessFailureError(code: exitCode, errorDescription: scanErrorLine() ?? "Command failed with exit code \(exitCode)")
+        }
+    }
+
+    /// Scan for common error patterns in the stderr and stdout
+    func scanErrorLine() -> String? {
+        let lines = (stdout + "\n" + stderr).split(separator: "\n")
+        let errors = lines.filter { line in
+            line.lowercased().hasPrefix("error: ")
+                || line.lowercased().hasPrefix("e: ") // Gradle error message
+                || line.contains(": error: ") // Xcode-formatted error message
+        }
+        if errors.isEmpty {
+            return nil // no error found
+        }
+
+        return errors.joined(separator: "\n")
+    }
+
+    struct ProcessFailureError: LocalizedError {
+        let code: Int32
+        let errorDescription: String?
+    }
+}
 
 extension Date {
     /// The number of seconds since the given date
@@ -236,19 +266,15 @@ extension ToolOptionsCommand {
 
     /// Executes a tool with the given arguments and prefix message, waits for the result while showing a progress animation,
     /// and then processes the result and outputs the given message block.
-    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ commandArgs: [String], environment: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, additionalEnvironment: [String: String] = [:], in workingDirectory: URL? = nil, watch: Bool = true, resultHandler finalResultHandler: MessageResultHandler<ProcessOutput>? = nil) async -> Result<ProcessOutput, Error> {
+    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ commandArgs: [String], environment: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, additionalEnvironment: [String: String] = [:], in workingDirectory: URL? = nil, watch: Bool = true, resultHandler finalResultHandler: MessageResultHandler<ProcessOutput>? = nil) async throws -> Result<ProcessOutput, Error> {
 
         // default to a result handler that outputs the duration of the operation
         let resultHandler = finalResultHandler ?? Self.timingResultHandler(message: message)
 
         var cmd = commandArgs.first ?? ""
-        do {
-            // attempt to resolve the tool command if it is not prefixed with a slash
-            if !cmd.hasPrefix("/") {
-                cmd = try toolOptions.toolPath(for: cmd)
-            }
-        } catch {
-            return Result.failure(error)
+        // attempt to resolve the tool command if it is not prefixed with a slash
+        if !cmd.hasPrefix("/") {
+            cmd = try toolOptions.toolPath(for: cmd)
         }
 
         let args = [cmd] + commandArgs.dropFirst()
@@ -256,14 +282,14 @@ extension ToolOptionsCommand {
         // write the command output directly to stderr
         self.outputOptions.logMessage("executing command\(workingDirectory == nil ? "" : " in \(workingDirectory!.path)"): \(args.joined(separator: " "))")
 
-        return await outputOptions.monitor(with: messenger, message, watch: watch, resultHandler: resultHandler) { outputHandler in
+        let result: Result<ProcessOutput, Error> = await outputOptions.monitor(with: messenger, message, watch: watch, resultHandler: resultHandler) { outputHandler in
             //let result = try await Process.popen(arguments: args, environment: environment, loggingHandler: outputHandler)
             var outBufferComplete: [UInt8] = []
             var outBuffer: [UInt8] = []
             var errBufferComplete: [UInt8] = []
             var errBuffer: [UInt8] = []
             let newline = UnicodeScalar("\n")
-            
+
             // both stdout and stderr go the an output buffer; when there are any newlines available in the buffer, flush it
             func addBuffer(err: Bool) -> (_ bytes: [UInt8]?) -> () {
                 return { bytes in
@@ -326,12 +352,17 @@ extension ToolOptionsCommand {
             addBuffer(err: true)(nil)
             addBuffer(err: false)(nil)
 
-            if code != 0 {
-                throw ExitCode(code)
-            }
-            let res = ProcessOutput(exitCode: code, stdout: String(bytes: outBufferComplete, encoding: .utf8) ?? "", stderr: String(bytes: errBufferComplete, encoding: .utf8) ?? "")
-            return res
+            let output = ProcessOutput(exitCode: code, stdout: String(bytes: outBufferComplete, encoding: .utf8) ?? "", stderr: String(bytes: errBufferComplete, encoding: .utf8) ?? "")
+            try output.throwOnFailure()
+            return output
         }
+
+        if self.failFast {
+            // this will cause a failure to surface as an error and halt the process
+            _ = try result.get() // .throwOnFailure()
+        }
+
+        return result
     }
 }
 

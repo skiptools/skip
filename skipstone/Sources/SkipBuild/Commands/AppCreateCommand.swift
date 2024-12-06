@@ -65,7 +65,7 @@ struct AppCreateCommand: MessageCommand, ToolOptionsCommand {
         let projectFolderURL = URL(fileURLWithPath: projectFolder, isDirectory: true)
         try FileManager.default.createDirectory(at: projectFolderURL, withIntermediateDirectories: true)
 
-        await run(with: out, "Unpacking template \(createOptions.template) (\(ByteCountFormatter().string(fromByteCount: Int64((try? downloadURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)))) for project \(pname)", ["unzip", downloadURL.path, "-d", projectFolderURL.path])
+        try await run(with: out, "Unpacking template \(createOptions.template) (\(ByteCountFormatter().string(fromByteCount: Int64((try? downloadURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)))) for project \(pname)", ["unzip", downloadURL.path, "-d", projectFolderURL.path])
 
 
         let packageJSON = try await parseSwiftPackage(with: out, at: projectFolderURL.path)
@@ -73,14 +73,14 @@ struct AppCreateCommand: MessageCommand, ToolOptionsCommand {
         //let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
         let appName = packageJSON.products.first?.name ?? "App"
 
-        await run(with: out, "Resolving \(pname)/\(appName)", ["swift", "package", "resolve", "--verbose", "--package-path", projectFolderURL.path])
+        try await run(with: out, "Resolving \(pname)/\(appName)", ["swift", "package", "resolve", "--verbose", "--package-path", projectFolderURL.path])
 
         if buildOptions.build == true {
-            await run(with: out, "Building \(pname)/\(appName)", ["swift", "build", "--verbose", "-c", createOptions.configuration.rawValue, "--package-path", projectFolderURL.path])
+            try await run(with: out, "Building \(pname)/\(appName)", ["swift", "build", "--verbose", "-c", createOptions.configuration.rawValue, "--package-path", projectFolderURL.path])
         }
 
         if buildOptions.test == true {
-            await run(with: out, "Test \(pname)/\(appName)", ["swift", "test", "-j", "1", "--verbose", "-c", createOptions.configuration.rawValue, "--package-path", projectFolderURL.path])
+            try await run(with: out, "Test \(pname)/\(appName)", ["swift", "test", "-j", "1", "--verbose", "-c", createOptions.configuration.rawValue, "--package-path", projectFolderURL.path])
         }
 
         // TODO: make code project match project name
@@ -90,7 +90,7 @@ struct AppCreateCommand: MessageCommand, ToolOptionsCommand {
         }
 
         if open == true {
-            await run(with: out, "Launching project \(projectPath)", ["open", projectPath])
+            try await run(with: out, "Launching project \(projectPath)", ["open", projectPath])
         }
 
         await out.write(status: .pass, "Created project: \(projectPath)")

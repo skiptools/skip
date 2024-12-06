@@ -176,7 +176,7 @@ class FrameworkProjectLayout {
 import Observation
 import \(native ? "SkipFuse" : "OSLog")
 
-fileprivate let logger: Logger = Logger(subsystem: "HiyaSkipModel", category: "HiyaSkipModel")
+fileprivate let logger: Logger = Logger(subsystem: "\(moduleName)", category: "\(moduleName)")
 
 /// The Observable ViewModel used by the application.
 @Observable public class ViewModel {
@@ -1044,13 +1044,12 @@ class AppProjectLayout : FrameworkProjectLayout {
             throw InitError(errorDescription: "ModuleName and project-name must be different: \(projectName)")
         }
 
-        if native && modules.count < 2 {
-            throw InitError(errorDescription: "skip init --native requires at least two modules")
-        }
-
         if let appid = appid {
             if !appid.contains(".") {
                 throw InitError(errorDescription: "Appid must be a valid bundle identifier containing at least one dot: \(appid)")
+            }
+            if native && modules.count < 2 {
+                throw InitError(errorDescription: "skip init --native requires at least two modules")
             }
         }
 

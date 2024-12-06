@@ -470,13 +470,14 @@ extension StreamingCommand {
             if warnings > 0 || errors > 0 {
                 if errors > 0 {
                     msg += " failed with \(errors) error\(errors == 1 ? "" : "s")"
-                    msg += "\nOutput logged to: \(logPath)"
-                    msg += "\nSee \(outputOptions.term.yellow("https://skip.tools/docs/faq")) and \(outputOptions.term.yellow("https://community.skip.tools")) for help"
                 }
                 if warnings > 0 {
                     msg += " \(errors > 0 ? "and" : "with") \(warnings) warning\(warnings == 1 ? "" : "s")"
                 }
-
+                if errors > 0 || warnings > 0 {
+                    msg += "\nSee \(outputOptions.term.yellow("https://skip.tools/docs/faq")) and \(outputOptions.term.yellow("https://community.skip.tools")) for help"
+                    msg += "\nSee output log for error details: \(logPath)"
+                }
             } else {
                 msg += " succeeded in \(startTime.timingSecondsSinceNow)"
             }
@@ -918,16 +919,24 @@ extension ProjectCommand {
 protocol ToolOptionsCommand : OutputOptionsCommand {
     /// This command's tool options
     var toolOptions: ToolOptions { get set }
+
+    /// Whether this command should immediately fail on error or not
+    var failFast: Bool { get }
 }
 
 extension ToolOptionsCommand {
+    // By default, all tools will fail fast
+    var failFast: Bool {
+        true
+    }
+
     /// Run swift package dump-package and return the parsed JSON results
     func parseSwiftPackage(with out: MessageQueue, at projectPath: String, swift swiftCommand: String = "swift") async throws -> PackageManifest {
         try await decodeCommand(with: out, title: "Check Swift Package", cmd: [swiftCommand, "package", "dump-package", "--package-path", projectPath]).get()
     }
 
     /// Invokes the given command that launches an executable and is expected to output JSON, which we parse into the specified data structure
-    func decodeCommand<T: Decodable>(with out: MessageQueue, title: String, cmd: [String]) async -> Result<T, Error> {
+    func decodeCommand<T: Decodable>(with out: MessageQueue, title: String, cmd: [String]) async throws -> Result<T, Error> {
 
         func decodeResult(_ result: Result<ProcessOutput, Error>) -> Result<T, Error> {
             do {
@@ -940,7 +949,7 @@ extension ToolOptionsCommand {
             }
         }
 
-        let output = await run(with: out, title, cmd)
+        let output = try await run(with: out, title, cmd)
         return decodeResult(output)
     }
 }
