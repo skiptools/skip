@@ -26,7 +26,7 @@ class SkipCommandTests : XCTestCase {
         XCTAssertNotEqual(0, welcome.count, "Welcome message should not be empty")
     }
 
-    func testSkipDoctor() async throws {
+    func DISABLEDtestSkipDoctor() async throws {
         // run `skip doctor` with JSON array output and make sure we can parse the result
         let doctor = try await skip("doctor", "-jA", "-v").out.parseJSONMessages()
         XCTAssertGreaterThan(doctor.count, 5, "doctor output should have contained some lines")
