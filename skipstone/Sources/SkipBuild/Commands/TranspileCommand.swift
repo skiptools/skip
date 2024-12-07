@@ -512,12 +512,12 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             // not a stable or well-documented format, and would require a lot of other metadata about the package;
             // so instead we tack on some code to the Package.swift file that we output
             //
-            // Note that we need @MainActor to work with Swift 6.0+ Package.swift,
-            // but we also need @preconcurrency to *not* break 5.9- Package.swift
+            // We pass dependencies is inout to bypass Swift 6+ requiring that it be @MainActor.
             var packageAddendum = """
 
-            @preconcurrency @MainActor func useLocalPackage(named packageName: String) {
-                package.dependencies = package.dependencies.filter {
+            func useLocalPackage(named packageName: String, dependencies: inout [Package.Dependency]) {
+                let odependencies = dependencies
+                dependencies = dependencies.filter {
                     switch $0.kind {
                     case let .sourceControl(name: name, location: location, requirement: _):
                         return name != packageName && !location.hasSuffix(packageName) && !location.hasSuffix(packageName + ".git")
@@ -525,8 +525,10 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                         return true
                     }
                 }
-                // change the dependency to a link to the given package
-                package.dependencies += [.package(name: packageName, path: "Packages/" + packageName)]
+                // change the dependency to a link to the given package if we have filtered it out
+                if dependencies.count < odependencies.count {
+                    dependencies += [.package(name: packageName, path: "Packages/" + packageName)]
+                }
             }
             
             """
@@ -558,7 +560,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 try addLink(dependencyPackageLink, pointingAt: destinationPath, relative: false)
 
                 packageAddendum += """
-                useLocalPackage(named: "\(packageID)")
+                useLocalPackage(named: "\(packageID)", dependencies: &package.dependencies)
                 
                 """
             }
@@ -725,7 +727,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 return (currentModuleConfig, currentModuleConfig, configMap) // just the unmerged base YAML
             }
 
-            // build up a merged YAML from the base dependenices to the current module
+            // build up a merged YAML from the base dependencies to the current module
             var aggregateJSON: Universal.JSON = [:]
 
             for (moduleName, modulePath) in moduleNamePaths {
