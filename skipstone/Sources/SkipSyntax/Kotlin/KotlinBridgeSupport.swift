@@ -44,9 +44,9 @@ struct JavaClassRef {
     init(for signature: TypeSignature, packageName: String?) {
         let className: String
         if let packageName {
-            className = packageName.replacing(".", with: "/") + "/" + signature.name
+            className = packageName.replacing(".", with: "/") + "/" + signature.name.replacing(".", with: "$")
         } else {
-            className = signature.name
+            className = signature.name.replacing(".", with: "$")
         }
         self.identifier = "Java_class"
         self.className = className
@@ -334,11 +334,15 @@ extension TypeSignature {
         case .int128:
             return "Ljava/math/BigInteger;"
         case .member(let parent, let type):
-            var jni = parent.jni(options: options)
-            if jni.hasSuffix(";") {
-                jni = String(jni.dropLast())
+            var parentJNI = parent.jni(options: options)
+            if parentJNI.hasSuffix(";") {
+                parentJNI = String(parentJNI.dropLast())
             }
-            return jni + "$" + type.jni(options: options)
+            var typeJNI = type.jni(options: options)
+            if typeJNI.hasSuffix(";") {
+                typeJNI = String(typeJNI.dropFirst())
+            }
+            return parentJNI + "$" + typeJNI
         case .metaType:
             return "Ljava/lang/Class;"
         case .module(let name, let type):
@@ -546,8 +550,6 @@ extension KotlinFunctionDeclaration {
 
 extension KotlinClassDeclaration {
     /// Check that this class is bridgable.
-    ///
-    /// This function will add messages about invalid modifiers or types to this variable.
     func checkBridgable(options: KotlinBridgeOptions, translator: KotlinTranslator) -> Bool {
         switch declarationType {
         case .enumDeclaration:
@@ -570,8 +572,7 @@ extension KotlinClassDeclaration {
         guard checkNonGeneric(self, generics: generics, translator: translator) else {
             return false
         }
-        guard !(parent is KotlinClassDeclaration) && !(parent is KotlinInterfaceDeclaration) else {
-            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "inner types", source: translator.syntaxTree.source))
+        guard checkParentBridgable(self, options: options, translator: translator) else {
             return false
         }
         return true
@@ -588,10 +589,11 @@ extension KotlinClassDeclaration {
 
 extension KotlinInterfaceDeclaration {
     /// Check that this interface is bridgable.
-    ///
-    /// This function will add messages about invalid modifiers or types to this variable.
     func checkBridgable(options: KotlinBridgeOptions, translator: KotlinTranslator) -> Bool {
         guard checkNonGeneric(self, generics: generics, translator: translator) else {
+            return false
+        }
+        guard checkParentBridgable(self, options: options, translator: translator) else {
             return false
         }
         return true
@@ -874,6 +876,18 @@ private func checkNonGeneric(_ sourceDerived: SourceDerived, generics: Generics,
     }
     sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: "generic types", source: translator.syntaxTree.source))
     return false
+}
+
+private func checkParentBridgable(_ statement: KotlinStatement, options: KotlinBridgeOptions, translator: KotlinTranslator) -> Bool {
+    guard (statement.parent as? KotlinClassDeclaration)?.checkBridgable(options: options, translator: translator) != false else {
+        // This is not an error - the children of an unbridged type are simply not bridged either
+        return false
+    }
+    guard (statement.parent as? KotlinInterfaceDeclaration)?.checkBridgable(options: options, translator: translator) != false else {
+        // This is not an error - the children of an unbridged type are simply not bridged either
+        return false
+    }
+    return true
 }
 
 private func checkNonStaticProtocolRequirement(_ sourceDerived: SourceDerived, in parent: KotlinSyntaxNode?, modifiers: Modifiers, translator: KotlinTranslator) -> Bool {

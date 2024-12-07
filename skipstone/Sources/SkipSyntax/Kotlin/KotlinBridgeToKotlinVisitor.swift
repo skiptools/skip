@@ -847,7 +847,7 @@ final class KotlinBridgeToKotlinVisitor {
         let typeName: String
         let cdeclTypeName: String
         if let classDeclaration = statement.owningTypeDeclaration as? KotlinClassDeclaration {
-            typeName = classDeclaration.signature.description
+            typeName = classDeclaration.signature.description.replacing(".", with: "$")
             if (statement as? KotlinMemberDeclaration)?.isStatic == true {
                 cdeclTypeName = typeName + "$Companion"
             } else {

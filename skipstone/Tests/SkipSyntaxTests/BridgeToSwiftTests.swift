@@ -1384,9 +1384,137 @@ final class BridgeToSwiftTests: XCTestCase {
     }
 
     func testInnerClass() async throws {
-        try await checkProducesMessage(swift: """
-        public class D {
-            public class C {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public enum A {
+            public class B {
+                public struct C {
+                    public var b = B()
+                }
+            }
+        }
+        #endif
+        """, kotlin: """
+        enum class A {
+            ;
+            open class B {
+                @Suppress("MUST_BE_INITIALIZED")
+                class C: MutableStruct {
+                    var b: A.B
+                        set(newValue) {
+                            willmutate()
+                            field = newValue
+                            didmutate()
+                        }
+
+                    constructor(b: A.B = B()) {
+                        this.b = b
+                    }
+
+                    override var supdate: ((Any) -> Unit)? = null
+                    override var smutatingcount = 0
+                    override fun scopy(): MutableStruct = A.B.C(b)
+
+                    companion object {
+                    }
+                }
+
+                companion object: CompanionClass() {
+                }
+                open class CompanionClass {
+                }
+            }
+
+            companion object {
+            }
+        }
+        """, swiftBridgeSupport: """
+        public enum A: BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "A")
+            private var Java_peer: JavaObjectPointer {
+                return toJavaObject(options: [])!
+            }
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let name: String = try! obj!.call(method: Java_name_methodID, options: options, args: [])
+                return fromJavaName(name)
+            }
+            fileprivate static func fromJavaName(_ name: String) -> Self {
+                return switch name {
+                default: fatalError()
+                }
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let name = switch self {
+                default: fatalError()
+                }
+                return try! Self.Java_class.callStatic(method: Self.Java_valueOf_methodID, options: options, args: [name.toJavaParameter(options: options)])
+            }
+            private static let Java_name_methodID = Java_class.getMethodID(name: "name", sig: "()Ljava/lang/String;")!
+            private static let Java_valueOf_methodID = Java_class.getStaticMethodID(name: "valueOf", sig: "(Ljava/lang/String;)LA;")!
+        }
+        extension A {
+            public class B: BridgedFromKotlin {
+                private static let Java_class = try! JClass(name: "A$B")
+                public let Java_peer: JObject
+                public required init(Java_ptr: JavaObjectPointer) {
+                    Java_peer = JObject(Java_ptr)
+                }
+                public init() {
+                    Java_peer = jniContext {
+                        let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                        return JObject(ptr)
+                    }
+                }
+                private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+                public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                    return .init(Java_ptr: obj!)
+                }
+                public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                    return Java_peer.safePointer()
+                }
+            }
+        }
+        extension A.B {
+            public struct C: BridgedFromKotlin {
+                private static let Java_class = try! JClass(name: "A$B$C")
+                public var Java_peer: JObject
+                public init(Java_ptr: JavaObjectPointer) {
+                    Java_peer = JObject(Java_ptr)
+                }
+                private static let Java_scopy_methodID = Java_class.getMethodID(name: "scopy", sig: "()Lskip/lib/MutableStruct;")!
+                public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                    return .init(Java_ptr: obj!)
+                }
+                public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                    return Java_peer.safePointer()
+                }
+
+                public var b: A.B {
+                    get {
+                        return jniContext {
+                            let value_java: JavaObjectPointer = try! Java_peer.call(method: Self.Java_get_b_methodID, options: [], args: [])
+                            return A.B.fromJavaObject(value_java, options: [])
+                        }
+                    }
+                    set {
+                        jniContext {
+                            Java_peer = try! JObject(Java_peer.call(method: Self.Java_scopy_methodID, options: [], args: []))
+                            let value_java = newValue.toJavaObject(options: [])!.toJavaParameter(options: [])
+                            try! Java_peer.call(method: Self.Java_set_b_methodID, options: [], args: [value_java])
+                        }
+                    }
+                }
+                private static let Java_get_b_methodID = Java_class.getMethodID(name: "getB", sig: "()LA$B;")!
+                private static let Java_set_b_methodID = Java_class.getMethodID(name: "setB", sig: "(LA$B;)V")!
+
+                public init(b p_0: A.B) {
+                    Java_peer = jniContext {
+                        let p_0_java = p_0.toJavaObject(options: [])!.toJavaParameter(options: [])
+                        let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, args: [p_0_java])
+                        return JObject(ptr)
+                    }
+                }
+                private static let Java_constructor_0_methodID = Java_class.getMethodID(name: "<init>", sig: "(LA$B;)V")!
             }
         }
         """, transformers: transformers)

@@ -713,13 +713,33 @@ final class KotlinBridgeToSwiftVisitor {
             swift.append(1, Self.swiftForJConvertibleContract(visibility: finalMemberVisibility))
         }
 
-        let definition = SwiftDefinition(statement: classDeclaration, children: memberDefinitions) { output, indentation, children in
-            swift.forEach { output.append(indentation).append($0).append("\n") }
-            let childIndentation = indentation.inc()
+        let definition = definition(of: classDeclaration.signature, statement: classDeclaration, swift: swift, members: memberDefinitions)
+        swiftDefinitions.append(definition)
+    }
+
+    private func definition(of signature: TypeSignature, statement: KotlinStatement, swift: [String], members: [SwiftDefinition]) -> SwiftDefinition {
+        let definitionSwift: [String]
+        let isNested: Bool
+        if case .member(let parent, _) = signature {
+            var extensionSwift: [String] = ["extension \(parent) {"]
+            extensionSwift.append(1, swift)
+            definitionSwift = extensionSwift
+            isNested = true
+        } else {
+            definitionSwift = swift
+            isNested = false
+        }
+
+        let definition = SwiftDefinition(statement: statement, children: members) { output, indentation, children in
+            definitionSwift.forEach { output.append(indentation).append($0).append("\n") }
+            let childIndentation = Indentation(level: indentation.level + (isNested ? 2 : 1))
             children.forEach { output.append("\n").append($0, indentation: childIndentation) }
+            if isNested {
+                output.append(indentation.inc()).append("}\n")
+            }
             output.append(indentation).append("}\n")
         }
-        swiftDefinitions.append(definition)
+        return definition
     }
 
     private static func swiftForJConvertibleContract(visibility: Modifiers.Visibility) -> [String] {
@@ -754,8 +774,12 @@ final class KotlinBridgeToSwiftVisitor {
 
         swift.append(visibilityString + "func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {")
         swift.append(1, "let name = switch self {")
-        for enumCaseDeclaration in caseDeclarations {
-            swift.append(1, "case .\(enumCaseDeclaration.preEscapedName ?? enumCaseDeclaration.name): \"\(enumCaseDeclaration.name)\"")
+        if caseDeclarations.isEmpty {
+            swift.append(1, "default: fatalError()")
+        } else {
+            for enumCaseDeclaration in caseDeclarations {
+                swift.append(1, "case .\(enumCaseDeclaration.preEscapedName ?? enumCaseDeclaration.name): \"\(enumCaseDeclaration.name)\"")
+            }
         }
         swift.append(1, "}")
         swift.append(1, "return try! Self.Java_class.callStatic(method: Self.Java_valueOf_methodID, options: options, args: [name.toJavaParameter(options: options)])")
@@ -805,12 +829,7 @@ final class KotlinBridgeToSwiftVisitor {
             }
         }
 
-        let definition = SwiftDefinition(statement: interfaceDeclaration, children: memberDefinitions) { output, indentation, children in
-            swift.forEach { output.append(indentation).append($0).append("\n") }
-            let childIndentation = indentation.inc()
-            children.forEach { output.append("\n").append($0, indentation: childIndentation) }
-            output.append(indentation).append("}\n")
-        }
+        let definition = definition(of: interfaceDeclaration.signature, statement: interfaceDeclaration, swift: swift, members: memberDefinitions)
         swiftDefinitions.append(definition)
 
         if let bridgeImplDefinition = Self.unknownBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, options: options, codebaseInfo: codebaseInfo) {
