@@ -219,7 +219,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         // always touch the sourcehash file with the most recent source hashes in order to update the output file time
         /// Create a link from the source to the destination; this is used for resources and custom Kotlin files in order to permit edits to target file and have them reflected in the original source
-        func addLink(_ linkSource: AbsolutePath, pointingAt destPath: AbsolutePath, relative: Bool, replace: Bool = true) throws {
+        func addLink(_ linkSource: AbsolutePath, pointingAt destPath: AbsolutePath, relative: Bool, replace: Bool = true, copyReadOnlyFiles: Bool = true) throws {
             msg(.trace, "linking: \(linkSource) to: \(destPath)")
 
             if replace && fs.isSymlink(destPath) {
@@ -234,18 +234,36 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 }
             }
 
-            let modTime = try? fs.getFileInfo(destPath).modTime
-            removePath(linkSource) // remove any existing link in order to re-create it
-            try fs.createSymbolicLink(addOutputFile(linkSource), pointingAt: destPath, relative: relative)
-            // set the output link mod time to match the source link mod time
-            if let modTime = modTime {
-                // this will try to set the mod time of the *destination* file, which is incorrect (and also not allowed, since the dest is likely outside of our sandboxed write folder list)
-                //try FileManager.default.setAttributes([.modificationDate: modTime], ofItemAtPath: linkSource.pathString)
+            let destInfo = try fs.getFileInfo(destPath)
+            let modTime = destInfo.modTime
+            let perms = destInfo.posixPermissions
 
-                // using setResourceValue instead does apply it to the link
-                // https://stackoverflow.com/questions/10608724/set-modification-date-on-symbolic-link-in-cocoa
-                try (linkSource.asURL as NSURL).setResourceValue(modTime, forKey: .contentModificationDateKey)
+            // 0o200 adds owner write permission (write = 2, owner = 2)
+            let writablePermissions = perms | 0o200
+
+            // when the source file is not writable, we copy the file insead of linking it, because otherwise Gradle may fail to overwrite the desination the second time it tries to copy it
+            // https://github.com/skiptools/skip/issues/296
+            let shouldCopy = copyReadOnlyFiles && !fs.isDirectory(linkSource) && (perms != writablePermissions)
+
+            removePath(linkSource) // remove any existing link in order to re-create it
+            if shouldCopy {
+                msg(.trace, "copying \(destPath) to \(linkSource)")
+                try fs.copy(from: destPath, to: addOutputFile(linkSource))
+                //try fs.chmod(.userWritable, path: destPath)
+                try FileManager.default.setAttributes([.posixPermissions: writablePermissions], ofItemAtPath: linkSource.pathString)
+            } else {
+                msg(.trace, "linking \(destPath) to \(linkSource)")
+                try fs.createSymbolicLink(addOutputFile(linkSource), pointingAt: destPath, relative: relative)
             }
+
+            // set the output link mod time to match the source link mod time
+
+            // this will try to set the mod time of the *destination* file, which is incorrect (and also not allowed, since the dest is likely outside of our sandboxed write folder list)
+            //try FileManager.default.setAttributes([.modificationDate: modTime], ofItemAtPath: linkSource.pathString)
+
+            // using setResourceValue instead does apply it to the link
+            // https://stackoverflow.com/questions/10608724/set-modification-date-on-symbolic-link-in-cocoa
+            try (linkSource.asURL as NSURL).setResourceValue(modTime, forKey: .contentModificationDateKey)
         }
 
 
@@ -493,9 +511,12 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             // but this would involve writing to the .build/workspace-state.json file with the "edited" property, which is
             // not a stable or well-documented format, and would require a lot of other metadata about the package;
             // so instead we tack on some code to the Package.swift file that we output
+            //
+            // Note that we need @MainActor to work with Swift 6.0+ Package.swift,
+            // but we also need @preconcurrency to *not* break 5.9- Package.swift
             var packageAddendum = """
 
-            func useLocalPackage(named packageName: String) {
+            @preconcurrency @MainActor func useLocalPackage(named packageName: String) {
                 package.dependencies = package.dependencies.filter {
                     switch $0.kind {
                     case let .sourceControl(name: name, location: location, requirement: _):

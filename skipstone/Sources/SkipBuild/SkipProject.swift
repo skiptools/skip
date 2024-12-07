@@ -268,7 +268,7 @@ extension ViewModel {
         }
     }
 }
-            
+
 """
 
             if shouldOutputModel {
