@@ -578,7 +578,7 @@ final class KotlinBridgeToKotlinVisitor {
         equals.isGenerated = true
         let sourceCode: [String] = [
             "if (other !is skip.bridge.kt.SwiftPeerBridged) return false",
-            "return Swift_peer == other.Swift_bridgedPeer()"
+            "return Swift_peer == other.Swift_peer()"
         ]
         equals.body = KotlinCodeBlock(statements: sourceCode.map { KotlinRawStatement(sourceCode: $0) })
         return equals
@@ -736,7 +736,7 @@ final class KotlinBridgeToKotlinVisitor {
                 cdeclFunctions.append(CDeclFunction(name: constructorCdecl.cdeclFunctionName, cdecl: constructorCdecl.cdecl, signature: .function([], .swiftObjectPointer(kotlin: false), APIFlags(), nil), body: constructorBody))
             }
 
-            let bridgedPeer = KotlinFunctionDeclaration(name: "Swift_bridgedPeer")
+            let bridgedPeer = KotlinFunctionDeclaration(name: "Swift_peer")
             bridgedPeer.returnType = .swiftObjectPointer(kotlin: true)
             bridgedPeer.modifiers.visibility = .public
             bridgedPeer.modifiers.isOverride = true

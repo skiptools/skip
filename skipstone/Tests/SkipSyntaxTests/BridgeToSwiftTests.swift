@@ -625,11 +625,11 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             private external fun Swift_constructor(): skip.bridge.kt.SwiftObjectPointer
 
-            override fun Swift_bridgedPeer(): skip.bridge.kt.SwiftObjectPointer = Swift_peer
+            override fun Swift_peer(): skip.bridge.kt.SwiftObjectPointer = Swift_peer
 
             override fun equals(other: Any?): Boolean {
                 if (other !is skip.bridge.kt.SwiftPeerBridged) return false
-                return Swift_peer == other.Swift_bridgedPeer()
+                return Swift_peer == other.Swift_peer()
             }
 
             override fun hashCode(): Int = Swift_peer.hashCode()
@@ -2330,10 +2330,23 @@ final class BridgeToSwiftTests: XCTestCase {
 
     func testSubclass() async throws {
         try await checkProducesMessage(swift: """
+        #if !SKIP_BRIDGE
         public class Base {
+            public var i = 0
+        
+            public init(i: Int) {
+                self.i = i
+            }
         }
-        public class Sub: Base {
+        public class Sub1: Base {
+            public var s = ""
+        
+            public init(i: Int, s: String) {
+                self.s = s
+                super.init(i: i)
+            }
         }
+        #endif
         """, transformers: transformers)
     }
 
