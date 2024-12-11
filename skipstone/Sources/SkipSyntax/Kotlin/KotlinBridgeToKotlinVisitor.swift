@@ -51,7 +51,7 @@ final class KotlinBridgeToKotlinVisitor {
                 return .recurse(nil)
             } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
                 if updateInterfaceDeclaration(interfaceDeclaration) {
-                    if let bridgeImplDefinition = KotlinBridgeToSwiftVisitor.unknownBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, options: options, codebaseInfo: codebaseInfo) {
+                    if let bridgeImplDefinition = KotlinBridgeToSwiftVisitor.protocolBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, options: options, codebaseInfo: codebaseInfo) {
                         swiftDefinitions.append(bridgeImplDefinition)
                     }
                 }
@@ -134,7 +134,7 @@ final class KotlinBridgeToKotlinVisitor {
         let propertyName = variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName
         let externalName = "Swift_" + ((variableDeclaration.isStatic) ? "Companion_" + propertyName : propertyName)
         var externalFunctionDeclarations: [String] = []
-        let (cdecl, cdeclName) = cdecl(for: variableDeclaration, name: externalName, translator: translator)
+        let (cdecl, cdeclName) = CDeclFunction.declaration(for: variableDeclaration, name: externalName, translator: translator)
 
         // Getter
         let isInstance = classDeclaration != nil && !variableDeclaration.isStatic
@@ -516,7 +516,7 @@ final class KotlinBridgeToKotlinVisitor {
         }
         (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [KotlinRawStatement(sourceCode: externalFunctionDeclaration, isStatic: functionDeclaration.isStatic)], after: functionDeclaration)
 
-        let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: externalName, translator: translator)
+        let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, name: externalName, translator: translator)
         let instanceParameter = classDeclaration != nil && functionDeclaration.type != .constructorDeclaration && !functionDeclaration.isStatic ? [cdeclInstanceParameter(for: classDeclaration!)] : []
         let callbackParameter = isAsync ? [TypeSignature.Parameter(label: "f_callback", type: .javaObjectPointer)] : []
         let cdeclType: TypeSignature = .function(instanceParameter + bridgable.parameters.enumerated().map { (index, bridgable) in
@@ -557,7 +557,7 @@ final class KotlinBridgeToKotlinVisitor {
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_isequal(lhs: \(classDeclaration.signature), rhs: \(classDeclaration.signature)): Boolean")
         classDeclaration.insert(statements: [externalFunctionDeclaration], after: functionDeclaration)
 
-        let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: "Swift_isequal", translator: translator)
+        let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, name: "Swift_isequal", translator: translator)
         let cdeclType: TypeSignature = .function([TypeSignature.Parameter(label: "lhs", type: .javaObjectPointer), TypeSignature.Parameter(label: "rhs", type: .javaObjectPointer)], .bool, APIFlags(), nil)
         let cdeclBody: [String] = [
             "let lhs_swift = \(classDeclaration.signature).fromJavaObject(lhs, options: \(options.jconvertibleOptions))",
@@ -599,7 +599,7 @@ final class KotlinBridgeToKotlinVisitor {
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_hashvalue(Swift_peer: skip.bridge.kt.SwiftObjectPointer): Long")
         classDeclaration.insert(statements: [externalFunctionDeclaration], after: functionDeclaration)
 
-        let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: "Swift_hashvalue", translator: translator)
+        let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, name: "Swift_hashvalue", translator: translator)
         let cdeclType: TypeSignature = .function([cdeclInstanceParameter(for: classDeclaration)], .int64, APIFlags(), nil)
         var cdeclBody: [String] = []
         if classDeclaration.declarationType == .classDeclaration {
@@ -637,7 +637,7 @@ final class KotlinBridgeToKotlinVisitor {
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_islessthan(lhs: \(classDeclaration.signature), rhs: \(classDeclaration.signature)): Boolean")
         classDeclaration.insert(statements: [externalFunctionDeclaration], after: functionDeclaration)
 
-        let (cdecl, cdeclName) = cdecl(for: functionDeclaration, name: "Swift_islessthan", translator: translator)
+        let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, name: "Swift_islessthan", translator: translator)
         let cdeclType: TypeSignature = .function([TypeSignature.Parameter(label: "lhs", type: .javaObjectPointer), TypeSignature.Parameter(label: "rhs", type: .javaObjectPointer)], .bool, APIFlags(), nil)
         let cdeclBody: [String] = [
             "let lhs_swift = \(classDeclaration.signature).fromJavaObject(lhs, options: \(options.jconvertibleOptions))",
@@ -724,7 +724,7 @@ final class KotlinBridgeToKotlinVisitor {
                 let externalConstructor = KotlinRawStatement(sourceCode: "private external fun Swift_constructor(): skip.bridge.kt.SwiftObjectPointer")
                 insertStatements.append(externalConstructor)
 
-                let constructorCdecl = cdecl(for: classDeclaration, name: "Swift_constructor", translator: translator)
+                let constructorCdecl = CDeclFunction.declaration(for: classDeclaration, name: "Swift_constructor", translator: translator)
                 var constructorBody: [String] = []
                 if classDeclaration.declarationType == .classDeclaration {
                     constructorBody.append("let f_return_swift = \(classDeclaration.signature)()")
@@ -747,7 +747,7 @@ final class KotlinBridgeToKotlinVisitor {
             bridgedPeer.isGenerated = true
             insertStatements.append(bridgedPeer)
 
-            let releaseCdecl = cdecl(for: classDeclaration, name: "Swift_release", translator: translator)
+            let releaseCdecl = CDeclFunction.declaration(for: classDeclaration, name: "Swift_release", translator: translator)
             var releaseBody: [String] = []
             if classDeclaration.declarationType == .classDeclaration {
                 releaseBody.append("Swift_peer.release(as: \(classDeclaration.signature).self)")
@@ -836,30 +836,10 @@ final class KotlinBridgeToKotlinVisitor {
 
         let swiftDefinition = SwiftDefinition(swift: swift)
         swiftDefinitions.append(swiftDefinition)
-        return true
-    }
 
-    private func cdecl(for statement: KotlinStatement, name: String, translator: KotlinTranslator) -> (cdecl: String, cdeclFunctionName: String) {
-        var cdeclPrefix = "Java_"
-        if let package = translator.packageName {
-            cdeclPrefix += package.cdeclEscaped.replacing(".", with: "_") + "_"
-        }
-        let typeName: String
-        let cdeclTypeName: String
-        if let classDeclaration = statement.owningTypeDeclaration as? KotlinClassDeclaration {
-            typeName = classDeclaration.signature.description.replacing(".", with: "$")
-            if (statement as? KotlinMemberDeclaration)?.isStatic == true {
-                cdeclTypeName = typeName + "$Companion"
-            } else {
-                cdeclTypeName = typeName
-            }
-        } else {
-            var file = translator.syntaxTree.source.file
-            file.extension = ""
-            typeName = file.name + "Kt"
-            cdeclTypeName = typeName
-        }
-        return (cdeclPrefix + cdeclTypeName.cdeclEscaped + "_" + name.cdeclEscaped, typeName + "_" + name)
+        let cdeclFunction = KotlinBridgeToSwiftVisitor.addSwiftProjectable(to: classDeclaration, options: options, translator: translator)
+        cdeclFunctions.append(cdeclFunction)
+        return true
     }
 
     private func cdeclInstanceParameter(for classDeclaration: KotlinClassDeclaration) -> TypeSignature.Parameter {
@@ -868,34 +848,5 @@ final class KotlinBridgeToKotlinVisitor {
         } else {
             return TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))
         }
-    }
-}
-
-private struct CDeclFunction {
-    let name: String
-    let cdecl: String
-    let signature: TypeSignature
-    let body: [String]
-
-    func append(to output: OutputGenerator, indentation: Indentation) {
-        output.append(indentation).append("@_cdecl(\"").append(cdecl).append("\")\n")
-        output.append(indentation).append("func ").append(name).append("(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer")
-        for parameter in signature.parameters {
-            output.append(", _")
-            if let label = parameter.label {
-                output.append(" ").append(label)
-            }
-            output.append(": ").append(parameter.type.description)
-        }
-        output.append(")")
-        if signature.returnType != .void {
-            output.append(" -> ").append(signature.returnType.description)
-        }
-        output.append(" {\n")
-
-        let bodyIndentation = indentation.inc()
-        body.forEach { output.append(bodyIndentation).append($0).append("\n") }
-
-        output.append(indentation).append("}\n")
     }
 }
