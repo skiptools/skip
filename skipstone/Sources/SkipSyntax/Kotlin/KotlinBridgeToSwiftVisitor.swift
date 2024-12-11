@@ -612,6 +612,7 @@ final class KotlinBridgeToSwiftVisitor {
             classDeclaration.messages.append(Message.kotlinBridgeMissingInfo(classDeclaration, source: translator.syntaxTree.source))
             return
         }
+
         let classRef = JavaClassRef(for: classDeclaration.signature, packageName: translator.packageName)
 
         let isEnum = classDeclaration.declarationType == .enumDeclaration
@@ -713,11 +714,45 @@ final class KotlinBridgeToSwiftVisitor {
             swift.append(1, Self.swiftForJConvertibleContract(visibility: finalMemberVisibility))
         }
 
-        let definition = definition(of: classDeclaration.signature, statement: classDeclaration, swift: swift, members: memberDefinitions)
+        let definition = swiftDefinition(of: classDeclaration.signature, statement: classDeclaration, swift: swift, members: memberDefinitions)
         swiftDefinitions.append(definition)
+
+        // Make bridged Kotlin types implement `SwiftProjectable`
+        let cdeclFunction = Self.addSwiftProjectable(to: classDeclaration, options: options, translator: translator)
+        swiftDefinitions.append(SwiftDefinition { output, indentation, _ in
+            cdeclFunction.append(to: output, indentation: indentation)
+        })
     }
 
-    private func definition(of signature: TypeSignature, statement: KotlinStatement, swift: [String], members: [SwiftDefinition]) -> SwiftDefinition {
+    static func addSwiftProjectable(to classDeclaration: KotlinClassDeclaration, options: KotlinBridgeOptions, translator: KotlinTranslator) -> CDeclFunction {
+        classDeclaration.inherits.append(.named("skip.bridge.kt.SwiftProjectable", []))
+
+        let projectionFunc = KotlinFunctionDeclaration(name: "Swift_projection")
+        let externalName = "Swift_projectionImpl"
+        projectionFunc.parameters = [Parameter<KotlinExpression>(externalLabel: "options", declaredType: .int)]
+        projectionFunc.returnType = .function([], .any, APIFlags(), nil)
+        projectionFunc.extras = .singleNewline
+        projectionFunc.modifiers.visibility = .public
+        projectionFunc.modifiers.isOverride = true
+        projectionFunc.body = KotlinCodeBlock(statements: [
+            KotlinRawStatement(sourceCode: "return \(externalName)(options)")
+        ])
+        classDeclaration.insert(statements: [projectionFunc], after: classDeclaration.members.last)
+
+        let externalFunc = KotlinRawStatement(sourceCode: "private external fun \(externalName)(options: Int): () -> Any")
+        classDeclaration.insert(statements: [externalFunc], after: projectionFunc)
+
+        let (cdecl, cdeclName) = CDeclFunction.declaration(for: classDeclaration, name: externalName, translator: translator)
+        let cdeclSignature: TypeSignature = .function([TypeSignature.Parameter(label: "options", type: .int32)], .javaObjectPointer, APIFlags(), nil)
+        let swift = [
+            "let projection = \(classDeclaration.signature).fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))",
+            "let factory: () -> Any = { projection }",
+            "return " + projectionFunc.returnType.convertToJava(value: "factory", strategy: .direct, options: options)
+        ]
+        return CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: swift)
+    }
+
+    private func swiftDefinition(of signature: TypeSignature, statement: KotlinStatement, swift: [String], members: [SwiftDefinition]) -> SwiftDefinition {
         let definitionSwift: [String]
         let isNested: Bool
         if case .member(let parent, _) = signature {
@@ -829,21 +864,21 @@ final class KotlinBridgeToSwiftVisitor {
             }
         }
 
-        let definition = definition(of: interfaceDeclaration.signature, statement: interfaceDeclaration, swift: swift, members: memberDefinitions)
+        let definition = swiftDefinition(of: interfaceDeclaration.signature, statement: interfaceDeclaration, swift: swift, members: memberDefinitions)
         swiftDefinitions.append(definition)
 
-        if let bridgeImplDefinition = Self.unknownBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, options: options, codebaseInfo: codebaseInfo) {
+        if let bridgeImplDefinition = Self.protocolBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, options: options, codebaseInfo: codebaseInfo) {
             swiftDefinitions.append(bridgeImplDefinition)
         }
     }
 
     /// Define an anonymous implementation of a bridged protocol.
-    static func unknownBridgeImplDefinition(forProtocol type: TypeSignature, inPackage packageName: String?, statement: KotlinStatement?, options: KotlinBridgeOptions, codebaseInfo: CodebaseInfo.Context) -> SwiftDefinition? {
+    static func protocolBridgeImplDefinition(forProtocol type: TypeSignature, inPackage packageName: String?, statement: KotlinStatement?, options: KotlinBridgeOptions, codebaseInfo: CodebaseInfo.Context) -> SwiftDefinition? {
         guard let primaryTypeInfo = codebaseInfo.primaryTypeInfo(forNamed: type) else {
             return nil
         }
         let protocolSignatures = codebaseInfo.global.protocolSignatures(forNamed: type).dropFirst()
-        let bridgeImpl = type.unknownBridgeImpl
+        let bridgeImpl = type.protocolBridgeImpl
 
         var swift: [String] = []
         swift.append("public final class \(bridgeImpl): \(type), BridgedFromKotlin {")
@@ -856,7 +891,7 @@ final class KotlinBridgeToSwiftVisitor {
         swift.append(1, "}")
 
         var functionCount = 0
-        swift.append(1, self.swift(forUnknownBridgeImplMembers: primaryTypeInfo, options: options, codebaseInfo: codebaseInfo, functionCount: &functionCount))
+        swift.append(1, self.swift(forProtocolBridgeImplMembers: primaryTypeInfo, options: options, codebaseInfo: codebaseInfo, functionCount: &functionCount))
         var seenProtocolSignatures: Set<TypeSignature> = []
         for protocolSignature in protocolSignatures {
             guard seenProtocolSignatures.insert(protocolSignature).inserted else {
@@ -872,7 +907,7 @@ final class KotlinBridgeToSwiftVisitor {
                 guard protocolInfo.modifiers.visibility >= .public, !protocolInfo.attributes.isNoBridge else {
                     continue
                 }
-                swift.append(1, self.swift(forUnknownBridgeImplMembers: protocolInfo, options: options, codebaseInfo: codebaseInfo, functionCount: &functionCount))
+                swift.append(1, self.swift(forProtocolBridgeImplMembers: protocolInfo, options: options, codebaseInfo: codebaseInfo, functionCount: &functionCount))
             }
         }
         swift.append(1, swiftForJConvertibleContract(visibility: .public))
@@ -881,7 +916,7 @@ final class KotlinBridgeToSwiftVisitor {
         return SwiftDefinition(statement: statement, swift: swift)
     }
 
-    private static func swift(forUnknownBridgeImplMembers info: CodebaseInfo.TypeInfo, options: KotlinBridgeOptions, codebaseInfo: CodebaseInfo.Context, functionCount: inout Int) -> [String] {
+    private static func swift(forProtocolBridgeImplMembers info: CodebaseInfo.TypeInfo, options: KotlinBridgeOptions, codebaseInfo: CodebaseInfo.Context, functionCount: inout Int) -> [String] {
         var swift: [String] = []
         for variableInfo in info.variables {
             guard !variableInfo.attributes.isNoBridge else {

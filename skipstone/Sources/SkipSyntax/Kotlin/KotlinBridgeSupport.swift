@@ -76,6 +76,60 @@ struct JavaClassRef {
     }
 }
 
+/// `cdecl` function information.
+struct CDeclFunction {
+    let name: String
+    let cdecl: String
+    let signature: TypeSignature
+    let body: [String]
+
+    /// Return the `cdecl` declarations for a given external function name.
+    static func declaration(for statement: KotlinStatement, name: String, translator: KotlinTranslator) -> (cdecl: String, cdeclFunctionName: String) {
+        var cdeclPrefix = "Java_"
+        if let package = translator.packageName {
+            cdeclPrefix += package.cdeclEscaped.replacing(".", with: "_") + "_"
+        }
+        let typeName: String
+        let cdeclTypeName: String
+        if let classDeclaration = statement.owningTypeDeclaration as? KotlinClassDeclaration {
+            typeName = classDeclaration.signature.description.replacing(".", with: "$")
+            if (statement as? KotlinMemberDeclaration)?.isStatic == true {
+                cdeclTypeName = typeName + "$Companion"
+            } else {
+                cdeclTypeName = typeName
+            }
+        } else {
+            var file = translator.syntaxTree.source.file
+            file.extension = ""
+            typeName = file.name + "Kt"
+            cdeclTypeName = typeName
+        }
+        return (cdeclPrefix + cdeclTypeName.cdeclEscaped + "_" + name.cdeclEscaped, typeName + "_" + name)
+    }
+
+    func append(to output: OutputGenerator, indentation: Indentation) {
+        output.append(indentation).append("@_cdecl(\"").append(cdecl).append("\")\n")
+        output.append(indentation).append("func ").append(name).append("(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer")
+        for parameter in signature.parameters {
+            output.append(", _")
+            if let label = parameter.label {
+                output.append(" ").append(label)
+            }
+            output.append(": ").append(parameter.type.description)
+        }
+        output.append(")")
+        if signature.returnType != .void {
+            output.append(" -> ").append(signature.returnType.description)
+        }
+        output.append(" {\n")
+
+        let bodyIndentation = indentation.inc()
+        body.forEach { output.append(bodyIndentation).append($0).append("\n") }
+
+        output.append(indentation).append("}\n")
+    }
+}
+
 extension Source.FilePath {
     /// Return the JNI class name for this file in the given package.
     func jniClassName(packageName: String?) -> String {
@@ -114,8 +168,8 @@ extension TypeSignature {
         return kotlin ? .named("skip.bridge.kt.SwiftObjectPointer", []) : .named("SwiftObjectPointer", [])
     }
 
-    /// The generated native type when the bridging strategy is unknown - e.g. for protocols.
-    var unknownBridgeImpl: TypeSignature {
+    /// The generated native type when bridging a protocol with unknown implementation.
+    var protocolBridgeImpl: TypeSignature {
         return withExistentialMode(.none).withName(name + "_BridgeImpl")
     }
 
@@ -162,7 +216,7 @@ extension TypeSignature {
         default:
             if strategy == .direct && !isOptional {
                 return value
-            } else if strategy == .unknown {
+            } else if strategy == .protocol || strategy == .unknown {
                 let converted = "((\(value) as? JConvertible)?.toJavaObject(options: \(options.jconvertibleOptions)))"
                 return isOptional ? converted : converted + "!"
             } else {
@@ -174,9 +228,13 @@ extension TypeSignature {
 
     /// Return code that converts the given value of our `@_cdecl` function type back to this type.
     func convertFromCDecl(value: String, strategy: Bridgable.Strategy, options: KotlinBridgeOptions) -> String {
-        guard strategy != .unknown else {
-            return self.unknownBridgeImpl.description + ".fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
+        if strategy == .unknown {
+            let converted = "AnyBridging.fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
+            return self == .optional(.any) ? converted : converted + " as! \(self)"
+        } else if strategy == .protocol {
+            return "AnyBridging.fromJavaObject(\(value), options: \(options.jconvertibleOptions)) { \(self.protocolBridgeImpl.description).fromJavaObject(\(value), options: \(options.jconvertibleOptions)) as Any } as! \(self)"
         }
+
         switch self.asOptional(false) {
         case .function(let parameters, _, _, _):
             let converted = "SwiftClosure\(parameters.count).closure(forJavaObject: \(value), options: \(options.jconvertibleOptions))"
@@ -225,17 +283,19 @@ extension TypeSignature {
     func convertToJava(value: String, strategy: Bridgable.Strategy, options: KotlinBridgeOptions) -> String {
         switch self.asOptional(false) {
         case .function(let parameters, _, _, _):
-            return "SwiftClosure\(parameters.count).javaObject(for: \(value), options: \(options.jconvertibleOptions))"
+            let converted = "SwiftClosure\(parameters.count).javaObject(for: \(value), options: \(options.jconvertibleOptions))"
+            return isOptional ? converted : converted + "!"
         case .int:
             return isOptional ? value : "Int32(\(value))"
         case .tuple:
-            return "SwiftTuple.javaObject(for: \(value), options: \(options.jconvertibleOptions))"
+            let converted = "SwiftTuple.javaObject(for: \(value), options: \(options.jconvertibleOptions))"
+            return isOptional ? converted : converted + "!"
         case .unwrappedOptional(let type):
             return type.convertToJava(value: value, strategy: strategy, options: options)
         default:
             if strategy == .direct {
                 return value
-            } else if strategy == .unknown {
+            } else if strategy == .protocol || strategy == .unknown {
                 let converted = "((\(value) as? JConvertible)?.toJavaObject(options: \(options.jconvertibleOptions)))"
                 return isOptional ? converted : converted + "!"
             } else {
@@ -247,9 +307,13 @@ extension TypeSignature {
 
     /// Return code that converts the given value of our Java type back to this type.
     func convertFromJava(value: String, strategy: Bridgable.Strategy, options: KotlinBridgeOptions) -> String {
-        guard strategy != .unknown else {
-            return self.unknownBridgeImpl.description + ".fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
+        if strategy == .unknown {
+            let converted = "AnyBridging.fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
+            return self == .optional(.any) ? converted : converted + " as! \(self)"
+        } else if strategy == .protocol {
+            return "AnyBridging.fromJavaObject(\(value), options: \(options.jconvertibleOptions)) { \(self.protocolBridgeImpl.description).fromJavaObject(\(value), options: \(options.jconvertibleOptions)) as Any } as! \(self)"
         }
+
         switch self {
         case .function:
             return convertClosureFromJava(value: value, isOptional: false, options: options)
@@ -464,6 +528,7 @@ struct Bridgable {
         case convertible
         case javaPeer
         case swiftPeer
+        case `protocol`
         case unknown
     }
 
@@ -640,10 +705,7 @@ extension TypeSignature {
     func checkBridgable(options: KotlinBridgeOptions, codebaseInfo: CodebaseInfo.Context, sourceDerived: SourceDerived? = nil, source: Source? = nil) -> Bridgable? {
         switch self {
         case .any, .anyObject:
-            if let sourceDerived, let source {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))
-            }
-            return nil
+            return Bridgable(type: self, kotlinType: self, strategy: .unknown)
         case .array(let elementType):
             guard let elementBridgable = elementType?.checkBridgable(options: options, codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) else {
                 return nil
@@ -833,12 +895,12 @@ extension TypeSignature {
         let strategy: Bridgable.Strategy
         var kotlinType: TypeSignature = .none
         if typeInfo.attributes.isBridgeToSwift {
-            strategy = typeInfo.declarationType == .protocolDeclaration ? .unknown : .javaPeer
+            strategy = typeInfo.declarationType == .protocolDeclaration ? .protocol : .javaPeer
         } else if typeInfo.attributes.isBridgeToKotlin {
-            strategy = typeInfo.declarationType == .protocolDeclaration ? .unknown : .swiftPeer
+            strategy = typeInfo.declarationType == .protocolDeclaration ? .protocol : .swiftPeer
         } else if typeInfo.declarationType == .protocolDeclaration, let moduleName = typeInfo.moduleName, isSkipModule(name: moduleName) {
             // Any protocol in a built-in module will have a Swift and Kotlin representation
-            strategy = .unknown
+            strategy = .protocol
         } else {
             if typeInfo.inherits.contains(where: { $0.isNamed("SwiftCustomBridged", moduleName: "Swift") }) {
                 strategy = .convertible
