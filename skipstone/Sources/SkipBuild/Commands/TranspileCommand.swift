@@ -516,7 +516,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             var packageAddendum = """
 
             func useLocalPackage(named packageName: String, dependencies: inout [Package.Dependency]) {
-                let odependencies = dependencies
                 dependencies = dependencies.filter {
                     switch $0.kind {
                     case let .sourceControl(name: name, location: location, requirement: _):
@@ -525,10 +524,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                         return true
                     }
                 }
-                // change the dependency to a link to the given package if we have filtered it out
-                if dependencies.count < odependencies.count {
-                    dependencies += [.package(name: packageName, path: "Packages/" + packageName)]
-                }
+                dependencies += [.package(name: packageName, path: "Packages/" + packageName)]
             }
             
             """

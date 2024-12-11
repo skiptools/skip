@@ -162,6 +162,47 @@ final class SkipCommandTests: XCTestCase {
         let XCSkipTests = try load("Tests/SomeModuleTests/XCSkipTests.swift")
         XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
 
+        let moduleCode = try load("Sources/SomeModule/SomeModule.swift")
+        XCTAssertEqual(moduleCode, """
+        import Foundation
+
+        public class SomeModuleModule {
+        }
+
+        """)
+
+        let testCaseCode = try load("Tests/SomeModuleTests/SomeModuleTests.swift")
+        XCTAssertEqual(testCaseCode, """
+        import XCTest
+        import OSLog
+        import Foundation
+        @testable import SomeModule
+
+        let logger: Logger = Logger(subsystem: "SomeModule", category: "Tests")
+
+        @available(macOS 13, *)
+        final class SomeModuleTests: XCTestCase {
+
+            func testSomeModule() throws {
+                logger.log("running testSomeModule")
+                XCTAssertEqual(1 + 2, 3, "basic test")
+            }
+
+            func testDecodeType() throws {
+                // load the TestData.json file from the Resources folder and decode it into a struct
+                let resourceURL: URL = try XCTUnwrap(Bundle.module.url(forResource: "TestData", withExtension: "json"))
+                let testData = try JSONDecoder().decode(TestData.self, from: Data(contentsOf: resourceURL))
+                XCTAssertEqual("SomeModule", testData.testModuleName)
+            }
+
+        }
+
+        struct TestData : Codable, Hashable {
+            var testModuleName: String
+        }
+
+        """)
+
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 5.9
@@ -536,8 +577,141 @@ final class SkipCommandTests: XCTestCase {
         #endif
     }
 
+    func testLibInitNativeCommand() async throws {
+        let (projectURL, projectTree) = try await libInitComand(projectName: "basic-project", native: true, moduleNames: "SomeModule")
+        XCTAssertEqual(projectTree ?? "", """
+        .
+        ├─ Package.swift
+        ├─ README.md
+        ├─ Sources
+        │  └─ SomeModule
+        │     ├─ Skip
+        │     │  └─ skip.yml
+        │     └─ SomeModule.swift
+        └─ Tests
+           └─ SomeModuleTests
+              ├─ Skip
+              │  └─ skip.yml
+              ├─ SomeModuleTests.swift
+              └─ XCSkipTests.swift
+
+        """)
+
+        let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
+
+        let XCSkipTests = try load("Tests/SomeModuleTests/XCSkipTests.swift")
+        XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
+
+        let moduleCode = try load("Sources/SomeModule/SomeModule.swift")
+        XCTAssertEqual(moduleCode, """
+        import Foundation
+
+        public class SomeModuleModule {
+
+            public static func createSomeModuleType(id: UUID, delay: Double? = nil) async throws -> SomeModuleType {
+                if let delay = delay {
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                }
+                return SomeModuleType(id: id)
+            }
+
+            /// An example of a type that can be bridged between Swift and Kotlin
+            public struct SomeModuleType: Identifiable, Hashable, Codable {
+                public var id: UUID
+            }
+        }
+
+        """)
+
+        let testCaseCode = try load("Tests/SomeModuleTests/SomeModuleTests.swift")
+        XCTAssertEqual(testCaseCode, """
+        import XCTest
+        import OSLog
+        import Foundation
+        import SkipBridgeKt
+        @testable import SomeModule
+
+        let logger: Logger = Logger(subsystem: "SomeModule", category: "Tests")
+
+        @available(macOS 13, *)
+        final class SomeModuleTests: XCTestCase {
+            override func setUp() {
+                #if os(Android)
+                // needed to load the compiled bridge from the traspiled tests
+                loadPeerLibrary(packageName: "basic-project", moduleName: "SomeModule")
+                #endif
+            }
+
+            func testSomeModule() throws {
+                logger.log("running testSomeModule")
+                XCTAssertEqual(1 + 2, 3, "basic test")
+            }
+
+            func testAsyncThrowsFunction() async throws {
+                let id = UUID()
+                let type: SomeModuleModule.SomeModuleType = try await SomeModuleModule.createSomeModuleType(id: id, delay: 0.001)
+                XCTAssertEqual(id, type.id)
+            }
+
+        }
+        
+        """)
+
+        let SkipYML = try load("Sources/SomeModule/Skip/skip.yml")
+        XCTAssertEqual(SkipYML, """
+        # Configuration file for https://skip.tools project
+        #
+        # Kotlin dependencies and Gradle build options for this module can be configured here
+        #build:
+        #  contents:
+        #    - block: 'dependencies'
+        #      contents:
+        #        - 'implementation("androidx.compose.runtime:runtime")'
+
+        # this is a natively-compiled module
+        skip:
+          mode: native
+          bridging: true
+        
+        """)
+
+        let PackageSwift = try load("Package.swift")
+        XCTAssertEqual(PackageSwift, """
+        // swift-tools-version: 5.9
+        // This is a Skip (https://skip.tools) package,
+        // containing a Swift Package Manager project
+        // that will use the Skip build plugin to transpile the
+        // Swift Package, Sources, and Tests into an
+        // Android Gradle Project with Kotlin sources and JUnit tests.
+        import PackageDescription
+
+        let package = Package(
+            name: "basic-project",
+            defaultLocalization: "en",
+            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            products: [
+                .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
+            ],
+            dependencies: [
+                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-fuse.git", "0.0.0"..<"2.0.0")
+            ],
+            targets: [
+                .target(name: "SomeModule", dependencies: [
+                    .product(name: "SkipFuse", package: "skip-fuse")
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .testTarget(name: "SomeModuleTests", dependencies: [
+                    "SomeModule",
+                    .product(name: "SkipTest", package: "skip")
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+            ]
+        )
+
+        """)
+    }
+
     func testLibInitAppNativeCommand() async throws {
-        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: false, native: true, tests: false, fastlane: false, appid: "some.cool.app", moduleNames: "APP_MODULE", "MODEL_MODULE")
+        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: false, native: true, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "APP_MODULE", "MODEL_MODULE")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -573,22 +747,33 @@ final class SkipCommandTests: XCTestCase {
         ├─ Package.swift
         ├─ README.md
         ├─ Skip.env
-        └─ Sources
-           ├─ APP_MODULE
-           │  ├─ APP_MODULEApp.swift
-           │  ├─ ContentView.swift
+        ├─ Sources
+        │  ├─ APP_MODULE
+        │  │  ├─ APP_MODULEApp.swift
+        │  │  ├─ ContentView.swift
+        │  │  ├─ Resources
+        │  │  │  ├─ Localizable.xcstrings
+        │  │  │  └─ Module.xcassets
+        │  │  │     └─ Contents.json
+        │  │  └─ Skip
+        │  │     └─ skip.yml
+        │  └─ MODEL_MODULE
+        │     ├─ Skip
+        │     │  └─ skip.yml
+        │     └─ ViewModel.swift
+        └─ Tests
+           ├─ APP_MODULETests
+           │  ├─ APP_MODULETests.swift
            │  ├─ Resources
-           │  │  ├─ Localizable.xcstrings
-           │  │  └─ Module.xcassets
-           │  │     └─ Contents.json
-           │  └─ Skip
-           │     └─ skip.yml
-           └─ MODEL_MODULE
-              ├─ Resources
-              │  └─ Localizable.xcstrings
+           │  │  └─ TestData.json
+           │  ├─ Skip
+           │  │  └─ skip.yml
+           │  └─ XCSkipTests.swift
+           └─ MODEL_MODULETests
+              ├─ MODEL_MODULETests.swift
               ├─ Skip
               │  └─ skip.yml
-              └─ ViewModel.swift
+              └─ XCSkipTests.swift
 
         """)
 
@@ -614,6 +799,44 @@ final class SkipCommandTests: XCTestCase {
         
         """)
 
+        let testCaseCode = try load("Tests/MODEL_MODULETests/MODEL_MODULETests.swift")
+        XCTAssertEqual(testCaseCode, """
+        import XCTest
+        import OSLog
+        import Foundation
+        import SkipBridgeKt
+        @testable import MODEL_MODULE
+
+        let logger: Logger = Logger(subsystem: "MODEL_MODULE", category: "Tests")
+
+        @available(macOS 13, *)
+        final class MODEL_MODULETests: XCTestCase {
+            override func setUp() {
+                #if os(Android)
+                // needed to load the compiled bridge from the traspiled tests
+                loadPeerLibrary(packageName: "cool-app", moduleName: "MODEL_MODULE")
+                #endif
+            }
+
+            func testMODEL_MODULE() throws {
+                logger.log("running testMODEL_MODULE")
+                XCTAssertEqual(1 + 2, 3, "basic test")
+            }
+
+            func testViewModel() async throws {
+                let vm = ViewModel()
+                vm.items.append(Item(title: "ABC"))
+                XCTAssertFalse(vm.items.isEmpty)
+                XCTAssertEqual("ABC", vm.items.last?.title)
+
+                vm.clear()
+                XCTAssertTrue(vm.items.isEmpty)
+            }
+
+        }
+
+        """)
+
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 5.9
@@ -635,17 +858,23 @@ final class SkipCommandTests: XCTestCase {
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
                 .package(url: "https://source.skip.tools/skip-ui.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0"),
                 .package(url: "https://source.skip.tools/skip-fuse.git", "0.0.0"..<"2.0.0")
             ],
             targets: [
                 .target(name: "APP_MODULE", dependencies: [
                     "MODEL_MODULE",
                     .product(name: "SkipUI", package: "skip-ui")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .testTarget(name: "APP_MODULETests", dependencies: [
+                    "APP_MODULE",
+                    .product(name: "SkipTest", package: "skip")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .target(name: "MODEL_MODULE", dependencies: [
-                    .product(name: "SkipFoundation", package: "skip-foundation"),
                     .product(name: "SkipFuse", package: "skip-fuse")
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .testTarget(name: "MODEL_MODULETests", dependencies: [
+                    "MODEL_MODULE",
+                    .product(name: "SkipTest", package: "skip")
                 ], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
@@ -925,7 +1154,7 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
-    func testLibInitApp5NativeoduleCommand() async throws {
+    func testLibInitApp5NativeModuleCommand() async throws {
         let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: false, native: true, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "M1", "M2", "M3", "M4", "M5")
         XCTAssertEqual(projectTree ?? "", """
         .
@@ -973,8 +1202,6 @@ final class SkipCommandTests: XCTestCase {
         │  │  └─ Skip
         │  │     └─ skip.yml
         │  ├─ M2
-        │  │  ├─ Resources
-        │  │  │  └─ Localizable.xcstrings
         │  │  ├─ Skip
         │  │  │  └─ skip.yml
         │  │  └─ ViewModel.swift
@@ -994,8 +1221,6 @@ final class SkipCommandTests: XCTestCase {
            │  └─ XCSkipTests.swift
            └─ M2Tests
               ├─ M2Tests.swift
-              ├─ Resources
-              │  └─ TestData.json
               ├─ Skip
               │  └─ skip.yml
               └─ XCSkipTests.swift
@@ -1043,11 +1268,11 @@ final class SkipCommandTests: XCTestCase {
                 .target(name: "M2", dependencies: [
                     "M3",
                     .product(name: "SkipFuse", package: "skip-fuse")
-                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .testTarget(name: "M2Tests", dependencies: [
                     "M2",
                     .product(name: "SkipTest", package: "skip")
-                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .target(name: "M3", dependencies: [
                     "M4"
                 ]),

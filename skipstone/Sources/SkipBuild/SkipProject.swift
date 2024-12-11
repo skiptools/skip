@@ -102,7 +102,7 @@ class FrameworkProjectLayout {
         // Set SKIP_ZERO=1 to build without Skip libraries
         let zero = ProcessInfo.processInfo.environment["SKIP_ZERO"] != nil
         let skipstone = !zero ? [Target.PluginUsage.plugin(name: "skipstone", package: "skip")] : []
-        
+
         """ : "")
         """
 
@@ -117,6 +117,8 @@ class FrameworkProjectLayout {
             let isAppModule = app == true && moduleIndex == modules.startIndex
             // the model module is the second in the chain
             let isModelModule = app == true && moduleIndex == modules.startIndex + 1
+            // a native module is either the second module for an app project, or any module for a non-app --native project
+            let isNativeModule = native && (isModelModule || !app)
             // we output the model when it is the second module, or when there is only a single top-level app module
             let shouldOutputModel = isModelModule || (app == true && modules.count == 1)
             // this is the final module in the chain, which will add a dependency on SkipFoundation
@@ -149,9 +151,9 @@ class FrameworkProjectLayout {
                 """
 
                 var skipYamlModule = skipYamlGeneric
-                if native && isModelModule {
+                if isNativeModule {
                     skipYamlModule += """
-                    
+
                     # this is a natively-compiled module
                     skip:
                       mode: native
@@ -277,19 +279,41 @@ extension ViewModel {
                 // we need to output *something*, so just make an empty class
                 let moduleSwiftFile = sourceDir.appending(path: "\(moduleName).swift")
 
-                let moduleCode = """
-                \(sourceHeader)import Foundation
-                
-                public class \(moduleName)Module {
+                var moduleCode = """
+\(sourceHeader)import Foundation
+
+public class \(moduleName)Module {
+
+"""
+
+                if isNativeModule {
+                    moduleCode += """
+
+    public static func create\(moduleName)Type(id: UUID, delay: Double? = nil) async throws -> \(moduleName)Type {
+        if let delay = delay {
+            try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+        }
+        return \(moduleName)Type(id: id)
+    }
+
+    /// An example of a type that can be bridged between Swift and Kotlin
+    public struct \(moduleName)Type: Identifiable, Hashable, Codable {
+        public var id: UUID
+    }
+
+"""
                 }
 
-                """
+                moduleCode += """
+}
+
+"""
 
                 try moduleCode.write(to: moduleSwiftFile, atomically: false, encoding: .utf8)
             }
 
             var resourcesAttribute: String = ""
-            if !isDependentNativeModule, let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
+            if !isDependentNativeModule, !isNativeModule, let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
                 let sourceResourcesDir = try sourceDir.append(path: resourceFolder, create: true)
                 let sourceResourcesFile = sourceResourcesDir.appending(path: "Localizable.xcstrings")
                 try """
@@ -592,38 +616,110 @@ extension ViewModel {
                 let testSkipDir = try testDir.append(path: "Skip", create: true)
                 let testSwiftFile = testDir.appending(path: "\(moduleName)Tests.swift")
 
-                try """
-                \(sourceHeader)import XCTest
-                import OSLog
-                import Foundation
-                @testable import \(moduleName)
+                let rfolder = isNativeModule ? nil : resourceFolder
 
-                let logger: Logger = Logger(subsystem: "\(moduleName)", category: "Tests")
+                var testCaseCode = """
+\(sourceHeader)import XCTest
+import OSLog
+import Foundation
 
-                @available(macOS 13, *)
-                final class \(moduleName)Tests: XCTestCase {
-                    func test\(moduleName)() throws {
-                        logger.log("running test\(moduleName)")
-                        XCTAssertEqual(1 + 2, 3, "basic test")
-                        \(resourceFolder.flatMap { folderName in
-                """
+"""
 
-                        // load the TestData.json file from the \(folderName) folder and decode it into a struct
-                        let resourceURL: URL = try XCTUnwrap(Bundle.module.url(forResource: "TestData", withExtension: "json"))
-                        let testData = try JSONDecoder().decode(TestData.self, from: Data(contentsOf: resourceURL))
-                        XCTAssertEqual("\(moduleName)", testData.testModuleName)
-                """
-                        } ?? "")
-                    }
+                if isNativeModule {
+                    testCaseCode += """
+import SkipBridgeKt
+
+"""
                 }
-                \(resourceFolder.flatMap { folderName in
-                """
 
-                struct TestData : Codable, Hashable {
-                    var testModuleName: String
+                testCaseCode += """
+@testable import \(moduleName)
+
+let logger: Logger = Logger(subsystem: "\(moduleName)", category: "Tests")
+
+@available(macOS 13, *)
+final class \(moduleName)Tests: XCTestCase {
+
+"""
+
+                if isNativeModule {
+                    testCaseCode += """
+    override func setUp() {
+        #if os(Android)
+        // needed to load the compiled bridge from the traspiled tests
+        loadPeerLibrary(packageName: "\(projectName)", moduleName: "\(moduleName)")
+        #endif
+    }
+
+"""
                 }
-                """ } ?? "")
-                """.write(to: testSwiftFile, atomically: false, encoding: .utf8)
+
+                testCaseCode += """
+
+    func test\(moduleName)() throws {
+        logger.log("running test\(moduleName)")
+        XCTAssertEqual(1 + 2, 3, "basic test")
+    }
+
+"""
+
+                if let folderName = rfolder {
+                    testCaseCode += """
+
+    func testDecodeType() throws {
+        // load the TestData.json file from the \(folderName) folder and decode it into a struct
+        let resourceURL: URL = try XCTUnwrap(Bundle.module.url(forResource: "TestData", withExtension: "json"))
+        let testData = try JSONDecoder().decode(TestData.self, from: Data(contentsOf: resourceURL))
+        XCTAssertEqual("\(moduleName)", testData.testModuleName)
+    }
+
+"""
+                }
+
+                if isNativeModule && isModelModule {
+                    testCaseCode += """
+
+    func testViewModel() async throws {
+        let vm = ViewModel()
+        vm.items.append(Item(title: "ABC"))
+        XCTAssertFalse(vm.items.isEmpty)
+        XCTAssertEqual("ABC", vm.items.last?.title)
+
+        vm.clear()
+        XCTAssertTrue(vm.items.isEmpty)
+    }
+
+"""
+
+                } else if isNativeModule {
+                    testCaseCode += """
+
+    func testAsyncThrowsFunction() async throws {
+        let id = UUID()
+        let type: \(moduleName)Module.\(moduleName)Type = try await \(moduleName)Module.create\(moduleName)Type(id: id, delay: 0.001)
+        XCTAssertEqual(id, type.id)
+    }
+
+"""
+                }
+
+
+                testCaseCode += """
+
+}
+
+"""
+                if rfolder != nil {
+                    testCaseCode += """
+
+struct TestData : Codable, Hashable {
+    var testModuleName: String
+}
+
+"""
+                }
+
+                try testCaseCode.write(to: testSwiftFile, atomically: false, encoding: .utf8)
 
                 let testSkipModuleFile = testDir.appending(path: "XCSkipTests.swift")
                 try """
@@ -673,7 +769,7 @@ extension ViewModel {
                 let testSkipYamlFile = testSkipDir.appending(path: "skip.yml")
                 try (isAppModule ? skipYamlAppTests : skipYamlModuleTests).write(to: testSkipYamlFile, atomically: false, encoding: .utf8)
 
-                if let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
+                if let resourceFolder = resourceFolder, !resourceFolder.isEmpty, !isNativeModule {
                     let testResourcesDir = try testDir.append(path: resourceFolder, create: true)
                     let testResourcesFile = testResourcesDir.appending(path: "TestData.json")
                     try """
@@ -710,16 +806,20 @@ extension ViewModel {
                 if isAppModule {
                     modDeps.append(PackageModule(repositoryName: "skip-ui", moduleName: "SkipUI"))
                 } else if (isFinalModule || chain == false) && !isDependentNativeModule {
-                    // only add SkipFoundation to the innermost module, or else
-                    modDeps.append(PackageModule(repositoryName: "skip-foundation", moduleName: "SkipFoundation"))
+                    // only add SkipFoundation to the innermost module
+                    if isNativeModule {
+                        modDeps.append(PackageModule(repositoryName: "skip-fuse", moduleName: "SkipFuse"))
+                    } else {
+                        modDeps.append(PackageModule(repositoryName: "skip-foundation", moduleName: "SkipFoundation"))
+                    }
                 }
 
                 // in addition to a top-level dependency on SkipUI and a bottom-level dependency on SkipFoundation, a secondary module will also have a dependency on SkipModel for observability
                 if isModelModule {
-                    if native {
+                    // skip-model is a dependency of skip-fuse
+                    modDeps.append(PackageModule(repositoryName: "skip-model", moduleName: "SkipModel"))
+                    if isNativeModule {
                         modDeps.append(PackageModule(repositoryName: "skip-fuse", moduleName: "SkipFuse"))
-                    } else {
-                        modDeps.append(PackageModule(repositoryName: "skip-model", moduleName: "SkipModel"))
                     }
                 }
             }
@@ -771,7 +871,7 @@ extension ViewModel {
                 ? (!skipZeroSupport
                    ? bracket(interModuleDep + ",\n            " + skipModuleDep)
                    : bracket(interModuleDep) + " + " + zeroSkipModuleCondition)
-                : !skipModuleDep.isEmpty 
+                : !skipModuleDep.isEmpty
                     ? (skipZeroSupport ? zeroSkipModuleCondition : bracket(skipModuleDep))
                 : bracket(interModuleDep)
 
@@ -844,7 +944,7 @@ extension ViewModel {
         This project is a \(free ? "free " : "")Swift Package Manager module that uses the
         [Skip](https://skip.tools) plugin to transpile Swift into Kotlin.
 
-        Building the module requires that Skip be installed using 
+        Building the module requires that Skip be installed using
         [Homebrew](https://brew.sh) with `brew install skiptools/skip/skip`.
         This will also install the necessary build prerequisites:
         Kotlin, Gradle, and the Android build tools.
@@ -896,10 +996,10 @@ extension ViewModel {
 
         Xcode and Android Studio must be downloaded and installed in order to
         run the app in the iOS simulator / Android emulator.
-        An Android emulator must already be running, which can be launched from 
+        An Android emulator must already be running, which can be launched from
         Android Studio's Device Manager.
 
-        To run both the Swift and Kotlin apps simultaneously, 
+        To run both the Swift and Kotlin apps simultaneously,
         launch the \(primaryModuleName)App target from Xcode.
         A build phases runs the "Launch Android APK" script that
         will deploy the transpiled app a running Android emulator or connected device.
@@ -3622,7 +3722,7 @@ func freeLicenseHeader(type: String?) -> String {
 
 // cat SkipLogo.pdf | base64 -b 80 -i - | pbcopy
 // not currently used, but we might populate the Module.xcassets catalog with it,
-// and use it as the basis for 
+// and use it as the basis for
 fileprivate let logoPDF = """
 JVBERi0xLjMKJcTl8uXrp/Og0MTGCjMgMCBvYmoKPDwgL0ZpbHRlciAvRmxhdGVEZWNvZGUgL0xlbmd0
 aCAxMTQ5ID4+CnN0cmVhbQp4AXWVW2pmNxCE388qtAKlb2q1nrOCPGUBJmECdmDi/UO+lj0mkIRh4Lh+
