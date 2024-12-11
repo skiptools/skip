@@ -858,7 +858,8 @@ final class SkipCommandTests: XCTestCase {
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
                 .package(url: "https://source.skip.tools/skip-ui.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-fuse.git", "0.0.0"..<"2.0.0")
+                .package(url: "https://source.skip.tools/skip-fuse.git", "0.0.0"..<"2.0.0"),
+                .package(url: "https://source.skip.tools/skip-model.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "APP_MODULE", dependencies: [
@@ -870,7 +871,8 @@ final class SkipCommandTests: XCTestCase {
                     .product(name: "SkipTest", package: "skip")
                 ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .target(name: "MODEL_MODULE", dependencies: [
-                    .product(name: "SkipFuse", package: "skip-fuse")
+                    .product(name: "SkipFuse", package: "skip-fuse"),
+                    .product(name: "SkipModel", package: "skip-model")
                 ], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .testTarget(name: "MODEL_MODULETests", dependencies: [
                     "MODEL_MODULE",
@@ -1254,6 +1256,7 @@ final class SkipCommandTests: XCTestCase {
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
                 .package(url: "https://source.skip.tools/skip-ui.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-model.git", from: "1.0.0"),
                 .package(url: "https://source.skip.tools/skip-fuse.git", "0.0.0"..<"2.0.0")
             ],
             targets: [
@@ -1267,6 +1270,7 @@ final class SkipCommandTests: XCTestCase {
                 ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .target(name: "M2", dependencies: [
                     "M3",
+                    .product(name: "SkipModel", package: "skip-model"),
                     .product(name: "SkipFuse", package: "skip-fuse")
                 ], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .testTarget(name: "M2Tests", dependencies: [
