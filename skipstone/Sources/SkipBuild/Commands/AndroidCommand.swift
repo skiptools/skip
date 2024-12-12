@@ -487,8 +487,19 @@ fileprivate extension AndroidOperationCommand {
                 throw CrossCompilerError(errorDescription: "The Swift Android SDK did not contain an NDK sysroot at \(sdkRoot.path)")
             }
 
-            let libFolder = arch.libpath(api: apiLevel)
-            let libPath = sdkRoot.appendingPathComponent(sysrootPath, isDirectory: true).appendingPathComponent("usr/lib", isDirectory: true).appendingPathComponent(libFolder, isDirectory: true)
+            var libPath = sdkRoot
+                .appendingPathComponent(sysrootPath, isDirectory: true)
+                .appendingPathComponent("usr/lib", isDirectory: true)
+                .appendingPathComponent(arch.libpath, isDirectory: true)
+
+            // pre-6.0.3 SDKs stored their libraries in the API-level-specific folder, and after in the parent folder; check each lib location for the expected "libswiftCore.so" library
+            if !FileManager.default.fileExists(atPath: libPath.appendingPathComponent("libswiftCore.so", isDirectory: false).path) {
+                libPath = libPath.appendingPathComponent(apiLevel.description, isDirectory: true)
+                if !FileManager.default.fileExists(atPath: libPath.appendingPathComponent("libswiftCore.so", isDirectory: false).path) {
+                    throw CrossCompilerError(errorDescription: "Could not locate library path for SDK: \(libPath.path)")
+                }
+            }
+
             if !isDir(libPath) {
                 throw CrossCompilerError(errorDescription: "The Swift Android SDK sysroot for \(arch.tripleKey(api: apiLevel)) did not exist at: \(libPath.path)")
             }
@@ -908,14 +919,14 @@ enum AndroidArch: String {
         }
     }
 
-    func libpath(api: Int) -> String {
+    var libpath: String {
         switch self {
         case .aarch64:
-            return "aarch64-linux-android/\(api)"
+            return "aarch64-linux-android"
         case .armv7:
-            return "armv7-linux-androideabi/\(api)" // note: different from triple, which is: "arm-linux-androideabi"
+            return "armv7-linux-androideabi" // note: different from triple, which is: "arm-linux-androideabi"
         case .x86_64:
-            return "x86_64-linux-android/\(api)"
+            return "x86_64-linux-android"
         }
     }
 
