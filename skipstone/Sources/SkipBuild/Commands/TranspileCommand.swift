@@ -1026,7 +1026,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
                         func escape(_ string: String) throws -> String? {
                             // escape quotes and newlines; we just use a JSON string fragment for this
-                            try String(data: JSONSerialization.data(withJSONObject: string, options: .fragmentsAllowed), encoding: .utf8)
+                            try String(data: JSONSerialization.data(withJSONObject: string, options: [.fragmentsAllowed, .withoutEscapingSlashes]), encoding: .utf8)
                         }
 
                         var stringsContent = ""
