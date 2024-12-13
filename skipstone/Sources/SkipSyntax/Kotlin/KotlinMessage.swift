@@ -66,8 +66,16 @@ extension Message {
         return Message(kind: .warning, message: "This bridged @Observable will not be able to power your Android UI unless you 'import SkipFuse'", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinBridgeSuperclassBridging(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "This release does not support bridging a compiled subclass of a transpiled type or vice versa", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinBridgeToKotlinSubclassDepth(_ sourceDerived: SourceDerived, maximumDepth: Int, source: Source) -> Message {
+        return Message(kind: .error, message: "This release supports bridging inheritance hierarchies up to \(maximumDepth) layers deep", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinBridgeTypedThrows(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "Bridging does not supported typed throws. Specific error types are not bridged", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "Bridging does not support typed throws. Specific error types are not bridged", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinBridgeUnbridgedType(_ sourceDerived: SourceDerived, type: String, source: Source) -> Message {

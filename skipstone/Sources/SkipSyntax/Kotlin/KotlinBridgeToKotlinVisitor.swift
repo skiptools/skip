@@ -134,7 +134,7 @@ final class KotlinBridgeToKotlinVisitor {
         let propertyName = variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName
         let externalName = "Swift_" + ((variableDeclaration.isStatic) ? "Companion_" + propertyName : propertyName)
         var externalFunctionDeclarations: [String] = []
-        let (cdecl, cdeclName) = CDeclFunction.declaration(for: variableDeclaration, name: externalName, translator: translator)
+        let (cdecl, cdeclName) = CDeclFunction.declaration(for: variableDeclaration, isCompanion: variableDeclaration.isStatic, name: externalName, translator: translator)
 
         // Getter
         let isInstance = classDeclaration != nil && !variableDeclaration.isStatic
@@ -276,14 +276,14 @@ final class KotlinBridgeToKotlinVisitor {
         }
     }
 
-    private func updateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, uniquifier: Int) -> Bool {
+    private func updateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, isBridgedSubclass: Bool = false, uniquifier: Int) -> Bool {
         guard !functionDeclaration.isGenerated || functionDeclaration.type == .constructorDeclaration else {
             return false
         }
         let isMutableStructCopyConstructor = classDeclaration != nil && functionDeclaration.isMutableStructCopyConstructor
         let bridgable: FunctionBridgable
         if isMutableStructCopyConstructor {
-            let parameterBridgable = Bridgable(type: .named("MutableStruct", []), kotlinType: .module("Swift", .named("MutableStruct", [])), strategy: .swiftPeer)
+            let parameterBridgable = Bridgable(type: .named("MutableStruct", []), kotlinType: .module("Swift", .named("MutableStruct", [])), strategy: .peer)
             bridgable = FunctionBridgable(parameters: [parameterBridgable], return: Bridgable(type: .void, kotlinType: .void, strategy: .direct))
         } else {
             guard let functionBridgable = functionDeclaration.checkBridgable(options: options, translator: translator) else {
@@ -302,7 +302,8 @@ final class KotlinBridgeToKotlinVisitor {
         let functionName = functionDeclaration.preEscapedName ?? functionDeclaration.name
         let isAsync = functionDeclaration.apiFlags.options.contains(.async)
         let isThrows = functionDeclaration.apiFlags.throwsType != .none
-        let externalName = (isAsync ? "Swift_callback_" : "Swift_") + ((functionDeclaration.isStatic) ? "Companion_" + functionName : functionName) + "_\(uniquifier)"
+        let isCompanionCall = functionDeclaration.isStatic || (functionDeclaration.type == .constructorDeclaration && isBridgedSubclass)
+        let externalName = (isAsync ? "Swift_callback_" : "Swift_") + (isCompanionCall ? "Companion_" + functionName : functionName) + "_\(uniquifier)"
 
         var cdeclBody: [String] = []
         for index in 0..<bridgable.parameters.count {
@@ -361,7 +362,11 @@ final class KotlinBridgeToKotlinVisitor {
         let cdeclReturnType: TypeSignature
         if let classDeclaration, functionDeclaration.type == .constructorDeclaration {
             if isThrows {
-                body.append("Swift_peer = \(externalName)(\(externalArgumentsString))!!")
+                if isBridgedSubclass {
+                    functionDeclaration.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super(Swift_peer = \(externalName)(\(externalArgumentsString))!!, marker = null)")
+                } else {
+                    body.append("Swift_peer = \(externalName)(\(externalArgumentsString))!!")
+                }
                 cdeclBody.append("do {")
                 if classDeclaration.declarationType == .classDeclaration {
                     cdeclBody.append(1, "let f_return_swift = try \(classDeclaration.signature)(\(swiftArgumentsString))")
@@ -375,7 +380,11 @@ final class KotlinBridgeToKotlinVisitor {
                 cdeclBody.append("}")
                 cdeclReturnType = .optional(.swiftObjectPointer(kotlin: false))
             } else {
-                body.append("Swift_peer = \(externalName)(\(externalArgumentsString))")
+                if isBridgedSubclass {
+                    functionDeclaration.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super(Swift_peer = \(externalName)(\(externalArgumentsString)), marker = null)")
+                } else {
+                    body.append("Swift_peer = \(externalName)(\(externalArgumentsString))")
+                }
                 if classDeclaration.declarationType == .classDeclaration {
                     cdeclBody.append("let f_return_swift = \(classDeclaration.signature)(\(swiftArgumentsString))")
                 } else if isMutableStructCopyConstructor {
@@ -514,9 +523,9 @@ final class KotlinBridgeToKotlinVisitor {
             }
             externalFunctionDeclaration += ": " + returnType.kotlin
         }
-        (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [KotlinRawStatement(sourceCode: externalFunctionDeclaration, isStatic: functionDeclaration.isStatic)], after: functionDeclaration)
+        (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [KotlinRawStatement(sourceCode: externalFunctionDeclaration, isStatic: isCompanionCall)], after: functionDeclaration)
 
-        let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, name: externalName, translator: translator)
+        let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: isCompanionCall, name: externalName, translator: translator)
         let instanceParameter = classDeclaration != nil && functionDeclaration.type != .constructorDeclaration && !functionDeclaration.isStatic ? [cdeclInstanceParameter(for: classDeclaration!)] : []
         let callbackParameter = isAsync ? [TypeSignature.Parameter(label: "f_callback", type: .javaObjectPointer)] : []
         let cdeclType: TypeSignature = .function(instanceParameter + bridgable.parameters.enumerated().map { (index, bridgable) in
@@ -557,7 +566,7 @@ final class KotlinBridgeToKotlinVisitor {
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_isequal(lhs: \(classDeclaration.signature), rhs: \(classDeclaration.signature)): Boolean")
         classDeclaration.insert(statements: [externalFunctionDeclaration], after: functionDeclaration)
 
-        let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, name: "Swift_isequal", translator: translator)
+        let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: false, name: "Swift_isequal", translator: translator)
         let cdeclType: TypeSignature = .function([TypeSignature.Parameter(label: "lhs", type: .javaObjectPointer), TypeSignature.Parameter(label: "rhs", type: .javaObjectPointer)], .bool, APIFlags(), nil)
         let cdeclBody: [String] = [
             "let lhs_swift = \(classDeclaration.signature).fromJavaObject(lhs, options: \(options.jconvertibleOptions))",
@@ -599,7 +608,7 @@ final class KotlinBridgeToKotlinVisitor {
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_hashvalue(Swift_peer: skip.bridge.kt.SwiftObjectPointer): Long")
         classDeclaration.insert(statements: [externalFunctionDeclaration], after: functionDeclaration)
 
-        let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, name: "Swift_hashvalue", translator: translator)
+        let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: false, name: "Swift_hashvalue", translator: translator)
         let cdeclType: TypeSignature = .function([cdeclInstanceParameter(for: classDeclaration)], .int64, APIFlags(), nil)
         var cdeclBody: [String] = []
         if classDeclaration.declarationType == .classDeclaration {
@@ -637,7 +646,7 @@ final class KotlinBridgeToKotlinVisitor {
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_islessthan(lhs: \(classDeclaration.signature), rhs: \(classDeclaration.signature)): Boolean")
         classDeclaration.insert(statements: [externalFunctionDeclaration], after: functionDeclaration)
 
-        let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, name: "Swift_islessthan", translator: translator)
+        let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: false, name: "Swift_islessthan", translator: translator)
         let cdeclType: TypeSignature = .function([TypeSignature.Parameter(label: "lhs", type: .javaObjectPointer), TypeSignature.Parameter(label: "rhs", type: .javaObjectPointer)], .bool, APIFlags(), nil)
         let cdeclBody: [String] = [
             "let lhs_swift = \(classDeclaration.signature).fromJavaObject(lhs, options: \(options.jconvertibleOptions))",
@@ -677,54 +686,99 @@ final class KotlinBridgeToKotlinVisitor {
         guard let codebaseInfo = translator.codebaseInfo else {
             return false
         }
+        let superclassInfo = classDeclaration.superclassInfo(translator: translator)
+        guard superclassInfo?.attributes.isBridgeToSwift != true else {
+            classDeclaration.messages.append(.kotlinBridgeSuperclassBridging(classDeclaration, source: translator.syntaxTree.source))
+            return false
+        }
+
+        // Figure out our subclass depth within the bridged hierarchy. -1 means not inheritable, 0 means base type
+        let subclassDepth: Int
+        if let superclassInfo, superclassInfo.attributes.isBridgeToKotlin {
+            let hierarchy = codebaseInfo.global.inheritanceChainSignatures(forNamed: superclassInfo.signature)
+            var depth = 1
+            for i in 1..<hierarchy.count {
+                if let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: hierarchy[i]), typeInfo.attributes.isBridgeToKotlin {
+                    depth += 1
+                } else {
+                    break
+                }
+            }
+            subclassDepth = depth
+        } else if classDeclaration.declarationType == .classDeclaration && !classDeclaration.modifiers.isFinal {
+            subclassDepth = 0
+        } else {
+            subclassDepth = -1
+        }
+        let maximumDepth = 4
+        guard subclassDepth < maximumDepth else {
+            classDeclaration.messages.append(.kotlinBridgeToKotlinSubclassDepth(classDeclaration, maximumDepth: maximumDepth, source: translator.syntaxTree.source))
+            return false
+        }
+
         classDeclaration.extras = nil
         classDeclaration.inherits = classDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.isNamed("MutableStruct") || $0.checkBridgable(options: options, codebaseInfo: codebaseInfo) != nil }
 
         var insertStatements: [KotlinStatement] = []
         let isEnum = classDeclaration.declarationType == .enumDeclaration
         if !isEnum {
-            classDeclaration.inherits.append(.named("skip.bridge.kt.SwiftPeerBridged", []))
+            if subclassDepth < 1 {
+                classDeclaration.inherits.append(.named("skip.bridge.kt.SwiftPeerBridged", []))
 
-            let swiftPeer = KotlinVariableDeclaration(names: ["Swift_peer"], variableTypes: [.swiftObjectPointer(kotlin: true)])
-            swiftPeer.role = .property
-            swiftPeer.modifiers.visibility = .public
-            swiftPeer.apiFlags.options = .writeable
-            swiftPeer.declaredType = .swiftObjectPointer(kotlin: true)
-            swiftPeer.isGenerated = true
-            insertStatements.append(swiftPeer)
+                let swiftPeer = KotlinVariableDeclaration(names: ["Swift_peer"], variableTypes: [.swiftObjectPointer(kotlin: true)])
+                swiftPeer.role = .property
+                swiftPeer.modifiers.visibility = .public
+                swiftPeer.apiFlags.options = .writeable
+                swiftPeer.declaredType = .swiftObjectPointer(kotlin: true)
+                swiftPeer.isGenerated = true
+                insertStatements.append(swiftPeer)
+            }
 
             let swiftPeerConstructor = KotlinFunctionDeclaration(name: "constructor")
             swiftPeerConstructor.modifiers.visibility = .public
             swiftPeerConstructor.parameters = [Parameter<KotlinExpression>(externalLabel: "Swift_peer", declaredType: .swiftObjectPointer(kotlin: true)), Parameter<KotlinExpression>(externalLabel: "marker", declaredType: .named("skip.bridge.kt.SwiftPeerMarker", []).asOptional(true))]
-            swiftPeerConstructor.body = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: "this.Swift_peer = Swift_peer")])
+            if subclassDepth < 1 {
+                swiftPeerConstructor.body = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: "this.Swift_peer = Swift_peer")])
+            } else {
+                swiftPeerConstructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super(Swift_peer = Swift_peer, marker = marker)")
+            }
             swiftPeerConstructor.ensureLeadingNewlines(1)
             swiftPeerConstructor.isGenerated = true
             insertStatements.append(swiftPeerConstructor)
 
-            let finalize = KotlinFunctionDeclaration(name: "finalize")
-            finalize.modifiers.visibility = .public
-            finalize.body = KotlinCodeBlock(statements: [
-                "Swift_release(Swift_peer)",
-                "Swift_peer = skip.bridge.kt.SwiftObjectNil"
-            ].map { KotlinRawStatement(sourceCode: $0) })
-            finalize.ensureLeadingNewlines(1)
-            finalize.isGenerated = true
-            insertStatements.append(finalize)
+            if subclassDepth < 1 {
+                let finalize = KotlinFunctionDeclaration(name: "finalize")
+                finalize.modifiers.visibility = .public
+                finalize.body = KotlinCodeBlock(statements: [
+                    "Swift_release(Swift_peer)",
+                    "Swift_peer = skip.bridge.kt.SwiftObjectNil"
+                ].map { KotlinRawStatement(sourceCode: $0) })
+                finalize.ensureLeadingNewlines(1)
+                finalize.isGenerated = true
+                insertStatements.append(finalize)
 
-            let release = KotlinRawStatement(sourceCode: "private external fun Swift_release(Swift_peer: skip.bridge.kt.SwiftObjectPointer)")
-            insertStatements.append(release)
+                let release = KotlinRawStatement(sourceCode: "private external fun Swift_release(Swift_peer: skip.bridge.kt.SwiftObjectPointer)")
+                insertStatements.append(release)
+            }
 
             if !classDeclaration.members.contains(where: { $0.type == .constructorDeclaration }) {
                 let constructor = KotlinFunctionDeclaration(name: "constructor")
                 constructor.modifiers.visibility = .public
-                constructor.body = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: "Swift_peer = Swift_constructor()")])
+                if subclassDepth < 1 {
+                    constructor.body = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: "Swift_peer = Swift_constructor()")])
+                } else {
+                    constructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super(Swift_peer = Swift_constructor(), marker = null)")
+                }
                 constructor.ensureLeadingNewlines(1)
                 constructor.isGenerated = true
                 insertStatements.append(constructor)
-                let externalConstructor = KotlinRawStatement(sourceCode: "private external fun Swift_constructor(): skip.bridge.kt.SwiftObjectPointer")
+
+                let externalConstructorName = subclassDepth >= 1 ? "Swift_Companion_constructor" : "Swift_constructor"
+                let externalConstructor = KotlinRawStatement(sourceCode: "private external fun \(externalConstructorName)(): skip.bridge.kt.SwiftObjectPointer")
+                externalConstructor.isStatic = subclassDepth >= 1
                 insertStatements.append(externalConstructor)
 
-                let constructorCdecl = CDeclFunction.declaration(for: classDeclaration, name: "Swift_constructor", translator: translator)
+                let constructorCdecl = CDeclFunction.declaration(for: classDeclaration, isCompanion: subclassDepth >= 1, name: externalConstructorName, translator: translator)
                 var constructorBody: [String] = []
                 if classDeclaration.declarationType == .classDeclaration {
                     constructorBody.append("let f_return_swift = \(classDeclaration.signature)()")
@@ -736,25 +790,27 @@ final class KotlinBridgeToKotlinVisitor {
                 cdeclFunctions.append(CDeclFunction(name: constructorCdecl.cdeclFunctionName, cdecl: constructorCdecl.cdecl, signature: .function([], .swiftObjectPointer(kotlin: false), APIFlags(), nil), body: constructorBody))
             }
 
-            let bridgedPeer = KotlinFunctionDeclaration(name: "Swift_peer")
-            bridgedPeer.returnType = .swiftObjectPointer(kotlin: true)
-            bridgedPeer.modifiers.visibility = .public
-            bridgedPeer.modifiers.isOverride = true
-            bridgedPeer.body = KotlinCodeBlock(statements: [
-                KotlinReturn(expression: KotlinIdentifier(name: "Swift_peer"))
-            ])
-            bridgedPeer.ensureLeadingNewlines(1)
-            bridgedPeer.isGenerated = true
-            insertStatements.append(bridgedPeer)
+            if subclassDepth < 1 {
+                let bridgedPeer = KotlinFunctionDeclaration(name: "Swift_peer")
+                bridgedPeer.returnType = .swiftObjectPointer(kotlin: true)
+                bridgedPeer.modifiers.visibility = .public
+                bridgedPeer.modifiers.isOverride = true
+                bridgedPeer.body = KotlinCodeBlock(statements: [
+                    KotlinReturn(expression: KotlinIdentifier(name: "Swift_peer"))
+                ])
+                bridgedPeer.ensureLeadingNewlines(1)
+                bridgedPeer.isGenerated = true
+                insertStatements.append(bridgedPeer)
 
-            let releaseCdecl = CDeclFunction.declaration(for: classDeclaration, name: "Swift_release", translator: translator)
-            var releaseBody: [String] = []
-            if classDeclaration.declarationType == .classDeclaration {
-                releaseBody.append("Swift_peer.release(as: \(classDeclaration.signature).self)")
-            } else {
-                releaseBody.append("Swift_peer.release(as: SwiftValueTypeBox<\(classDeclaration.signature)>.self)")
+                let releaseCdecl = CDeclFunction.declaration(for: classDeclaration, isCompanion: false, name: "Swift_release", translator: translator)
+                var releaseBody: [String] = []
+                if classDeclaration.declarationType == .classDeclaration {
+                    releaseBody.append("Swift_peer.release(as: \(classDeclaration.signature).self)")
+                } else {
+                    releaseBody.append("Swift_peer.release(as: SwiftValueTypeBox<\(classDeclaration.signature)>.self)")
+                }
+                cdeclFunctions.append(CDeclFunction(name: releaseCdecl.cdeclFunctionName, cdecl: releaseCdecl.cdecl, signature: .function([cdeclInstanceParameter(for: classDeclaration)], .void, APIFlags(), nil), body: releaseBody))
             }
-            cdeclFunctions.append(CDeclFunction(name: releaseCdecl.cdeclFunctionName, cdecl: releaseCdecl.cdecl, signature: .function([cdeclInstanceParameter(for: classDeclaration)], .void, APIFlags(), nil), body: releaseBody))
         }
 
         var hasEqualsDeclaration = false
@@ -779,12 +835,12 @@ final class KotlinBridgeToKotlinVisitor {
                     // The decoder includes all constructors so that we can detect whether the class needs a default
                     // constructor generated, but it marks constructors that shouldn't be bridged
                     classDeclaration.remove(statement: functionDeclaration)
-                } else if updateFunctionDeclaration(functionDeclaration, in: classDeclaration, uniquifier: functionCount) {
+                } else if updateFunctionDeclaration(functionDeclaration, in: classDeclaration, isBridgedSubclass: subclassDepth >= 1, uniquifier: functionCount) {
                     functionCount += 1
                 }
             }
         }
-        if !isEnum {
+        if !isEnum && subclassDepth < 1 {
             if !hasEqualsDeclaration {
                 let equalsDeclaration = defaultEqualsDeclaration()
                 insertStatements.append(equalsDeclaration)
@@ -800,8 +856,17 @@ final class KotlinBridgeToKotlinVisitor {
 
         // Conform to `BridgedToKotlin`
         let classRef = JavaClassRef(for: classDeclaration.signature, packageName: translator.packageName)
+        let conformances: String
+        switch subclassDepth {
+        case -1:
+            conformances = "BridgedToKotlin"
+        case 0:
+            conformances = "BridgedToKotlin, BridgedToKotlinBaseClass"
+        default:
+            conformances = "BridgedToKotlinSubclass\(subclassDepth)"
+        }
         var swift: [String] = []
-        swift.append("extension \(classDeclaration.signature): BridgedToKotlin {")
+        swift.append("extension \(classDeclaration.signature): \(conformances) {")
         swift.append(1, classRef.declaration)
 
         let finalMemberVisibility = classDeclaration.modifiers.visibility > .public ? .public : classDeclaration.modifiers.visibility
@@ -811,33 +876,43 @@ final class KotlinBridgeToKotlinVisitor {
             swift.append(1, KotlinBridgeToSwiftVisitor.swiftForEnumJConvertibleContract(className: classRef.className, caseDeclarations: enumCases, visibility: finalMemberVisibility, options: options))
         } else {
             let finalMemberVisibilityString = finalMemberVisibility.swift(suffix: " ")
-            swift.append(1, "\(finalMemberVisibilityString)static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {")
-            swift.append(2, "let ptr = SwiftObjectPointer.peer(of: obj!, options: options)")
-            if classDeclaration.declarationType == .classDeclaration {
-                swift.append(2, "return ptr.pointee()!")
-            } else {
-                swift.append(2, "let box: SwiftValueTypeBox<Self> = ptr.pointee()!")
-                swift.append(2, "return box.value")
-            }
-            swift.append(1, "}")
+            if subclassDepth < 1 {
+                swift.append(1, "\(finalMemberVisibilityString)static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {")
+                swift.append(2, "let ptr = SwiftObjectPointer.peer(of: obj!, options: options)")
+                if classDeclaration.declarationType == .classDeclaration {
+                    swift.append(2, "return ptr.pointee()!")
+                } else {
+                    swift.append(2, "let box: SwiftValueTypeBox<Self> = ptr.pointee()!")
+                    swift.append(2, "return box.value")
+                }
+                swift.append(1, "}")
 
-            swift.append(1, "\(finalMemberVisibilityString)func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {")
-            if classDeclaration.declarationType == .classDeclaration {
-                swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)")
-            } else {
-                swift.append(2, "let box = SwiftValueTypeBox(self)")
-                swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: box, retain: true)")
+                swift.append(1, "\(finalMemberVisibilityString)func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {")
+                if classDeclaration.declarationType == .classDeclaration {
+                    swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)")
+                } else {
+                    swift.append(2, "let box = SwiftValueTypeBox(self)")
+                    swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: box, retain: true)")
+                }
+                if subclassDepth == 0 {
+                    swift.append(2, "let constructor = Java_findConstructor(base: Self.Java_class, Self.Java_constructor_methodID)")
+                    swift.append(2, "return try! constructor.cls.create(ctor: constructor.ctor, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])")
+                } else {
+                    swift.append(2, "return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])")
+                }
+                swift.append(1, "}")
             }
-            swift.append(2, "return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])")
-            swift.append(1, "}")
             swift.append(1, "private static let Java_constructor_methodID = Java_class.getMethodID(name: \"<init>\", sig: \"(JLskip/bridge/kt/SwiftPeerMarker;)V\")!")
+            if subclassDepth >= 1 {
+                swift.append(1, "public static let Java_subclass\(subclassDepth)Constructor = (Java_class, Java_constructor_methodID)")
+            }
         }
         swift.append("}")
 
         let swiftDefinition = SwiftDefinition(swift: swift)
         swiftDefinitions.append(swiftDefinition)
 
-        let cdeclFunction = KotlinBridgeToSwiftVisitor.addSwiftProjectable(to: classDeclaration, options: options, translator: translator)
+        let cdeclFunction = KotlinBridgeToSwiftVisitor.addSwiftProjecting(to: classDeclaration, isBridgedSubclass: subclassDepth >= 1, options: options, translator: translator)
         cdeclFunctions.append(cdeclFunction)
         return true
     }

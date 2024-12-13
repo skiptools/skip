@@ -450,7 +450,7 @@ final class BridgeToKotlinTests: XCTestCase {
     func testTranspiledBridgedTypeVar() async throws {
         try await check(swift: """
         #if !SKIP_BRIDGE
-        public class C {
+        public final class C {
         }
         #endif
         """, swiftBridge: """
@@ -464,14 +464,12 @@ final class BridgeToKotlinTests: XCTestCase {
         private external fun Swift_c(): C
         private external fun Swift_c_set(value: C)
         """, """
-        open class C: skip.bridge.kt.SwiftProjectable {
+        class C: skip.lib.SwiftProjecting {
 
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """], swiftBridgeSupports: ["""
@@ -484,7 +482,7 @@ final class BridgeToKotlinTests: XCTestCase {
             c = C.fromJavaObject(value, options: [])
         }
         """, """
-        public class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -516,7 +514,7 @@ final class BridgeToKotlinTests: XCTestCase {
     func testOptionalTranspiledBridgedTypeVar() async throws {
         try await check(swift: """
         #if !SKIP_BRIDGE
-        public class C {
+        public final class C {
         }
         #endif
         """, swiftBridge: """
@@ -530,14 +528,12 @@ final class BridgeToKotlinTests: XCTestCase {
         private external fun Swift_c(): C?
         private external fun Swift_c_set(value: C?)
         """, """
-        open class C: skip.bridge.kt.SwiftProjectable {
+        class C: skip.lib.SwiftProjecting {
 
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """], swiftBridgeSupports: ["""
@@ -550,7 +546,7 @@ final class BridgeToKotlinTests: XCTestCase {
             c = C?.fromJavaObject(value, options: [])
         }
         """, """
-        public class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -581,11 +577,11 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testCompiledBridgedTypeVar() async throws {
         try await check(swiftBridge: """
-        public class C {
+        public final class C {
         }
         public var c = C()
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -615,9 +611,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         var c: C
@@ -668,11 +662,11 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testOptionalCompiledBridgedTypeVar() async throws {
         try await check(swiftBridge: """
-        public class C {
+        public final class C {
         }
         public var c: C? = C()
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -702,9 +696,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         var c: C?
@@ -826,7 +818,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         @_cdecl("Java_BridgeKt_Swift_1a_1set")
         func BridgeKt_Swift_a_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
-            a = AnyBridging.fromJavaObject(value, options: []) as! Any
+            a = AnyBridging.fromJavaObject(value, options: [])!
         }
         """, transformers: transformers)
     }
@@ -1019,12 +1011,12 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testBridgedObjectFunction() async throws {
         try await check(swiftBridge: """
-        public class C {
+        public final class C {
         }
         public func f(c: C) -> C {
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -1054,9 +1046,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         fun f(c: C): C = Swift_f_0(c)
@@ -1258,11 +1248,11 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testClass() async throws {
         try await check(swiftBridge: """
-        public class C {
+        public final class C {
             public var i = 1
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -1289,7 +1279,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
             override fun hashCode(): Int = Swift_peer.hashCode()
 
-            open var i: Int
+            var i: Int
                 get() = Swift_i(Swift_peer)
                 set(newValue) {
                     Swift_i_set(Swift_peer, newValue)
@@ -1300,9 +1290,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, swiftBridgeSupport: """
@@ -1363,7 +1351,7 @@ final class BridgeToKotlinTests: XCTestCase {
             open var i = 1
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        open class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -1407,7 +1395,7 @@ final class BridgeToKotlinTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        extension C: BridgedToKotlin {
+        extension C: BridgedToKotlin, BridgedToKotlinBaseClass {
             private static let Java_class = try! JClass(name: "C")
             public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
@@ -1415,7 +1403,8 @@ final class BridgeToKotlinTests: XCTestCase {
             }
             public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+                let constructor = Java_findConstructor(base: Self.Java_class, Self.Java_constructor_methodID)
+                return try! constructor.cls.create(ctor: constructor.ctor, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -1450,16 +1439,16 @@ final class BridgeToKotlinTests: XCTestCase {
     func testInnerClass() async throws {
         try await check(swiftBridge: """
         public enum A {
-            public class B {
+            public final class B {
                 public struct C {
                     public var b = B()
                 }
             }
         }
         """, kotlin: """
-        enum class A: skip.bridge.kt.SwiftProjectable {
+        enum class A: skip.lib.SwiftProjecting {
             ;
-            open class B: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+            class B: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
                 var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
                 constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -1485,7 +1474,7 @@ final class BridgeToKotlinTests: XCTestCase {
                 }
 
                 override fun hashCode(): Int = Swift_peer.hashCode()
-                class C: MutableStruct, skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+                class C: MutableStruct, skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
                     var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
                     constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -1538,9 +1527,7 @@ final class BridgeToKotlinTests: XCTestCase {
                 override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
                 private external fun Swift_projectionImpl(options: Int): () -> Any
 
-                companion object: CompanionClass() {
-                }
-                open class CompanionClass {
+                companion object {
                 }
             }
 
@@ -1662,12 +1649,12 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testPrivateConstructor() async throws {
         try await check(swiftBridge: """
-        public class C {
+        public final class C {
             private init(i: Int) {
             }
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -1692,9 +1679,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, swiftBridgeSupport: """
@@ -1725,12 +1710,12 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testConstructor() async throws {
         try await check(swiftBridge: """
-        public class C {
+        public final class C {
             public init(i: Int) {
             }
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -1760,9 +1745,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, swiftBridgeSupport: """
@@ -1799,12 +1782,12 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testThrowsConstructor() async throws {
         try await check(swiftBridge: """
-        public class C {
+        public final class C {
             public init(i: Int) throws {
             }
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -1834,9 +1817,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, swiftBridgeSupport: """
@@ -1888,12 +1869,12 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testDestructor() async throws {
         try await check(swiftBridge: """
-        public class C {
+        public final class C {
             deinit {
             }
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -1923,9 +1904,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, swiftBridgeSupport: """
@@ -1961,11 +1940,11 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testMemberConstant() async throws {
         try await check(swiftBridge: """
-        public class C {
+        public final class C {
             public let i = 0
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -1997,9 +1976,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, swiftBridgeSupport: """
@@ -2035,11 +2012,11 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testMemberVar() async throws {
         try await check(swiftBridge: """
-        public class C {
+        public final class C {
             public var i = 0
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -2066,7 +2043,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
             override fun hashCode(): Int = Swift_peer.hashCode()
 
-            open var i: Int
+            var i: Int
                 get() = Swift_i(Swift_peer)
                 set(newValue) {
                     Swift_i_set(Swift_peer, newValue)
@@ -2077,9 +2054,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, swiftBridgeSupport: """
@@ -2125,13 +2100,13 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testMemberFunction() async throws {
         try await check(swiftBridge: """
-        public class C {
+        public final class C {
             public func add(a: Int, b: Int) -> Int {
                 return a + b
             }
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -2158,15 +2133,13 @@ final class BridgeToKotlinTests: XCTestCase {
 
             override fun hashCode(): Int = Swift_peer.hashCode()
 
-            open fun add(a: Int, b: Int): Int = Swift_add_0(Swift_peer, a, b)
+            fun add(a: Int, b: Int): Int = Swift_add_0(Swift_peer, a, b)
             private external fun Swift_add_0(Swift_peer: skip.bridge.kt.SwiftObjectPointer, a: Int, b: Int): Int
 
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, swiftBridgeSupport: """
@@ -2210,13 +2183,13 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testAsyncMemberFunction() async throws {
         try await check(swiftBridge: """
-        public class C {
+        public final class C {
             public func add() async -> Int {
                 return 1
             }
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -2243,7 +2216,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
             override fun hashCode(): Int = Swift_peer.hashCode()
 
-            open suspend fun add(): Int = Async.run {
+            suspend fun add(): Int = Async.run {
                 kotlin.coroutines.suspendCoroutine { f_continuation ->
                     Swift_callback_add_0(Swift_peer) { f_return ->
                         f_continuation.resumeWith(kotlin.Result.success(f_return))
@@ -2255,9 +2228,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, swiftBridgeSupport: """
@@ -2302,11 +2273,11 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testStaticConstant() async throws {
         try await check(swiftBridge: """
-        public class C {
+        public final class C {
             public static let i = 0
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -2336,13 +2307,9 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
+            companion object {
 
-                override val i = 0
-            }
-            open class CompanionClass {
-                open val i
-                    get() = C.i
+                val i = 0
             }
         }
         """, swiftBridgeSupport: """
@@ -2378,11 +2345,11 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testStaticVar() async throws {
         try await check(swiftBridge: """
-        public class C {
+        public final class C {
             public static var i = 0
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -2412,22 +2379,15 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
+            companion object {
 
-                override var i: Int
+                var i: Int
                     get() = Swift_Companion_i()
                     set(newValue) {
                         Swift_Companion_i_set(newValue)
                     }
                 private external fun Swift_Companion_i(): Int
                 private external fun Swift_Companion_i_set(value: Int)
-            }
-            open class CompanionClass {
-                open var i: Int
-                    get() = C.i
-                    set(newValue) {
-                        C.i = newValue
-                    }
             }
         }
         """, swiftBridgeSupport: """
@@ -2471,13 +2431,13 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testStaticFunction() async throws {
         try await check(swiftBridge: """
-        public class C {
+        public final class C {
             public static func add(a: Int, b: Int) -> Int {
                 return a + b
             }
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -2507,13 +2467,10 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
+            companion object {
 
-                override fun add(a: Int, b: Int): Int = Swift_Companion_add_0(a, b)
+                fun add(a: Int, b: Int): Int = Swift_Companion_add_0(a, b)
                 private external fun Swift_Companion_add_0(a: Int, b: Int): Int
-            }
-            open class CompanionClass {
-                open fun add(a: Int, b: Int): Int = C.add(a = a, b = b)
             }
         }
         """, swiftBridgeSupport: """
@@ -2570,12 +2527,12 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testUnbridgedMember() async throws {
         try await check(swiftBridge: """
-        public class C {
+        public final class C {
             @BridgeIgnored
             public var i = 1
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -2605,9 +2562,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, swiftBridgeSupport: """
@@ -2643,7 +2598,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testCommonProtocols() async throws {
         try await check(swiftBridge: """
-        public class C: Equatable, Hashable, Comparable {
+        public final class C: Equatable, Hashable, Comparable {
             public var i = 1
             public static func ==(lhs: C, rhs: C) -> Bool {
                 return lhs.i == rhs.i
@@ -2656,7 +2611,7 @@ final class BridgeToKotlinTests: XCTestCase {
             }
         }
         """, kotlin: """
-        open class C: Comparable<C>, skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: Comparable<C>, skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -2676,7 +2631,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
             override fun Swift_peer(): skip.bridge.kt.SwiftObjectPointer = Swift_peer
 
-            open var i: Int
+            var i: Int
                 get() = Swift_i(Swift_peer)
                 set(newValue) {
                     Swift_i_set(Swift_peer, newValue)
@@ -2697,7 +2652,7 @@ final class BridgeToKotlinTests: XCTestCase {
                 hash(into = InOut<Hasher>({ hasher }, { hasher = it }))
                 return hasher.finalize()
             }
-            open fun hash(into: InOut<Hasher>) {
+            fun hash(into: InOut<Hasher>) {
                 val hasher = into
                 hasher.value.combine(Swift_hashvalue(Swift_peer))
             }
@@ -2714,9 +2669,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, swiftBridgeSupport: """
@@ -2779,7 +2732,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testCodable() async throws {
         try await check(swiftBridge: """
-        public class C: Codable {
+        public final class C: Codable {
             public var i = 1
         
             private enum CK: CodingKey {
@@ -2793,7 +2746,7 @@ final class BridgeToKotlinTests: XCTestCase {
             }
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -2820,7 +2773,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
             override fun hashCode(): Int = Swift_peer.hashCode()
 
-            open var i: Int
+            var i: Int
                 get() = Swift_i(Swift_peer)
                 set(newValue) {
                     Swift_i_set(Swift_peer, newValue)
@@ -2831,9 +2784,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, swiftBridgeSupport: """
@@ -2877,8 +2828,8 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
-    func testSubclass() async throws {
-        try await checkProducesMessage(swift: """
+    func testSubclassOfBridged() async throws {
+        try await check(swiftBridge: """
         public class Base {
             public var i = 0
         
@@ -2894,8 +2845,375 @@ final class BridgeToKotlinTests: XCTestCase {
                 super.init(i: i)
             }
         }
-        """, isSwiftBridge: true, transformers: transformers)
+        public final class Sub2: Base {
+        }
+        public var base: Base = Sub2(i: 1)
+        """, kotlin: """
+        open class Base: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.kt.SwiftObjectPointer
+
+            constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.kt.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.kt.SwiftObjectPointer)
+
+            override fun Swift_peer(): skip.bridge.kt.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.kt.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_peer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            open var i: Int
+                get() = Swift_i(Swift_peer)
+                set(newValue) {
+                    Swift_i_set(Swift_peer, newValue)
+                }
+            private external fun Swift_i(Swift_peer: skip.bridge.kt.SwiftObjectPointer): Int
+            private external fun Swift_i_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer, value: Int)
+            constructor(i: Int) {
+                Swift_peer = Swift_constructor_0(i)
+            }
+            private external fun Swift_constructor_0(i: Int): skip.bridge.kt.SwiftObjectPointer
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
+        }
+        open class Sub1: Base {
+
+            constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?): super(Swift_peer = Swift_peer, marker = marker)
+
+            open var s: String
+                get() = Swift_s(Swift_peer)
+                set(newValue) {
+                    Swift_s_set(Swift_peer, newValue)
+                }
+            private external fun Swift_s(Swift_peer: skip.bridge.kt.SwiftObjectPointer): String
+            private external fun Swift_s_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer, value: String)
+            constructor(i: Int, s: String): super(Swift_peer = Swift_Companion_constructor_0(i, s), marker = null) {
+            }
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object: CompanionClass() {
+                private external fun Swift_Companion_constructor_0(i: Int, s: String): skip.bridge.kt.SwiftObjectPointer
+            }
+            open class CompanionClass: Base.CompanionClass() {
+            }
+        }
+        class Sub2: Base {
+
+            constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?): super(Swift_peer = Swift_peer, marker = marker)
+
+            constructor(i: Int): super(Swift_peer = Swift_Companion_constructor_0(i), marker = null) {
+            }
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object: Base.CompanionClass() {
+                private external fun Swift_Companion_constructor_0(i: Int): skip.bridge.kt.SwiftObjectPointer
+            }
+        }
+        var base: Base
+            get() = Swift_base()
+            set(newValue) {
+                Swift_base_set(newValue)
+            }
+        private external fun Swift_base(): Base
+        private external fun Swift_base_set(value: Base)
+        """, swiftBridgeSupport: """
+        extension Base: BridgedToKotlin, BridgedToKotlinBaseClass {
+            private static let Java_class = try! JClass(name: "Base")
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                return ptr.pointee()!
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                let constructor = Java_findConstructor(base: Self.Java_class, Self.Java_constructor_methodID)
+                return try! constructor.cls.create(ctor: constructor.ctor, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
+        }
+        extension Sub1: BridgedToKotlinSubclass1 {
+            private static let Java_class = try! JClass(name: "Sub1")
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
+            public static let Java_subclass1Constructor = (Java_class, Java_constructor_methodID)
+        }
+        extension Sub2: BridgedToKotlinSubclass1 {
+            private static let Java_class = try! JClass(name: "Sub2")
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
+            public static let Java_subclass1Constructor = (Java_class, Java_constructor_methodID)
+        }
+        @_cdecl("Java_Base_Swift_1release")
+        func Base_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: Base.self)
+        }
+        @_cdecl("Java_Base_Swift_1i")
+        func Base_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> Int32 {
+            let peer_swift: Base = Swift_peer.pointee()!
+            return Int32(peer_swift.i)
+        }
+        @_cdecl("Java_Base_Swift_1i_1set")
+        func Base_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: Int32) {
+            let peer_swift: Base = Swift_peer.pointee()!
+            peer_swift.i = Int(value)
+        }
+        @_cdecl("Java_Base_Swift_1constructor_10")
+        func Base_Swift_constructor_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: Int32) -> SwiftObjectPointer {
+            let p_0_swift = Int(p_0)
+            let f_return_swift = Base(i: p_0_swift)
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_Base_Swift_1projectionImpl")
+        func Base_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = Base.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        @_cdecl("Java_Sub1_Swift_1s")
+        func Sub1_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaString {
+            let peer_swift: Sub1 = Swift_peer.pointee()!
+            return peer_swift.s.toJavaObject(options: [])!
+        }
+        @_cdecl("Java_Sub1_Swift_1s_1set")
+        func Sub1_Swift_s_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: JavaString) {
+            let peer_swift: Sub1 = Swift_peer.pointee()!
+            peer_swift.s = String.fromJavaObject(value, options: [])
+        }
+        @_cdecl("Java_Sub1_00024Companion_Swift_1Companion_1constructor_10")
+        func Sub1_Swift_Companion_constructor_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: Int32, _ p_1: JavaString) -> SwiftObjectPointer {
+            let p_0_swift = Int(p_0)
+            let p_1_swift = String.fromJavaObject(p_1, options: [])
+            let f_return_swift = Sub1(i: p_0_swift, s: p_1_swift)
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_Sub1_Swift_1projectionImpl")
+        func Sub1_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = Sub1.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        @_cdecl("Java_Sub2_00024Companion_Swift_1Companion_1constructor_10")
+        func Sub2_Swift_Companion_constructor_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: Int32) -> SwiftObjectPointer {
+            let p_0_swift = Int(p_0)
+            let f_return_swift = Sub2(i: p_0_swift)
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_Sub2_Swift_1projectionImpl")
+        func Sub2_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = Sub2.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        @_cdecl("Java_BridgeKt_Swift_1base")
+        func BridgeKt_Swift_base(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
+            return base.toJavaObject(options: [])!
+        }
+        @_cdecl("Java_BridgeKt_Swift_1base_1set")
+        func BridgeKt_Swift_base_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
+            base = AnyBridging.fromJavaObject(value, options: []) as! Base
+        }
+        """, transformers: transformers)
     }
+
+    func testSubclassOfUnbridged() async throws {
+        try await check(swiftBridge: """
+        // SKIP @nobridge
+        public class Base {
+            public var i = 0
+        
+            public init(i: Int) {
+                self.i = i
+            }
+        }
+        public class Sub1: Base {
+            public var s = ""
+        
+            public init(i: Int, s: String) {
+                self.s = s
+                super.init(i: i)
+            }
+        }
+        public final class Sub2: Base {
+        }
+        public var sub1 = Sub1()
+        """, kotlin: """
+        open class Sub1: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.kt.SwiftObjectPointer
+
+            constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.kt.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.kt.SwiftObjectPointer)
+
+            override fun Swift_peer(): skip.bridge.kt.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.kt.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_peer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            open var s: String
+                get() = Swift_s(Swift_peer)
+                set(newValue) {
+                    Swift_s_set(Swift_peer, newValue)
+                }
+            private external fun Swift_s(Swift_peer: skip.bridge.kt.SwiftObjectPointer): String
+            private external fun Swift_s_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer, value: String)
+            constructor(i: Int, s: String) {
+                Swift_peer = Swift_constructor_0(i, s)
+            }
+            private external fun Swift_constructor_0(i: Int, s: String): skip.bridge.kt.SwiftObjectPointer
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
+        }
+        class Sub2: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.kt.SwiftObjectPointer
+
+            constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.kt.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.kt.SwiftObjectPointer)
+
+            constructor() {
+                Swift_peer = Swift_constructor()
+            }
+            private external fun Swift_constructor(): skip.bridge.kt.SwiftObjectPointer
+
+            override fun Swift_peer(): skip.bridge.kt.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.kt.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_peer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        var sub1: Sub1
+            get() = Swift_sub1()
+            set(newValue) {
+                Swift_sub1_set(newValue)
+            }
+        private external fun Swift_sub1(): Sub1
+        private external fun Swift_sub1_set(value: Sub1)
+        """, swiftBridgeSupport: """
+        extension Sub1: BridgedToKotlin, BridgedToKotlinBaseClass {
+            private static let Java_class = try! JClass(name: "Sub1")
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                return ptr.pointee()!
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                let constructor = Java_findConstructor(base: Self.Java_class, Self.Java_constructor_methodID)
+                return try! constructor.cls.create(ctor: constructor.ctor, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
+        }
+        extension Sub2: BridgedToKotlin {
+            private static let Java_class = try! JClass(name: "Sub2")
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                return ptr.pointee()!
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
+        }
+        @_cdecl("Java_Sub1_Swift_1release")
+        func Sub1_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: Sub1.self)
+        }
+        @_cdecl("Java_Sub1_Swift_1s")
+        func Sub1_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaString {
+            let peer_swift: Sub1 = Swift_peer.pointee()!
+            return peer_swift.s.toJavaObject(options: [])!
+        }
+        @_cdecl("Java_Sub1_Swift_1s_1set")
+        func Sub1_Swift_s_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: JavaString) {
+            let peer_swift: Sub1 = Swift_peer.pointee()!
+            peer_swift.s = String.fromJavaObject(value, options: [])
+        }
+        @_cdecl("Java_Sub1_Swift_1constructor_10")
+        func Sub1_Swift_constructor_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: Int32, _ p_1: JavaString) -> SwiftObjectPointer {
+            let p_0_swift = Int(p_0)
+            let p_1_swift = String.fromJavaObject(p_1, options: [])
+            let f_return_swift = Sub1(i: p_0_swift, s: p_1_swift)
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_Sub1_Swift_1projectionImpl")
+        func Sub1_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = Sub1.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        @_cdecl("Java_Sub2_Swift_1constructor")
+        func Sub2_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
+            let f_return_swift = Sub2()
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_Sub2_Swift_1release")
+        func Sub2_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: Sub2.self)
+        }
+        @_cdecl("Java_Sub2_Swift_1projectionImpl")
+        func Sub2_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = Sub2.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        @_cdecl("Java_BridgeKt_Swift_1sub1")
+        func BridgeKt_Swift_sub1(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
+            return sub1.toJavaObject(options: [])!
+        }
+        @_cdecl("Java_BridgeKt_Swift_1sub1_1set")
+        func BridgeKt_Swift_sub1_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
+            sub1 = AnyBridging.fromJavaObject(value, options: []) as! Sub1
+        }
+        """, transformers: transformers)
+    }
+
 
     func testStruct() async throws {
         try await check(swiftBridge: """
@@ -2909,7 +3227,7 @@ final class BridgeToKotlinTests: XCTestCase {
             }
         }
         """, kotlin: """
-        class S: MutableStruct, skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class S: MutableStruct, skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -3029,7 +3347,7 @@ final class BridgeToKotlinTests: XCTestCase {
             }
         }
         """, kotlin: """
-        class S: Comparable<S>, MutableStruct, skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class S: Comparable<S>, MutableStruct, skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -3163,7 +3481,7 @@ final class BridgeToKotlinTests: XCTestCase {
         public protocol P: Base, Unbridged, Unbridged2 {
             func f() -> Int
         }
-        public class C: P {
+        public final class C: P {
             public func a() {
             }
             public func f() {
@@ -3177,7 +3495,7 @@ final class BridgeToKotlinTests: XCTestCase {
         interface P: Base {
             fun f(): Int
         }
-        open class C: P, skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: P, skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -3212,9 +3530,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, swiftBridgeSupport: """
@@ -3337,7 +3653,7 @@ final class BridgeToKotlinTests: XCTestCase {
         try await check(swiftBridge: """
         public protocol P {
         }
-        public class C {
+        public final class C {
             public var p: (any P)?
             public func f(p: any P) -> (any P)? {
                 return nil
@@ -3346,7 +3662,7 @@ final class BridgeToKotlinTests: XCTestCase {
         """, kotlin: """
         interface P {
         }
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -3373,7 +3689,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
             override fun hashCode(): Int = Swift_peer.hashCode()
 
-            open var p: P?
+            var p: P?
                 get() = Swift_p(Swift_peer).sref({ this.p = it })
                 set(newValue) {
                     @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
@@ -3381,15 +3697,13 @@ final class BridgeToKotlinTests: XCTestCase {
                 }
             private external fun Swift_p(Swift_peer: skip.bridge.kt.SwiftObjectPointer): P?
             private external fun Swift_p_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer, value: P?)
-            open fun f(p: P): P? = Swift_f_0(Swift_peer, p)
+            fun f(p: P): P? = Swift_f_0(Swift_peer, p)
             private external fun Swift_f_0(Swift_peer: skip.bridge.kt.SwiftObjectPointer, p: P): P?
 
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, swiftBridgeSupport: """
@@ -3486,7 +3800,7 @@ final class BridgeToKotlinTests: XCTestCase {
             }
         }
         """, kotlin: """
-        enum class E(override val rawValue: Int, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): skip.bridge.kt.SwiftProjectable {
+        enum class E(override val rawValue: Int, @Suppress("UNUSED_PARAMETER") unusedp: Nothing? = null): skip.lib.SwiftProjecting {
 
             a(100),
             b(101);
@@ -3597,11 +3911,11 @@ final class BridgeToKotlinTests: XCTestCase {
         try await check(swiftBridge: """
         import SkipFuse
         @Observable
-        public class C {
+        public final class C {
             public var i = 1
         }
         """, kotlin: """
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -3628,7 +3942,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
             override fun hashCode(): Int = Swift_peer.hashCode()
 
-            open var i: Int
+            var i: Int
                 get() = Swift_i(Swift_peer)
                 set(newValue) {
                     Swift_i_set(Swift_peer, newValue)
@@ -3639,9 +3953,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, swiftBridgeSupport: """
@@ -3699,7 +4011,7 @@ final class BridgeToKotlinTests: XCTestCase {
         class URL: SwiftCustomBridged, KotlinConverting<java.net.URI> {
         }
         """, swiftBridge: """
-        public class C {
+        public final class C {
             public var urls: [URL] = []
             public var map = ["a": [1]]
             public var set: Set<Int> = [1, 2, 3]
@@ -3710,7 +4022,7 @@ final class BridgeToKotlinTests: XCTestCase {
         import skip.lib.Array
         import skip.lib.Set
 
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -3737,7 +4049,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
             override fun hashCode(): Int = Swift_peer.hashCode()
 
-            open var urls: kotlin.collections.List<java.net.URI>
+            var urls: kotlin.collections.List<java.net.URI>
                 get() = Swift_urls(Swift_peer)
                 set(newValue) {
                     @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
@@ -3745,7 +4057,7 @@ final class BridgeToKotlinTests: XCTestCase {
                 }
             private external fun Swift_urls(Swift_peer: skip.bridge.kt.SwiftObjectPointer): kotlin.collections.List<java.net.URI>
             private external fun Swift_urls_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer, value: kotlin.collections.List<java.net.URI>)
-            open var map: kotlin.collections.Map<String, kotlin.collections.List<Int>>
+            var map: kotlin.collections.Map<String, kotlin.collections.List<Int>>
                 get() = Swift_map(Swift_peer)
                 set(newValue) {
                     @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
@@ -3753,7 +4065,7 @@ final class BridgeToKotlinTests: XCTestCase {
                 }
             private external fun Swift_map(Swift_peer: skip.bridge.kt.SwiftObjectPointer): kotlin.collections.Map<String, kotlin.collections.List<Int>>
             private external fun Swift_map_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer, value: kotlin.collections.Map<String, kotlin.collections.List<Int>>)
-            open var set: kotlin.collections.Set<Int>
+            var set: kotlin.collections.Set<Int>
                 get() = Swift_set(Swift_peer)
                 set(newValue) {
                     @Suppress("NAME_SHADOWING") val newValue = newValue.sref()
@@ -3761,15 +4073,13 @@ final class BridgeToKotlinTests: XCTestCase {
                 }
             private external fun Swift_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer): kotlin.collections.Set<Int>
             private external fun Swift_set_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer, value: kotlin.collections.Set<Int>)
-            open fun perform(action: (java.net.URI) -> Int): Unit = Swift_perform_0(Swift_peer, action)
+            fun perform(action: (java.net.URI) -> Int): Unit = Swift_perform_0(Swift_peer, action)
             private external fun Swift_perform_0(Swift_peer: skip.bridge.kt.SwiftObjectPointer, action: (java.net.URI) -> Int)
 
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, """
@@ -3848,14 +4158,14 @@ final class BridgeToKotlinTests: XCTestCase {
         class URL: SwiftCustomBridged, KotlinConverting<java.net.URI> {
         }
         """, swiftBridge: """
-        public class C {
+        public final class C {
             public var t2: (URL, Int)
             public var t3: (String, Int, Bool)
             public func f() -> (String, Int, Bool, Double) {
             }
         }
         """, kotlins: ["""
-        open class C: skip.bridge.kt.SwiftPeerBridged, skip.bridge.kt.SwiftProjectable {
+        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
@@ -3882,29 +4192,27 @@ final class BridgeToKotlinTests: XCTestCase {
 
             override fun hashCode(): Int = Swift_peer.hashCode()
 
-            open var t2: kotlin.Pair<java.net.URI, Int>
+            var t2: kotlin.Pair<java.net.URI, Int>
                 get() = Swift_t2(Swift_peer)
                 set(newValue) {
                     Swift_t2_set(Swift_peer, newValue)
                 }
             private external fun Swift_t2(Swift_peer: skip.bridge.kt.SwiftObjectPointer): kotlin.Pair<java.net.URI, Int>
             private external fun Swift_t2_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer, value: kotlin.Pair<java.net.URI, Int>)
-            open var t3: kotlin.Triple<String, Int, Boolean>
+            var t3: kotlin.Triple<String, Int, Boolean>
                 get() = Swift_t3(Swift_peer)
                 set(newValue) {
                     Swift_t3_set(Swift_peer, newValue)
                 }
             private external fun Swift_t3(Swift_peer: skip.bridge.kt.SwiftObjectPointer): kotlin.Triple<String, Int, Boolean>
             private external fun Swift_t3_set(Swift_peer: skip.bridge.kt.SwiftObjectPointer, value: kotlin.Triple<String, Int, Boolean>)
-            open fun f(): Tuple4<String, Int, Boolean, Double> = Swift_f_0(Swift_peer)
+            fun f(): Tuple4<String, Int, Boolean, Double> = Swift_f_0(Swift_peer)
             private external fun Swift_f_0(Swift_peer: skip.bridge.kt.SwiftObjectPointer): Tuple4<String, Int, Boolean, Double>
 
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
-            companion object: CompanionClass() {
-            }
-            open class CompanionClass {
+            companion object {
             }
         }
         """, """

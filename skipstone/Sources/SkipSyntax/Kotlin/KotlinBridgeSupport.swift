@@ -84,7 +84,7 @@ struct CDeclFunction {
     let body: [String]
 
     /// Return the `cdecl` declarations for a given external function name.
-    static func declaration(for statement: KotlinStatement, name: String, translator: KotlinTranslator) -> (cdecl: String, cdeclFunctionName: String) {
+    static func declaration(for statement: KotlinStatement, isCompanion: Bool, name: String, translator: KotlinTranslator) -> (cdecl: String, cdeclFunctionName: String) {
         var cdeclPrefix = "Java_"
         if let package = translator.packageName {
             cdeclPrefix += package.cdeclEscaped.replacing(".", with: "_") + "_"
@@ -93,7 +93,7 @@ struct CDeclFunction {
         let cdeclTypeName: String
         if let classDeclaration = statement.owningTypeDeclaration as? KotlinClassDeclaration {
             typeName = classDeclaration.signature.description.replacing(".", with: "$")
-            if (statement as? KotlinMemberDeclaration)?.isStatic == true {
+            if isCompanion {
                 cdeclTypeName = typeName + "$Companion"
             } else {
                 cdeclTypeName = typeName
@@ -228,11 +228,12 @@ extension TypeSignature {
 
     /// Return code that converts the given value of our `@_cdecl` function type back to this type.
     func convertFromCDecl(value: String, strategy: Bridgable.Strategy, options: KotlinBridgeOptions) -> String {
-        if strategy == .unknown {
+        if strategy == .polymorphic || strategy == .unknown {
             let converted = "AnyBridging.fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
-            return self == .optional(.any) ? converted : converted + " as! \(self)"
+            return castOptionalAny(converted)
         } else if strategy == .protocol {
-            return "AnyBridging.fromJavaObject(\(value), options: \(options.jconvertibleOptions)) { \(self.protocolBridgeImpl.description).fromJavaObject(\(value), options: \(options.jconvertibleOptions)) as Any } as! \(self)"
+            let converted = "AnyBridging.fromJavaObject(\(value), options: \(options.jconvertibleOptions)) { \(self.protocolBridgeImpl.description).fromJavaObject(\(value), options: \(options.jconvertibleOptions)) as Any }"
+            return castOptionalAny(converted)
         }
 
         switch self.asOptional(false) {
@@ -258,6 +259,17 @@ extension TypeSignature {
             } else {
                 return description + ".fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
             }
+        }
+    }
+
+    private func castOptionalAny(_ value: String) -> String {
+        switch self {
+        case .optional(.any):
+            return value
+        case .any:
+            return value + "!"
+        default:
+            return value + " as! \(self)"
         }
     }
 
@@ -307,11 +319,12 @@ extension TypeSignature {
 
     /// Return code that converts the given value of our Java type back to this type.
     func convertFromJava(value: String, strategy: Bridgable.Strategy, options: KotlinBridgeOptions) -> String {
-        if strategy == .unknown {
+        if strategy == .polymorphic || strategy == .unknown {
             let converted = "AnyBridging.fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
-            return self == .optional(.any) ? converted : converted + " as! \(self)"
+            return castOptionalAny(converted)
         } else if strategy == .protocol {
-            return "AnyBridging.fromJavaObject(\(value), options: \(options.jconvertibleOptions)) { \(self.protocolBridgeImpl.description).fromJavaObject(\(value), options: \(options.jconvertibleOptions)) as Any } as! \(self)"
+            let converted = "AnyBridging.fromJavaObject(\(value), options: \(options.jconvertibleOptions)) { \(self.protocolBridgeImpl.description).fromJavaObject(\(value), options: \(options.jconvertibleOptions)) as Any }"
+            return castOptionalAny(converted)
         }
 
         switch self {
@@ -526,8 +539,8 @@ struct Bridgable {
     enum Strategy {
         case direct
         case convertible
-        case javaPeer
-        case swiftPeer
+        case peer
+        case polymorphic
         case `protocol`
         case unknown
     }
@@ -623,10 +636,6 @@ extension KotlinClassDeclaration {
                 return false
             }
         case .classDeclaration:
-            guard !isSubclass(translator: translator) else {
-                messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "subclasses", source: translator.syntaxTree.source))
-                return false
-            }
             break
         case .structDeclaration:
             break
@@ -643,12 +652,15 @@ extension KotlinClassDeclaration {
         return true
     }
 
-    private func isSubclass(translator: KotlinTranslator) -> Bool {
-        guard let codebaseInfo = translator.codebaseInfo, let inherit = inherits.first else {
-            return false
+    /// Return the info for this type's superclass, or `nil`.
+    func superclassInfo(translator: KotlinTranslator) -> CodebaseInfo.TypeInfo? {
+        guard declarationType == .classDeclaration, let codebaseInfo = translator.codebaseInfo, let inherit = inherits.first else {
+            return nil
         }
-        let primaryTypeInfo = codebaseInfo.primaryTypeInfo(forNamed: inherit)
-        return primaryTypeInfo != nil && primaryTypeInfo?.declarationType != .protocolDeclaration
+        guard let primaryTypeInfo = codebaseInfo.primaryTypeInfo(forNamed: inherit) else {
+            return nil
+        }
+        return primaryTypeInfo.declarationType == .classDeclaration ? primaryTypeInfo : nil
     }
 }
 
@@ -894,10 +906,14 @@ extension TypeSignature {
         }
         let strategy: Bridgable.Strategy
         var kotlinType: TypeSignature = .none
-        if typeInfo.attributes.isBridgeToSwift {
-            strategy = typeInfo.declarationType == .protocolDeclaration ? .protocol : .javaPeer
-        } else if typeInfo.attributes.isBridgeToKotlin {
-            strategy = typeInfo.declarationType == .protocolDeclaration ? .protocol : .swiftPeer
+        if typeInfo.attributes.isBridgeToSwift || typeInfo.attributes.isBridgeToKotlin {
+            if typeInfo.declarationType == .classDeclaration && !typeInfo.modifiers.isFinal {
+                strategy = .polymorphic
+            } else if typeInfo.declarationType == .protocolDeclaration {
+                strategy = .protocol
+            } else {
+                strategy = .peer
+            }
         } else if typeInfo.declarationType == .protocolDeclaration, let moduleName = typeInfo.moduleName, isSkipModule(name: moduleName) {
             // Any protocol in a built-in module will have a Swift and Kotlin representation
             strategy = .protocol
