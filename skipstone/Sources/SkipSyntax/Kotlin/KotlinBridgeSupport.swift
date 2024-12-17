@@ -431,6 +431,9 @@ extension TypeSignature {
                 return typeName
             }
         case .named(let name, _):
+            if isNamed("AnyHashable", moduleName: "Swift", generics: []) {
+                return "Ljava/lang/Object;"
+            }
             return "L" + name.replacing(".", with: "/") + ";"
         case .none:
             return "Ljava/lang/Object;"
@@ -795,6 +798,9 @@ extension TypeSignature {
             }
             return nil
         case .member, .module, .named:
+            if isNamed("AnyHashable", moduleName: "Swift", generics: []) {
+                return Bridgable(type: self, kotlinType: self, strategy: .unknown)
+            }
             return checkNamedBridgable(options: options, codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source)
         case .metaType:
             if let sourceDerived, let source {
