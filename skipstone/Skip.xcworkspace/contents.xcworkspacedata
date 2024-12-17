@@ -47,6 +47,9 @@
       location = "group:../skipapp-hello/Darwin/HelloSkip.xcodeproj">
    </FileRef>
    <FileRef
+      location = "group:../skipapp-hiya/Darwin/HiyaSkip.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "group:../skipapp-showcase/Darwin/Showcase.xcodeproj">
    </FileRef>
    <FileRef
