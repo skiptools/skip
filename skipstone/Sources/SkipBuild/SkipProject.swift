@@ -1139,7 +1139,7 @@ class AppProjectLayout : FrameworkProjectLayout {
         let sourceHeader = free ? freeLicenseHeader(type: nil) : ""
 
         if modules.contains(where: { module in
-            module.moduleName == projectName
+            module.moduleName.lowercased() == projectName.lowercased()
         }) {
             throw InitError(errorDescription: "ModuleName and project-name must be different: \(projectName)")
         }
