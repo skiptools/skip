@@ -1810,7 +1810,7 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun hashCode(): Int = Swift_peer.hashCode()
 
             constructor(i: Int) {
-                Swift_peer = Swift_constructor_0(i)!!
+                Swift_peer = Swift_constructor_0(i)
             }
             private external fun Swift_constructor_0(i: Int): skip.bridge.kt.SwiftObjectPointer
 
@@ -1838,14 +1838,14 @@ final class BridgeToKotlinTests: XCTestCase {
             Swift_peer.release(as: C.self)
         }
         @_cdecl("Java_C_Swift_1constructor_10")
-        func C_Swift_constructor_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: Int32) -> SwiftObjectPointer? {
+        func C_Swift_constructor_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: Int32) -> SwiftObjectPointer {
             let p_0_swift = Int(p_0)
             do {
                 let f_return_swift = try C(i: p_0_swift)
                 return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
             } catch {
                 JavaThrowError(error, env: Java_env)
-                return nil
+                return SwiftObjectNil
             }
         }
         @_cdecl("Java_C_Swift_1projectionImpl")

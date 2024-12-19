@@ -361,12 +361,12 @@ final class KotlinBridgeToKotlinVisitor {
         var body: [String] = []
         let cdeclReturnType: TypeSignature
         if let classDeclaration, functionDeclaration.type == .constructorDeclaration {
+            if isBridgedSubclass {
+                functionDeclaration.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super(Swift_peer = \(externalName)(\(externalArgumentsString)), marker = null)")
+            } else {
+                body.append("Swift_peer = \(externalName)(\(externalArgumentsString))")
+            }
             if isThrows {
-                if isBridgedSubclass {
-                    functionDeclaration.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super(Swift_peer = \(externalName)(\(externalArgumentsString))!!, marker = null)")
-                } else {
-                    body.append("Swift_peer = \(externalName)(\(externalArgumentsString))!!")
-                }
                 cdeclBody.append("do {")
                 if classDeclaration.declarationType == .classDeclaration {
                     cdeclBody.append(1, "let f_return_swift = try \(classDeclaration.signature)(\(swiftArgumentsString))")
@@ -376,15 +376,9 @@ final class KotlinBridgeToKotlinVisitor {
                 cdeclBody.append(1, "return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)")
                 cdeclBody.append("} catch {")
                 cdeclBody.append(1, "JavaThrowError(error, env: Java_env)")
-                cdeclBody.append(1, "return nil")
+                cdeclBody.append(1, "return SwiftObjectNil")
                 cdeclBody.append("}")
-                cdeclReturnType = .optional(.swiftObjectPointer(kotlin: false))
             } else {
-                if isBridgedSubclass {
-                    functionDeclaration.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super(Swift_peer = \(externalName)(\(externalArgumentsString)), marker = null)")
-                } else {
-                    body.append("Swift_peer = \(externalName)(\(externalArgumentsString))")
-                }
                 if classDeclaration.declarationType == .classDeclaration {
                     cdeclBody.append("let f_return_swift = \(classDeclaration.signature)(\(swiftArgumentsString))")
                 } else if isMutableStructCopyConstructor {
@@ -393,8 +387,8 @@ final class KotlinBridgeToKotlinVisitor {
                     cdeclBody.append("let f_return_swift = SwiftValueTypeBox(\(classDeclaration.signature)(\(swiftArgumentsString)))")
                 }
                 cdeclBody.append("return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)")
-                cdeclReturnType = .swiftObjectPointer(kotlin: false)
             }
+            cdeclReturnType = .swiftObjectPointer(kotlin: false)
         } else if isAsync {
             body.append("kotlin.coroutines.suspendCoroutine { f_continuation ->")
             if isThrows {
