@@ -86,7 +86,7 @@ extension ToolOptionsCommand {
         }
 
         /// check for stale Intel Homebrew installations of tools (java, etc.) on ARM (https://github.com/skiptools/skip/issues/97)
-        func checkArchitecture() async throws {
+        func checkRosetta() async throws {
 
             let arch = ProcessInfo.isARM ? "ARM" : "Intel"
 
@@ -110,7 +110,10 @@ extension ToolOptionsCommand {
 
         try await checkVersion(title: "Skip version", cmd: ["skip", "version"], min: Version(skipVersion), pattern: "Skip version ([0-9.]+)")
         try await checkVersion(title: "macOS version", cmd: ["sw_vers", "--productVersion"], min: Version("13.5.0"), pattern: "([0-9.]+)")
-        try await checkArchitecture()
+        if ProcessInfo.isARM {
+            // only check for Rosetta when we are on an ARM machine
+            try await checkRosetta()
+        }
         try await checkVersion(title: "Swift version", cmd: ["swift", "-version"], min: Version("5.9.0"), pattern: "Swift version ([0-9.]+)")
         // TODO: add advice to run `xcode-select -s /Applications/Xcode.app/Contents/Developer` to work around https://github.com/skiptools/skip/issues/18
         try await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)", hint: " (install from: https://developer.apple.com/xcode/)")
