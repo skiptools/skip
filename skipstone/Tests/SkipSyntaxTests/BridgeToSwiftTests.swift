@@ -718,6 +718,64 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testJavaTypeVar() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        #if SKIP
+        public var d: java.util.Date = java.util.Date()
+        public var bds: [java.math.BigDecimal]? = nil
+        #endif
+        #endif
+        """, kotlin: """
+        import skip.lib.Array
+
+        var d: java.util.Date = java.util.Date()
+            get() = field.sref({ d = it })
+            set(newValue) {
+                field = newValue.sref()
+            }
+        var bds: Array<java.math.BigDecimal>? = null
+            get() = field.sref({ bds = it })
+            set(newValue) {
+                field = newValue.sref()
+            }
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        public var d: AnyDynamicObject {
+            get {
+                return jniContext {
+                    let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_d_methodID, options: [], args: [])
+                    return AnyDynamicObject.fromJavaObject(value_java, options: [])
+                }
+            }
+            set {
+                jniContext {
+                    let value_java = newValue.toJavaObject(options: [])!.toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_set_d_methodID, options: [], args: [value_java])
+                }
+            }
+        }
+        private let Java_get_d_methodID = Java_SourceKt.getStaticMethodID(name: "getD", sig: "()Ljava/util/Date;")!
+        private let Java_set_d_methodID = Java_SourceKt.getStaticMethodID(name: "setD", sig: "(Ljava/util/Date;)V")!
+        public var bds: [AnyDynamicObject]? {
+            get {
+                return jniContext {
+                    let value_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_get_bds_methodID, options: [], args: [])
+                    return [AnyDynamicObject]?.fromJavaObject(value_java, options: [])
+                }
+            }
+            set {
+                jniContext {
+                    let value_java = newValue.toJavaObject(options: []).toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_set_bds_methodID, options: [], args: [value_java])
+                }
+            }
+        }
+        private let Java_get_bds_methodID = Java_SourceKt.getStaticMethodID(name: "getBds", sig: "()Lskip/lib/Array;")!
+        private let Java_set_bds_methodID = Java_SourceKt.getStaticMethodID(name: "setBds", sig: "(Lskip/lib/Array;)V")!
+        """, transformers: transformers)
+    }
+
     func testClosureVar() async throws {
         try await check(swift: """
         #if !SKIP_BRIDGE

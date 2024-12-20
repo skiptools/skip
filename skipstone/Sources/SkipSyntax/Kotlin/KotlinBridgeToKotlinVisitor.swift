@@ -118,7 +118,7 @@ final class KotlinBridgeToKotlinVisitor {
         guard !variableDeclaration.isGenerated else {
             return
         }
-        guard let bridgable = variableDeclaration.checkBridgable(options: options, translator: translator) else {
+        guard let bridgable = variableDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator) else {
             return
         }
         variableDeclaration.extras = nil
@@ -286,7 +286,7 @@ final class KotlinBridgeToKotlinVisitor {
             let parameterBridgable = Bridgable(type: .named("MutableStruct", []), kotlinType: .module("Swift", .named("MutableStruct", [])), strategy: .peer)
             bridgable = FunctionBridgable(parameters: [parameterBridgable], return: Bridgable(type: .void, kotlinType: .void, strategy: .direct))
         } else {
-            guard let functionBridgable = functionDeclaration.checkBridgable(options: options, translator: translator) else {
+            guard let functionBridgable = functionDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator) else {
                 return false
             }
             bridgable = functionBridgable
@@ -652,19 +652,19 @@ final class KotlinBridgeToKotlinVisitor {
     }
 
     @discardableResult private func updateInterfaceDeclaration(_ interfaceDeclaration: KotlinInterfaceDeclaration) -> Bool {
-        guard interfaceDeclaration.checkBridgable(options: options, translator: translator) else {
+        guard interfaceDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator) else {
             return false
         }
         guard let codebaseInfo = translator.codebaseInfo else {
             return false
         }
         interfaceDeclaration.extras = nil
-        interfaceDeclaration.inherits = interfaceDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.checkBridgable(options: options, codebaseInfo: codebaseInfo) != nil }
+        interfaceDeclaration.inherits = interfaceDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.checkBridgable(direction: .toKotlin, options: options, codebaseInfo: codebaseInfo) != nil }
         for member in interfaceDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
-                _ = variableDeclaration.checkBridgable(options: options, translator: translator)
+                _ = variableDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator)
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
-                _ = functionDeclaration.checkBridgable(options: options, translator: translator)
+                _ = functionDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator)
             }
         }
         return true
@@ -674,7 +674,7 @@ final class KotlinBridgeToKotlinVisitor {
         guard !classDeclaration.isGenerated else {
             return false
         }
-        guard classDeclaration.checkBridgable(options: options, translator: translator) else {
+        guard classDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator) else {
             return false
         }
         guard let codebaseInfo = translator.codebaseInfo else {
@@ -711,7 +711,7 @@ final class KotlinBridgeToKotlinVisitor {
         }
 
         classDeclaration.extras = nil
-        classDeclaration.inherits = classDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.isNamed("MutableStruct") || $0.checkBridgable(options: options, codebaseInfo: codebaseInfo) != nil }
+        classDeclaration.inherits = classDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.isNamed("MutableStruct") || $0.checkBridgable(direction: .toKotlin, options: options, codebaseInfo: codebaseInfo) != nil }
 
         var insertStatements: [KotlinStatement] = []
         let isEnum = classDeclaration.declarationType == .enumDeclaration
