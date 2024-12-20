@@ -100,7 +100,7 @@ final class KotlinBridgeToSwiftVisitor {
     }
 
     private func update(global variableDeclaration: KotlinVariableDeclaration, swiftDefinitions: inout [SwiftDefinition], globalsClassRef: JavaClassRef) -> Bool {
-        guard let bridgable = variableDeclaration.checkBridgable(options: options, translator: translator) else {
+        guard let bridgable = variableDeclaration.checkBridgable(direction: .toSwift, options: options, translator: translator) else {
             return false
         }
         guard !addConstantDefinition(for: variableDeclaration, type: bridgable.type, modifiers: variableDeclaration.modifiers, to: &swiftDefinitions) else {
@@ -113,7 +113,7 @@ final class KotlinBridgeToSwiftVisitor {
     }
 
     @discardableResult private func update(member variableDeclaration: KotlinVariableDeclaration, info: CodebaseInfo.VariableInfo?, in parentStatement: KotlinStatement, swiftDefinitions: inout [SwiftDefinition]) -> Bool {
-        guard let bridgable = variableDeclaration.checkBridgable(options: options, translator: translator) else {
+        guard let bridgable = variableDeclaration.checkBridgable(direction: .toSwift, options: options, translator: translator) else {
             return false
         }
         let modifiers = info?.modifiers ?? variableDeclaration.modifiers
@@ -281,7 +281,7 @@ final class KotlinBridgeToSwiftVisitor {
     }
 
     private func update(global functionDeclaration: KotlinFunctionDeclaration, uniquifier: Int, swiftDefinitions: inout [SwiftDefinition], globalsClassRef: JavaClassRef) -> Bool {
-        guard let bridgable = functionDeclaration.checkBridgable(options: options, translator: translator) else {
+        guard let bridgable = functionDeclaration.checkBridgable(direction: .toSwift, options: options, translator: translator) else {
             return false
         }
         let name = functionDeclaration.preEscapedName ?? functionDeclaration.name
@@ -295,7 +295,7 @@ final class KotlinBridgeToSwiftVisitor {
     }
 
     @discardableResult private func update(member functionDeclaration: KotlinFunctionDeclaration, info: CodebaseInfo.FunctionInfo?, uniquifier: Int, in parentStatement: KotlinStatement, isBridgedSubclass: Bool = false, swiftDefinitions: inout [SwiftDefinition]) -> Bool {
-        guard let bridgable = functionDeclaration.checkBridgable(options: options, translator: translator) else {
+        guard let bridgable = functionDeclaration.checkBridgable(direction: .toSwift, options: options, translator: translator) else {
             return false
         }
         let inType: StatementType = parentStatement is KotlinInterfaceDeclaration ? .protocolDeclaration : (parentStatement as? KotlinClassDeclaration)?.declarationType ?? .classDeclaration
@@ -616,7 +616,7 @@ final class KotlinBridgeToSwiftVisitor {
     }
 
     private func update(_ classDeclaration: KotlinClassDeclaration, swiftDefinitions: inout [SwiftDefinition]) {
-        guard classDeclaration.checkBridgable(options: options, translator: translator) else {
+        guard classDeclaration.checkBridgable(direction: .toSwift, options: options, translator: translator) else {
             return
         }
         let typeInfos = codebaseInfo.typeInfos(forNamed: classDeclaration.signature)
@@ -639,7 +639,7 @@ final class KotlinBridgeToSwiftVisitor {
         let modifiersString = primaryTypeInfo.declarationType == .classDeclaration && primaryTypeInfo.modifiers.isFinal ? "final " : ""
         let inherits = typeInfos.flatMap(\.inherits).compactMap {
             let inherit = $0.withGenerics([])
-            return inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.checkBridgable(options: options, codebaseInfo: codebaseInfo) != nil ? inherit : nil
+            return inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.checkBridgable(direction: .toSwift, options: options, codebaseInfo: codebaseInfo) != nil ? inherit : nil
         }
         var inheritsString = inherits.map { $0.description }.joined(separator: ", ")
         if !isBridgedSubclass {
@@ -874,7 +874,7 @@ final class KotlinBridgeToSwiftVisitor {
     }
 
     private func update(_ interfaceDeclaration: KotlinInterfaceDeclaration, swiftDefinitions: inout [SwiftDefinition]) {
-        guard interfaceDeclaration.checkBridgable(options: options, translator: translator) else {
+        guard interfaceDeclaration.checkBridgable(direction: .toSwift, options: options, translator: translator) else {
             return
         }
         guard let primaryTypeInfo = codebaseInfo.primaryTypeInfo(forNamed: interfaceDeclaration.signature) else {
@@ -885,7 +885,7 @@ final class KotlinBridgeToSwiftVisitor {
         let visibilityString = primaryTypeInfo.modifiers.visibility.swift(suffix: " ")
         let inherits = primaryTypeInfo.inherits.compactMap {
             let inherit = $0.withGenerics([])
-            return inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.checkBridgable(options: options, codebaseInfo: codebaseInfo) != nil ? inherit : nil
+            return inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.checkBridgable(direction: .toSwift, options: options, codebaseInfo: codebaseInfo) != nil ? inherit : nil
         }
         let inheritsString = inherits.isEmpty ? "" : ": " + inherits.map { $0.description }.joined(separator: ", ")
 
@@ -970,7 +970,7 @@ final class KotlinBridgeToSwiftVisitor {
             guard !variableInfo.attributes.isNoBridge else {
                 continue
             }
-            guard let bridgable = variableInfo.signature.checkBridgable(options: options, codebaseInfo: codebaseInfo) else {
+            guard let bridgable = variableInfo.signature.checkBridgable(direction: .any, options: options, codebaseInfo: codebaseInfo) else {
                 continue
             }
             var modifiers = variableInfo.modifiers
@@ -981,7 +981,7 @@ final class KotlinBridgeToSwiftVisitor {
             guard !functionInfo.attributes.isNoBridge else {
                 continue
             }
-            guard let bridgable = functionInfo.signature.checkFunctionBridgable(isConstructor: functionInfo.declarationType == .initDeclaration, options: options, codebaseInfo: codebaseInfo) else {
+            guard let bridgable = functionInfo.signature.checkFunctionBridgable(direction: .any, isConstructor: functionInfo.declarationType == .initDeclaration, options: options, codebaseInfo: codebaseInfo) else {
                 continue
             }
             var modifiers = functionInfo.modifiers
