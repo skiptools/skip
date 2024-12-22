@@ -592,6 +592,12 @@ extension KotlinVariableDeclaration {
         let type = declaredType.or(propertyType)
         return type.checkBridgable(direction: direction, options: options, codebaseInfo: codebaseInfo, sourceDerived: self, source: translator.syntaxTree.source)
     }
+
+    func checkExtensionUnbridgable(translator: KotlinTranslator) {
+        if isExtensionUnbridgable(translator: translator) {
+            messages.append(.kotlinBridgeExtensionFunction(self, source: translator.syntaxTree.source))
+        }
+    }
 }
 
 extension KotlinFunctionDeclaration {
@@ -634,6 +640,12 @@ extension KotlinFunctionDeclaration {
             return nil
         }
         return functionType.checkFunctionBridgable(direction: direction, isConstructor: type == .constructorDeclaration, options: options, codebaseInfo: codebaseInfo, sourceDerived: self, source: translator.syntaxTree.source)
+    }
+
+    func checkExtensionUnbridgable(translator: KotlinTranslator) {
+        if isExtensionUnbridgable(translator: translator) {
+            messages.append(.kotlinBridgeExtensionFunction(self, source: translator.syntaxTree.source))
+        }
     }
 }
 
@@ -683,6 +695,34 @@ extension KotlinInterfaceDeclaration {
         }
         guard checkParentBridgable(self, direction: direction, options: options, translator: translator) else {
             return false
+        }
+        return true
+    }
+}
+
+extension KotlinMemberDeclaration {
+    fileprivate func isExtensionUnbridgable(translator: KotlinTranslator) -> Bool {
+        guard let extendsType = extends?.0, !attributes.isNoBridge else {
+            return false
+        }
+        let extendsTypeInfo = translator.codebaseInfo?.primaryTypeInfo(forNamed: extendsType)
+        if let extendsTypeInfo {
+            guard extendsTypeInfo.attributes.isBridgeToKotlin || extendsTypeInfo.attributes.isBridgeToSwift else {
+                return false
+            }
+        } else {
+            guard !extendsType.isNamedType else {
+                return false
+            }
+        }
+        if extendsTypeInfo?.declarationType == .protocolDeclaration {
+            guard visibility == .default || visibility >= .public else {
+                return false
+            }
+        } else {
+            guard visibility >= .public else {
+                return false
+            }
         }
         return true
     }

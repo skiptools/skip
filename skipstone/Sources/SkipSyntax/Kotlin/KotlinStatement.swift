@@ -86,6 +86,7 @@ protocol KotlinMemberDeclaration: AnyObject {
     var companion: (TypeSignature, KotlinCompanionType)? { get set }
     var isStatic: Bool { get }
     var visibility: Modifiers.Visibility { get set }
+    var attributes: Attributes { get set }
 
     /// Append an equivalent member that delegates from the companion class to the companion object.
     ///

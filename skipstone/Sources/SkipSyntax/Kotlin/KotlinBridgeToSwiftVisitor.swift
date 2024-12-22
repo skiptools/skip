@@ -26,19 +26,23 @@ final class KotlinBridgeToSwiftVisitor {
         var needsGlobalsJavaClass = false
         var globalFunctionCount = 0
         syntaxTree.root.visit { node in
-            if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global {
-                if variableDeclaration.modifiers.visibility >= .public, !variableDeclaration.attributes.isNoBridge {
+            if let variableDeclaration = node as? KotlinVariableDeclaration {
+                if variableDeclaration.role == .global, variableDeclaration.modifiers.visibility >= .public, !variableDeclaration.attributes.isNoBridge {
                     needsGlobalsJavaClass = update(global: variableDeclaration, swiftDefinitions: &swiftDefinitions, globalsClassRef: globalsClassRef) || needsGlobalsJavaClass
                     checkIfNotSkipBridge(variableDeclaration)
+                } else if variableDeclaration.extends != nil {
+                    variableDeclaration.checkExtensionUnbridgable(translator: translator)
                 }
                 return .skip
-            } else if let functionDeclaration = node as? KotlinFunctionDeclaration, functionDeclaration.role == .global {
-                if functionDeclaration.modifiers.visibility >= .public, !functionDeclaration.attributes.isNoBridge {
+            } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
+                if functionDeclaration.role == .global, functionDeclaration.modifiers.visibility >= .public, !functionDeclaration.attributes.isNoBridge {
                     if update(global: functionDeclaration, uniquifier: globalFunctionCount, swiftDefinitions: &swiftDefinitions, globalsClassRef: globalsClassRef) {
                         needsGlobalsJavaClass = true
                         globalFunctionCount += 1
                     }
                     checkIfNotSkipBridge(functionDeclaration)
+                } else if functionDeclaration.extends != nil {
+                    functionDeclaration.checkExtensionUnbridgable(translator: translator)
                 }
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {

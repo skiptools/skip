@@ -50,6 +50,10 @@ extension Message {
         return Message(kind: .warning, message: "Shadowing a SwiftUI Binding parameter with a variable of the same name may produce incorrect Kotlin. Consider using a different variable name", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinBridgeExtensionFunction(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "This API is implemented as a Kotlin extension function. This release does not support bridging extension functions", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinBridgeMissingIfNotSkipBridge(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "When bridging API from a transpiled module, place all code within a `#if !SKIP_BRIDGE` condition", sourceDerived: sourceDerived, source: source)
     }

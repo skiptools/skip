@@ -47,7 +47,7 @@ struct  StatementDecoder {
 
 /// Decoding context.
 struct DecodeContext {
-    var memberOf: StatementType?
+    var memberOf: (type: StatementType, modifiers: Modifiers)?
 }
 
 /// Levels of decoding.

@@ -296,6 +296,7 @@ extension Attributes {
 }
 
 extension Attribute {
+    static let bridgeIgnored = Attribute(signature: .named("BridgeIgnored", []))
     static let bridgeToKotlin = Attribute(signature: .named("BridgeToKotlin", []))
     static let bridgeToSwift = Attribute(signature: .named("BridgeToSwift", []))
 
