@@ -384,19 +384,19 @@ final class BridgeToSwiftTests: XCTestCase {
         public var object: String {
             get {
                 return jniContext {
-                    let value_java: String = try! Java_SourceKt.callStatic(method: Java_get_object__methodID, options: [], args: [])
+                    let value_java: String = try! Java_SourceKt.callStatic(method: Java_get_object_methodID, options: [], args: [])
                     return value_java
                 }
             }
             set {
                 jniContext {
                     let value_java = newValue.toJavaParameter(options: [])
-                    try! Java_SourceKt.callStatic(method: Java_set_object__methodID, options: [], args: [value_java])
+                    try! Java_SourceKt.callStatic(method: Java_set_object_methodID, options: [], args: [value_java])
                 }
             }
         }
-        private let Java_get_object__methodID = Java_SourceKt.getStaticMethodID(name: "getObject_", sig: "()Ljava/lang/String;")!
-        private let Java_set_object__methodID = Java_SourceKt.getStaticMethodID(name: "setObject_", sig: "(Ljava/lang/String;)V")!
+        private let Java_get_object_methodID = Java_SourceKt.getStaticMethodID(name: "getObject_", sig: "()Ljava/lang/String;")!
+        private let Java_set_object_methodID = Java_SourceKt.getStaticMethodID(name: "setObject_", sig: "(Ljava/lang/String;)V")!
         """, transformers: transformers)
     }
 
@@ -433,7 +433,7 @@ final class BridgeToSwiftTests: XCTestCase {
     }
 
     func testAsyncVar() async throws {
-        try await checkProducesMessage(swift: """
+        try await check(swift: """
         #if !SKIP_BRIDGE
         public var i: Int {
             get async {
@@ -441,6 +441,76 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         #endif
+        """, kotlin: """
+        suspend fun i(): Int = Async.run l@{
+            return@l 0
+        }
+        fun callback_i(f_return_callback: (Int) -> Unit) {
+            Task {
+                f_return_callback(i())
+            }
+        }
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        public var i: Int {
+            get async {
+                return await withCheckedContinuation { f_continuation in
+                    let f_return_callback: (Int) -> Void = { f_return in
+                        f_continuation.resume(returning: f_return)
+                    }
+                    jniContext {
+                        let f_return_callback_java = SwiftClosure1.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
+                        try! Java_SourceKt.callStatic(method: Java_i_methodID, options: [], args: [f_return_callback_java])
+                    }
+                }
+            }
+        }
+        private let Java_i_methodID = Java_SourceKt.getStaticMethodID(name: "callback_i", sig: "(Lkotlin/jvm/functions/Function1;)V")!
+        """, transformers: transformers)
+    }
+
+    func testAsyncThrowsVar() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public var i: Int {
+            get async throws {
+                return 0
+            }
+        }
+        #endif
+        """, kotlin: """
+        suspend fun i(): Int = Async.run l@{
+            return@l 0
+        }
+        fun callback_i(f_return_callback: (Int?, Throwable?) -> Unit) {
+            Task {
+                try {
+                    f_return_callback(i(), null)
+                } catch(t: Throwable) {
+                    f_return_callback(null, t)
+                }
+            }
+        }
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        public var i: Int {
+            get async throws {
+                return try await withCheckedThrowingContinuation { f_continuation in
+                    let f_return_callback: (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
+                        if let f_error {
+                            f_continuation.resume(throwing: ThrowableError(throwable: f_error))
+                        } else {
+                            f_continuation.resume(returning: f_return!)
+                        }
+                    }
+                    jniContext {
+                        let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
+                        try! Java_SourceKt.callStatic(method: Java_i_methodID, options: [], args: [f_return_callback_java])
+                    }
+                }
+            }
+        }
+        private let Java_i_methodID = Java_SourceKt.getStaticMethodID(name: "callback_i", sig: "(Lkotlin/jvm/functions/Function2;)V")!
         """, transformers: transformers)
     }
 
@@ -3610,10 +3680,140 @@ final class BridgeToSwiftTests: XCTestCase {
 
     func testExtensionFunction() async throws {
         try await checkProducesMessage(swift: """
+        #if !SKIP_BRIDGE
         extension Int {
             public var zero: Int {
                 return 0
             }
+        }
+        #endif
+        """, transformers: transformers)
+    }
+
+    func testActor() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public actor A {
+            public var x: Int {
+                return 0
+            }
+            public nonisolated var y = 1
+            public func f(i: Int) -> String {
+                return ""
+            }
+            public nonisolated func g() -> Int {
+                return 0
+            }
+        }
+        #endif
+        """, kotlin: """
+        class A: Actor, skip.lib.SwiftProjecting {
+            override val isolatedContext = Actor.isolatedContext()
+            suspend fun x(): Int = Actor.run(this) l@{
+                return@l 0
+            }
+            fun callback_x(f_return_callback: (Int) -> Unit) {
+                Task {
+                    f_return_callback(x())
+                }
+            }
+            var y = 1
+            suspend fun f(i: Int): String = Actor.run(this) l@{
+                return@l ""
+            }
+            fun callback_f(i: Int, f_return_callback: (String) -> Unit) {
+                Task {
+                    f_return_callback(f(i = i))
+                }
+            }
+            fun g(): Int = 0
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        """, swiftBridgeSupport: """
+        public actor A: BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "A")
+            public nonisolated let Java_peer: JObject
+            public init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            public init() {
+                Java_peer = jniContext {
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    return JObject(ptr)
+                }
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            public nonisolated func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+
+            public var x: Int {
+                get async {
+                    return await withCheckedContinuation { f_continuation in
+                        let f_return_callback: (Int) -> Void = { f_return in
+                            f_continuation.resume(returning: f_return)
+                        }
+                        jniContext {
+                            let f_return_callback_java = SwiftClosure1.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
+                            try! Java_peer.call(method: Self.Java_x_methodID, options: [], args: [f_return_callback_java])
+                        }
+                    }
+                }
+            }
+            private static let Java_x_methodID = Java_class.getMethodID(name: "callback_x", sig: "(Lkotlin/jvm/functions/Function1;)V")!
+
+            public nonisolated var y: Int {
+                get {
+                    return jniContext {
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_y_methodID, options: [], args: [])
+                        return Int(value_java)
+                    }
+                }
+                set {
+                    jniContext {
+                        let value_java = Int32(newValue).toJavaParameter(options: [])
+                        try! Java_peer.call(method: Self.Java_set_y_methodID, options: [], args: [value_java])
+                    }
+                }
+            }
+            private static let Java_get_y_methodID = Java_class.getMethodID(name: "getY", sig: "()I")!
+            private static let Java_set_y_methodID = Java_class.getMethodID(name: "setY", sig: "(I)V")!
+
+            public func f(i p_0: Int) async -> String {
+                return await withCheckedContinuation { f_continuation in
+                    let f_return_callback: (String) -> Void = { f_return in
+                        f_continuation.resume(returning: f_return)
+                    }
+                    jniContext {
+                        let f_return_callback_java = SwiftClosure1.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
+                        let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                        try! Java_peer.call(method: Self.Java_f_0_methodID, options: [], args: [p_0_java, f_return_callback_java])
+                    }
+                }
+            }
+            private static let Java_f_0_methodID = Java_class.getMethodID(name: "callback_f", sig: "(ILkotlin/jvm/functions/Function1;)V")!
+
+            public nonisolated func g() -> Int {
+                return jniContext {
+                    let f_return_java: Int32 = try! Java_peer.call(method: Self.Java_g_1_methodID, options: [], args: [])
+                    return Int(f_return_java)
+                }
+            }
+            private static let Java_g_1_methodID = Java_class.getMethodID(name: "g", sig: "()I")!
+        }
+        @_cdecl("Java_A_Swift_1projectionImpl")
+        func A_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = A.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
         }
         """, transformers: transformers)
     }

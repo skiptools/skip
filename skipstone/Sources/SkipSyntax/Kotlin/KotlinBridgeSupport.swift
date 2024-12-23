@@ -505,6 +505,12 @@ extension TypeSignature {
 extension Modifiers {
     func swift(suffix: String = "") -> String {
         var string = visibility.swift()
+        if isNonisolated {
+            if !string.isEmpty {
+                string += " "
+            }
+            string += "nonisolated"
+        }
         if isStatic {
             if !string.isEmpty {
                 string += " "
@@ -573,10 +579,6 @@ extension KotlinVariableDeclaration {
     /// This function will add messages about invalid modifiers or types to this variable.
     func checkBridgable(direction: Bridgable.Direction, options: KotlinBridgeOptions, translator: KotlinTranslator) -> Bridgable? {
         guard checkNonStaticProtocolRequirement(self, in: parent, modifiers: modifiers, translator: translator) else {
-            return nil
-        }
-        guard !apiFlags.options.contains(.async) else {
-            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "async vars", source: translator.syntaxTree.source))
             return nil
         }
         guard checkNonTypedThrows(self, apiFlags: apiFlags, source: translator.syntaxTree.source) else {
@@ -653,6 +655,8 @@ extension KotlinClassDeclaration {
     /// Check that this class is bridgable.
     func checkBridgable(direction: Bridgable.Direction, options: KotlinBridgeOptions, translator: KotlinTranslator) -> Bool {
         switch declarationType {
+        case .actorDeclaration:
+            break
         case .enumDeclaration:
             guard !isSealedClassesEnum else {
                 messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "enums with additional state", source: translator.syntaxTree.source))
