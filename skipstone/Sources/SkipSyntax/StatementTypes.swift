@@ -981,10 +981,10 @@ final class ExtensionDeclaration: TypeDeclaration {
         guard extends != .none else {
             return nil
         }
-        var context = context
-        context.memberOf = .extensionDeclaration
-
         let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
+        var context = context
+        context.memberOf = (.extensionDeclaration, modifiers)
+
         var attributes = Attributes.for(syntax: extensionDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
@@ -1495,12 +1495,12 @@ class TypeDeclaration: Statement {
     }
 
     private static func decodeClassDeclaration(_ classDecl: ClassDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+        let modifiers = Modifiers.for(syntax: classDecl.modifiers)
         var context = context
-        context.memberOf = .classDeclaration
+        context.memberOf = (.classDeclaration, modifiers)
 
         var attributes = Attributes.for(syntax: classDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
-        let modifiers = Modifiers.for(syntax: classDecl.modifiers)
         guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
@@ -1514,12 +1514,12 @@ class TypeDeclaration: Statement {
     }
 
     private static func decodeStructDeclaration(_ structDecl: StructDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+        let modifiers = Modifiers.for(syntax: structDecl.modifiers)
         var context = context
-        context.memberOf = .structDeclaration
+        context.memberOf = (.structDeclaration, modifiers)
 
         var attributes = Attributes.for(syntax: structDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
-        let modifiers = Modifiers.for(syntax: structDecl.modifiers)
         guard self.decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
@@ -1533,12 +1533,12 @@ class TypeDeclaration: Statement {
     }
 
     private static func decodeProtocolDeclaration(_ protocolDecl: ProtocolDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+        let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
         var context = context
-        context.memberOf = .protocolDeclaration
+        context.memberOf = (.protocolDeclaration, modifiers)
 
         var attributes = Attributes.for(syntax: protocolDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
-        let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
         guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
@@ -1554,12 +1554,12 @@ class TypeDeclaration: Statement {
     }
 
     private static func decodeEnumDeclaration(_ enumDecl: EnumDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+        let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
         var context = context
-        context.memberOf = .enumDeclaration
+        context.memberOf = (.enumDeclaration, modifiers)
 
         var attributes = Attributes.for(syntax: enumDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
-        let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
         guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
@@ -1573,12 +1573,12 @@ class TypeDeclaration: Statement {
     }
 
     private static func decodeActorDeclaration(_ actorDecl: ActorDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+        let modifiers = Modifiers.for(syntax: actorDecl.modifiers)
         var context = context
-        context.memberOf = .actorDeclaration
+        context.memberOf = (.actorDeclaration, modifiers)
 
         var attributes = Attributes.for(syntax: actorDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
-        let modifiers = Modifiers.for(syntax: actorDecl.modifiers)
         guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }

@@ -551,6 +551,7 @@ final class KotlinEmpty: KotlinStatement, KotlinMemberDeclaration {
     var companion: (TypeSignature, KotlinCompanionType)?
     let isStatic = false
     var visibility: Modifiers.Visibility = .private
+    var attributes = Attributes()
 }
 
 final class KotlinForLoop: KotlinStatement {
@@ -1002,6 +1003,11 @@ final class KotlinClassDeclaration: KotlinStatement {
                 kpartitionedMembers.first?.ensureLeadingNewlines(1)
                 kmembers += kpartitionedMembers
                 kstatement.movedExtensionImportModulePaths += extImportModulePaths
+
+                // Make sure moved members of an unbridged extension do not bridge
+                if extDeclaration.attributes.isNoBridge {
+                    kpartitionedMembers.forEach { ($0 as? KotlinMemberDeclaration)?.attributes.attributes.append(.bridgeIgnored) }
+                }
             }
 
             kstatement.companionType = codebaseInfo.companionType(of: statement.signature)
@@ -1038,7 +1044,7 @@ final class KotlinClassDeclaration: KotlinStatement {
             kstatement.inherits.append(.named("Actor", []))
         }
 
-        let kextensionMembers = KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, generics: kstatement.generics, declarationType: .classDeclaration, companionType: kstatement.companionType ?? .object, translator: translator)
+        let kextensionMembers = KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, attributes: kstatement.attributes, generics: kstatement.generics, declarationType: .classDeclaration, companionType: kstatement.companionType ?? .object, translator: translator)
         kextensionMembers.first?.ensureLeadingNewlines(1)
         return [kstatement] + kextensionMembers
     }
@@ -1546,15 +1552,20 @@ struct KotlinExtensionDeclaration {
         placement.visibilityAllowsMove = isInSameFile || statement.visibilityAllowsMoveIntoExtendedType
         placement.isInModule = translator.codebaseInfo == nil ? nil : declarationType?.isInModule == true
         guard !placement.canMove || !placement.visibilityAllowsMove || placement.isInModule != true else {
-            if !isInSameFile && mayUseFilePrivateAPI(statement: statement, in: translator.syntaxTree) {
+            if !translator.syntaxTree.isBridgeFile && !isInSameFile && mayUseFilePrivateAPI(statement: statement, in: translator.syntaxTree) {
                 let message: Message = .kotlinExtensionUsingFileprivateAPI(statement, source: translator.syntaxTree.source)
                 kstatements.append(KotlinMessageStatement(message: message, statement: statement))
             }
             return kstatements
         }
 
-        if !statement.inherits.isEmpty, let message = Message.kotlinExtensionAddProtocols(statement, extensionPlacement: placement, source: translator.syntaxTree.source) {
-            kstatements.append(KotlinMessageStatement(message: message, statement: statement))
+        // Raise an error if user is trying to add protocols to a type defined outside this module.
+        // If this is a bridging file we may translate non-public extension in case they have public
+        // members that birdge, but we can ignore non-public protocol conformance
+        if !translator.syntaxTree.isBridgeFile || statement.modifiers.visibility >= .public {
+            if !statement.inherits.isEmpty, let message = Message.kotlinExtensionAddProtocols(statement, extensionPlacement: placement, source: translator.syntaxTree.source) {
+                kstatements.append(KotlinMessageStatement(message: message, statement: statement))
+            }
         }
         var generics = statement.generics.resolvingSelf(in: statement)
         var visibility: Modifiers.Visibility? = nil
@@ -1569,17 +1580,18 @@ struct KotlinExtensionDeclaration {
             }
         }
         let companionType = translator.codebaseInfo?.companionType(of: extends) ?? .object
-        let kextensionMembers = translateExtensionMembers(statement.members, of: extends, visibility: visibility, generics: generics, declarationType: declarationType?.type, companionType: companionType, translator: translator, extensionPlacement: placement)
+        let kextensionMembers = translateExtensionMembers(statement.members, of: extends, visibility: visibility, attributes: statement.attributes, generics: generics, declarationType: declarationType?.type, companionType: companionType, translator: translator, extensionPlacement: placement)
         kextensionMembers.first?.ensureLeadingNewlines(1)
         return kstatements + kextensionMembers
     }
 
-    static func translateExtensionMembers(_ members: [Statement], of extends: TypeSignature, visibility: Modifiers.Visibility?, generics: Generics, declarationType: StatementType?, companionType: KotlinCompanionType, translator: KotlinTranslator, extensionPlacement: KotlinExtensionPlacement? = nil) -> [KotlinStatement] {
+    static func translateExtensionMembers(_ members: [Statement], of extends: TypeSignature, visibility: Modifiers.Visibility?, attributes: Attributes, generics: Generics, declarationType: StatementType?, companionType: KotlinCompanionType, translator: KotlinTranslator, extensionPlacement: KotlinExtensionPlacement? = nil) -> [KotlinStatement] {
         var canAddStaticMembers: Bool? = nil
         if let extensionPlacement, !extensionPlacement.canMove {
             canAddStaticMembers = declarationType != .protocolDeclaration || extensionPlacement.isInModule != false || translator.codebaseInfo == nil || companionType.isInterface
         }
 
+        let isNoBridge = attributes.isNoBridge
         var kstatements: [KotlinStatement] = []
         for member in members {
             if let extensionPlacement, !extensionPlacement.canMove {
@@ -1625,6 +1637,9 @@ struct KotlinExtensionDeclaration {
                 }
                 memberDeclaration.extends = (extends, extendsGenerics)
                 memberDeclaration.companion = (extends, companionType)
+                if isNoBridge {
+                    memberDeclaration.attributes.attributes.append(.bridgeIgnored)
+                }
                 kstatements.append(kmember)
             }
         }
@@ -2447,12 +2462,17 @@ final class KotlinInterfaceDeclaration: KotlinStatement {
             let partitioned = KotlinExtensionDeclaration.partition(members: extDeclaration.members, of: kstatement.signature, isFinal: false)
             extensionMembers += partitioned.extensionMembers
 
+            let isNoBridge = extDeclaration.attributes.isNoBridge
             for kmember in partitioned.members.flatMap({ translator.translateStatement($0) }) {
                 if !replaceMember(in: &originalMembers, with: kmember) {
                     if newMembers.isEmpty {
                         kmember.ensureLeadingNewlines(1)
                     }
                     newMembers.append(kmember)
+                    if isNoBridge {
+                        // Make sure moved members of an unbridged extension do not bridge
+                        (kmember as? KotlinMemberDeclaration)?.attributes.attributes.append(.bridgeIgnored)
+                    }
                 }
             }
             kstatement.movedExtensionImportModulePaths += extImportModulePaths
@@ -2474,7 +2494,7 @@ final class KotlinInterfaceDeclaration: KotlinStatement {
         kstatement.inherits.forEach { $0.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source) }
 
         let companionType: KotlinCompanionType = kstatement.companionInterface == nil ? .none : .interface(kstatement.companionInterface!)
-        let kextensionMembers = KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, generics: kstatement.generics, declarationType: .protocolDeclaration, companionType: companionType, translator: translator)
+        let kextensionMembers = KotlinExtensionDeclaration.translateExtensionMembers(extensionMembers, of: kstatement.signature, visibility: kstatement.modifiers.visibility, attributes: kstatement.attributes, generics: kstatement.generics, declarationType: .protocolDeclaration, companionType: companionType, translator: translator)
         kextensionMembers.first?.ensureLeadingNewlines(1)
         return [kstatement] + kextensionMembers
     }

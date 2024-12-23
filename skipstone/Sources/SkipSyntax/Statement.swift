@@ -36,8 +36,14 @@ class Statement: SyntaxNode {
         guard !syntaxTree.isBridgeFile || !attributes.isNoBridge else {
             return .none
         }
-        if context.memberOf == .protocolDeclaration && !(self is TypeDeclaration.Type) {
+        if context.memberOf?.type == .protocolDeclaration && !(self is TypeDeclaration.Type) {
             return visibility == .default || visibility >= .public ? .api : .none
+        } else if context.memberOf?.type == .extensionDeclaration && !(self is TypeDeclaration.Type) {
+            let memberVisibility = visibility == .default ? (context.memberOf?.modifiers.visibility ?? visibility) : visibility
+            return memberVisibility >= .public ? .api : .none
+        } else if self is ExtensionDeclaration.Type {
+            // Extensions with default visibility may contain public members
+            return visibility >= .public || visibility == .default ? .api : .none
         } else {
             return visibility >= .public ? .api : .none
         }

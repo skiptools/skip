@@ -34,23 +34,31 @@ final class KotlinBridgeToKotlinVisitor {
                     nonKotlinImports.append(importDeclaration)
                 }
                 return .skip
-            } else if let variableDeclaration = node as? KotlinVariableDeclaration, variableDeclaration.role == .global {
-                updateVariableDeclaration(variableDeclaration)
+            } else if let variableDeclaration = node as? KotlinVariableDeclaration {
+                if variableDeclaration.role == .global {
+                    update(variableDeclaration)
+                } else if variableDeclaration.extends != nil {
+                    variableDeclaration.checkExtensionUnbridgable(translator: translator)
+                }
                 return .skip
-            } else if let functionDeclaration = node as? KotlinFunctionDeclaration, functionDeclaration.role == .global {
-                if updateFunctionDeclaration(functionDeclaration, uniquifier: globalFunctionCount) {
-                    globalFunctionCount += 1
+            } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
+                if functionDeclaration.role == .global {
+                    if update(functionDeclaration, uniquifier: globalFunctionCount) {
+                        globalFunctionCount += 1
+                    }
+                } else if functionDeclaration.extends != nil {
+                    functionDeclaration.checkExtensionUnbridgable(translator: translator)
                 }
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
-                if updateClassDeclaration(classDeclaration) {
+                if update(classDeclaration) {
                     if classDeclaration.attributes.contains(.observable) {
                         bridgedObservables.append(classDeclaration)
                     }
                 }
                 return .recurse(nil)
             } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
-                if updateInterfaceDeclaration(interfaceDeclaration) {
+                if update(interfaceDeclaration) {
                     if let bridgeImplDefinition = KotlinBridgeToSwiftVisitor.protocolBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, options: options, codebaseInfo: codebaseInfo) {
                         swiftDefinitions.append(bridgeImplDefinition)
                     }
@@ -114,7 +122,7 @@ final class KotlinBridgeToKotlinVisitor {
         return codebaseInfo.global.dependentModules.contains { moduleName == $0.moduleName }
     }
 
-    private func updateVariableDeclaration(_ variableDeclaration: KotlinVariableDeclaration, in classDeclaration: KotlinClassDeclaration? = nil) {
+    private func update(_ variableDeclaration: KotlinVariableDeclaration, in classDeclaration: KotlinClassDeclaration? = nil) {
         guard !variableDeclaration.isGenerated else {
             return
         }
@@ -276,7 +284,7 @@ final class KotlinBridgeToKotlinVisitor {
         }
     }
 
-    private func updateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, isBridgedSubclass: Bool = false, uniquifier: Int) -> Bool {
+    private func update(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration? = nil, isBridgedSubclass: Bool = false, uniquifier: Int) -> Bool {
         guard !functionDeclaration.isGenerated || functionDeclaration.type == .constructorDeclaration else {
             return false
         }
@@ -651,7 +659,7 @@ final class KotlinBridgeToKotlinVisitor {
         cdeclFunctions.append(cdeclFunction)
     }
 
-    @discardableResult private func updateInterfaceDeclaration(_ interfaceDeclaration: KotlinInterfaceDeclaration) -> Bool {
+    @discardableResult private func update(_ interfaceDeclaration: KotlinInterfaceDeclaration) -> Bool {
         guard interfaceDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator) else {
             return false
         }
@@ -670,7 +678,7 @@ final class KotlinBridgeToKotlinVisitor {
         return true
     }
 
-    @discardableResult private func updateClassDeclaration(_ classDeclaration: KotlinClassDeclaration) -> Bool {
+    @discardableResult private func update(_ classDeclaration: KotlinClassDeclaration) -> Bool {
         guard !classDeclaration.isGenerated else {
             return false
         }
@@ -815,7 +823,7 @@ final class KotlinBridgeToKotlinVisitor {
             if let enumCaseDeclaration = member as? KotlinEnumCaseDeclaration {
                 enumCases.append(enumCaseDeclaration)
             } else if let variableDeclaration = member as? KotlinVariableDeclaration {
-                updateVariableDeclaration(variableDeclaration, in: classDeclaration)
+                update(variableDeclaration, in: classDeclaration)
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
                 if functionDeclaration.isEqualImplementation || functionDeclaration.isKotlinEqualImplementation {
                     updateEqualsDeclaration(functionDeclaration, in: classDeclaration)
@@ -829,7 +837,7 @@ final class KotlinBridgeToKotlinVisitor {
                     // The decoder includes all constructors so that we can detect whether the class needs a default
                     // constructor generated, but it marks constructors that shouldn't be bridged
                     classDeclaration.remove(statement: functionDeclaration)
-                } else if updateFunctionDeclaration(functionDeclaration, in: classDeclaration, isBridgedSubclass: subclassDepth >= 1, uniquifier: functionCount) {
+                } else if update(functionDeclaration, in: classDeclaration, isBridgedSubclass: subclassDepth >= 1, uniquifier: functionCount) {
                     functionCount += 1
                 }
             }

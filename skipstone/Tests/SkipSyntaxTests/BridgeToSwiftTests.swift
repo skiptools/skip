@@ -3420,21 +3420,202 @@ final class BridgeToSwiftTests: XCTestCase {
     }
 
     func testClassWithExtension() async throws {
-        // TODO
-//        try await check(swift: """
-//        #if !SKIP_BRIDGE
-//        public class C {
-//        }
-//        extension C {
-//            public static func s() {
-//            }
-//            public func f() {
-//            }
-//        }
-//        #endif
-//        """, kotlin: """
-//        """, swiftBridgeSupport: """
-//        """, transformers: transformers)
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public class C {
+        }
+        extension C {
+            public static func s() {
+            }
+            public func f() {
+            }
+            func g() {
+            }
+        }
+        #endif
+        """, kotlin: """
+        open class C: skip.lib.SwiftProjecting {
+            open fun f() = Unit
+            internal open fun g() = Unit
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object: CompanionClass() {
+
+                override fun s() = Unit
+            }
+            open class CompanionClass {
+                open fun s() = C.s()
+            }
+        }
+        """, swiftBridgeSupport: """
+        public class C: BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "C")
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            public init(Java_peer: JObject) {
+                self.Java_peer = Java_peer
+            }
+            public init() {
+                Java_peer = jniContext {
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    return JObject(ptr)
+                }
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+            private static let Java_Companion_class = try! JClass(name: "C$Companion")
+            private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: "Companion", sig: "LC$Companion;")!, options: []))
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+
+            public static func s() {
+                jniContext {
+                    try! Java_Companion.call(method: Java_Companion_s_0_methodID, options: [], args: [])
+                }
+            }
+            private static let Java_Companion_s_0_methodID = Java_Companion_class.getMethodID(name: "s", sig: "()V")!
+
+            public func f() {
+                jniContext {
+                    try! Java_peer.call(method: Self.Java_f_1_methodID, options: [], args: [])
+                }
+            }
+            private static let Java_f_1_methodID = Java_class.getMethodID(name: "f", sig: "()V")!
+        }
+        @_cdecl("Java_C_Swift_1projectionImpl")
+        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
+    func testClassWithPublicExtension() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public final class C {
+        }
+        public extension C {
+            func f() {
+            }
+        }
+        #endif
+        """, kotlin: """
+        class C: skip.lib.SwiftProjecting {
+
+            open fun f() = Unit
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        """, swiftBridgeSupport: """
+        public final class C: BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "C")
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            public init() {
+                Java_peer = jniContext {
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    return JObject(ptr)
+                }
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+
+            public func f() {
+                jniContext {
+                    try! Java_peer.call(method: Self.Java_f_0_methodID, options: [], args: [])
+                }
+            }
+            private static let Java_f_0_methodID = Java_class.getMethodID(name: "f", sig: "()V")!
+        }
+        @_cdecl("Java_C_Swift_1projectionImpl")
+        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
+    func testClassWithUnbridgedExtension() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public final class C {
+        }
+        // SKIP @nobridge
+        extension C {
+            public func f() {
+            }
+        }
+        #endif
+        """, kotlin: """
+        class C: skip.lib.SwiftProjecting {
+
+            open fun f() = Unit
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        """, swiftBridgeSupport: """
+        public final class C: BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "C")
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            public init() {
+                Java_peer = jniContext {
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    return JObject(ptr)
+                }
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+        }
+        @_cdecl("Java_C_Swift_1projectionImpl")
+        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
+    func testExtensionFunction() async throws {
+        try await checkProducesMessage(swift: """
+        extension Int {
+            public var zero: Int {
+                return 0
+            }
+        }
+        """, transformers: transformers)
     }
 
     func testImports() async throws {
