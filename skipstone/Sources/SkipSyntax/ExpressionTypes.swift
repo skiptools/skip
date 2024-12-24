@@ -1231,11 +1231,33 @@ final class MacroExpansion: Expression {
         guard syntax.kind == .macroExpansionExpr, let macroExpansionExpr = syntax.as(MacroExpansionExprSyntax.self) else {
             return nil
         }
-        // We don't yet support macro expansion, but we know we can safely ignore these
+        // We don't yet support macro expansion, but we know we can safely translate these
         if macroExpansionExpr.macroName.text == "Preview" {
             return RawExpression(sourceCode: "// #\(macroExpansionExpr.macroName.text) omitted", syntax: syntax, in: syntaxTree)
+        } else if macroExpansionExpr.macroName.text == "colorLiteral" {
+            return colorLiteral(syntax: macroExpansionExpr)
         }
         throw Message.macroExpansionUnsupported(syntax, source: syntaxTree.source)
+    }
+
+    private static func colorLiteral(syntax macroExpansionExpr: MacroExpansionExprSyntax) -> Expression {
+        let red = numericLiteral(for: macroExpansionExpr.arguments.first { $0.label?.text == "red" })
+        let green = numericLiteral(for: macroExpansionExpr.arguments.first { $0.label?.text == "green" })
+        let blue = numericLiteral(for: macroExpansionExpr.arguments.first { $0.label?.text == "blue" })
+        let alpha = numericLiteral(for: macroExpansionExpr.arguments.first { $0.label?.text == "alpha" })
+        let functionCall = FunctionCall(function: Identifier(name: "UIColor"), arguments: [
+            LabeledValue(label: "red", value: red),
+            LabeledValue(label: "green", value: green),
+            LabeledValue(label: "blue", value: blue),
+            LabeledValue(label: "alpha", value: alpha)
+        ], syntax: macroExpansionExpr)
+        return functionCall
+    }
+
+    private static func numericLiteral(for expression: LabeledExprListSyntax.Element?) -> NumericLiteral {
+        let value = expression?.expression.description ?? "0"
+        let isFloatingPoint = value.firstIndex(of: ".") != nil
+        return NumericLiteral(literal: value, isFloatingPoint: isFloatingPoint, syntax: expression)
     }
 }
 
