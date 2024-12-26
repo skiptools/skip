@@ -57,6 +57,12 @@ final class KotlinBridgeToSwiftVisitor {
                     checkIfNotSkipBridge(interfaceDeclaration)
                 }
                 return .recurse(nil)
+            } else if let typealiasDeclaration = node as? KotlinTypealiasDeclaration {
+                if typealiasDeclaration.modifiers.visibility >= .public, !typealiasDeclaration.attributes.isNoBridge {
+                    update(typealiasDeclaration, swiftDefinitions: &swiftDefinitions)
+                    checkIfNotSkipBridge(typealiasDeclaration)
+                }
+                return .skip
             } else {
                 return .recurse(nil)
             }
@@ -1059,5 +1065,22 @@ final class KotlinBridgeToSwiftVisitor {
             functionCount += 1
         }
         return swift
+    }
+
+    private func update(_ typealiasDeclaration: KotlinTypealiasDeclaration, swiftDefinitions: inout [SwiftDefinition]) {
+        guard let bridgable = typealiasDeclaration.aliasedType.checkBridgable(direction: .toSwift, options: options, codebaseInfo: codebaseInfo, sourceDerived: typealiasDeclaration, source: syntaxTree.source) else {
+            return
+        }
+
+        let visibilityString = typealiasDeclaration.modifiers.visibility.swift(suffix: " ")
+        let genericsString: String
+        if typealiasDeclaration.generics.isEmpty {
+            genericsString = ""
+        } else {
+            genericsString = "<" + typealiasDeclaration.generics.entries.map(\.name).joined(separator: ", ") + ">"
+        }
+        let swift = "\(visibilityString)typealias \(typealiasDeclaration.name)\(genericsString) = \(typealiasDeclaration.aliasedType)"
+        let definition = SwiftDefinition(statement: typealiasDeclaration, swift: [swift])
+        swiftDefinitions.append(definition)
     }
 }
