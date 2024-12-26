@@ -3818,6 +3818,20 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testTypealias() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public typealias IntArray = [Int]
+        #endif
+        """, kotlin: """
+        import skip.lib.Array
+
+        typealias IntArray = Array<Int>
+        """, swiftBridgeSupport: """
+        public typealias IntArray = [Int]
+        """, transformers: transformers)
+    }
+
     func testImports() async throws {
         try await check(swift: """
         #if !SKIP_BRIDGE

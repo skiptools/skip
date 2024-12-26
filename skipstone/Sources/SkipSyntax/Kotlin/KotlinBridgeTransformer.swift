@@ -51,6 +51,15 @@ public final class KotlinBridgeTransformer: KotlinTransformer {
                     }
                 }
                 return .recurse(nil)
+            } else if let typealiasDeclaration = node as? TypealiasDeclaration {
+                if typealiasDeclaration.modifiers.visibility >= .public, !typealiasDeclaration.attributes.isNoBridge {
+                    if syntaxTree.isBridgeFile {
+                        typealiasDeclaration.attributes.attributes.append(.bridgeToKotlin)
+                    } else {
+                        typealiasDeclaration.attributes.attributes.append(.bridgeToSwift)
+                    }
+                }
+                return .skip
             } else if node is VariableDeclaration || node is FunctionDeclaration {
                 return .skip
             } else {
