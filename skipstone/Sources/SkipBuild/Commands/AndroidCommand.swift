@@ -249,14 +249,14 @@ fileprivate extension AndroidOperationCommand {
             /// Returns all the shared object files that will need to be linked to a binary
             ///
             /// e.g.: `~/Library/Developer/Skip/SDKs/swift-5.10.1-android-24-ndk-27-sdk/usr/lib/aarch64-linux-android/*.so`
-            func dependencySharedObjectFiles() throws -> [URL] {
+            func dependencySharedObjectFiles(withBuildOutputLibraries: Bool = true) throws -> [URL] {
                 let libFolder = tc.libPath
                 if !FileManager.default.fileExists(atPath: libFolder.path) {
                     throw AndroidError(errorDescription: "Android SDK library folder did not exist at: \(libFolder)")
                 }
                 // check for .so files like libswift_Concurrency.so or libxml2.so.2.13.3
                 // we need to preserve symbolic links because some libraries link to a linked version
-                let sharedObjects = try files(at: libFolder, allowLinks: true)
+                var sharedObjects = try files(at: libFolder, allowLinks: true)
                     .filter({ $0.lastPathComponent.contains(".so") })
                     .filter {
                         // filter out some of the native Android libraries that are located in the same folder as the Swift libraries
@@ -280,17 +280,21 @@ fileprivate extension AndroidOperationCommand {
                             "libvulkan.so",
                         ].contains($0.lastPathComponent) == false
                     }
+
+                if withBuildOutputLibraries == true {
+                    sharedObjects += try files(at: buildOutputFolderURL).filter({ $0.lastPathComponent.contains(".so") })
+                }
+
                 return sharedObjects
             }
+
 
             if let archiveOutputFolder = archiveOutputFolder {
                 let archOutputFolder = archiveOutputFolder.appendingPathComponent(arch.abi, isDirectory: true)
                 //try? FileManager.default.removeItem(at: archiveOutputFolder) // delete any existing archive output folder
                 try FileManager.default.createDirectory(at: archOutputFolder, withIntermediateDirectories: true)
 
-                let buildLibraries = try files(at: buildOutputFolderURL).filter({ $0.lastPathComponent.contains(".so") })
-                var copyFiles = buildLibraries
-                copyFiles += try dependencySharedObjectFiles()
+                let copyFiles = try dependencySharedObjectFiles()
 
                 for so in copyFiles {
                     let dest = archOutputFolder.appendingPathComponent(so.lastPathComponent, isDirectory: true)

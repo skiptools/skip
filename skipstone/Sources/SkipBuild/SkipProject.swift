@@ -1779,7 +1779,12 @@ public struct ContentView: View {
                         #else
                         Text(verbatim: "💙")
                         #endif
-                        Text("Powered by Skip and \\(androidSDK != nil ? "Jetpack Compose" : "SwiftUI")")
+                        if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+                           let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
+                            Text("Version \\(version) (\\(buildNumber))")
+                                .foregroundStyle(.gray)
+                        }
+                        Text("Powered by [Skip](https://skip.tools)")
                     }
                     .foregroundStyle(.gray)
                 }
