@@ -3480,12 +3480,106 @@ final class BridgeToSwiftTests: XCTestCase {
     }
 
     func testEnumWithAssociatedValue() async throws {
-        try await checkProducesMessage(swift: """
+        try await check(swift: """
         #if !SKIP_BRIDGE
         public enum E {
-            case a(Int), b
+            case a(i: Int, String), b
+            public var intValue: Int? {
+                switch self {
+                case .a(let value, _):
+                    return value
+                case .b:
+                    return nil
+            }
         }
         #endif
+        """, kotlin: """
+        sealed class E: skip.lib.SwiftProjecting {
+            class ACase(val associated0: Int, val associated1: String): E() {
+                val i = associated0
+            }
+            class BCase: E() {
+            }
+            val intValue: Int?
+                get() {
+                    when (this) {
+                        is E.ACase -> {
+                            val value = this.associated0
+                            return value
+                        }
+                        is E.BCase -> return null
+                    }
+                }
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+                fun a(i: Int, associated1: String): E = ACase(i, associated1)
+                val b: E = BCase()
+            }
+        }
+        """, swiftBridgeSupport: """
+        public enum E: BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "E")
+            private var Java_peer: JavaObjectPointer {
+                return toJavaObject(options: [])!
+            }
+            private static let Java_Companion_class = try! JClass(name: "E$Companion")
+            private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: "Companion", sig: "LE$Companion;")!, options: []))
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let className = Java_className(of: obj!, options: options)
+                return fromJavaClassName(className, obj!)
+            }
+            fileprivate static func fromJavaClassName(_ className: String, _ obj: JavaObjectPointer) -> Self {
+                switch className {
+                case "E$ACase":
+                    let associated0_java: Int32 = try! obj.call(method: Self.Java_a_associated0_methodID, options: options, args: [])
+                    let associated0 = Int(associated0_java)
+                    let associated1_java: String = try! obj.call(method: Self.Java_a_associated1_methodID, options: options, args: [])
+                    let associated1 = associated1_java
+                    return .a(i: associated0, associated1)
+                case "E$BCase":
+                    return .b
+                default: fatalError()
+                }
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                switch self {
+                case .a(let associated0, let associated1):
+                    let associated0_java = Int32(associated0).toJavaParameter(options: options)
+                    let associated1_java = associated1.toJavaParameter(options: options)
+                    return try! Self.Java_Companion.call(method: Self.Java_Companion_a_methodID, options: options, args: [associated0_java, associated1_java])
+                case .b:
+                    return try! Self.Java_Companion.call(method: Self.Java_Companion_b_methodID, options: options, args: [])
+                }
+            }
+            private static let Java_a_class = try! JClass(name: "E$ACase")
+            private static let Java_a_associated0_methodID = Java_a_class.getMethodID(name: "getAssociated0", sig: "()I")!
+            private static let Java_a_associated1_methodID = Java_a_class.getMethodID(name: "getAssociated1", sig: "()Ljava/lang/String;")!
+            private static let Java_Companion_a_methodID = Java_Companion_class.getMethodID(name: "a", sig: "(ILjava/lang/String;)LE;")!
+            private static let Java_Companion_b_methodID = Java_Companion_class.getMethodID(name: "getB", sig: "()LE;")!
+
+            case `a`(i: Int, String)
+
+            case `b`
+
+            public var intValue: Int? {
+                get {
+                    return jniContext {
+                        let value_java: JavaObjectPointer? = try! Java_peer.call(method: Self.Java_get_intValue_methodID, options: [], args: [])
+                        return Int?.fromJavaObject(value_java, options: [])
+                    }
+                }
+            }
+            private static let Java_get_intValue_methodID = Java_class.getMethodID(name: "getIntValue", sig: "()Ljava/lang/Integer;")!
+        }
+        @_cdecl("Java_E_Swift_1projectionImpl")
+        func E_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = E.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
         """, transformers: transformers)
     }
 

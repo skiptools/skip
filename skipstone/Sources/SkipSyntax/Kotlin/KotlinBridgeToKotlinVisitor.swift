@@ -163,11 +163,12 @@ final class KotlinBridgeToKotlinVisitor {
         // Getter
         let isInstance = classDeclaration != nil && !variableDeclaration.isStatic
         let isEnum = classDeclaration?.declarationType == .enumDeclaration
+        let isSealedClassesEnum = classDeclaration?.isSealedClassesEnum == true
         let getterArguments: String
         let getterParameters: String
         if isInstance {
-            getterArguments = isEnum ? "(name)" : "(Swift_peer)"
-            getterParameters = isEnum ? "(name: String)" : "(Swift_peer: skip.bridge.kt.SwiftObjectPointer)"
+            getterArguments = isSealedClassesEnum ? "(javaClass.name)" : isEnum ? "(name)" : "(Swift_peer)"
+            getterParameters = isSealedClassesEnum ? "(className: String)" : isEnum ? "(name: String)" : "(Swift_peer: skip.bridge.kt.SwiftObjectPointer)"
         } else {
             getterArguments = "()"
             getterParameters = "()"
@@ -198,7 +199,11 @@ final class KotlinBridgeToKotlinVisitor {
                 if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
                     cdeclGetterBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
                     valueString = bridgable.type.convertToCDecl(value: "peer_swift.\(propertyName)", strategy: bridgable.strategy, options: options)
-                } else if classDeclaration.declarationType == .enumDeclaration {
+                } else if isSealedClassesEnum {
+                    cdeclGetterBody.append("let className_swift = String.fromJavaObject(className, options: \(options.jconvertibleOptions))")
+                    cdeclGetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaClassName(className_swift, Java_target, options: \(options.jconvertibleOptions))")
+                    valueString = bridgable.type.convertToCDecl(value: "peer_swift.\(propertyName)", strategy: bridgable.strategy, options: options)
+                } else if isEnum {
                     cdeclGetterBody.append("let name_swift = String.fromJavaObject(name, options: \(options.jconvertibleOptions))")
                     cdeclGetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaName(name_swift)")
                     valueString = bridgable.type.convertToCDecl(value: "peer_swift.\(propertyName)", strategy: bridgable.strategy, options: options)
@@ -234,8 +239,8 @@ final class KotlinBridgeToKotlinVisitor {
             let setterArguments: String
             let setterInstanceParameter: String
             if isInstance {
-                setterArguments = isEnum ? "name, newValue" : "Swift_peer, newValue"
-                setterInstanceParameter = isEnum ? "name: String, " : "Swift_peer: skip.bridge.kt.SwiftObjectPointer, "
+                setterArguments = isSealedClassesEnum ? "javaClass.name, newValue" : isEnum ? "name, newValue" : "Swift_peer, newValue"
+                setterInstanceParameter = isSealedClassesEnum ? "className: String, " : isEnum ? "name: String, " : "Swift_peer: skip.bridge.kt.SwiftObjectPointer, "
             } else {
                 setterArguments = "newValue"
                 setterInstanceParameter = ""
@@ -252,7 +257,11 @@ final class KotlinBridgeToKotlinVisitor {
                     if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
                         cdeclSetterBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
                         cdeclSetterBody.append("peer_swift.\(propertyName) = " + bridgable.type.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options))
-                    } else if classDeclaration.declarationType == .enumDeclaration {
+                    } else if isSealedClassesEnum {
+                        cdeclSetterBody.append("let className_swift = String.fromJavaObject(className, options: \(options.jconvertibleOptions))")
+                        cdeclSetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaClassName(className_swift, Java_target, options: \(options.jconvertibleOptions))")
+                        cdeclSetterBody.append("peer_swift.\(propertyName) = " + bridgable.type.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options))
+                    } else if isEnum {
                         cdeclSetterBody.append("let name_swift = String.fromJavaObject(name, options: \(options.jconvertibleOptions))")
                         cdeclSetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaName(name_swift)")
                         cdeclSetterBody.append("peer_swift.\(propertyName) = " + bridgable.type.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options))
@@ -359,6 +368,11 @@ final class KotlinBridgeToKotlinVisitor {
                     cdeclBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
                     swiftCallTarget = "peer_swift."
                     externalArgumentsString = "Swift_peer"
+                } else if classDeclaration.isSealedClassesEnum {
+                    cdeclBody.append("let className_swift = String.fromJavaObject(className, options: \(options.jconvertibleOptions))")
+                    cdeclBody.append("let peer_swift = \(classDeclaration.signature).fromJavaClassName(className_swift, Java_target, options: \(options.jconvertibleOptions))")
+                    swiftCallTarget = "peer_swift."
+                    externalArgumentsString = "javaClass.name"
                 } else if classDeclaration.declarationType == .enumDeclaration {
                     cdeclBody.append("let name_swift = String.fromJavaObject(name, options: \(options.jconvertibleOptions))")
                     cdeclBody.append("let peer_swift = \(classDeclaration.signature).fromJavaName(name_swift)")
@@ -519,7 +533,9 @@ final class KotlinBridgeToKotlinVisitor {
         var externalFunctionDeclaration = "private external fun \(externalName)("
         var externalParametersString: String
         if classDeclaration != nil, functionDeclaration.type != .constructorDeclaration && !functionDeclaration.isStatic {
-            if classDeclaration?.declarationType == .enumDeclaration {
+            if classDeclaration?.isSealedClassesEnum == true {
+                externalParametersString = "className: String"
+            } else if classDeclaration?.declarationType == .enumDeclaration {
                 externalParametersString = "name: String"
             } else {
                 externalParametersString = "Swift_peer: skip.bridge.kt.SwiftObjectPointer"
@@ -905,7 +921,7 @@ final class KotlinBridgeToKotlinVisitor {
         if isEnum {
             swift.append(1, "private static let Java_Companion_class = try! JClass(name: \"\(classRef.className)$Companion\")")
             swift.append(1, "private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: \"Companion\", sig: \"L\(classRef.className)$Companion;\")!, options: \(options.jconvertibleOptions)))")
-            swift.append(1, KotlinBridgeToSwiftVisitor.swiftForEnumJConvertibleContract(className: classRef.className, caseDeclarations: enumCases, visibility: finalMemberVisibility, options: options))
+            swift.append(1, KotlinBridgeToSwiftVisitor.swiftForEnumJConvertibleContract(className: classRef.className, isSealedClassesEnum: classDeclaration.isSealedClassesEnum, caseDeclarations: enumCases, visibility: finalMemberVisibility, options: options, translator: translator))
         } else {
             let finalMemberVisibilityString = finalMemberVisibility.swift(suffix: " ")
             if subclassDepth < 1 {
@@ -951,7 +967,9 @@ final class KotlinBridgeToKotlinVisitor {
     }
 
     private func cdeclInstanceParameter(for classDeclaration: KotlinClassDeclaration) -> TypeSignature.Parameter {
-        if classDeclaration.declarationType == .enumDeclaration {
+        if classDeclaration.isSealedClassesEnum {
+            return TypeSignature.Parameter(label: "className", type: .javaString)
+        } else if classDeclaration.declarationType == .enumDeclaration {
             return TypeSignature.Parameter(label: "name", type: .javaString)
         } else {
             return TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))
