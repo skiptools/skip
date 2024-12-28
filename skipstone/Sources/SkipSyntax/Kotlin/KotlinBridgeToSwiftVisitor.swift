@@ -104,6 +104,18 @@ final class KotlinBridgeToSwiftVisitor {
         var swift = "case `\(name)`"
         if let value = enumCaseDeclaration.rawValueSwift {
             swift += " = " + value
+        } else if !enumCaseDeclaration.associatedValues.isEmpty {
+            swift += "(" + enumCaseDeclaration.associatedValues.map {
+                var caseSwift = ""
+                if let label = $0.externalLabel {
+                    caseSwift = "\(label): "
+                }
+                caseSwift += $0.declaredType.description
+                if let valueString = $0.defaultValueSwift {
+                    caseSwift += " = \(valueString)"
+                }
+                return caseSwift
+            }.joined(separator: ", ") + ")"
         }
         swiftDefinitions.append(SwiftDefinition(statement: enumCaseDeclaration, swift: [swift]))
         return true
@@ -194,7 +206,7 @@ final class KotlinBridgeToSwiftVisitor {
         let callType = inType == nil ? "callStatic" : "call"
         let callGet = inType == nil || modifiers.isStatic ? getMethodIdentifier : "Self." + getMethodIdentifier
         let getterBody = [
-            "let value_java: " + bridgable.type.java(strategy: bridgable.strategy, options: options).description + " = try! \(targetIdentifier).\(callType)(method: \(callGet), options: \(options.jconvertibleOptions), args: [])",
+            "let value_java: \(bridgable.type.java(strategy: bridgable.strategy, options: options)) = try! \(targetIdentifier).\(callType)(method: \(callGet), options: \(options.jconvertibleOptions), args: [])",
             "return " + bridgable.type.convertFromJava(value: "value_java", strategy: bridgable.strategy, options: options)
         ]
         if apiFlags.throwsType != .none {
@@ -824,12 +836,12 @@ final class KotlinBridgeToSwiftVisitor {
         if classDeclaration.inherits.contains(.named("MutableStruct", [])) {
             swift.append(1, "private static let Java_scopy_methodID = Java_class.getMethodID(name: \"scopy\", sig: \"()Lskip/lib/MutableStruct;\")!")
         }
-        if hasBridgedStaticMembers {
+        if hasBridgedStaticMembers || classDeclaration.isSealedClassesEnum {
             swift.append(1, "private static let Java_Companion_class = try! JClass(name: \"\(classRef.className)$Companion\")")
             swift.append(1, "private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: \"Companion\", sig: \"L\(classRef.className)$Companion;\")!, options: \(options.jconvertibleOptions)))")
         }
         if isEnum {
-            swift.append(1, Self.swiftForEnumJConvertibleContract(className: classRef.className, caseDeclarations: enumCases, visibility: finalMemberVisibility, options: options))
+            swift.append(1, Self.swiftForEnumJConvertibleContract(className: classRef.className, isSealedClassesEnum: classDeclaration.isSealedClassesEnum, caseDeclarations: enumCases, visibility: finalMemberVisibility, options: options, translator: translator))
         } else if !isBridgedSubclass {
             swift.append(1, Self.swiftForJConvertibleContract(in: classDeclaration.declarationType, visibility: finalMemberVisibility))
         }
@@ -913,39 +925,138 @@ final class KotlinBridgeToSwiftVisitor {
     }
 
     /// Return the Swift statements implementing the `JConvertible` contract for an enum.
-    static func swiftForEnumJConvertibleContract(className: String, caseDeclarations: [KotlinEnumCaseDeclaration], visibility: Modifiers.Visibility, options: KotlinBridgeOptions) -> [String] {
+    ///
+    /// - Warning: If this is a sealed classes enum, it will use `Java_Companion_class` and `Java_Companion`. Make sure to declare them.
+    static func swiftForEnumJConvertibleContract(className: String, isSealedClassesEnum: Bool, caseDeclarations: [KotlinEnumCaseDeclaration], visibility: Modifiers.Visibility, options: KotlinBridgeOptions, translator: KotlinTranslator) -> [String] {
+        let caseBridgables = caseDeclarations.compactMap({ $0.checkBridgable(direction: .any, options: options, translator: translator) })
+        guard caseBridgables.count == caseDeclarations.count else {
+            return []
+        }
+
         let visibilityString = visibility.swift(suffix: " ")
         var swift: [String] = []
+        var declarations: [String] = []
+
         swift.append(visibilityString + "static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {")
-        swift.append(1, "let name: String = try! obj!.call(method: Java_name_methodID, options: options, args: [])")
-        swift.append(1, "return fromJavaName(name)")
+        if isSealedClassesEnum {
+            swift.append(1, "let className = Java_className(of: obj!, options: options)")
+            swift.append(1, "return fromJavaClassName(className, obj!, options: options)")
+        } else {
+            swift.append(1, "let name: String = try! obj!.call(method: Java_name_methodID, options: options, args: [])")
+            swift.append(1, "return fromJavaName(name)")
+            declarations.append("private static let Java_name_methodID = Java_class.getMethodID(name: \"name\", sig: \"()Ljava/lang/String;\")!")
+        }
         swift.append("}")
 
-        swift.append("fileprivate static func fromJavaName(_ name: String) -> Self {")
-        swift.append(1, "return switch name {")
-        for enumCaseDeclaration in caseDeclarations {
-            swift.append(1, "case \"\(enumCaseDeclaration.name)\": .\(enumCaseDeclaration.preEscapedName ?? enumCaseDeclaration.name)")
+        if isSealedClassesEnum {
+            swift.append("fileprivate static func fromJavaClassName(_ className: String, _ obj: JavaObjectPointer, options: JConvertibleOptions) -> Self {")
+            swift.append(1, "switch className {")
+            for (enumCaseDeclaration, enumCaseBridgables) in zip(caseDeclarations, caseBridgables) {
+                let (enumCaseCode, enumCaseDeclarations) = sealedClassesEnumCaseFromJavaClassName(enumCaseDeclaration, bridgables: enumCaseBridgables, inClassName: className, options: options)
+                swift.append(1, enumCaseCode)
+                declarations += enumCaseDeclarations
+            }
+        } else {
+            swift.append("fileprivate static func fromJavaName(_ name: String) -> Self {")
+            swift.append(1, "return switch name {")
+            for enumCaseDeclaration in caseDeclarations {
+                swift.append(1, "case \"\(enumCaseDeclaration.name)\": .\(enumCaseDeclaration.preEscapedName ?? enumCaseDeclaration.name)")
+            }
         }
         swift.append(1, "default: fatalError()")
         swift.append(1, "}")
         swift.append("}")
 
         swift.append(visibilityString + "func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {")
-        swift.append(1, "let name = switch self {")
-        if caseDeclarations.isEmpty {
-            swift.append(1, "default: fatalError()")
-        } else {
-            for enumCaseDeclaration in caseDeclarations {
-                swift.append(1, "case .\(enumCaseDeclaration.preEscapedName ?? enumCaseDeclaration.name): \"\(enumCaseDeclaration.name)\"")
+        if isSealedClassesEnum {
+            swift.append(1, "switch self {")
+            if caseDeclarations.isEmpty {
+                swift.append(1, "default: fatalError()")
+            } else {
+                for (enumCaseDeclaration, enumCaseBridgables) in zip(caseDeclarations, caseBridgables) {
+                    let (enumCaseCode, enumCaseDeclarations) = sealedClassesEnumCaseToJavaObject(enumCaseDeclaration, bridgables: enumCaseBridgables, inClassName: className, options: options)
+                    swift.append(1, enumCaseCode)
+                    declarations += enumCaseDeclarations
+                }
             }
+            swift.append(1, "}")
+        } else {
+            swift.append(1, "let name = switch self {")
+            if caseDeclarations.isEmpty {
+                swift.append(1, "default: fatalError()")
+            } else {
+                for enumCaseDeclaration in caseDeclarations {
+                    swift.append(1, "case .\(enumCaseDeclaration.preEscapedName ?? enumCaseDeclaration.name): \"\(enumCaseDeclaration.name)\"")
+                }
+            }
+            swift.append(1, "}")
+            swift.append(1, "return try! Self.Java_class.callStatic(method: Self.Java_valueOf_methodID, options: options, args: [name.toJavaParameter(options: options)])")
+            declarations.append("private static let Java_valueOf_methodID = Java_class.getStaticMethodID(name: \"valueOf\", sig: \"(Ljava/lang/String;)L\(className);\")!")
         }
-        swift.append(1, "}")
-        swift.append(1, "return try! Self.Java_class.callStatic(method: Self.Java_valueOf_methodID, options: options, args: [name.toJavaParameter(options: options)])")
         swift.append("}")
 
-        swift.append("private static let Java_name_methodID = Java_class.getMethodID(name: \"name\", sig: \"()Ljava/lang/String;\")!")
-        swift.append("private static let Java_valueOf_methodID = Java_class.getStaticMethodID(name: \"valueOf\", sig: \"(Ljava/lang/String;)L\(className);\")!")
+        swift += declarations
         return swift
+    }
+
+    private static func sealedClassesEnumCaseFromJavaClassName(_ enumCaseDeclaration: KotlinEnumCaseDeclaration, bridgables: [Bridgable], inClassName: String, options: KotlinBridgeOptions) -> (code: [String], declarations: [String]) {
+        var swift: [String] = []
+
+        let caseName = enumCaseDeclaration.preEscapedName ?? enumCaseDeclaration.name
+        let caseClassName = inClassName + "$" + KotlinEnumCaseDeclaration.sealedClassName(for: enumCaseDeclaration)
+        swift.append("case \"\(caseClassName.replacing("/", with: "."))\":")
+        guard !enumCaseDeclaration.associatedValues.isEmpty else {
+            swift.append(1, "return .\(caseName)")
+            return (swift, [])
+        }
+
+        var declarations: [String] = []
+        declarations.append("private static let Java_\(caseName)_class = try! JClass(name: \"\(caseClassName)\")")
+        for i in 0..<enumCaseDeclaration.associatedValues.count {
+            let associated = "associated\(i)"
+            let methodID = "Java_\(caseName)_\(associated)_methodID"
+            swift.append(1, "let \(associated)_java: \(bridgables[i].type.java(strategy: bridgables[i].strategy, options: options)) = try! obj.call(method: Self.\(methodID), options: options, args: [])")
+            swift.append(1, "let \(associated) = \(bridgables[i].type.convertFromJava(value: associated + "_java", strategy: bridgables[i].strategy, options: options))")
+            declarations.append("private static let \(methodID) = Java_\(caseName)_class.getMethodID(name: \"getAssociated\(i)\", sig: \"()\(bridgables[i].kotlinType.jni(options: options))\")!")
+        }
+        let associatedValues = enumCaseDeclaration.associatedValues.enumerated().map { (i, parameter) in
+            if let label = parameter.externalLabel {
+                return "\(label): associated\(i)"
+            } else {
+                return "associated\(i)"
+            }
+        }.joined(separator: ", ")
+        swift.append(1, "return .\(caseName)(\(associatedValues))")
+        return (swift, declarations)
+    }
+
+    private static func sealedClassesEnumCaseToJavaObject(_ enumCaseDeclaration: KotlinEnumCaseDeclaration, bridgables: [Bridgable], inClassName: String, options: KotlinBridgeOptions) -> (code: [String], declarations: [String]) {
+        var swift: [String] = []
+
+        let caseName = enumCaseDeclaration.preEscapedName ?? enumCaseDeclaration.name
+        var caseDeclaration = "case .\(caseName)"
+        if !enumCaseDeclaration.associatedValues.isEmpty {
+            caseDeclaration += "(" + (0..<enumCaseDeclaration.associatedValues.count).map { "let associated\($0)" }.joined(separator: ", ") + ")"
+        }
+        swift.append(caseDeclaration + ":")
+
+        for i in 0..<enumCaseDeclaration.associatedValues.count {
+            let conversion = bridgables[i].type.convertToJava(value: "associated\(i)", strategy: bridgables[i].strategy, optionsString: "options")
+            swift.append(1, "let associated\(i)_java = \(conversion).toJavaParameter(options: options)")
+        }
+        let arguments = (0..<enumCaseDeclaration.associatedValues.count).map { "associated\($0)_java" }.joined(separator: ", ")
+        swift.append(1, "return try! Self.Java_Companion.call(method: Self.Java_Companion_\(caseName)_methodID, options: options, args: [\(arguments)])")
+
+        let methodName: String
+        if enumCaseDeclaration.associatedValues.isEmpty {
+            let capitalizedPropertyName = (enumCaseDeclaration.name.first?.uppercased() ?? "") + enumCaseDeclaration.name.dropFirst()
+            methodName = "get" + capitalizedPropertyName
+        } else {
+            methodName = enumCaseDeclaration.name
+        }
+        let signature = "(" + enumCaseDeclaration.associatedValues.map { $0.declaredType.jni(options: options) }.joined() + ")L" + inClassName + ";"
+        let declaration = "private static let Java_Companion_\(caseName)_methodID = Java_Companion_class.getMethodID(name: \"\(methodName)\", sig: \"\(signature)\")!"
+        return (swift, [declaration])
     }
 
     private func update(_ interfaceDeclaration: KotlinInterfaceDeclaration, swiftDefinitions: inout [SwiftDefinition]) {
@@ -1079,7 +1190,7 @@ final class KotlinBridgeToSwiftVisitor {
         } else {
             genericsString = "<" + typealiasDeclaration.generics.entries.map(\.name).joined(separator: ", ") + ">"
         }
-        let swift = "\(visibilityString)typealias \(typealiasDeclaration.name)\(genericsString) = \(typealiasDeclaration.aliasedType)"
+        let swift = "\(visibilityString)typealias \(typealiasDeclaration.name)\(genericsString) = \(bridgable.type)"
         let definition = SwiftDefinition(statement: typealiasDeclaration, swift: [swift])
         swiftDefinitions.append(definition)
     }

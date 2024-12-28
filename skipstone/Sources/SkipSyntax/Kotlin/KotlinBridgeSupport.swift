@@ -194,7 +194,7 @@ extension TypeSignature {
         }
     }
 
-    /// Return code that converst the given value of this type to its `@_cdecl` function form.
+    /// Return code that converts the given value of this type to its `@_cdecl` function form.
     func convertToCDecl(value: String, strategy: Bridgable.Strategy, options: KotlinBridgeOptions) -> String {
         switch self.asOptional(false) {
         case .function(let parameters, _, _, _):
@@ -294,25 +294,30 @@ extension TypeSignature {
 
     /// Return code that converts the given value of this type to its Java form.
     func convertToJava(value: String, strategy: Bridgable.Strategy, options: KotlinBridgeOptions) -> String {
+        return convertToJava(value: value, strategy: strategy, optionsString: options.jconvertibleOptions)
+    }
+
+    /// Return code that converts the given value of this type to its Java form.
+    func convertToJava(value: String, strategy: Bridgable.Strategy, optionsString: String) -> String {
         switch self.asOptional(false) {
         case .function(let parameters, _, _, _):
-            let converted = "SwiftClosure\(parameters.count).javaObject(for: \(value), options: \(options.jconvertibleOptions))"
+            let converted = "SwiftClosure\(parameters.count).javaObject(for: \(value), options: \(optionsString))"
             return isOptional ? converted : converted + "!"
         case .int:
             return isOptional ? value : "Int32(\(value))"
         case .tuple:
-            let converted = "SwiftTuple.javaObject(for: \(value), options: \(options.jconvertibleOptions))"
+            let converted = "SwiftTuple.javaObject(for: \(value), options: \(optionsString))"
             return isOptional ? converted : converted + "!"
         case .unwrappedOptional(let type):
-            return type.convertToJava(value: value, strategy: strategy, options: options)
+            return type.convertToJava(value: value, strategy: strategy, optionsString: optionsString)
         default:
             if strategy == .direct {
                 return value
             } else if strategy == .protocol || strategy == .unknown {
-                let converted = "((\(value) as? JConvertible)?.toJavaObject(options: \(options.jconvertibleOptions)))"
+                let converted = "((\(value) as? JConvertible)?.toJavaObject(options: \(optionsString)))"
                 return isOptional ? converted : converted + "!"
             } else {
-                let converted = value + ".toJavaObject(options: \(options.jconvertibleOptions))"
+                let converted = value + ".toJavaObject(options: \(optionsString))"
                 return isOptional ? converted : converted + "!"
             }
         }
@@ -651,25 +656,28 @@ extension KotlinFunctionDeclaration {
     }
 }
 
+extension KotlinEnumCaseDeclaration {
+    /// Check that the associated values of this case are bridgable.
+    ///
+    /// This function will add messages about invalid modifiers or types to this case.
+    func checkBridgable(direction: Bridgable.Direction, options: KotlinBridgeOptions, translator: KotlinTranslator) -> [Bridgable]? {
+        guard !associatedValues.isEmpty else {
+            return []
+        }
+        guard let codebaseInfo = translator.codebaseInfo else {
+            return nil
+        }
+        let bridgables = associatedValues.compactMap { $0.declaredType.checkBridgable(direction: direction, options: options, codebaseInfo: codebaseInfo, sourceDerived: self, source: translator.syntaxTree.source) }
+        guard bridgables.count == associatedValues.count else {
+            return nil
+        }
+        return bridgables
+    }
+}
+
 extension KotlinClassDeclaration {
     /// Check that this class is bridgable.
     func checkBridgable(direction: Bridgable.Direction, options: KotlinBridgeOptions, translator: KotlinTranslator) -> Bool {
-        switch declarationType {
-        case .actorDeclaration:
-            break
-        case .enumDeclaration:
-            guard !isSealedClassesEnum else {
-                messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "enums with additional state", source: translator.syntaxTree.source))
-                return false
-            }
-        case .classDeclaration:
-            break
-        case .structDeclaration:
-            break
-        default:
-            messages.append(.kotlinBridgeUnsupportedFeature(self, feature: String(describing: declarationType), source: translator.syntaxTree.source))
-            return false
-        }
         guard checkNonGeneric(self, generics: generics, translator: translator) else {
             return false
         }
