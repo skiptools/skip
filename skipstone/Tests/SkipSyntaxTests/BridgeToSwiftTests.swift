@@ -3529,9 +3529,9 @@ final class BridgeToSwiftTests: XCTestCase {
             private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: "Companion", sig: "LE$Companion;")!, options: []))
             public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 let className = Java_className(of: obj!, options: options)
-                return fromJavaClassName(className, obj!)
+                return fromJavaClassName(className, obj!, options: options)
             }
-            fileprivate static func fromJavaClassName(_ className: String, _ obj: JavaObjectPointer) -> Self {
+            fileprivate static func fromJavaClassName(_ className: String, _ obj: JavaObjectPointer, options: JConvertibleOptions) -> Self {
                 switch className {
                 case "E$ACase":
                     let associated0_java: Int32 = try! obj.call(method: Self.Java_a_associated0_methodID, options: options, args: [])
