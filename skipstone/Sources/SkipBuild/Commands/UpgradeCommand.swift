@@ -43,7 +43,8 @@ extension SkipCommand {
 
     /// Grabs an Atom XML feed of releases and returns the first title.
     private func fetchLatestRelease(from atomURL: URL) async throws -> String? {
-        let (data, response) = try await URLSession.shared.data(from: atomURL, delegate: URLSessionTaskDelegate?.none)
+        let request = URLRequest(url: atomURL, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData, timeoutInterval: 120.0)
+        let (data, response) = try await URLSession.shared.data(for: request, delegate: URLSessionTaskDelegate?.none)
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         if !(200..<300).contains(code) {
             throw SkipUpdateError(errorDescription: "Update check from \(atomURL.absoluteString) returned error: \(code)")
