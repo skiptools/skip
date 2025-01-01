@@ -194,17 +194,18 @@ final class KotlinBridgeToKotlinVisitor {
         let cdeclInstanceParameters: [TypeSignature.Parameter]
         var cdeclGetterBody: [String] = []
         let valueString: String
+        let optionsString = options.jconvertibleOptions
         if let classDeclaration {
             if isInstance {
                 if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
                     cdeclGetterBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
                     valueString = bridgable.type.convertToCDecl(value: "peer_swift.\(propertyName)", strategy: bridgable.strategy, options: options)
                 } else if isSealedClassesEnum {
-                    cdeclGetterBody.append("let className_swift = String.fromJavaObject(className, options: \(options.jconvertibleOptions))")
-                    cdeclGetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaClassName(className_swift, Java_target, options: \(options.jconvertibleOptions))")
+                    cdeclGetterBody.append("let className_swift = String.fromJavaObject(className, options: \(optionsString))")
+                    cdeclGetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaClassName(className_swift, Java_target, options: \(optionsString))")
                     valueString = bridgable.type.convertToCDecl(value: "peer_swift.\(propertyName)", strategy: bridgable.strategy, options: options)
                 } else if isEnum {
-                    cdeclGetterBody.append("let name_swift = String.fromJavaObject(name, options: \(options.jconvertibleOptions))")
+                    cdeclGetterBody.append("let name_swift = String.fromJavaObject(name, options: \(optionsString))")
                     cdeclGetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaName(name_swift)")
                     valueString = bridgable.type.convertToCDecl(value: "peer_swift.\(propertyName)", strategy: bridgable.strategy, options: options)
                 } else {
@@ -225,9 +226,9 @@ final class KotlinBridgeToKotlinVisitor {
         } else {
             cdeclGetterBody.append("do {")
             cdeclGetterBody.append(1, "let f_return_swift = try " + valueString)
-            cdeclGetterBody.append(1, "return f_return_swift.toJavaObject(options: \(options.jconvertibleOptions))")
+            cdeclGetterBody.append(1, "return f_return_swift.toJavaObject(options: \(optionsString))")
             cdeclGetterBody.append("} catch {")
-            cdeclGetterBody.append(1, "JavaThrowError(error, env: Java_env)")
+            cdeclGetterBody.append(1, "JThrowable.throw(error, options: \(optionsString), env: Java_env)")
             cdeclGetterBody.append(1, "return nil")
             cdeclGetterBody.append("}")
         }
@@ -258,11 +259,11 @@ final class KotlinBridgeToKotlinVisitor {
                         cdeclSetterBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
                         cdeclSetterBody.append("peer_swift.\(propertyName) = " + bridgable.type.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options))
                     } else if isSealedClassesEnum {
-                        cdeclSetterBody.append("let className_swift = String.fromJavaObject(className, options: \(options.jconvertibleOptions))")
-                        cdeclSetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaClassName(className_swift, Java_target, options: \(options.jconvertibleOptions))")
+                        cdeclSetterBody.append("let className_swift = String.fromJavaObject(className, options: \(optionsString))")
+                        cdeclSetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaClassName(className_swift, Java_target, options: \(optionsString))")
                         cdeclSetterBody.append("peer_swift.\(propertyName) = " + bridgable.type.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options))
                     } else if isEnum {
-                        cdeclSetterBody.append("let name_swift = String.fromJavaObject(name, options: \(options.jconvertibleOptions))")
+                        cdeclSetterBody.append("let name_swift = String.fromJavaObject(name, options: \(optionsString))")
                         cdeclSetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaName(name_swift)")
                         cdeclSetterBody.append("peer_swift.\(propertyName) = " + bridgable.type.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options))
                     } else {
@@ -359,6 +360,7 @@ final class KotlinBridgeToKotlinVisitor {
 
         let swiftCallTarget: String
         var externalArgumentsString: String
+        let optionsString = options.jconvertibleOptions
         if let classDeclaration, functionDeclaration.type != .constructorDeclaration {
             if functionDeclaration.isStatic {
                 swiftCallTarget = classDeclaration.name + "."
@@ -369,12 +371,12 @@ final class KotlinBridgeToKotlinVisitor {
                     swiftCallTarget = "peer_swift."
                     externalArgumentsString = "Swift_peer"
                 } else if classDeclaration.isSealedClassesEnum {
-                    cdeclBody.append("let className_swift = String.fromJavaObject(className, options: \(options.jconvertibleOptions))")
-                    cdeclBody.append("let peer_swift = \(classDeclaration.signature).fromJavaClassName(className_swift, Java_target, options: \(options.jconvertibleOptions))")
+                    cdeclBody.append("let className_swift = String.fromJavaObject(className, options: \(optionsString))")
+                    cdeclBody.append("let peer_swift = \(classDeclaration.signature).fromJavaClassName(className_swift, Java_target, options: \(optionsString))")
                     swiftCallTarget = "peer_swift."
                     externalArgumentsString = "javaClass.name"
                 } else if classDeclaration.declarationType == .enumDeclaration {
-                    cdeclBody.append("let name_swift = String.fromJavaObject(name, options: \(options.jconvertibleOptions))")
+                    cdeclBody.append("let name_swift = String.fromJavaObject(name, options: \(optionsString))")
                     cdeclBody.append("let peer_swift = \(classDeclaration.signature).fromJavaName(name_swift)")
                     swiftCallTarget = "peer_swift."
                     externalArgumentsString = "name"
@@ -425,7 +427,7 @@ final class KotlinBridgeToKotlinVisitor {
                 }
                 cdeclBody.append(1, "return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)")
                 cdeclBody.append("} catch {")
-                cdeclBody.append(1, "JavaThrowError(error, env: Java_env)")
+                cdeclBody.append(1, "JThrowable.throw(error, options: \(optionsString), env: Java_env)")
                 cdeclBody.append(1, "return SwiftObjectNil")
                 cdeclBody.append("}")
             } else {
@@ -482,9 +484,9 @@ final class KotlinBridgeToKotlinVisitor {
                 cdeclBody.append(1, "} catch {")
                 cdeclBody.append(2, "jniContext {")
                 if bridgable.return.type == .void {
-                    cdeclBody.append(3, "f_callback_swift(JavaErrorThrowable(error, env: Java_env))")
+                    cdeclBody.append(3, "f_callback_swift(JThrowable.toThrowable(error, options: \(optionsString)))")
                 } else {
-                    cdeclBody.append(3, "f_callback_swift(nil, JavaErrorThrowable(error, env: Java_env))")
+                    cdeclBody.append(3, "f_callback_swift(nil, JThrowable.toThrowable(error, options: \(optionsString)))")
                 }
                 cdeclBody.append(2, "}")
                 cdeclBody.append(1, "}")
@@ -503,7 +505,7 @@ final class KotlinBridgeToKotlinVisitor {
                 cdeclBody.append("do {")
                 cdeclBody.append(1, "try \(swiftCallTarget)\(functionName)\(swiftArgumentsString)")
                 cdeclBody.append("} catch {")
-                cdeclBody.append(1, "JavaThrowError(error, env: Java_env)")
+                cdeclBody.append(1, "JThrowable.throw(error, options: \(optionsString), env: Java_env)")
                 cdeclBody.append("}")
             } else {
                 cdeclBody.append(swiftCallTarget + functionName + "\(swiftArgumentsString)")
@@ -517,7 +519,7 @@ final class KotlinBridgeToKotlinVisitor {
                 cdeclBody.append(1, "let f_return_swift = try \(swiftCallTarget)\(functionName)\(swiftArgumentsString)")
                 cdeclBody.append(1, "return " + bridgable.return.type.asOptional(true).convertToCDecl(value: "f_return_swift", strategy: bridgable.return.strategy, options: options))
                 cdeclBody.append("} catch {")
-                cdeclBody.append(1, "JavaThrowError(error, env: Java_env)")
+                cdeclBody.append(1, "JThrowable.throw(error, options: \(optionsString), env: Java_env)")
                 cdeclBody.append(1, "return nil")
                 cdeclBody.append("}")
                 cdeclReturnType = bridgable.return.type.asOptional(true).cdecl(strategy: bridgable.return.strategy, options: options)
@@ -762,13 +764,30 @@ final class KotlinBridgeToKotlinVisitor {
             classDeclaration.messages.append(.kotlinBridgeToKotlinSubclassDepth(classDeclaration, maximumDepth: maximumDepth, source: translator.syntaxTree.source))
             return false
         }
+        // We'll be adding constructors, so we can't use a superclass call. Transform it into a call to super(...)
+        // that we can add as a delegating call to each constructor. If this is a sealed classes enum, though, we
+        // keep the superclass call because we won't add constructors. This is most common for Error enums calling Exception()
+        let isEnum = classDeclaration.declarationType == .enumDeclaration
+        let superclassCall: String?
+        if isEnum {
+            superclassCall = nil
+        } else if let call = classDeclaration.superclassCall {
+            if let argumentsStart = call.firstIndex(of: "(") {
+                superclassCall = "super" + call[argumentsStart...]
+            } else {
+                superclassCall = "super()"
+            }
+            classDeclaration.superclassCall = nil
+        } else {
+            superclassCall = nil
+        }
 
+        let isError = classDeclaration.inherits.first?.isNamed("Exception") == true && classDeclaration.inherits.contains { $0.isNamed("Error", moduleName: "Swift", generics: []) }
         classDeclaration.extras = nil
         classDeclaration.inherits = classDeclaration.inherits.filter {
-            (classDeclaration.declarationType == .actorDeclaration && $0.isNamed("Actor")) || $0.isNamed("Comparable") || $0.isNamed("MutableStruct") || $0.checkBridgable(direction: .toKotlin, options: options, codebaseInfo: codebaseInfo) != nil }
+            (classDeclaration.declarationType == .actorDeclaration && $0.isNamed("Actor")) || (isError && $0.isNamed("Exception")) || $0.isNamed("Comparable") || $0.isNamed("MutableStruct") || $0.checkBridgable(direction: .toKotlin, options: options, codebaseInfo: codebaseInfo) != nil }
 
         var insertStatements: [KotlinStatement] = []
-        let isEnum = classDeclaration.declarationType == .enumDeclaration
         if !isEnum {
             if subclassDepth < 1 {
                 classDeclaration.inherits.append(.named("skip.bridge.kt.SwiftPeerBridged", []))
@@ -786,6 +805,11 @@ final class KotlinBridgeToKotlinVisitor {
             swiftPeerConstructor.modifiers.visibility = .public
             swiftPeerConstructor.parameters = [Parameter<KotlinExpression>(externalLabel: "Swift_peer", declaredType: .swiftObjectPointer(kotlin: true)), Parameter<KotlinExpression>(externalLabel: "marker", declaredType: .named("skip.bridge.kt.SwiftPeerMarker", []).asOptional(true))]
             if subclassDepth < 1 {
+                if let superclassCall {
+                    swiftPeerConstructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: superclassCall)
+                } else if isError {
+                    swiftPeerConstructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super()")
+                }
                 swiftPeerConstructor.body = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: "this.Swift_peer = Swift_peer")])
             } else {
                 swiftPeerConstructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super(Swift_peer = Swift_peer, marker = marker)")
@@ -813,6 +837,11 @@ final class KotlinBridgeToKotlinVisitor {
                 let constructor = KotlinFunctionDeclaration(name: "constructor")
                 constructor.modifiers.visibility = .public
                 if subclassDepth < 1 {
+                    if let superclassCall {
+                        constructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: superclassCall)
+                    } else if isError {
+                        constructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super()")
+                    }
                     constructor.body = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: "Swift_peer = Swift_constructor()")])
                 } else {
                     constructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super(Swift_peer = Swift_constructor(), marker = null)")
@@ -945,9 +974,9 @@ final class KotlinBridgeToKotlinVisitor {
                 }
                 if subclassDepth == 0 {
                     swift.append(2, "let constructor = Java_findConstructor(base: Self.Java_class, Self.Java_constructor_methodID)")
-                    swift.append(2, "return try! constructor.cls.create(ctor: constructor.ctor, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])")
+                    swift.append(2, "return try! constructor.cls.create(ctor: constructor.ctor, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])")
                 } else {
-                    swift.append(2, "return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])")
+                    swift.append(2, "return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])")
                 }
                 swift.append(1, "}")
             }

@@ -420,7 +420,7 @@ final class BridgeToSwiftTests: XCTestCase {
                     do {
                         let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, options: [], args: [])
                         return Int(value_java)
-                    } catch let error as ThrowableError {
+                    } catch let error as (Error & JConvertible) {
                         throw error
                     } catch {
                         fatalError(String(describing: error))
@@ -498,7 +498,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 return try await withCheckedThrowingContinuation { f_continuation in
                     let f_return_callback: (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
                         if let f_error {
-                            f_continuation.resume(throwing: ThrowableError(throwable: f_error))
+                            f_continuation.resume(throwing: JThrowable.toError(f_error, options: []))
                         } else {
                             f_continuation.resume(returning: f_return!)
                         }
@@ -581,7 +581,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -645,7 +645,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -735,7 +735,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
-                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
         }
@@ -1035,7 +1035,7 @@ final class BridgeToSwiftTests: XCTestCase {
             try jniContext {
                 do {
                     try Java_SourceKt.callStatic(method: Java_f_0_methodID, options: [], args: [])
-                } catch let error as ThrowableError {
+                } catch let error as (Error & JConvertible) {
                     throw error
                 } catch {
                     fatalError(String(describing: error))
@@ -1193,7 +1193,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -1354,7 +1354,7 @@ final class BridgeToSwiftTests: XCTestCase {
             return try await withCheckedThrowingContinuation { f_continuation in
                 let f_return_callback: (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
                     if let f_error {
-                        f_continuation.resume(throwing: ThrowableError(throwable: f_error))
+                        f_continuation.resume(throwing: JThrowable.toError(f_error, options: []))
                     } else {
                         f_continuation.resume(returning: f_return!)
                     }
@@ -1393,7 +1393,7 @@ final class BridgeToSwiftTests: XCTestCase {
             return try await withCheckedThrowingContinuation { f_continuation in
                 let f_return_callback: (JavaObjectPointer?) -> Void = { f_error in
                     if let f_error {
-                        f_continuation.resume(throwing: ThrowableError(throwable: f_error))
+                        f_continuation.resume(throwing: JThrowable.toError(f_error, options: []))
                     } else {
                         f_continuation.resume()
                     }
@@ -1435,7 +1435,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -1516,7 +1516,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -1681,7 +1681,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
                 public init() {
                     Java_peer = jniContext {
-                        let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                        let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                         return JObject(ptr)
                     }
                 }
@@ -1736,7 +1736,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 public init(b p_0: A.B) {
                     Java_peer = jniContext {
                         let p_0_java = p_0.toJavaObject(options: [])!.toJavaParameter(options: [])
-                        let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, args: [p_0_java])
+                        let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java])
                         return JObject(ptr)
                     }
                 }
@@ -1830,7 +1830,7 @@ final class BridgeToSwiftTests: XCTestCase {
             public init(i p_0: Int) {
                 Java_peer = jniContext {
                     let p_0_java = Int32(p_0).toJavaParameter(options: [])
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, args: [p_0_java])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java])
                     return JObject(ptr)
                 }
             }
@@ -1881,7 +1881,7 @@ final class BridgeToSwiftTests: XCTestCase {
             public init(i p_0: Int) throws {
                 Java_peer = try jniContext {
                     let p_0_java = Int32(p_0).toJavaParameter(options: [])
-                    let ptr = try Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, args: [p_0_java])
+                    let ptr = try Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java])
                     return JObject(ptr)
                 }
             }
@@ -1932,7 +1932,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -1979,7 +1979,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -2028,7 +2028,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -2094,7 +2094,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -2160,7 +2160,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -2220,7 +2220,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -2269,7 +2269,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -2337,7 +2337,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -2411,7 +2411,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -2491,7 +2491,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -2612,7 +2612,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -2755,7 +2755,7 @@ final class BridgeToSwiftTests: XCTestCase {
             public init(i p_0: Int) {
                 Java_peer = jniContext {
                     let p_0_java = Int32(p_0).toJavaParameter(options: [])
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, args: [p_0_java])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java])
                     return JObject(ptr)
                 }
             }
@@ -2797,7 +2797,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 let Java_peer = jniContext {
                     let p_0_java = Int32(p_0).toJavaParameter(options: [])
                     let p_1_java = p_1.toJavaParameter(options: [])
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, args: [p_0_java, p_1_java])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java, p_1_java])
                     return JObject(ptr)
                 }
                 super.init(Java_peer: Java_peer)
@@ -2822,7 +2822,7 @@ final class BridgeToSwiftTests: XCTestCase {
             public init(i p_0: Int) {
                 let Java_peer = jniContext {
                     let p_0_java = Int32(p_0).toJavaParameter(options: [])
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, args: [p_0_java])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java])
                     return JObject(ptr)
                 }
                 super.init(Java_peer: Java_peer)
@@ -2851,6 +2851,91 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         private let Java_get_base_methodID = Java_SourceKt.getStaticMethodID(name: "getBase", sig: "()LBase;")!
         private let Java_set_base_methodID = Java_SourceKt.getStaticMethodID(name: "setBase", sig: "(LBase;)V")!
+        """, transformers: transformers)
+    }
+
+    func testSubclassOfBridgedNoConstructors() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public class Base {
+        }
+        public class Sub: Base {
+        }
+        #endif
+        """, kotlin: """
+        open class Base: skip.lib.SwiftProjecting {
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass {
+            }
+        }
+        open class Sub: Base() {
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object: CompanionClass() {
+            }
+            open class CompanionClass: Base.CompanionClass() {
+            }
+        }
+        """, swiftBridgeSupport: """
+        public class Base: BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "Base")
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            public init(Java_peer: JObject) {
+                self.Java_peer = Java_peer
+            }
+            public init() {
+                Java_peer = jniContext {
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
+                    return JObject(ptr)
+                }
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+        }
+        @_cdecl("Java_Base_Swift_1projectionImpl")
+        func Base_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = Base.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        public class Sub: Base {
+            private static let Java_class = try! JClass(name: "Sub")
+            public required init(Java_ptr: JavaObjectPointer) {
+                super.init(Java_ptr: Java_ptr)
+            }
+            public init(Java_peer: JObject) {
+                super.init(Java_peer: Java_peer)
+            }
+            public init() {
+                let Java_peer = jniContext {
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
+                    return JObject(ptr)
+                }
+                super.init(Java_peer: Java_peer)
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+        }
+        @_cdecl("Java_Sub_Swift_1projectionImpl")
+        func Sub_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = Sub.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
         """, transformers: transformers)
     }
 
@@ -2958,7 +3043,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 Java_peer = jniContext {
                     let p_0_java = Int32(p_0).toJavaParameter(options: [])
                     let p_1_java = p_1.toJavaParameter(options: [])
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, args: [p_0_java, p_1_java])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java, p_1_java])
                     return JObject(ptr)
                 }
             }
@@ -2989,7 +3074,7 @@ final class BridgeToSwiftTests: XCTestCase {
             public init(i p_0: Int) {
                 Java_peer = jniContext {
                     let p_0_java = Int32(p_0).toJavaParameter(options: [])
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, args: [p_0_java])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java])
                     return JObject(ptr)
                 }
             }
@@ -3104,7 +3189,7 @@ final class BridgeToSwiftTests: XCTestCase {
             public init(_ p_0: String) {
                 Java_peer = jniContext {
                     let p_0_java = p_0.toJavaParameter(options: [])
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, args: [p_0_java])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java])
                     return JObject(ptr)
                 }
             }
@@ -3210,7 +3295,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -3291,7 +3376,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -3625,7 +3710,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -3692,7 +3777,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -3751,7 +3836,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -3837,7 +3922,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public init() {
                 Java_peer = jniContext {
-                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
                     return JObject(ptr)
                 }
             }
@@ -3923,6 +4008,125 @@ final class BridgeToSwiftTests: XCTestCase {
         typealias IntArray = Array<Int>
         """, swiftBridgeSupport: """
         public typealias IntArray = [Int]
+        """, transformers: transformers)
+    }
+
+    func testErrorType() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public struct CustomError: Error {
+        }
+        #endif
+        """, kotlin: """
+        class CustomError: Exception(), Error, skip.lib.SwiftProjecting {
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        """, swiftBridgeSupport: """
+        public struct CustomError: BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "CustomError")
+            public var Java_peer: JObject
+            public init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            public init() {
+                Java_peer = jniContext {
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
+                    return JObject(ptr)
+                }
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+        }
+        @_cdecl("Java_CustomError_Swift_1projectionImpl")
+        func CustomError_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = CustomError.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
+    func testEnumErrorType() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public enum E: Error {
+            case case1
+            case case2
+        }
+        #endif
+        """, kotlin: """
+        sealed class E: Exception(), Error, skip.lib.SwiftProjecting {
+            class Case1Case: E() {
+                override fun equals(other: Any?): Boolean = other is Case1Case
+                override fun hashCode(): Int = "Case1Case".hashCode()
+            }
+            class Case2Case: E() {
+                override fun equals(other: Any?): Boolean = other is Case2Case
+                override fun hashCode(): Int = "Case2Case".hashCode()
+            }
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+                val case1: E
+                    get() = Case1Case()
+                val case2: E
+                    get() = Case2Case()
+            }
+        }
+        """, swiftBridgeSupport: """
+        public enum E: BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "E")
+            private var Java_peer: JavaObjectPointer {
+                return toJavaObject(options: [])!
+            }
+            private static let Java_Companion_class = try! JClass(name: "E$Companion")
+            private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: "Companion", sig: "LE$Companion;")!, options: []))
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let className = Java_className(of: obj!, options: options)
+                return fromJavaClassName(className, obj!, options: options)
+            }
+            fileprivate static func fromJavaClassName(_ className: String, _ obj: JavaObjectPointer, options: JConvertibleOptions) -> Self {
+                switch className {
+                case "E$Case1Case":
+                    return .case1
+                case "E$Case2Case":
+                    return .case2
+                default: fatalError()
+                }
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                switch self {
+                case .case1:
+                    return try! Self.Java_Companion.call(method: Self.Java_Companion_case1_methodID, options: options, args: [])
+                case .case2:
+                    return try! Self.Java_Companion.call(method: Self.Java_Companion_case2_methodID, options: options, args: [])
+                }
+            }
+            private static let Java_Companion_case1_methodID = Java_Companion_class.getMethodID(name: "getCase1", sig: "()LE;")!
+            private static let Java_Companion_case2_methodID = Java_Companion_class.getMethodID(name: "getCase2", sig: "()LE;")!
+
+            case `case1`
+
+            case `case2`
+        }
+        @_cdecl("Java_E_Swift_1projectionImpl")
+        func E_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = E.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
         """, transformers: transformers)
     }
 

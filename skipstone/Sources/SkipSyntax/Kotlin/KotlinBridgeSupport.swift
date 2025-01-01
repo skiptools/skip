@@ -1001,7 +1001,7 @@ extension TypeSignature {
             if typeInfo.inherits.contains(where: { $0.isNamed("SwiftCustomBridged", moduleName: "Swift") }) {
                 strategy = .convertible
                 if options.contains(.kotlincompat), let kotlinConverting = typeInfo.inherits.first(where: { $0.isNamed("KotlinConverting", moduleName: "Swift") }), let kotlinConvertingType = kotlinConverting.generics.first, kotlinConvertingType != .any {
-                    kotlinType = kotlinConvertingType
+                    kotlinType = self.kotlinType(forKotlinConverting: kotlinConvertingType, info: typeInfo)
                 }
             } else {
                 if let sourceDerived, let source {
@@ -1025,6 +1025,18 @@ extension TypeSignature {
             return false
         }
         return CodebaseInfo.moduleNameMap.values.contains { $0.contains(name) }
+    }
+
+    private func kotlinType(forKotlinConverting kotlinConvertingType: TypeSignature, info: CodebaseInfo.TypeInfo) -> TypeSignature {
+        let generics = kotlinConvertingType.generics.map { generic in
+            if let idx = info.generics.entries.firstIndex(where: { $0.name == generic.name }), self.generics.count > idx {
+                let mapped = self.generics[idx]
+                return mapped.asOptional(mapped.isOptional || generic.isOptional)
+            } else {
+                return generic
+            }
+        }
+        return kotlinConvertingType.withGenerics(generics)
     }
 
     private var appearsToBeQualifiedJavaType: Bool {

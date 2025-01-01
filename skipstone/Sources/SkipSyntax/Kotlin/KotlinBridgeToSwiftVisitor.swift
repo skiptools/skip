@@ -188,6 +188,7 @@ final class KotlinBridgeToSwiftVisitor {
             modifiers.visibility = .default
         }
         let modifierString = modifiers.swift(suffix: " ")
+        let optionsString = options.jconvertibleOptions
         let hasSetter = apiFlags.options.contains(.writeable) && (modifiers.setVisibility == .default || modifiers.setVisibility >= .public)
         var declarationSuffix = " {"
         if inType == .protocolDeclaration {
@@ -206,7 +207,7 @@ final class KotlinBridgeToSwiftVisitor {
         let callType = inType == nil ? "callStatic" : "call"
         let callGet = inType == nil || modifiers.isStatic ? getMethodIdentifier : "Self." + getMethodIdentifier
         let getterBody = [
-            "let value_java: \(bridgable.type.java(strategy: bridgable.strategy, options: options)) = try! \(targetIdentifier).\(callType)(method: \(callGet), options: \(options.jconvertibleOptions), args: [])",
+            "let value_java: \(bridgable.type.java(strategy: bridgable.strategy, options: options)) = try! \(targetIdentifier).\(callType)(method: \(callGet), options: \(optionsString), args: [])",
             "return " + bridgable.type.convertFromJava(value: "value_java", strategy: bridgable.strategy, options: options)
         ]
         if apiFlags.throwsType != .none {
@@ -214,7 +215,7 @@ final class KotlinBridgeToSwiftVisitor {
             swift.append(2, "return try jniContext {")
             swift.append(3, "do {")
             swift.append(4, getterBody)
-            swift.append(3, "} catch let error as ThrowableError {")
+            swift.append(3, "} catch let error as (Error & JConvertible) {")
             swift.append(4, "throw error")
             swift.append(3, "} catch {")
             swift.append(4, "fatalError(String(describing: error))")
@@ -242,8 +243,8 @@ final class KotlinBridgeToSwiftVisitor {
                 swift.append(3, swiftToCopyJavaPeer(options: options))
             }
             swift.append(3, [
-                "let value_java = " + bridgable.type.convertToJava(value: "newValue", strategy: bridgable.strategy, options: options) + ".toJavaParameter(options: \(options.jconvertibleOptions))",
-                "try! \(targetIdentifier).\(callType)(method: \(callSet), options: \(options.jconvertibleOptions), args: [value_java])"
+                "let value_java = " + bridgable.type.convertToJava(value: "newValue", strategy: bridgable.strategy, options: options) + ".toJavaParameter(options: \(optionsString))",
+                "try! \(targetIdentifier).\(callType)(method: \(callSet), options: \(optionsString), args: [value_java])"
             ])
             swift.append(2, "}")
             swift.append(1, "}")
@@ -396,6 +397,7 @@ final class KotlinBridgeToSwiftVisitor {
         let name = preEscapedName.fixingKeyword(in: KotlinIdentifier.hardKeywords)
         let isAsync = apiFlags.options.contains(.async)
         let isThrows = apiFlags.throwsType != .none
+        let optionsString = options.jconvertibleOptions
 
         var modifiers = modifiers
         if inType == .protocolDeclaration {
@@ -411,25 +413,25 @@ final class KotlinBridgeToSwiftVisitor {
             return str
         }
         .joined(separator: ", ")
-        var optionsString = isAsync ? " async" : ""
-        optionsString += isThrows ? " throws" : ""
+        var apiOptionsString = isAsync ? " async" : ""
+        apiOptionsString += isThrows ? " throws" : ""
         if isDeclaredByVariable {
             var returnString = bridgable.return.type.description
             if inType == .protocolDeclaration {
-                returnString += " { get\(optionsString) }"
+                returnString += " { get\(apiOptionsString) }"
             } else {
                 returnString += " {"
             }
             swift.append("\(modifierString)var \(preEscapedName): \(returnString)")
             if inType != .protocolDeclaration {
-                swift.append(1, "get\(optionsString) {")
+                swift.append(1, "get\(apiOptionsString) {")
             }
         } else {
             var returnString = bridgable.return.type == .void || isFactory ? "" : " -> " + bridgable.return.type.description
             if inType != .protocolDeclaration {
                 returnString += " {"
             }
-            swift.append(modifierString + (isConstructor ? "init" : "func " + preEscapedName) + "(\(parameterString))\(optionsString)\(returnString)")
+            swift.append(modifierString + (isConstructor ? "init" : "func " + preEscapedName) + "(\(parameterString))\(apiOptionsString)\(returnString)")
         }
         guard inType != .protocolDeclaration else {
             return swift
@@ -466,7 +468,7 @@ final class KotlinBridgeToSwiftVisitor {
                 }
                 indentation = indentation.inc()
                 swift.append(indentation, "if let f_error {")
-                swift.append(indentation.inc(), "f_continuation.resume(throwing: ThrowableError(throwable: f_error))")
+                swift.append(indentation.inc(), "f_continuation.resume(throwing: JThrowable.toError(f_error, options: \(optionsString)))")
                 swift.append(indentation, "} else {")
                 if callbackType.parameters.count == 1 {
                     swift.append(indentation.inc(), "f_continuation.resume()")
@@ -480,7 +482,7 @@ final class KotlinBridgeToSwiftVisitor {
             }
             swift.append(indentation, "}")
             swift.append(indentation, "jniContext {")
-            swift.append(indentation.inc(), "let f_return_callback_java = SwiftClosure\(callbackType.parameters.count).javaObject(for: f_return_callback, options: \(options.jconvertibleOptions)).toJavaParameter(options: \(options.jconvertibleOptions))")
+            swift.append(indentation.inc(), "let f_return_callback_java = SwiftClosure\(callbackType.parameters.count).javaObject(for: f_return_callback, options: \(optionsString)).toJavaParameter(options: \(optionsString))")
         } else {
             returnCallString += "jniContext {"
             if isConstructor && inType == .enumDeclaration {
@@ -505,7 +507,7 @@ final class KotlinBridgeToSwiftVisitor {
             let name = label + "_java"
             javaParameterNames.append(name)
             let strategy = bridgable.strategy
-            swift.append(indentation, "let \(name) = " + bridgable.type.convertToJava(value: label, strategy: strategy, options: options) + ".toJavaParameter(options: \(options.jconvertibleOptions))")
+            swift.append(indentation, "let \(name) = " + bridgable.type.convertToJava(value: label, strategy: strategy, options: options) + ".toJavaParameter(options: \(optionsString))")
         }
         for i in 0..<disambiguatingParameterCount {
             let name = "p_\(bridgable.parameters.count + i)_java"
@@ -516,10 +518,10 @@ final class KotlinBridgeToSwiftVisitor {
         let tryType = isThrows && !isAsync ? "try" : "try!"
         if isConstructor {
             if inType == .enumDeclaration {
-                swift.append(indentation, "let f_return_java: JavaObjectPointer = \(tryType) Self.Java_Companion.call(method: Self.\(methodIdentifier), options: \(options.jconvertibleOptions), args: [" + javaParameterNames.joined(separator: ", ") + "])")
-                swift.append(indentation, "return Self.fromJavaObject(f_return_java, options: \(options.jconvertibleOptions))")
+                swift.append(indentation, "let f_return_java: JavaObjectPointer = \(tryType) Self.Java_Companion.call(method: Self.\(methodIdentifier), options: \(optionsString), args: [" + javaParameterNames.joined(separator: ", ") + "])")
+                swift.append(indentation, "return Self.fromJavaObject(f_return_java, options: \(optionsString))")
             } else {
-                swift.append(indentation, "let ptr = \(tryType) Self.Java_class.create(ctor: Self.\(methodIdentifier), args: [" + javaParameterNames.joined(separator: ", ") + "])")
+                swift.append(indentation, "let ptr = \(tryType) Self.Java_class.create(ctor: Self.\(methodIdentifier), options: \(optionsString), args: [" + javaParameterNames.joined(separator: ", ") + "])")
                 swift.append(indentation, "return JObject(ptr)")
             }
         } else if isAsync {
@@ -530,12 +532,12 @@ final class KotlinBridgeToSwiftVisitor {
                 argumentsString += ", "
             }
             argumentsString += "f_return_callback_java"
-            let call = "\(tryType) \(targetIdentifier).\(callType)(method: \(callMethod), options: \(options.jconvertibleOptions), args: [\(argumentsString)])"
+            let call = "\(tryType) \(targetIdentifier).\(callType)(method: \(callMethod), options: \(optionsString), args: [\(argumentsString)])"
             swift.append(indentation, call)
         } else {
             let callType = inType == nil ? "callStatic" : "call"
             let callMethod = inType == nil || modifiers.isStatic ? methodIdentifier : "Self." + methodIdentifier
-            let call = "\(tryType) \(targetIdentifier).\(callType)(method: \(callMethod), options: \(options.jconvertibleOptions), args: [" + javaParameterNames.joined(separator: ", ") + "])"
+            let call = "\(tryType) \(targetIdentifier).\(callType)(method: \(callMethod), options: \(optionsString), args: [" + javaParameterNames.joined(separator: ", ") + "])"
             if isThrows {
                 swift.append(indentation, "do {")
                 indentation = indentation.inc()
@@ -548,7 +550,7 @@ final class KotlinBridgeToSwiftVisitor {
             }
             if isThrows {
                 indentation = indentation.dec()
-                swift.append(indentation, "} catch let error as ThrowableError {")
+                swift.append(indentation, "} catch let error as (Error & JConvertible) {")
                 swift.append(indentation.inc(), "throw error")
                 swift.append(indentation, "} catch {")
                 swift.append(indentation.inc(), "fatalError(String(describing: error))")
@@ -648,12 +650,13 @@ final class KotlinBridgeToSwiftVisitor {
 
     private static func swift(forEqualsFunctionIn type: TypeSignature, options: KotlinBridgeOptions, modifiers: Modifiers) -> [String] {
         let modifiersString = modifiers.swift(suffix: " ")
+        let optionsString = options.jconvertibleOptions
         var sourceCode: [String] = []
         sourceCode.append("\(modifiersString)func ==(lhs: \(type), rhs: \(type)) -> Bool {")
         sourceCode.append(1, "return jniContext {")
-        sourceCode.append(2, "let lhs_java = lhs.toJavaObject(options: \(options.jconvertibleOptions))!")
-        sourceCode.append(2, "let rhs_java = rhs.toJavaParameter(options: \(options.jconvertibleOptions))")
-        sourceCode.append(2, "return try! Bool.call(Java_isequal_methodID, on: lhs_java, options: \(options.jconvertibleOptions), args: [rhs_java])")
+        sourceCode.append(2, "let lhs_java = lhs.toJavaObject(options: \(optionsString))!")
+        sourceCode.append(2, "let rhs_java = rhs.toJavaParameter(options: \(optionsString))")
+        sourceCode.append(2, "return try! Bool.call(Java_isequal_methodID, on: lhs_java, options: \(optionsString), args: [rhs_java])")
         sourceCode.append(1, "}")
         sourceCode.append("}")
         sourceCode.append("private static let Java_isequal_methodID = Java_class.getMethodID(name: \"equals\", sig: \"(Ljava/lang/Object;)Z\")!")
@@ -687,12 +690,13 @@ final class KotlinBridgeToSwiftVisitor {
 
     private static func swift(forLessThanDeclarationIn type: TypeSignature, options: KotlinBridgeOptions, modifiers: Modifiers) -> [String] {
         let modifiersString = modifiers.swift(suffix: " ")
+        let optionsString = options.jconvertibleOptions
         var sourceCode: [String] = []
         sourceCode.append("\(modifiersString)func <(lhs: \(type), rhs: \(type)) -> Bool {")
         sourceCode.append(1, "return jniContext {")
-        sourceCode.append(2, "let lhs_java = lhs.toJavaObject(options: \(options.jconvertibleOptions))!")
-        sourceCode.append(2, "let rhs_java = rhs.toJavaParameter(options: \(options.jconvertibleOptions))")
-        sourceCode.append(2, "let f_return_java = try! Int32.call(Java_compareTo_methodID, on: lhs_java, options: \(options.jconvertibleOptions), args: [rhs_java])")
+        sourceCode.append(2, "let lhs_java = lhs.toJavaObject(options: \(optionsString))!")
+        sourceCode.append(2, "let rhs_java = rhs.toJavaParameter(options: \(optionsString))")
+        sourceCode.append(2, "let f_return_java = try! Int32.call(Java_compareTo_methodID, on: lhs_java, options: \(optionsString), args: [rhs_java])")
         sourceCode.append(2, "return f_return_java < 0")
         sourceCode.append(1, "}")
         sourceCode.append("}")
@@ -723,6 +727,7 @@ final class KotlinBridgeToSwiftVisitor {
         let isBridgedSubclass = superclassInfo?.attributes.isBridgeToSwift == true
         let visibilityString = primaryTypeInfo.modifiers.visibility.swift(suffix: " ")
         let modifiersString = primaryTypeInfo.declarationType == .classDeclaration && primaryTypeInfo.modifiers.isFinal ? "final " : ""
+        let optionsString = options.jconvertibleOptions
         let inherits = typeInfos.flatMap(\.inherits).compactMap {
             let inherit = $0.withGenerics([])
             return inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.checkBridgable(direction: .toSwift, options: options, codebaseInfo: codebaseInfo) != nil ? inherit : nil
@@ -743,7 +748,7 @@ final class KotlinBridgeToSwiftVisitor {
 
         if isEnum {
             swift.append(1, "private var Java_peer: JavaObjectPointer {")
-            swift.append(2, "return toJavaObject(options: \(options.jconvertibleOptions))!")
+            swift.append(2, "return toJavaObject(options: \(optionsString))!")
             swift.append(1, "}")
         } else {
             if !isBridgedSubclass {
@@ -777,7 +782,7 @@ final class KotlinBridgeToSwiftVisitor {
                     swift.append(2, "Java_peer = jniContext {")
                 }
                 swift.append(3, [
-                    "let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, args: [])",
+                    "let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: \(optionsString), args: [])",
                     "return JObject(ptr)"
                 ])
                 swift.append(2, "}")
@@ -838,7 +843,7 @@ final class KotlinBridgeToSwiftVisitor {
         }
         if hasBridgedStaticMembers || classDeclaration.isSealedClassesEnum {
             swift.append(1, "private static let Java_Companion_class = try! JClass(name: \"\(classRef.className)$Companion\")")
-            swift.append(1, "private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: \"Companion\", sig: \"L\(classRef.className)$Companion;\")!, options: \(options.jconvertibleOptions)))")
+            swift.append(1, "private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: \"Companion\", sig: \"L\(classRef.className)$Companion;\")!, options: \(optionsString)))")
         }
         if isEnum {
             swift.append(1, Self.swiftForEnumJConvertibleContract(className: classRef.className, isSealedClassesEnum: classDeclaration.isSealedClassesEnum, caseDeclarations: enumCases, visibility: finalMemberVisibility, options: options, translator: translator))
