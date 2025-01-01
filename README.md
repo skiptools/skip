@@ -127,7 +127,7 @@ let package = Package(
         .library(name: "ModuleName", targets: ["ModuleName"]),
     ],
     dependencies: [
-        .package(url: "https://source.skip.tools/skip.git", from: "1.2.16"),
+        .package(url: "https://source.skip.tools/skip.git", from: "1.2.17"),
         .package(url: "https://source.skip.tools/skip-foundation.git", from: "0.0.0"),
     ],
     targets: [
