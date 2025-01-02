@@ -81,7 +81,9 @@ final class KotlinStructTransformer: KotlinTransformer {
         if needsMemberwiseConstructor {
             addMemberwiseConstructor(to: classDeclaration, variableDeclarations: initializableVariableDeclarations, translator: translator)
         }
-        let needsMutableStructCopyConstructor = isMutable && (transformsConstructorParameters || (!needsMemberwiseConstructor && !copyableVariableDeclarations.isEmpty) || (needsMemberwiseConstructor && copyableVariableDeclarations.count > initializableVariableDeclarations.count))
+        // The reason for the last condition where we use a mutable struct copy constructor for bridged generic Swift types is that
+        // we can't bridge standard constructors of generic types
+        let needsMutableStructCopyConstructor = isMutable && (transformsConstructorParameters || (!needsMemberwiseConstructor && !copyableVariableDeclarations.isEmpty) || (needsMemberwiseConstructor && copyableVariableDeclarations.count > initializableVariableDeclarations.count) || (translator.syntaxTree.isBridgeFile && !classDeclaration.generics.isEmpty))
         if needsMutableStructCopyConstructor && !hasMutableStructCopyConstructor {
             addMutableStructCopyConstructor(to: classDeclaration, isOptionSet: isOptionSet, variableDeclarations: copyableVariableDeclarations)
         }

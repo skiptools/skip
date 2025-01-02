@@ -573,7 +573,7 @@ final class BridgeToSwiftTests: XCTestCase {
         var c = C()
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -637,7 +637,7 @@ final class BridgeToSwiftTests: XCTestCase {
         var c: C? = C()
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -692,7 +692,7 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         """, kotlins: ["""
         class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
-            var Swift_peer: skip.bridge.kt.SwiftObjectPointer
+            var Swift_peer: skip.bridge.kt.SwiftObjectPointer = skip.bridge.kt.SwiftObjectNil
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
                 this.Swift_peer = Swift_peer
@@ -727,7 +727,7 @@ final class BridgeToSwiftTests: XCTestCase {
         """, """
         var c = C()
         """], swiftBridgeSupports: ["""
-        extension C: BridgedToKotlin {
+        extension C: BridgedToKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
@@ -1185,7 +1185,7 @@ final class BridgeToSwiftTests: XCTestCase {
         fun f(c: C): C = Unit
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -1427,7 +1427,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -1469,17 +1469,6 @@ final class BridgeToSwiftTests: XCTestCase {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
-        }
-        """, transformers: transformers)
-    }
-
-    func testGenericClass() async throws {
-        try await checkProducesMessage(swift: """
-        public class C<T> {
-            public var value: T
-            public func f(v: T) -> T {
-                return v
-            }
         }
         """, transformers: transformers)
     }
@@ -1673,7 +1662,7 @@ final class BridgeToSwiftTests: XCTestCase {
             return SwiftClosure0.javaObject(for: factory, options: [])!
         }
         extension A {
-            public final class B: BridgedFromKotlin {
+            public final class B: BridgedFromKotlin, BridgedFinalClass {
                 private static let Java_class = try! JClass(name: "A$B")
                 public let Java_peer: JObject
                 public required init(Java_ptr: JavaObjectPointer) {
@@ -1772,7 +1761,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -1814,7 +1803,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -1865,7 +1854,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -1924,7 +1913,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -1971,7 +1960,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -2020,7 +2009,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -2086,7 +2075,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -2152,7 +2141,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -2212,7 +2201,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -2261,7 +2250,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -2329,7 +2318,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -2403,7 +2392,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -2483,7 +2472,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: Equatable, Hashable, Comparable, BridgedFromKotlin {
+        public final class C: Equatable, Hashable, Comparable, BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -2604,7 +2593,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -2839,7 +2828,7 @@ final class BridgeToSwiftTests: XCTestCase {
             get {
                 return jniContext {
                     let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_base_methodID, options: [], args: [])
-                    return AnyBridging.fromJavaObject(value_java, options: []) as! Base
+                    return AnyBridging.fromJavaObject(value_java, toBaseType: Base.self, options: [])!
                 }
             }
             set {
@@ -3090,7 +3079,7 @@ final class BridgeToSwiftTests: XCTestCase {
             get {
                 return jniContext {
                     let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_sub1_methodID, options: [], args: [])
-                    return AnyBridging.fromJavaObject(value_java, options: []) as! Sub1
+                    return AnyBridging.fromJavaObject(value_java, toBaseType: Sub1.self, options: [])!
                 }
             }
             set {
@@ -3287,7 +3276,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 return Java_peer.safePointer()
             }
         }
-        public final class C: P, BridgedFromKotlin {
+        public final class C: P, BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -3368,7 +3357,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 return Java_peer.safePointer()
             }
         }
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -3769,7 +3758,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -3828,7 +3817,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        public final class C: BridgedFromKotlin {
+        public final class C: BridgedFromKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "C")
             public let Java_peer: JObject
             public required init(Java_ptr: JavaObjectPointer) {
@@ -4129,6 +4118,99 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         """, transformers: transformers)
     }
+
+//    func testGenericType() async throws {
+//        try await check(swift: """
+//        #if !SKIP_BRIDGE
+//        public class C<T> {
+//            public init(value: T) {
+//            }
+//        
+//            public func access() -> T {
+//            }
+//        }
+//        #endif
+//        """, kotlin: """
+//        open class C<T>: skip.lib.SwiftProjecting {
+//            constructor(value: T) {
+//            }
+//
+//            open fun access(): T = Unit
+//
+//            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+//            private external fun Swift_projectionImpl(options: Int): () -> Any
+//
+//            companion object: CompanionClass() {
+//            }
+//            open class CompanionClass {
+//            }
+//        }
+//        """, swiftBridgeSupport: """
+//        public class C<T>: BridgedFromKotlin {
+//            private static let Java_class = try! JClass(name: "C")
+//            public let Java_peer: JObject
+//            public required init(Java_ptr: JavaObjectPointer) {
+//                Java_peer = JObject(Java_ptr)
+//            }
+//            public init(Java_peer: JObject) {
+//                self.Java_peer = Java_peer
+//            }
+//            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+//                return .init(Java_ptr: obj!)
+//            }
+//            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+//                return Java_peer.safePointer()
+//            }
+//
+//            public init(value p_0: T) {
+//                Java_peer = jniContext {
+//                    let p_0_java = p_0.toJavaObject(options: [])!.toJavaParameter(options: [])
+//                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java])
+//                    return JObject(ptr)
+//                }
+//            }
+//            private static let Java_constructor_0_methodID = Java_class.getMethodID(name: "<init>", sig: "(Ljava/lang/Object;)V")!
+//
+//            public func access() -> T {
+//                return jniContext {
+//                    let f_return_java: JavaObjectPointer = try! Java_peer.call(method: Self.Java_access_1_methodID, options: [], args: [])
+//                    return T.fromJavaObject(f_return_java, options: [])
+//                }
+//            }
+//            private static let Java_access_1_methodID = Java_class.getMethodID(name: "access", sig: "()Ljava/lang/Object;")!
+//        }
+//        @_cdecl("Java_C_Swift_1projectionImpl")
+//        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+//        //~~~ BLOCKER: How to call .fromJavaObject on correct generic type?
+//            let projection = C<(Constraints)>.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+//            let factory: () -> Any = { projection }
+//            return SwiftClosure0.javaObject(for: factory, options: [])!
+//        }
+//        """, transformers: transformers)
+//    }
+//
+//    func testGenericFunction() async throws {
+//        try await check(swift: """
+//        #if !SKIP_BRIDGE
+//        public func f<T>(p: T) -> T {
+//            return p
+//        }
+//        #endif
+//        """, kotlin: """
+//        fun <T> f(p: T): T = p.sref()
+//        """, swiftBridgeSupport: """
+//        //~~~ Could make this work...
+//        private let Java_SourceKt = try! JClass(name: "SourceKt")
+//        public func f<T>(p p_0: T) -> T {
+//            return jniContext {
+//                let p_0_java = p_0.toJavaObject(options: [])!.toJavaParameter(options: [])
+//                let f_return_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_f_0_methodID, options: [], args: [p_0_java])
+//                return T.fromJavaObject(f_return_java, options: [])
+//            }
+//        }
+//        private let Java_f_0_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "(LT;)LT;")!")
+//        """, transformers: transformers)
+//    }
 
     func testImports() async throws {
         try await check(swift: """
