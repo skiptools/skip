@@ -1232,12 +1232,14 @@ final class MacroExpansion: Expression {
             return nil
         }
         // We don't yet support macro expansion, but we know we can safely translate these
-        if macroExpansionExpr.macroName.text == "Preview" {
+        switch macroExpansionExpr.macroName.text {
+        case "Preview", "warning", "error":
             return RawExpression(sourceCode: "// #\(macroExpansionExpr.macroName.text) omitted", syntax: syntax, in: syntaxTree)
-        } else if macroExpansionExpr.macroName.text == "colorLiteral" {
+        case "colorLiteral":
             return colorLiteral(syntax: macroExpansionExpr)
+        default:
+            throw Message.macroExpansionUnsupported(syntax, source: syntaxTree.source)
         }
-        throw Message.macroExpansionUnsupported(syntax, source: syntaxTree.source)
     }
 
     private static func colorLiteral(syntax macroExpansionExpr: MacroExpansionExprSyntax) -> Expression {
