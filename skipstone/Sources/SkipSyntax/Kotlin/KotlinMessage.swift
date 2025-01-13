@@ -54,6 +54,10 @@ extension Message {
         return Message(kind: .error, message: "This API is implemented as a Kotlin extension function. This release does not support bridging extension functions", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinBridgeGenericMember(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Generic types cannot bridge constructors or static members. Comment this member with '// SKIP @nobridge' to exclude it from bridging", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinBridgeMissingIfNotSkipBridge(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "When bridging API from a transpiled module, place all code within a `#if !SKIP_BRIDGE` condition", sourceDerived: sourceDerived, source: source)
     }
