@@ -592,6 +592,47 @@ extension Generics {
         }
         return typeInfo.attributes.isBridgeToKotlin || typeInfo.attributes.isBridgeToSwift ? type : nil
     }
+
+    /// The `<...>` list of used generics in a function or type.
+    var swiftParametersString: String {
+        let entries = self.entries.filter { $0.name != "Self" }
+        if entries.isEmpty {
+            return ""
+        }
+        return "<" + entries.map { $0.name }.joined(separator: ", ") + ">"
+    }
+
+    /// The `where ...` list of generic constraints on a function or type.
+    var swiftWhereString: String {
+        let conditions = entries.compactMap { entry in
+            if let whereEqual = entry.whereEqual {
+                return "\(entry.name) == \(whereEqual)"
+            } else if !entry.inherits.isEmpty {
+                return entry.inherits.map { "\(entry.name): \($0)" }.joined(separator: ", ")
+            } else {
+                return nil
+            }
+        }
+        guard !conditions.isEmpty else {
+            return ""
+        }
+        return " where " + conditions.joined(separator: ", ")
+    }
+}
+
+extension Generic {
+    /// The `where ...` list of generic constraints on an individual generic entry.
+    var swiftWhereString: String {
+        let whereString: String
+        if let whereEqual {
+            whereString = "\(name) == \(whereEqual)"
+        } else if !inherits.isEmpty {
+            whereString = inherits.map { "\(name): \($0)" }.joined(separator: ", ")
+        } else {
+            return ""
+        }
+        return " where \(whereString)"
+    }
 }
 
 /// Information used to bridge values.
@@ -615,7 +656,8 @@ struct Bridgable {
 
     var type: TypeSignature
     var kotlinType: TypeSignature
-    var genericType: TypeSignature?
+    var genericType: TypeSignature? = nil
+    var isGenericEntry = false
     var strategy: Strategy
 
     var constrainedType: TypeSignature {
@@ -624,6 +666,10 @@ struct Bridgable {
 
     var externalType: TypeSignature {
         return genericType == nil ? kotlinType : .any.asOptional(kotlinType.isOptional)
+    }
+
+    func jni(options: KotlinBridgeOptions) -> String {
+        return (isGenericEntry ? TypeSignature.any : kotlinType).jni(options: options)
     }
 }
 
@@ -638,8 +684,10 @@ extension KotlinVariableDeclaration {
     ///
     /// This function will add messages about invalid modifiers or types to this variable.
     func checkBridgable(direction: Bridgable.Direction, options: KotlinBridgeOptions, translator: KotlinTranslator) -> Bridgable? {
-        guard checkNonStaticGenericTypeMember(self, in: parent, modifiers: modifiers, translator: translator) else {
-            return nil
+        if direction == .toKotlin {
+            guard checkNonStaticGenericTypeMember(self, in: parent, modifiers: modifiers, translator: translator) else {
+                return nil
+            }
         }
         guard checkNonStaticProtocolRequirement(self, in: parent, modifiers: modifiers, translator: translator) else {
             return nil
@@ -692,8 +740,10 @@ extension KotlinFunctionDeclaration {
             messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "optional inits", source: translator.syntaxTree.source))
             return nil
         }
-        guard isEqualImplementation || isLessThanImplementation || checkNonStaticGenericTypeMember(self, in: parent, modifiers: modifiers, translator: translator) else {
-            return nil
+        if direction == .toKotlin {
+            guard isEqualImplementation || isLessThanImplementation || checkNonStaticGenericTypeMember(self, in: parent, modifiers: modifiers, translator: translator) else {
+                return nil
+            }
         }
         guard checkNonStaticProtocolRequirement(self, in: parent, modifiers: modifiers, translator: translator) else {
             return nil
@@ -705,9 +755,11 @@ extension KotlinFunctionDeclaration {
             messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "variadic parameters", source: translator.syntaxTree.source))
             return nil
         }
-        guard name != "constructor" || (parent as? KotlinClassDeclaration)?.generics.isEmpty != false else {
-            messages.append(.kotlinBridgeGenericMember(self, source: translator.syntaxTree.source))
-            return nil
+        if direction == .toKotlin {
+            guard name != "constructor" || (parent as? KotlinClassDeclaration)?.generics.isEmpty != false else {
+                messages.append(.kotlinBridgeGenericMember(self, source: translator.syntaxTree.source))
+                return nil
+            }
         }
         guard let codebaseInfo = translator.codebaseInfo else {
             return nil
@@ -847,7 +899,7 @@ extension TypeSignature {
     func checkBridgable(direction: Bridgable.Direction, options: KotlinBridgeOptions, generics: Generics?, codebaseInfo: CodebaseInfo.Context, sourceDerived: SourceDerived? = nil, source: Source? = nil) -> Bridgable? {
         switch self {
         case .any, .anyObject:
-            return Bridgable(type: self, kotlinType: self, genericType: nil, strategy: .unknown)
+            return Bridgable(type: self, kotlinType: self, strategy: .unknown)
         case .array(let elementType):
             guard let elementBridgable = elementType?.checkBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) else {
                 return nil
@@ -861,7 +913,7 @@ extension TypeSignature {
                 return Bridgable(type: arrayType, kotlinType: .array(elementBridgable.kotlinType), genericType: genericType, strategy: .convertible)
             }
         case .bool:
-            return Bridgable(type: self, kotlinType: self, genericType: nil, strategy: .direct)
+            return Bridgable(type: self, kotlinType: self, strategy: .direct)
         case .character:
             // TODO
             if let sourceDerived, let source {
@@ -886,7 +938,7 @@ extension TypeSignature {
                 return Bridgable(type: dictType, kotlinType: .dictionary(keyBridgable.kotlinType, valueBridgable.kotlinType), genericType: genericType, strategy: .convertible)
             }
         case .double, .float:
-            return Bridgable(type: self, kotlinType: self, genericType: nil, strategy: .direct)
+            return Bridgable(type: self, kotlinType: self, strategy: .direct)
         case .existential(let mode, let type):
             guard var bridgable = type.checkBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) else {
                 return nil
@@ -943,7 +995,7 @@ extension TypeSignature {
             }
             return Bridgable(type: bridgeType, kotlinType: bridgeKotlinType, genericType: bridgeGenericType, strategy: .direct)
         case .int, .int8, .int16, .int32, .int64:
-            return Bridgable(type: self, kotlinType: self, genericType: nil, strategy: .direct)
+            return Bridgable(type: self, kotlinType: self, strategy: .direct)
         case .int128:
             // TODO
             if let sourceDerived, let source {
@@ -952,7 +1004,7 @@ extension TypeSignature {
             return nil
         case .member, .module, .named:
             if isNamed("AnyHashable", moduleName: "Swift", generics: []) {
-                return Bridgable(type: self, kotlinType: self, genericType: nil, strategy: .unknown)
+                return Bridgable(type: self, kotlinType: self, strategy: .unknown)
             }
             return checkNamedBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source)
         case .metaType:
@@ -969,7 +1021,7 @@ extension TypeSignature {
             guard let bridgable = type.checkBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) else {
                 return nil
             }
-            return Bridgable(type: bridgable.type.asOptional(true), kotlinType: bridgable.kotlinType.asOptional(true), genericType: bridgable.genericType?.asOptional(true), strategy: bridgable.strategy)
+            return Bridgable(type: bridgable.type.asOptional(true), kotlinType: bridgable.kotlinType.asOptional(true), genericType: bridgable.genericType?.asOptional(true), isGenericEntry: bridgable.isGenericEntry, strategy: bridgable.strategy)
         case .range:
             // TODO
             if let sourceDerived, let source {
@@ -989,7 +1041,7 @@ extension TypeSignature {
                 return Bridgable(type: setType, kotlinType: .set(elementBridgable.kotlinType), genericType: genericType, strategy: .convertible)
             }
         case .string:
-            return Bridgable(type: self, kotlinType: self, genericType: nil, strategy: .direct)
+            return Bridgable(type: self, kotlinType: self, strategy: .direct)
         case .tuple(let labels, let types):
             let typeBridgables: [Bridgable] = types.compactMap { type in
                 guard let bridgable = type.checkBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) else {
@@ -1049,7 +1101,7 @@ extension TypeSignature {
     func checkFunctionBridgable(direction: Bridgable.Direction, isConstructor: Bool, options: KotlinBridgeOptions, generics: Generics?, codebaseInfo: CodebaseInfo.Context, sourceDerived: SourceDerived? = nil, source: Source? = nil) -> FunctionBridgable? {
         let returnBridgable: Bridgable
         if isConstructor || returnType == .void {
-            returnBridgable = Bridgable(type: .void, kotlinType: .void, genericType: nil, strategy: .direct)
+            returnBridgable = Bridgable(type: .void, kotlinType: .void, strategy: .direct)
         } else {
             guard let bridgable = returnType.checkBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source) else {
                 return nil
@@ -1069,18 +1121,22 @@ extension TypeSignature {
     fileprivate func checkNamedBridgable(direction: Bridgable.Direction, options: KotlinBridgeOptions, generics: Generics?, codebaseInfo: CodebaseInfo.Context, sourceDerived: SourceDerived?, source: Source?) -> Bridgable? {
         let constrainedType = generics?.constrainedType(of: self.withoutOptionality(), fallback: .any) ?? .none
         if constrainedType != .none {
-            var bridgable: Bridgable? = nil
-            if case .composition(let types) = constrainedType {
-                for type in types {
-                    if let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: type), typeInfo.declarationType != .protocolDeclaration {
-                        bridgable = type.asOptional(type.isOptional || isOptional).checkBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo)
-                        break
-                    }
-                }
+            let types: [TypeSignature]
+            if case .composition(let composedTypes) = constrainedType {
+                types = composedTypes
             } else if constrainedType != .any {
-                bridgable = constrainedType.asOptional(constrainedType.isOptional || isOptional).checkBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo)
+                types = [constrainedType]
+            } else {
+                types = []
             }
-            return Bridgable(type: self, kotlinType: self, genericType: constrainedType, strategy: bridgable?.strategy ?? .unknown)
+            var bridgable: Bridgable? = nil
+            for type in types {
+                if let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: type), typeInfo.declarationType != .protocolDeclaration {
+                    bridgable = type.asOptional(type.isOptional || isOptional).checkBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo)
+                    break
+                }
+            }
+            return Bridgable(type: self, kotlinType: self, genericType: constrainedType, isGenericEntry: true, strategy: bridgable?.strategy ?? .unknown)
         }
 
         guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: self) else {

@@ -5038,8 +5038,6 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
-    //~~~ generic protocols too?
-    //~~~ using types with generic params as property values, function values, etc (not just T but C<T> or C<Int>)
     func testGenericClass() async throws {
         try await check(swiftBridge: """
         public class C<T> {
@@ -5107,7 +5105,7 @@ final class BridgeToKotlinTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        extension C: BridgedToKotlin, BridgedToKotlinBaseClass {
+        extension C: BridgedToKotlin, BridgedToKotlinBaseClass, BridgedFinalClass {
             private static var Java_class: JClass { try! JClass(name: "C") }
             public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
@@ -5571,7 +5569,7 @@ final class BridgeToKotlinTests: XCTestCase {
                     return AnyBridging.fromJavaObject(f_return_java, options: []) as! T
                 }
             }
-            private static var Java_f_0_methodID: JavaMethodID { Java_class.getMethodID(name: "f", sig: "(LT;)LT;")! }
+            private static var Java_f_0_methodID: JavaMethodID { Java_class.getMethodID(name: "f", sig: "(Ljava/lang/Object;)Ljava/lang/Object;")! }
             public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }

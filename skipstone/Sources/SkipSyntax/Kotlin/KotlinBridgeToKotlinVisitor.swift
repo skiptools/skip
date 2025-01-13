@@ -1075,7 +1075,7 @@ final class KotlinBridgeToKotlinVisitor {
         default:
             conformances = "BridgedToKotlinSubclass\(subclassDepth)"
         }
-        if classDeclaration.declarationType == .classDeclaration, classDeclaration.modifiers.isFinal {
+        if classDeclaration.declarationType == .classDeclaration, classDeclaration.modifiers.isFinal || !classDeclaration.generics.isEmpty {
             conformances += ", BridgedFinalClass"
         }
         var swift: [String] = []
@@ -1146,7 +1146,12 @@ final class KotlinBridgeToKotlinVisitor {
             swiftDefinitions.append(typeErasedPeerSwift(for: classDeclaration, variableDeclarations: bridgedVariableDeclarations, functionDeclarations: bridgedFunctionDeclarations))
         }
 
-        let cdeclFunction = KotlinBridgeToSwiftVisitor.addSwiftProjecting(to: classDeclaration, isBridgedSubclass: subclassDepth >= 1, options: options, translator: translator)
+        let customProjection: [String]? = classDeclaration.generics.isEmpty ? nil : [
+            "let ptr = SwiftObjectPointer.peer(of: Java_target, options: JConvertibleOptions(rawValue: Int(options)))",
+            "let peer_swift: \(classDeclaration.signature.typeErasedClass) = ptr.pointee()!",
+            "let projection = peer_swift.genericvalue"
+        ]
+        let cdeclFunction = KotlinBridgeToSwiftVisitor.addSwiftProjecting(to: classDeclaration, isBridgedSubclass: subclassDepth >= 1, customProjection: customProjection, options: options, translator: translator)
         cdeclFunctions.append(cdeclFunction)
         return true
     }
