@@ -220,6 +220,11 @@ fileprivate extension AndroidOperationCommand {
                 // set the SKIP_BRIDGE flag, which is transferred through to a build #define in SkipBridge and can be used to check whether the current build mode is targetting JNI
                 env["SKIP_BRIDGE"] = "1"
             }
+
+            // always set the TARGET_OS_ANDROID environment and build constant, regardless of bridging
+            env["TARGET_OS_ANDROID"] = "1"
+            cmd += ["-Xswiftc", "-DTARGET_OS_ANDROID"]
+
             for xcc in toolchainOptions.xcc {
                 cmd += ["-Xcc", xcc]
             }
