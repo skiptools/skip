@@ -63,8 +63,10 @@ final class KotlinStructTransformer: KotlinTransformer {
                     hasMutableStructCopyConstructor = true
                 } else if !functionDeclaration.isGenerated {
                     if functionDeclaration.type == .constructorDeclaration {
-                        // Decodable constructor doesn't count
-                        if !functionDeclaration.isDecodableConstructor {
+                        // NOTE: Swift doesn't generate a default constructor even if your only constructor is a custom Decodable
+                        // constructor. So this condition shouldn't be here. But we had this "bug" early on in the transpiler, and
+                        // we've decided to maintain the previous behavior in case it is being relied upon
+                        if !functionDeclaration.isDecodableConstructor || translator.syntaxTree.isBridgeFile {
                             hasConstructors = true
                         }
                     } else if !isNoCopy && functionDeclaration.modifiers.isMutating {
