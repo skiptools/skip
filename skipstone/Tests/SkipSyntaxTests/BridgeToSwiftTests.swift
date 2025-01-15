@@ -1642,18 +1642,12 @@ final class BridgeToSwiftTests: XCTestCase {
                 return fromJavaName(name)
             }
             fileprivate static func fromJavaName(_ name: String) -> Self {
-                return switch name {
-                default: fatalError()
-                }
+                fatalError()
             }
             public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
-                let name = switch self {
-                default: fatalError()
-                }
-                return try! Self.Java_class.callStatic(method: Self.Java_valueOf_methodID, options: options, args: [name.toJavaParameter(options: options)])
+                fatalError()
             }
             private static let Java_name_methodID = Java_class.getMethodID(name: "name", sig: "()Ljava/lang/String;")!
-            private static let Java_valueOf_methodID = Java_class.getStaticMethodID(name: "valueOf", sig: "(Ljava/lang/String;)LA;")!
         }
         @_cdecl("Java_A_Swift_1projectionImpl")
         func A_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
