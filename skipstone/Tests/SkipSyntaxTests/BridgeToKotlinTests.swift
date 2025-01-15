@@ -1592,18 +1592,12 @@ final class BridgeToKotlinTests: XCTestCase {
                 return fromJavaName(name)
             }
             fileprivate static func fromJavaName(_ name: String) -> Self {
-                return switch name {
-                default: fatalError()
-                }
+                fatalError()
             }
             public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
-                let name = switch self {
-                default: fatalError()
-                }
-                return try! Self.Java_class.callStatic(method: Self.Java_valueOf_methodID, options: options, args: [name.toJavaParameter(options: options)])
+                fatalError()
             }
             private static let Java_name_methodID = Java_class.getMethodID(name: "name", sig: "()Ljava/lang/String;")!
-            private static let Java_valueOf_methodID = Java_class.getStaticMethodID(name: "valueOf", sig: "(Ljava/lang/String;)LA;")!
         }
         extension A.B: BridgedToKotlin, BridgedFinalClass {
             private static let Java_class = try! JClass(name: "A$B")
@@ -4022,6 +4016,47 @@ final class BridgeToKotlinTests: XCTestCase {
             let p_0_swift = String.fromJavaObject(p_0, options: [])
             let f_return_swift = E.init(string: p_0_swift)
             return f_return_swift.toJavaObject(options: [])!
+        }
+        @_cdecl("Java_E_Swift_1projectionImpl")
+        func E_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = E.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
+    func testEmptyEnum() async throws {
+        // Empty enums sometimes used as namespaces
+        try await check(swiftBridge: """
+        public enum E {
+        }
+        """, kotlin: """
+        enum class E: skip.lib.SwiftProjecting {
+            ;
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        """, swiftBridgeSupport: """
+        extension E: BridgedToKotlin {
+            private static let Java_class = try! JClass(name: "E")
+            private static let Java_Companion_class = try! JClass(name: "E$Companion")
+            private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: "Companion", sig: "LE$Companion;")!, options: []))
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let name: String = try! obj!.call(method: Java_name_methodID, options: options, args: [])
+                return fromJavaName(name)
+            }
+            fileprivate static func fromJavaName(_ name: String) -> Self {
+                fatalError()
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                fatalError()
+            }
+            private static let Java_name_methodID = Java_class.getMethodID(name: "name", sig: "()Ljava/lang/String;")!
         }
         @_cdecl("Java_E_Swift_1projectionImpl")
         func E_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {

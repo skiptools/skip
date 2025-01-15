@@ -986,42 +986,45 @@ final class KotlinBridgeToSwiftVisitor {
                 swift.append(1, enumCaseCode)
                 declarations += enumCaseDeclarations
             }
+            swift.append(1, "default: fatalError()")
+            swift.append(1, "}")
+            swift.append("}")
         } else {
             swift.append("fileprivate static func fromJavaName(_ name: String) -> Self {")
-            swift.append(1, "return switch name {")
-            for enumCaseDeclaration in caseDeclarations {
-                swift.append(1, "case \"\(enumCaseDeclaration.name)\": .\(enumCaseDeclaration.preEscapedName ?? enumCaseDeclaration.name)")
+            if caseDeclarations.isEmpty {
+                swift.append(1, "fatalError()")
+            } else {
+                swift.append(1, "return switch name {")
+                for enumCaseDeclaration in caseDeclarations {
+                    swift.append(1, "case \"\(enumCaseDeclaration.name)\": .\(enumCaseDeclaration.preEscapedName ?? enumCaseDeclaration.name)")
+                }
+                swift.append(1, "default: fatalError()")
+                swift.append(1, "}")
             }
+            swift.append("}")
         }
-        swift.append(1, "default: fatalError()")
-        swift.append(1, "}")
-        swift.append("}")
 
         swift.append(visibilityString + "func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {")
         if isSealedClassesEnum {
             swift.append(1, "switch self {")
-            if caseDeclarations.isEmpty {
-                swift.append(1, "default: fatalError()")
-            } else {
-                for (enumCaseDeclaration, enumCaseBridgables) in zip(caseDeclarations, caseBridgables) {
-                    let (enumCaseCode, enumCaseDeclarations) = sealedClassesEnumCaseToJavaObject(enumCaseDeclaration, bridgables: enumCaseBridgables, inClassName: className, generics: generics, options: options)
-                    swift.append(1, enumCaseCode)
-                    declarations += enumCaseDeclarations
-                }
+            for (enumCaseDeclaration, enumCaseBridgables) in zip(caseDeclarations, caseBridgables) {
+                let (enumCaseCode, enumCaseDeclarations) = sealedClassesEnumCaseToJavaObject(enumCaseDeclaration, bridgables: enumCaseBridgables, inClassName: className, generics: generics, options: options)
+                swift.append(1, enumCaseCode)
+                declarations += enumCaseDeclarations
             }
             swift.append(1, "}")
         } else {
-            swift.append(1, "let name = switch self {")
             if caseDeclarations.isEmpty {
-                swift.append(1, "default: fatalError()")
+                swift.append(1, "fatalError()")
             } else {
+                swift.append(1, "let name = switch self {")
                 for enumCaseDeclaration in caseDeclarations {
                     swift.append(1, "case .\(enumCaseDeclaration.preEscapedName ?? enumCaseDeclaration.name): \"\(enumCaseDeclaration.name)\"")
                 }
+                swift.append(1, "}")
+                swift.append(1, "return try! Self.Java_class.callStatic(method: Self.Java_valueOf_methodID, options: options, args: [name.toJavaParameter(options: options)])")
+                declarations.append(declareStaticLet("Java_valueOf_methodID", ofType: "JavaMethodID", in: .named(className, generics), value: "Java_class.getStaticMethodID(name: \"valueOf\", sig: \"(Ljava/lang/String;)L\(className);\")!"))
             }
-            swift.append(1, "}")
-            swift.append(1, "return try! Self.Java_class.callStatic(method: Self.Java_valueOf_methodID, options: options, args: [name.toJavaParameter(options: options)])")
-            declarations.append(declareStaticLet("Java_valueOf_methodID", ofType: "JavaMethodID", in: .named(className, generics), value: "Java_class.getStaticMethodID(name: \"valueOf\", sig: \"(Ljava/lang/String;)L\(className);\")!"))
         }
         swift.append("}")
 
@@ -1038,19 +1041,18 @@ final class KotlinBridgeToSwiftVisitor {
         guard caseBridgables.count == caseDeclarations.count else {
             return ([], [])
         }
+        guard !caseDeclarations.isEmpty else {
+            return (["fatalError()"], [])
+        }
 
         var swift: [String] = []
         var declarations: [String] = []
         swift.append("let setSwift_peerMethodID = Self.Java_class.getMethodID(name: \"setSwift_peer\", sig: \"(J)V\")!")
         swift.append("switch self {")
-        if caseDeclarations.isEmpty {
-            swift.append("default: fatalError()")
-        } else {
-            for (enumCaseDeclaration, enumCaseBridgables) in zip(caseDeclarations, caseBridgables) {
-                let (enumCaseCode, enumCaseDeclarations) = sealedClassesEnumCaseToJavaObject(enumCaseDeclaration, bridgables: enumCaseBridgables, inClassName: className, generics: generics, peerName: peerName, setMethodID: "setSwift_peerMethodID", options: options)
-                swift += enumCaseCode
-                declarations += enumCaseDeclarations
-            }
+        for (enumCaseDeclaration, enumCaseBridgables) in zip(caseDeclarations, caseBridgables) {
+            let (enumCaseCode, enumCaseDeclarations) = sealedClassesEnumCaseToJavaObject(enumCaseDeclaration, bridgables: enumCaseBridgables, inClassName: className, generics: generics, peerName: peerName, setMethodID: "setSwift_peerMethodID", options: options)
+            swift += enumCaseCode
+            declarations += enumCaseDeclarations
         }
         swift.append("}")
         return (swift, declarations)
