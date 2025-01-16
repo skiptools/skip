@@ -3195,6 +3195,82 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testStructConstructorInternalProperties() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public struct S {
+            public var i: Int
+            let s: String
+        }
+        #endif
+        """, kotlin: """
+        @Suppress("MUST_BE_INITIALIZED")
+        class S: MutableStruct, skip.lib.SwiftProjecting {
+            var i: Int
+                set(newValue) {
+                    willmutate()
+                    field = newValue
+                    didmutate()
+                }
+            internal val s: String
+
+            internal constructor(i: Int, s: String) {
+                this.i = i
+                this.s = s
+            }
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S(i, s)
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        """, swiftBridgeSupport: """
+        public struct S: BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "S")
+            public var Java_peer: JObject
+            public init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            private static let Java_scopy_methodID = Java_class.getMethodID(name: "scopy", sig: "()Lskip/lib/MutableStruct;")!
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+
+            public var i: Int {
+                get {
+                    return jniContext {
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, options: [], args: [])
+                        return Int(value_java)
+                    }
+                }
+                set {
+                    jniContext {
+                        Java_peer = try! JObject(Java_peer.call(method: Self.Java_scopy_methodID, options: [], args: []))
+                        let value_java = Int32(newValue).toJavaParameter(options: [])
+                        try! Java_peer.call(method: Self.Java_set_i_methodID, options: [], args: [value_java])
+                    }
+                }
+            }
+            private static let Java_get_i_methodID = Java_class.getMethodID(name: "getI", sig: "()I")!
+            private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
+        }
+        @_cdecl("Java_S_Swift_1projectionImpl")
+        func S_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = S.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
     func testProtocolConformance() async throws {
         try await check(swift: """
         #if !SKIP_BRIDGE
