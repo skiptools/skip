@@ -1011,6 +1011,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             func convertStrings(resourceSourceURL: URL, sourcePath: AbsolutePath) throws {
                 // process the .xcstrings in the same way that Xcode does: parse the JSON and use the localizations keys to synthesize a LANG.lproj/TABLENAME.strings file
                 let xcstrings = try JSONDecoder().decode(LocalizableStringsDictionary.self, from: Data(contentsOf: resourceSourceURL))
+                let defaultLanguage = xcstrings.sourceLanguage
                 let locales = Set(xcstrings.strings.values.compactMap(\.localizations?.keys).joined())
                 for localeId in locales {
                     var locdict: [String: String] = [:]
@@ -1036,6 +1037,10 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                             }
                         }
                         try fs.createDirectory(destinationPath.parentDirectory, recursive: true)
+                        if localeId == defaultLanguage {
+                            // when there is a default language, set up a symbolic link so Android localization can know where to fall back in the case of a missing localization key
+                            try addLink(resourcesBasePath.appending(component: "base.lproj"), pointingAt: destinationPath.parentDirectory, relative: true)
+                        }
                         info("create \(lproj.pathString) from \(sourcePath.pathString)", sourceFile: destinationPath.sourceFile)
                         try writeChanges(tag: lproj.pathString, to: destinationPath, contents: stringsContent.utf8Data, readOnly: false)
                         resourcesIndex.append(lproj)
