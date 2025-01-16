@@ -948,6 +948,7 @@ final class KotlinClassDeclaration: KotlinStatement {
             members.forEach { ($0 as? KotlinMemberDeclaration)?.companion = (signature, companionType ?? .object) }
         }
     }
+    var unbridgedMemberKinds: UnbridgedMemberKinds = []
     var movedExtensionImportModulePaths: [[String]] = []
     var suppressSideEffectsPropertyName: String?
     var enumInheritedRawValueType: TypeSignature {
@@ -1032,6 +1033,7 @@ final class KotlinClassDeclaration: KotlinStatement {
             }
         }
         kstatement.members = kmembers // Setting assigns companion information on members
+        kstatement.unbridgedMemberKinds = statement.unbridgedMemberKinds
         if statement.type == .enumDeclaration {
             kstatement.processEnumMemberDeclarations(translator: translator)
         }

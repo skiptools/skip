@@ -948,7 +948,7 @@ final class KotlinBridgeToKotlinVisitor {
                 insertStatements.append(release)
             }
 
-            if classDeclaration.generics.isEmpty && !classDeclaration.members.contains(where: { $0.type == .constructorDeclaration }) {
+            if !classDeclaration.unbridgedMemberKinds.suppressDefaultConstructorGeneration && classDeclaration.generics.isEmpty && !classDeclaration.members.contains(where: { $0.type == .constructorDeclaration }) {
                 let constructor = KotlinFunctionDeclaration(name: "constructor")
                 constructor.modifiers.visibility = .public
                 if subclassDepth < 1 {
@@ -1032,10 +1032,6 @@ final class KotlinBridgeToKotlinVisitor {
                 } else if functionDeclaration.isLessThanImplementation {
                     updateLessThanDeclaration(functionDeclaration, in: classDeclaration)
                     bridgedFunctionDeclarations.append((functionDeclaration, nil))
-                } else if functionDeclaration.type == .constructorDeclaration, functionDeclaration.attributes.isNoBridge {
-                    // The decoder includes all constructors so that we can detect whether the class needs a default
-                    // constructor generated, but it marks constructors that shouldn't be bridged
-                    classDeclaration.remove(statement: functionDeclaration)
                 } else if update(functionDeclaration, in: classDeclaration, isBridgedSubclass: subclassDepth >= 1, uniquifier: functionCount) {
                     bridgedFunctionDeclarations.append((functionDeclaration, functionCount))
                     functionCount += 1

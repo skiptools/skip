@@ -158,6 +158,9 @@ public final class KotlinTranslator {
                 return KotlinFunctionDeclaration.translate(statement: statement as! SubscriptDeclaration, translator: self)
             case .typealiasDeclaration:
                 return KotlinTypealiasDeclaration.translate(statement: statement as! TypealiasDeclaration, translator: self)
+            case .unbridgedMemberDeclaration:
+                // This should never happen
+                break
             case .variableDeclaration:
                 return [KotlinVariableDeclaration.translate(statement: statement as! VariableDeclaration, translator: self)]
             case .raw:
