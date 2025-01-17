@@ -2,11 +2,14 @@
 # need to first install OSS Swift toolchain from:
 # https://www.swift.org/download/#releases
 # and install Linux Static SDK toolchain with:
+# swift sdk install https://download.swift.org/swift-6.0.3-release/static-sdk/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz --checksum 67f765e0030e661a7450f7e4877cfe008db4f57f177d5a08a6e26fd661cdd0bd
+# or older:
 # swift sdk install https://download.swift.org/swift-6.0.1-release/static-sdk/swift-6.0.1-RELEASE/swift-6.0.1-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz --checksum d4f46ba40e11e697387468e18987ee622908bc350310d8af54eb5e17c2ff5481
 
 # e.g., swift.build.x86_64-swift-linux-musl will use "x86_64-swift-linux-musl"
+VERSION="6.0.3"
 SDK="x86_64-swift-linux-musl"
-TOOLCHAIN="${HOME}/Library/Developer/Toolchains/swift-6.0.1-RELEASE.xctoolchain/usr"
+TOOLCHAIN="${HOME}/Library/Developer/Toolchains/swift-${VERSION}-RELEASE.xctoolchain/usr"
 CONFIGURATION=${CONFIGURATION:-"release"}
 
 PRODUCT=${PRODUCT:-"SkipRunner"}
