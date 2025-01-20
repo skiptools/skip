@@ -213,6 +213,8 @@ private final class TranslateVisitor {
                     return ("_" + variableName, "skip.ui.Bindable")
                 } else if variable.attributes.contains(.environmentObject) || variable.attributes.environmentAttribute?.tokenTypeSignature != nil {
                     return ("_" + variableName, "skip.ui.Environment")
+                } else if variable.attributes.contains(.focusState) {
+                    return ("_" + variableName, "skip.ui.FocusState")
                 } else {
                     return nil
                 }
@@ -296,12 +298,13 @@ private final class TranslateVisitor {
     private func transform(classDeclaration: KotlinClassDeclaration, isModifier: Bool = false, body: KotlinStatement) {
         let variableDeclarations = classDeclaration.members.compactMap { $0 as? KotlinVariableDeclaration }
         let stateVariables = variableDeclarations.filter { $0.attributes.stateAttribute != nil }
+        let focusStateVariables = variableDeclarations.filter { $0.attributes.contains(.focusState) }
         let environmentVariables = variableDeclarations.filter { $0.attributes.environmentAttribute != nil }
         let bindingVariables = variableDeclarations.filter { $0.attributes.contains(.binding) }
         let bindableVariables = variableDeclarations.filter { $0.attributes.contains(.bindable) || $0.attributes.contains(.observedObject) }
         let appStorageVariables = variableDeclarations.filter { $0.attributes.contains(.appStorage) }
-        if !stateVariables.isEmpty || !environmentVariables.isEmpty || !bindableVariables.isEmpty || !appStorageVariables.isEmpty {
-            let composeFunction = synthesizeComposeFunction(isModifier: isModifier, stateVariables: stateVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables)
+        if !stateVariables.isEmpty || !focusStateVariables.isEmpty || !environmentVariables.isEmpty || !bindableVariables.isEmpty || !appStorageVariables.isEmpty {
+            let composeFunction = synthesizeComposeFunction(isModifier: isModifier, stateVariables: stateVariables, focusStateVariables: focusStateVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables)
             classDeclaration.insert(statements: [composeFunction], after: body)
 
             for stateVariable in stateVariables {
@@ -312,6 +315,9 @@ private final class TranslateVisitor {
                     synthesizeStateBacking(variable: environmentVariable, propertyWrapperTypeName: "skip.ui.Environment", create: true)
                 }
             }
+        }
+        for focusStateVariable in focusStateVariables {
+            synthesizeFocusStateBacking(variable: focusStateVariable)
         }
         for bindingVariable in bindingVariables {
             synthesizeBindingBacking(variable: bindingVariable)
@@ -325,7 +331,7 @@ private final class TranslateVisitor {
     }
 
     /// Create an override of the SkipUI `Compose` function on views and modifiers to handle state synchronization, etc.
-    private func synthesizeComposeFunction(isModifier: Bool, stateVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], appStorageVariables: [KotlinVariableDeclaration]) -> KotlinStatement {
+    private func synthesizeComposeFunction(isModifier: Bool, stateVariables: [KotlinVariableDeclaration], focusStateVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], appStorageVariables: [KotlinVariableDeclaration]) -> KotlinStatement {
         let composeFunction = KotlinFunctionDeclaration(name: isModifier ? "Compose" : "ComposeContent")
         composeFunction.modifiers.visibility = .public
         composeFunction.modifiers.isOverride = true
@@ -341,7 +347,14 @@ private final class TranslateVisitor {
 
         var composeBodyStatements: [KotlinStatement] = []
         for stateVariable in stateVariables {
-            let statements = synthesizeStateSync(variable: stateVariable)
+            let statements = synthesizeStateSync(variable: stateVariable, propertyWrapperTypeName: "skip.ui.State")
+            if !composeBodyStatements.isEmpty {
+                statements[0].extras = .singleNewline
+            }
+            composeBodyStatements += statements
+        }
+        for focusStateVariable in focusStateVariables {
+            let statements = synthesizeStateSync(variable: focusStateVariable, propertyWrapperTypeName: "skip.ui.FocusState")
             if !composeBodyStatements.isEmpty {
                 statements[0].extras = .singleNewline
             }
@@ -357,7 +370,7 @@ private final class TranslateVisitor {
             composeBodyStatements.append(statement)
         }
         for appStorageVariable in appStorageVariables {
-            let statements = synthesizeAppStorageSync(variable: appStorageVariable)
+            let statements = synthesizeStateSync(variable: appStorageVariable, propertyWrapperTypeName: "skip.ui.AppStorage")
             if !composeBodyStatements.isEmpty {
                 statements[0].extras = .singleNewline
             }
@@ -384,19 +397,11 @@ private final class TranslateVisitor {
     }
 
     /// Create code to remember and sync a state variable.
-    private func synthesizeStateSync(variable: KotlinVariableDeclaration) -> [KotlinStatement] {
+    private func synthesizeStateSync(variable: KotlinVariableDeclaration, propertyWrapperTypeName: String) -> [KotlinStatement] {
         // We save and restore the State object rather than its wrappedValue so that bindings can mutate the value even if this
         // view has disappeared from the Compose tree (e.g. is on the back stack). The State object uses a Compose MutableState
         // internally so that all reads and writes are tracked by Compose, including those from bindings
-        let stateValue = KotlinRawStatement(sourceCode: "val remembered\(variable.propertyName) by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<\(variable.propertyType.kotlin)>, Any>) { mutableStateOf(_\(variable.propertyName)) }")
-        let updateStateValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName) = remembered\(variable.propertyName)")
-        return [stateValue, updateStateValue]
-    }
-
-    /// Create code to remember and sync an app storage variable.
-    private func synthesizeAppStorageSync(variable: KotlinVariableDeclaration) -> [KotlinStatement] {
-        // See explanation in the similar code for @State sync
-        let stateValue = KotlinRawStatement(sourceCode: "val remembered\(variable.propertyName) by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.AppStorage<\(variable.propertyType.kotlin)>, Any>) { mutableStateOf(_\(variable.propertyName)) }")
+        let stateValue = KotlinRawStatement(sourceCode: "val remembered\(variable.propertyName) by rememberSaveable(stateSaver = composectx.stateSaver as Saver<\(propertyWrapperTypeName)<\(variable.propertyType.kotlin)>, Any>) { mutableStateOf(_\(variable.propertyName)) }")
         let updateStateValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName) = remembered\(variable.propertyName)")
         return [stateValue, updateStateValue]
     }
@@ -489,6 +494,35 @@ private final class TranslateVisitor {
                     output.append(" = \(propertyWrapperTypeName)(null)")
                 }
             }
+            output.append("\n")
+        }
+        variable.storage = storage
+    }
+
+    /// Create the additional property synthesized for `@FocusState` variables.
+    private func synthesizeFocusStateBacking(variable: KotlinVariableDeclaration) {
+        // Tell the @FocusState variable to get and set its value using _variable of type State
+        let storageName = "_\(variable.propertyName)"
+        var storage = KotlinVariableStorage()
+        storage.isSingleStatementAppendable = { _ in true }
+        storage.appendGet = { variable, sref, isSingleStatement, output, indentation in
+            if !isSingleStatement {
+                output.append(indentation).append("return ")
+            }
+            output.append(storageName).append(".wrappedValue")
+            sref()
+            output.append("\n")
+        }
+        storage.appendSet = { variable, value, output, indentation in
+            output.append(indentation).append(storageName).append(".wrappedValue = ")
+            value()
+            output.append("\n")
+        }
+        storage.appendStorage = { variable, output, indentation in
+            let stateType = variable.propertyType.asPropertyWrapper("skip.ui.FocusState").kotlin
+            output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName)
+            let initialValue = variable.propertyType == .bool ? "false" : "null"
+            output.append(" = ").append(stateType).append("(\(initialValue))")
             output.append("\n")
         }
         variable.storage = storage

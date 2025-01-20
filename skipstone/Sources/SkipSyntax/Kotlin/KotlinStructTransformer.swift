@@ -47,7 +47,7 @@ final class KotlinStructTransformer: KotlinTransformer {
                     variableDeclaration.mutationFunctionNames = Self.mutationFunctionNames
                     isMutable = true
                 }
-                if variableDeclaration.value == nil && (variableDeclaration.attributes.contains(.environment) || variableDeclaration.attributes.contains(.environmentObject)) {
+                if variableDeclaration.value == nil && (variableDeclaration.attributes.environmentAttribute != nil || variableDeclaration.attributes.contains(.focusState)) {
                     // It's so rare to want to pass environment values to the constructor that we omit them when they'd cause an error due to
                     // lack of initial value. To fix this we'd need help from the SwiftUI transformer (which runs after us) to figure out the
                     // variable type in many cases
@@ -211,6 +211,12 @@ final class KotlinStructTransformer: KotlinTransformer {
                 assignment = "this._\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
             } else if variableDeclaration.attributes.contains(.bindable) || variableDeclaration.attributes.contains(.observedObject) {
                 assignment = "this._\(variableDeclaration.propertyName) = skip.ui.Bindable(\(variableDeclaration.propertyName))"
+            } else if variableDeclaration.attributes.contains(.focusState) {
+                var value = variableDeclaration.propertyName
+                if variableDeclaration.mayBeSharedMutableStruct {
+                    value += ".sref()"
+                }
+                assignment = "this._\(variableDeclaration.propertyName) = skip.ui.FocusState(\(value))"
             } else {
                 if variableDeclaration.modifiers.isLazy {
                     assignment = "if (\(variableDeclaration.propertyName) != null) { this.\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
@@ -324,6 +330,8 @@ final class KotlinStructTransformer: KotlinTransformer {
                     return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = copy._\(variableDeclaration.propertyName)")
                 } else if variableDeclaration.attributes.contains(.bindable) || variableDeclaration.attributes.contains(.observedObject) {
                     return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.Bindable(copy.\(variableDeclaration.propertyName))")
+                } else if variableDeclaration.attributes.contains(.focusState) {
+                    return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.FocusState(copy.\(variableDeclaration.propertyName))")
                 } else {
                     // Clear the default value if it will be assigned from the constructor to prevent creating the value twice. The constructor
                     // transformer will then add these assignments to each constructor. So we only do this for 'let' values that other constructors
@@ -462,6 +470,8 @@ final class KotlinStructTransformer: KotlinTransformer {
                 return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = \(copy)._\(variableDeclaration.propertyName)")
             } else if variableDeclaration.attributes.contains(.bindable) || variableDeclaration.attributes.contains(.observedObject) {
                 return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.Bindable(\(copy).\(variableDeclaration.propertyName))")
+            } else if variableDeclaration.attributes.contains(.focusState) {
+                return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.FocusState(\(copy).\(variableDeclaration.propertyName))")
             } else {
                 return KotlinRawStatement(sourceCode: "this.\(variableDeclaration.propertyName) = \(copy).\(variableDeclaration.propertyName)")
             }

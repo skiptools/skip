@@ -207,7 +207,7 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
 
     /// Some property wrappers are non-mutating.
     var isNonMutating: Bool {
-        return contains(.appStorage) || contains(.bindable) || contains(.binding) || contains(.environment) || contains(.environmentObject) || contains(.nonmutating) || contains(.observedObject) || contains(.state) || contains(.stateObject)
+        return contains(.appStorage) || contains(.bindable) || contains(.binding) || contains(.environment) || contains(.environmentObject) || contains(.focusState) || contains(.nonmutating) || contains(.observedObject) || contains(.state) || contains(.stateObject)
     }
 
     /// Convenience to retrieve any @Environment or @EnvironmentObject attribute.
@@ -289,6 +289,7 @@ struct Attribute: Hashable, Codable {
         case environment
         case environmentObject
         case escaping
+        case focusState
         case frozen
         case indirect
         case inlinable
@@ -342,6 +343,8 @@ struct Attribute: Hashable, Codable {
             return .environmentObject
         case "escaping":
             return .escaping
+        case "FocusState":
+            return .focusState
         case "frozen":
             return .frozen
         case "indirect":

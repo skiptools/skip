@@ -1734,7 +1734,7 @@ final class VariableDeclaration: Statement {
     var apiFlags: APIFlags {
         // Default to assuming that get-only protocol properties are computed
         let isComputed = getter?.body != nil || (getter != nil && setter == nil)
-        return APIFlags(isAsync: asyncBehavior != .sync, isMainActor: attributes.contains(.mainActor), isSwiftUIBindable: attributes.contains(.bindable) || attributes.contains(.observedObject) || attributes.contains(.state) || attributes.contains(.stateObject) || attributes.contains(.binding) || attributes.contains(.environmentObject) || attributes.environmentAttribute?.tokenTypeSignature != nil, isViewBuilder: attributes.contains(.viewBuilder), isComputed: isComputed, isWriteable: !isLet && (getter == nil || setter != nil), throwsType: throwsType)
+        return APIFlags(isAsync: asyncBehavior != .sync, isMainActor: attributes.contains(.mainActor), isSwiftUIBindable: attributes.contains(.bindable) || attributes.contains(.observedObject) || attributes.contains(.state) || attributes.contains(.stateObject) || attributes.contains(.binding) || attributes.contains(.environmentObject) || attributes.environmentAttribute?.tokenTypeSignature != nil || attributes.contains(.focusState), isViewBuilder: attributes.contains(.viewBuilder), isComputed: isComputed, isWriteable: !isLet && (getter == nil || setter != nil), throwsType: throwsType)
     }
     var isMutating: Bool {
         return !isLet && (getter == nil || setter != nil) && !attributes.isNonMutating
