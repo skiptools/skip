@@ -870,6 +870,77 @@ final class SwiftUITests: XCTestCase {
         """)
     }
 
+    func testFocusStateVariable() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        enum FocusField {
+            case textA, textB
+        }
+        struct V: View {
+            @FocusState var b: Bool
+            @FocusState var e: FocusField?
+            var body: some View {
+                VStack {
+                    Text("b: \\(b)")
+                    Text("e: \\(e == .textA)")
+                }
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
+        internal enum class FocusField {
+            textA,
+            textB;
+        }
+        internal class V: View {
+            internal var b: Boolean
+                get() = _b.wrappedValue
+                set(newValue) {
+                    _b.wrappedValue = newValue
+                }
+            internal var _b = skip.ui.FocusState<Boolean>(false)
+            internal var e: FocusField?
+                get() = _e.wrappedValue
+                set(newValue) {
+                    _e.wrappedValue = newValue
+                }
+            internal var _e = skip.ui.FocusState<FocusField?>(null)
+            override fun body(): View {
+                return ComposeBuilder { composectx: ComposeContext ->
+                    VStack { ->
+                        ComposeBuilder { composectx: ComposeContext ->
+                            Text("b: ${b}").Compose(composectx)
+                            Text("e: ${e == FocusField.textA}").Compose(composectx)
+                            ComposeResult.ok
+                        }
+                    }.Compose(composectx)
+                }
+            }
+
+            @Composable
+            override fun ComposeContent(composectx: ComposeContext) {
+                val rememberedb by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.FocusState<Boolean>, Any>) { mutableStateOf(_b) }
+                _b = rememberedb
+
+                val rememberede by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.FocusState<FocusField?>, Any>) { mutableStateOf(_e) }
+                _e = rememberede
+
+                super.ComposeContent(composectx)
+            }
+        }
+        """)
+    }
+
     func testKeyedEnvironmentVariable() async throws {
         try await check(supportingSwift: baseSupportingSwift + """
         extension Int {
