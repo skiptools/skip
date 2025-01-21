@@ -17,7 +17,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: current
-          generate-job-summary: false
+          add-job-summary: never
 
       - name: Checkout skipstone
         uses: actions/checkout@v4

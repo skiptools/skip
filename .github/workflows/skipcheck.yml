@@ -12,7 +12,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: current
-          generate-job-summary: false
+          add-job-summary: never
       - name: Cache Homebrew packages
         uses: actions/cache@v4
         with:
