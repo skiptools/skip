@@ -47,7 +47,18 @@ struct  StatementDecoder {
 
 /// Decoding context.
 struct DecodeContext {
-    var memberOf: (type: StatementType, modifiers: Modifiers)?
+    var memberOf: (type: StatementType, modifiers: Modifiers, flags: DecodeFlags)?
+}
+
+struct DecodeFlags: OptionSet {
+    /// Decoding for SwiftUI state only
+    static let swiftUIState = DecodeFlags(rawValue: 1 << 0)
+
+    let rawValue: Int
+
+    init(rawValue: Int) {
+        self.rawValue = rawValue
+    }
 }
 
 /// Levels of decoding.
