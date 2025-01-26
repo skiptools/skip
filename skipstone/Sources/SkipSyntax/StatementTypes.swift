@@ -649,6 +649,10 @@ final class IfDefined: Statement {
                     ifSkipBlockType = .ifNotSkipBridge
                     negated = !isNot
                     isTrue = isNot
+                } else if symbol.hasPrefix("canImport(Skip") {
+                    ifSkipBlockType = .ifCanImportSkipLib
+                    negated = isNot
+                    isTrue = !isNot
                 } else if preprocessorSymbols.contains(String(symbol)) {
                     ifSkipBlockType = nil
                     negated = isNot
@@ -985,14 +989,13 @@ final class ExtensionDeclaration: TypeDeclaration {
             return nil
         }
         let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
-        var context = context
-        context.memberOf = (.extensionDeclaration, modifiers)
-
         var attributes = Attributes.for(syntax: extensionDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return []
         }
+        var context = context
+        context.memberOf = (.extensionDeclaration, modifiers, [])
 
         let (inherits, inheritsMessages) = extensionDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: nil, where: extensionDecl.genericWhereClause, in: syntaxTree)
@@ -1077,6 +1080,7 @@ final class FunctionDeclaration: Statement {
         guard decodeLevel != .none else {
             return nil
         }
+
         let name = functionDecl.name.text.removingBacktickEscaping
         let (returnType, parameters, signatureMessges) = functionDecl.signature.typeSignatures(in: syntaxTree)
         let isAsync = functionDecl.signature.effectSpecifiers?.asyncSpecifier != nil
@@ -1105,6 +1109,7 @@ final class FunctionDeclaration: Statement {
                 return nil
             }
         }
+
         let isOptionalInit = initializerDecl.optionalMark != nil
         let (_, parameters, signatureMessages) = initializerDecl.signature.typeSignatures(in: syntaxTree)
         let isAsync = initializerDecl.signature.effectSpecifiers?.asyncSpecifier != nil
@@ -1280,6 +1285,7 @@ final class SubscriptDeclaration: Statement {
         guard decodeLevel != .none else {
             return []
         }
+
         let elementType = TypeSignature.for(syntax: subscriptDecl.returnClause.type, in: syntaxTree)
         let (parameters, parametersMessages) = subscriptDecl.parameterClause.parameters(in: syntaxTree)
         let (generics, genericsMessages) = Generics.for(syntax: subscriptDecl.genericParameterClause, where: subscriptDecl.genericWhereClause, in: syntaxTree)
@@ -1400,6 +1406,7 @@ final class TypealiasDeclaration: Statement {
         guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return []
         }
+
         let name = typealiasDecl.name.text.removingBacktickEscaping
         let (generics, messages) = Generics.for(syntax: typealiasDecl.genericParameterClause, where: typealiasDecl.genericWhereClause, in: syntaxTree)
         let aliasedType = TypeSignature.for(syntax: typealiasDecl.initializer.value, in: syntaxTree)
@@ -1503,14 +1510,14 @@ class TypeDeclaration: Statement {
 
     private static func decodeClassDeclaration(_ classDecl: ClassDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
         let modifiers = Modifiers.for(syntax: classDecl.modifiers)
-        var context = context
-        context.memberOf = (.classDeclaration, modifiers)
-
         var attributes = Attributes.for(syntax: classDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
+        var context = context
+        context.memberOf = (.classDeclaration, modifiers, [])
+
         let name = classDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = classDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: classDecl.genericParameterClause, where: classDecl.genericWhereClause, in: syntaxTree)
@@ -1522,16 +1529,27 @@ class TypeDeclaration: Statement {
 
     private static func decodeStructDeclaration(_ structDecl: StructDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
         let modifiers = Modifiers.for(syntax: structDecl.modifiers)
-        var context = context
-        context.memberOf = (.structDeclaration, modifiers)
-
         var attributes = Attributes.for(syntax: structDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
-        guard self.decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
-            return nil
+        var (inherits, inheritsMessages) = structDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
+        let inheritsView = inherits.first { $0.isNamed("View", moduleName: "SwiftUI", generics: []) || $0.isNamed("View", moduleName: "SkipFuseUI", generics: []) }
+        var decodeLevel = self.decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        var decodeFlags: DecodeFlags = []
+        if decodeLevel == .none {
+            // We need to decode native views for adapting to SkipFuseUI
+            if syntaxTree.isBridgeFile, let inheritsView {
+                decodeLevel = .api
+                decodeFlags.insert(.swiftUIState)
+                // We don't care about other protocols
+                inherits = [inheritsView]
+            } else {
+                return nil
+            }
         }
+        var context = context
+        context.memberOf = (.structDeclaration, modifiers, decodeFlags)
+
         let name = structDecl.name.text.removingBacktickEscaping
-        let (inherits, inheritsMessages) = structDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: structDecl.genericParameterClause, where: structDecl.genericWhereClause, in: syntaxTree)
         let (members, unbridgedMemberKinds) = decodeMembers(syntaxListContainer: structDecl.memberBlock, context: context, in: syntaxTree)
         let statement = TypeDeclaration(type: .structDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, unbridgedMemberKinds: unbridgedMemberKinds, syntax: structDecl, sourceFile: syntaxTree.source.file, sourceRange: structDecl.range(in: syntaxTree.source), extras: extras)
@@ -1541,14 +1559,14 @@ class TypeDeclaration: Statement {
 
     private static func decodeProtocolDeclaration(_ protocolDecl: ProtocolDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
         let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
-        var context = context
-        context.memberOf = (.protocolDeclaration, modifiers)
-
         var attributes = Attributes.for(syntax: protocolDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
+        var context = context
+        context.memberOf = (.protocolDeclaration, modifiers, [])
+
         let name = protocolDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = protocolDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let associatedTypeDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind == .associatedTypeDecl ? $0.decl.as(AssociatedTypeDeclSyntax.self) : nil }
@@ -1562,14 +1580,14 @@ class TypeDeclaration: Statement {
 
     private static func decodeEnumDeclaration(_ enumDecl: EnumDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
         let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
-        var context = context
-        context.memberOf = (.enumDeclaration, modifiers)
-
         var attributes = Attributes.for(syntax: enumDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
+        var context = context
+        context.memberOf = (.enumDeclaration, modifiers, [])
+
         let name = enumDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = enumDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: enumDecl.genericParameterClause, where: enumDecl.genericWhereClause, in: syntaxTree)
@@ -1581,14 +1599,14 @@ class TypeDeclaration: Statement {
 
     private static func decodeActorDeclaration(_ actorDecl: ActorDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
         let modifiers = Modifiers.for(syntax: actorDecl.modifiers)
-        var context = context
-        context.memberOf = (.actorDeclaration, modifiers)
-
         var attributes = Attributes.for(syntax: actorDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
             return nil
         }
+        var context = context
+        context.memberOf = (.actorDeclaration, modifiers, [])
+
         let name = actorDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = actorDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: actorDecl.genericParameterClause, where: actorDecl.genericWhereClause, in: syntaxTree)
@@ -1773,6 +1791,7 @@ final class VariableDeclaration: Statement {
                 return []
             }
         }
+
         let isLet = variableDecl.bindingSpecifier.text == "let"
         let isAsync = variableDecl.modifiers.contains(where: { $0.name.text == "async" })
         var statements: [Statement] = []

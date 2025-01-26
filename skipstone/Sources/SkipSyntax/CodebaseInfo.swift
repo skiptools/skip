@@ -1432,6 +1432,10 @@ public final class CodebaseInfo {
             return copy
         }
 
+        var isEmpty: Bool {
+            return rootTypes.isEmpty && rootTypealiases.isEmpty && rootVariables.isEmpty && rootFunctions.isEmpty && rootExtensions.isEmpty
+        }
+
         func prepareForUse() {
             rootTypes.forEach { prepareForUse(typeInfo: $0) }
             rootTypealiases = rootTypealiases.map { repopulateSourceFile(for: $0) }

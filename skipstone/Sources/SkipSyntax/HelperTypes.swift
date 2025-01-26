@@ -756,6 +756,8 @@ enum IfSkipBlockType {
     case ifSkip
     /// `#if !SKIP_BRIDGE`
     case ifNotSkipBridge
+    /// `#if canImport(Skip*)`
+    case ifCanImportSkipLib
 }
 
 /// A labeled value, as used in function call parameters.

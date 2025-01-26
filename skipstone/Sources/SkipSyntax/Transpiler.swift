@@ -49,7 +49,7 @@ public struct Transpiler {
                     // we may get errors from unsupported Swift if we're doing a full decode here, but they won't
                     // bubble up to the user because these trees are only used to gather information, and we re-parse
                     // for only bridging below
-                    let shouldBridge = isBridgeEnabled && bridgeSource.content.contains("public") || bridgeSource.content.contains("open")
+                    let shouldBridge = isBridgeEnabled && bridgeSource.content.contains("public") || bridgeSource.content.contains("open") || bridgeSource.content.contains("SkipFuseUI")
                     let bridgeDecodeLevel: DecodeLevel = isBridgeGatherEnabled ? .full : shouldBridge ? .api : .none
                     if bridgeDecodeLevel == .none {
                         return nil

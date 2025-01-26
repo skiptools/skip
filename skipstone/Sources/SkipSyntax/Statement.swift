@@ -30,8 +30,15 @@ class Statement: SyntaxNode {
     /// How to decode a declaration with the given attributes and visibility.
     static func decodeLevel(attributes: Attributes, visibility: Modifiers.Visibility, context: DecodeContext, in syntaxTree: SyntaxTree) -> DecodeLevel {
         // For full or none levels, no logic needed
-        guard syntaxTree.decodeLevel == .api else {
+        guard syntaxTree.decodeLevel != .full && syntaxTree.decodeLevel != .none else {
             return syntaxTree.decodeLevel
+        }
+        // We need to track state in SwiftUI views regardless of visibility
+        if syntaxTree.isBridgeFile, context.memberOf?.type == .structDeclaration, attributes.stateAttribute != nil || attributes.environmentAttribute != nil || attributes.contains(.focusState) {
+            return .api
+        }
+        guard context.memberOf?.flags.contains(.swiftUIState) != true else {
+            return .none
         }
         guard !syntaxTree.isBridgeFile || !attributes.isNoBridge else {
             return .none
