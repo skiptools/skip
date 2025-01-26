@@ -78,9 +78,7 @@ class SkipCommandTests : XCTestCase {
         │  │     └─ main
         │  │        ├─ AndroidManifest.xml
         │  │        ├─ kotlin
-        │  │        │  └─ hello
-        │  │        │     └─ skip
-        │  │        │        └─ Main.kt
+        │  │        │  └─ Main.kt
         │  │        └─ res
         │  │           ├─ mipmap-hdpi
         │  │           │  └─ ic_launcher.png
