@@ -292,7 +292,7 @@ extension ToolOptionsCommand {
         }
 
         if verify {
-            try await performVerifyCommand(project: projectPath.pathString, with: out)
+            try await performVerifyCommand(project: projectPath.pathString, with: out.subqueue("Verify Project"), free: free)
         }
 
         if showTree {
@@ -320,7 +320,7 @@ extension ToolOptionsCommand {
 
 extension ToolOptionsCommand {
     /// Perform a monitor check on the given URL
-    func check<T, U>(_ item: T, with out: MessageQueue, title: String, handle: @escaping (T) throws -> U) async -> Result<U, Error> {
+    @discardableResult func check<T, U>(_ item: T, with out: MessageQueue, title: String, handle: @escaping (T) throws -> U) async -> Result<U, Error> {
         await outputOptions.monitor(with: out, title, resultHandler: { result in
             return (nil, nil) as (result: Result<U, any Error>?, message: MessageBlock?)
         }) { line in
@@ -330,12 +330,13 @@ extension ToolOptionsCommand {
 
 
     /// Perform a monitor check on the given URL
-    func checkFile(_ url: URL, with out: MessageQueue, title: String, handle: @escaping (URL) throws -> CheckStatus) async {
-        await outputOptions.monitor(with: out, title, resultHandler: { result in
+    @discardableResult func checkFile(_ url: URL, with out: MessageQueue, title: String? = nil, handle: @escaping (URL) throws -> CheckStatus) async -> Bool {
+        let title = title ?? "Check \(url.lastPathComponent)"
+        let result = await outputOptions.monitor(with: out, title, resultHandler: { result in
             do {
                 if let resultURL = try result?.get() {
                     let handleResult = try handle(resultURL)
-                    return (result, MessageBlock(status: handleResult.status, handleResult.message))
+                    return (result, MessageBlock(status: handleResult.status, handleResult.message ?? title))
                 } else {
                     return (result, nil)
                 }
@@ -345,13 +346,14 @@ extension ToolOptionsCommand {
         }) { loggingHandler in
             return url
         }
+        return (try? result.get()) != nil
     }
 
 }
 
 struct CheckStatus {
-    let status: MessageBlock.Status
-    let message: String
+    var status: MessageBlock.Status
+    var message: String? = nil
 }
 
 struct PackageModule {

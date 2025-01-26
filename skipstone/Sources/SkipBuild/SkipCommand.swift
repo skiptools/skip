@@ -388,6 +388,11 @@ actor MessageQueue {
         self.continuation = continuation
     }
 
+    func subqueue(_ title: String) -> MessageQueue {
+        // TODO: create a child message queue that will be used for nesting output messages or hiding them in terse mode
+        return self
+    }
+
     @discardableResult public func yield(_ value: MessageStream.Element) -> AsyncThrowingStream<MessageStream.Element, Error>.Continuation.YieldResult {
         if retain {
             elements.append(.success(value))
@@ -414,7 +419,7 @@ actor MessageQueue {
 
 extension StreamingCommand {
 
-    /// Returns the plugin build output filder with the given module and package names, taking into account changes in the SwiftPM output folder structure between different Swift versions.
+    /// Returns the plugin build output folder with the given module and package names, taking into account changes in the SwiftPM output folder structure between different Swift versions.
     func buildPluginOutputFolder(forModule moduleName: String, withPackageName packageName: String, inBuildFolder buildFolderAbsolute: AbsolutePath) throws -> AbsolutePath {
         var buildOutputFolder = buildFolderAbsolute.appending(components: ["plugins", "outputs", packageName, moduleName])
         // accomodate the change in plugin output folders for Swift 6/Xcode 16:
@@ -493,7 +498,6 @@ protocol StreamingCommand: AsyncParsableCommand {
     var outputOptions: OutputOptions { get set }
 
     associatedtype Output : MessageEncodable
-    //typealias OutputMessage = Either<Output>.Or<Message>
 
     /// Perform the command, which will write messages to the output queue
     func performCommand(with out: MessageQueue) async throws
@@ -1019,6 +1023,15 @@ extension URL {
         throw ToolNotFoundError(errorDescription: "An executable tool named '\(toolName)' could not be found in the PATH, nor was it specified as part of the command-line flags.")
     }
 
+    func lastPathComponents(_ count: Int) -> String {
+        var components: [String] = []
+        var url = self
+        for _ in 0..<count {
+            components.append(url.lastPathComponent)
+            url = url.deletingLastPathComponent()
+        }
+        return components.reversed().joined(separator: "/")
+    }
 }
 
 protocol BuildOptionsCommand : ParsableArguments {
@@ -1034,7 +1047,7 @@ struct BuildOptions: ParsableArguments {
     var test: Bool = false
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Verify the project output"))
-    var verify: Bool = true
+    var verify: Bool = false
 }
 
 struct ProjectTemplate : Codable {

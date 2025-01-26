@@ -1012,9 +1012,9 @@ struct TestData : Codable, Hashable {
 
         if free == true {
             if app {
-                try licenseGPL.write(to: projectFolderURL.appending(path: "LICENSE.GPL"), atomically: false, encoding: .utf8)
+                try licenseGPLContents.write(to: projectFolderURL.appending(path: "LICENSE.GPL"), atomically: false, encoding: .utf8)
             } else {
-                try licenseLGPL.write(to: projectFolderURL.appending(path: "LICENSE.LGPL"), atomically: false, encoding: .utf8)
+                try licenseLGPLContents.write(to: projectFolderURL.appending(path: "LICENSE.LGPL"), atomically: false, encoding: .utf8)
             }
         }
 
@@ -1072,6 +1072,8 @@ class AppProjectLayout : FrameworkProjectLayout {
     let androidAppSrcMainKotlin: URL
     let androidFastlaneFolder: URL
 
+    var androidFastlaneMetadataFolder: URL { androidFastlaneFolder.appendingPathComponent("metadata/android", isDirectory: true) }
+    var darwinFastlaneMetadataFolder: URL { darwinFastlaneFolder.appendingPathComponent("metadata", isDirectory: true) }
 
     init(moduleName: String, root: URL, check: (URL, Bool) throws -> () = checkURLExists) rethrows {
         self.moduleName = moduleName
@@ -1405,7 +1407,9 @@ end
 
 desc "Deploy Skip Android App to Google Play"
 lane :release do
+
   assemble
+
   upload_to_play_store(
     aab: '../.build/Android/app/outputs/bundle/release/app-release.aab'
   )
@@ -1418,19 +1422,19 @@ end
             try """
 A great new app built with Skip!
 
-""".write(to: appProject.androidFastlaneFolder.appendingPathComponent("metadata/android/en-US/full_description.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+""".write(to: appProject.androidFastlaneMetadataFolder.appendingPathComponent("en-US/full_description.txt").createParentDirectory(), atomically: false, encoding: .utf8)
 
             // metadata/android/en-US/title.txt
             try """
 \(appModuleName)
 
-""".write(to: appProject.androidFastlaneFolder.appendingPathComponent("metadata/android/en-US/title.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+""".write(to: appProject.androidFastlaneMetadataFolder.appendingPathComponent("en-US/title.txt").createParentDirectory(), atomically: false, encoding: .utf8)
 
             // metadata/android/en-US/short_description.txt
             try """
 A great new app built with Skip!
 
-""".write(to: appProject.androidFastlaneFolder.appendingPathComponent("metadata/android/en-US/short_description.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+""".write(to: appProject.androidFastlaneMetadataFolder.appendingPathComponent("en-US/short_description.txt").createParentDirectory(), atomically: false, encoding: .utf8)
 
 
         }
@@ -1479,6 +1483,10 @@ end
 
 lane :release do |options|
   desc "Build and release app"
+
+  # if you have an apikey.json file (https://developer.apple.com/documentation/appstoreconnectapi/creating-api-keys-for-app-store-connect-api), fastlane can automatically fetch certificates and the ASC authentication information
+  #get_certificates(api_key_path: "fastlane/apikey.json")
+  #get_provisioning_profile(api_key_path: "fastlane/apikey.json")
 
   assemble
 
@@ -1567,61 +1575,61 @@ submission_information({
   "unrestrictedWebAccess": false
 }
 
-""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/rating.json").createParentDirectory(), atomically: false, encoding: .utf8)
+""".write(to: appProject.darwinFastlaneMetadataFolder.appendingPathComponent("rating.json").createParentDirectory(), atomically: false, encoding: .utf8)
 
             // description.txt
             try """
 A great new app built with Skip!
 
-""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/description.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+""".write(to: appProject.darwinFastlaneMetadataFolder.appendingPathComponent("en-US/description.txt").createParentDirectory(), atomically: false, encoding: .utf8)
 
             // keywords.txt
             try """
 app,key,words
 
-""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/keywords.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+""".write(to: appProject.darwinFastlaneMetadataFolder.appendingPathComponent("en-US/keywords.txt").createParentDirectory(), atomically: false, encoding: .utf8)
 
             // privacy_url.txt
             try """
 https://example.org/privacy/
 
-""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/privacy_url.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+""".write(to: appProject.darwinFastlaneMetadataFolder.appendingPathComponent("en-US/privacy_url.txt").createParentDirectory(), atomically: false, encoding: .utf8)
 
             // release_notes.txt
             try """
 Bug fixes and performance improvements.
 
-""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/release_notes.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+""".write(to: appProject.darwinFastlaneMetadataFolder.appendingPathComponent("en-US/release_notes.txt").createParentDirectory(), atomically: false, encoding: .utf8)
 
             // software_url.txt
             try """
 https://example.org/app/
 
-""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/software_url.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+""".write(to: appProject.darwinFastlaneMetadataFolder.appendingPathComponent("en-US/software_url.txt").createParentDirectory(), atomically: false, encoding: .utf8)
 
             // subtitle.txt
             try """
 A new Skip app
 
-""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/subtitle.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+""".write(to: appProject.darwinFastlaneMetadataFolder.appendingPathComponent("en-US/subtitle.txt").createParentDirectory(), atomically: false, encoding: .utf8)
 
             // support_url.txt
             try """
 https://example.org/support/
 
-""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/support_url.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+""".write(to: appProject.darwinFastlaneMetadataFolder.appendingPathComponent("en-US/support_url.txt").createParentDirectory(), atomically: false, encoding: .utf8)
 
             // title.txt
             try """
 \(appModuleName)
 
-""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/title.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+""".write(to: appProject.darwinFastlaneMetadataFolder.appendingPathComponent("en-US/title.txt").createParentDirectory(), atomically: false, encoding: .utf8)
 
             // version_whats_new.txt
             try """
 New features and better performance.
 
-""".write(to: appProject.darwinFastlaneFolder.appendingPathComponent("metadata/en-US/version_whats_new.txt").createParentDirectory(), atomically: false, encoding: .utf8)
+""".write(to: appProject.darwinFastlaneMetadataFolder.appendingPathComponent("en-US/version_whats_new.txt").createParentDirectory(), atomically: false, encoding: .utf8)
 
         }
 
@@ -2310,6 +2318,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 /* Begin XCBuildConfiguration section */
         499CD4422AC5B799001AE8D8 /* Debug */ = {
             isa = XCBuildConfiguration;
+            baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(APP).xcconfig */;
             buildSettings = {
                 ENABLE_PREVIEWS = YES;
                 LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
@@ -2319,6 +2328,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
         };
         499CD4432AC5B799001AE8D8 /* Release */ = {
             isa = XCBuildConfiguration;
+            baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(APP).xcconfig */;
             buildSettings = {
                 ENABLE_PREVIEWS = YES;
                 LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
@@ -2328,7 +2338,6 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
         };
         49F90C4B2A52156300F06D93 /* Debug */ = {
             isa = XCBuildConfiguration;
-            baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(APP).xcconfig */;
             buildSettings = {
                 ALWAYS_SEARCH_USER_PATHS = NO;
                 ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -2348,7 +2357,6 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
         };
         49F90C4C2A52156300F06D93 /* Release */ = {
             isa = XCBuildConfiguration;
-            baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(APP).xcconfig */;
             buildSettings = {
                 ALWAYS_SEARCH_USER_PATHS = NO;
                 ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -2414,7 +2422,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
         try defaultGradleWrapperProperties().write(to: appProject.androidGradleWrapperProperties.createParentDirectory(), atomically: false, encoding: .utf8)
 
 
-        let sourceMainKotlinPackage = appProject.androidAppSrcMainKotlin.appendingPathComponent(appModulePackage.split(separator: ".").joined(separator: "/"), isDirectory: true)
+        let sourceMainKotlinPackage = appProject.androidAppSrcMainKotlin
         let sourceMainKotlinSourceFile = sourceMainKotlinPackage.appendingPathComponent("Main.kt")
         try createKotlinMain(appModulePackage: appModulePackage, appModuleName: appModuleName, nativeLibrary: native ? secondModule?.moduleName : nil).write(to: sourceMainKotlinSourceFile.createParentDirectory(), atomically: false, encoding: .utf8)
 
@@ -2867,7 +2875,7 @@ enum SourceLicense: Equatable, CaseIterable {
 }
 
 
-fileprivate let licenseLGPL = """
+let licenseLGPLContents = """
                    GNU LESSER GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 
@@ -3036,7 +3044,7 @@ Library.
 
 """
 
-fileprivate let licenseGPL = """
+let licenseGPLContents = """
                     GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 

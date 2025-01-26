@@ -1,5 +1,6 @@
 import Foundation
 import ArgumentParser
+import Universal
 //import TSCUtility
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
@@ -20,9 +21,19 @@ struct VerifyCommand: SkipCommand, StreamingCommand, ProjectCommand, ToolOptions
     @Option(help: ArgumentHelp("Project folder", valueName: "dir"))
     var project: String = "."
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Validate free project"))
+    var free: Bool? = nil
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Validate fastlane config"))
+    var fastlane: Bool? = nil
+
+    // we do not fail fast by default for verify since it is useful to see all the parts that failed
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Fail immediately when an error occurs"))
+    var failFast: Bool = false
+
     func performCommand(with out: MessageQueue) async {
         await withLogStream(with: out) {
-            try await performVerifyCommand(project: project, with: out)
+            try await performVerifyCommand(project: project, with: out, free: free, fastlane: fastlane)
         }
     }
 }
@@ -34,8 +45,53 @@ struct NoResultOutputError : LocalizedError {
 
 extension ToolOptionsCommand {
 
-    func performVerifyCommand(project projectPath: String, with out: MessageQueue) async throws {
+    func performVerifyCommand(project projectPath: String, with out: MessageQueue, free: Bool? = nil, fastlane: Bool? = nil) async throws {
         let projectFolderURL = URL(fileURLWithPath: projectPath, isDirectory: true)
+
+        func checkFolder(_ dir: URL, _ message: String? = nil) async -> Bool {
+            await checkFile(dir, with: out, title: message ?? "Check folder: \(dir.lastPathComponents(2))") { url in
+                return CheckStatus(status: url.isDirectoryFile == true ? .pass : .fail, message: message ?? "Check folder: \(dir.lastPathComponents(2))")
+            }
+        }
+
+        /// Returns either the value of the flag, or, if nil, whether any of the specified files exist at the given paths.
+        ///
+        /// This is used to provide a default value for otherwise unspecified values.
+        func flagOrFiles(_ flag: Bool?, _ fileURLs: URL...) -> Bool {
+            if let flag = flag {
+                return flag
+            }
+
+            // return true if any of the file URLs exist
+            return fileURLs.first { $0.isReadableFile == true } != nil
+        }
+
+        @discardableResult func checkFileContents(_ file: URL, message: String? = nil, length: Range<Int>? = nil, matchContents: String? = nil, isURL: Bool = false) async -> Bool {
+            await checkFile(file, with: out, title: message) { url in
+                if url.isRegularFile != true {
+                    return CheckStatus(status: .fail, message: "Missing file: \(file.relativePath)")
+                }
+
+                let contents = try String(contentsOf: url, encoding: .utf8)
+                if let matchContents, matchContents != contents {
+                    return CheckStatus(status: .fail, message: "Contents did not match expected contents: \(file.relativePath)")
+                }
+
+                if let length, contents.count < length.lowerBound {
+                    return CheckStatus(status: .fail, message: "Contents too short (\(contents.count) < \(length.lowerBound)): \(file.relativePath)")
+                }
+
+                if let length, contents.count > length.upperBound {
+                    return CheckStatus(status: .fail, message: "Contents too long (\(contents.count) < \(length.upperBound)): \(file.relativePath)")
+                }
+
+                if isURL == true && (contents.hasPrefix("https://") == false || URL(string: contents) == nil) {
+                    return CheckStatus(status: .fail, message: "Contents not a valid URL: \(file.relativePath)")
+                }
+
+                return CheckStatus(status: .pass, message: message ?? "Verify file: \(file.lastPathComponent)")
+            }
+        }
 
         let packageJSON = try await parseSwiftPackage(with: out, at: projectPath)
         let packageName = packageJSON.name
@@ -46,16 +102,104 @@ extension ToolOptionsCommand {
             moduleName = moduleName.dropLast(3).description
         }
 
-        let androidDir = projectFolderURL.appendingPathComponent("Android", isDirectory: true)
-        let darwinDir = projectFolderURL.appendingPathComponent("Darwin", isDirectory: true)
+
+        //let project = try FrameworkProjectLayout(root: projectFolderURL)
+
+        let sourcesDir = URL(fileURLWithPath: "Sources", isDirectory: true, relativeTo: projectFolderURL)
+
+        let licenseGPL = URL(fileURLWithPath: "LICENSE.GPL", isDirectory: false, relativeTo: projectFolderURL)
+        let licenseLGPL = URL(fileURLWithPath: "LICENSE.LGPL", isDirectory: false, relativeTo: projectFolderURL)
+        if flagOrFiles(free, licenseGPL, licenseLGPL) {
+            if licenseLGPL.isReadableFile == true {
+                await checkFileContents(licenseLGPL, message: "Verify free software license", matchContents: licenseLGPLContents)
+            } else {
+                // either GPL or LGPL license file must exist for it to pass the free test
+                await checkFileContents(licenseGPL, message: "Verify free software license", matchContents: licenseGPLContents)
+            }
+
+            if await checkFolder(sourcesDir) {
+                await checkFile(sourcesDir, with: out, title: "Verify source file license headers") { url in
+                    let srcFiles = try FileManager.default.enumeratedURLs(of: url)
+                    let (unlicensedSources, _) = try SourceValidator.scanSources(from: srcFiles, in: ["swift"])
+                    if unlicensedSources.isEmpty {
+                        return CheckStatus(status: .pass, message: "Verify source file license headers (\(srcFiles.count))")
+                    } else {
+                        return CheckStatus(status: .fail, message: "Invalid license headers in: \(unlicensedSources.map(\.relativePath).joined(separator: ", "))")
+                    }
+                }
+            }
+        }
+
+        let androidDir = URL(fileURLWithPath: "Android", isDirectory: true, relativeTo: projectFolderURL)
+        let darwinDir = URL(fileURLWithPath: "Darwin", isDirectory: true, relativeTo: projectFolderURL)
         let isAppProject = androidDir.fileExists(isDirectory: true) && darwinDir.fileExists(isDirectory: true)
 
         if isAppProject {
             let project = try AppProjectLayout(moduleName: moduleName, root: projectFolderURL)
-            let _ = project
-        } else {
-            let project = try FrameworkProjectLayout(root: projectFolderURL)
-            let _ = project
+
+            await checkFile(project.skipEnv, with: out) { url in
+                //let plist = try PLIST.parse(Data(contentsOf: url))
+                return CheckStatus(status: .pass)
+            }
+
+            await checkFile(project.androidManifest, with: out) { url in
+                let node = try XMLNode.parse(data: Data(contentsOf: url), options: [.processNamespaces], entityResolver: nil)
+                guard let manifest = node.elementChildren.first else {
+                    return CheckStatus(status: .fail, message: "Verify AndroidManifest.xml: root node is not <manifest>: \(node.elementName)")
+                }
+                if manifest.elementName != "manifest" {
+                    return CheckStatus(status: .fail, message: "Verify AndroidManifest.xml: root node is not <manifest>: \(manifest.elementName)")
+                }
+                guard let application = manifest.elementChildren.first(where: { $0.elementName == "application" }) else {
+                    return CheckStatus(status: .fail, message: "Verify AndroidManifest.xml: <application> node not found")
+                }
+                // TODO: add more checks for application and uses-permission…
+                let _ = application
+
+                return CheckStatus(status: .pass)
+            }
+
+            if flagOrFiles(fastlane, project.darwinFastlaneFolder, project.androidFastlaneFolder) {
+                if await checkFolder(project.darwinFastlaneFolder) {
+                    let metadataDir = project.darwinFastlaneMetadataFolder
+                    for locale in ["en-US"] {
+                        let enUSDir = metadataDir.appendingPathComponent(locale, isDirectory: true)
+                        await checkFileContents(enUSDir.appendingPathComponent("title.txt"), length: 1..<30)
+                        await checkFileContents(enUSDir.appendingPathComponent("subtitle.txt"), length: 1..<30)
+                        await checkFileContents(enUSDir.appendingPathComponent("description.txt"), length: 1..<4000)
+                        await checkFileContents(enUSDir.appendingPathComponent("keywords.txt"), length: 1..<255)
+                        await checkFileContents(enUSDir.appendingPathComponent("release_notes.txt"), length: 1..<4000)
+                        await checkFileContents(enUSDir.appendingPathComponent("version_whats_new.txt"), length: 1..<4000)
+                        await checkFileContents(enUSDir.appendingPathComponent("software_url.txt"), length: 1..<255, isURL: true)
+                        await checkFileContents(enUSDir.appendingPathComponent("privacy_url.txt"), length: 1..<255, isURL: true)
+                        await checkFileContents(enUSDir.appendingPathComponent("support_url.txt"), length: 1..<255, isURL: true)
+
+                        // TODO: replicate Fastlane's deliver checks like:
+                        /*
+                         [14:03:21]: ✅  Passed: No negative  sentiment
+                         [14:03:21]: ✅  Passed: No placeholder text
+                         [14:03:21]: ✅  Passed: No mentioning  competitors
+                         [14:03:21]: ✅  Passed: No future functionality promises
+                         [14:03:21]: ✅  Passed: No words indicating test content
+                         [14:03:21]: ✅  Passed: No curse words
+                         [14:03:21]: ✅  Passed: No words indicating your IAP is free
+                         [14:03:21]: ✅  Passed: Incorrect, or missing copyright date
+                         [14:03:21]: ✅  Passed: No broken urls
+
+                         */
+                    }
+                }
+
+                if await checkFolder(project.androidFastlaneFolder) {
+                    let metadataDir = project.androidFastlaneMetadataFolder
+                    for locale in ["en-US"] {
+                        let enUSDir = metadataDir.appendingPathComponent(locale, isDirectory: true)
+                        await checkFileContents(enUSDir.appendingPathComponent("title.txt"), length: 1..<30)
+                        await checkFileContents(enUSDir.appendingPathComponent("short_description.txt"), length: 1..<100)
+                        await checkFileContents(enUSDir.appendingPathComponent("full_description.txt"), length: 30..<4000)
+                    }
+                }
+            }
         }
 
         #if os(macOS)

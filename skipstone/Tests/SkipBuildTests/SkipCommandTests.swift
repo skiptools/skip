@@ -325,9 +325,7 @@ final class SkipCommandTests: XCTestCase {
         │  │     └─ main
         │  │        ├─ AndroidManifest.xml
         │  │        └─ kotlin
-        │  │           └─ appname
-        │  │              └─ module
-        │  │                 └─ Main.kt
+        │  │           └─ Main.kt
         │  ├─ gradle
         │  │  └─ wrapper
         │  │     └─ gradle-wrapper.properties
@@ -390,9 +388,7 @@ final class SkipCommandTests: XCTestCase {
         │  │     └─ main
         │  │        ├─ AndroidManifest.xml
         │  │        └─ kotlin
-        │  │           └─ appname
-        │  │              └─ module
-        │  │                 └─ Main.kt
+        │  │           └─ Main.kt
         │  ├─ fastlane
         │  │  ├─ Appfile
         │  │  ├─ Fastfile
@@ -484,9 +480,7 @@ final class SkipCommandTests: XCTestCase {
         │  │     └─ main
         │  │        ├─ AndroidManifest.xml
         │  │        ├─ kotlin
-        │  │        │  └─ appname
-        │  │        │     └─ module
-        │  │        │        └─ Main.kt
+        │  │        │  └─ Main.kt
         │  │        └─ res
         │  │           ├─ mipmap-hdpi
         │  │           │  └─ ic_launcher.png
@@ -722,9 +716,7 @@ final class SkipCommandTests: XCTestCase {
         │  │     └─ main
         │  │        ├─ AndroidManifest.xml
         │  │        └─ kotlin
-        │  │           └─ app_
-        │  │              └─ module
-        │  │                 └─ Main.kt
+        │  │           └─ Main.kt
         │  ├─ gradle
         │  │  └─ wrapper
         │  │     └─ gradle-wrapper.properties
@@ -897,9 +889,7 @@ final class SkipCommandTests: XCTestCase {
         │  │     └─ main
         │  │        ├─ AndroidManifest.xml
         │  │        └─ kotlin
-        │  │           └─ top_
-        │  │              └─ module
-        │  │                 └─ Main.kt
+        │  │           └─ Main.kt
         │  ├─ gradle
         │  │  └─ wrapper
         │  │     └─ gradle-wrapper.properties
@@ -1040,9 +1030,7 @@ final class SkipCommandTests: XCTestCase {
         │  │     └─ main
         │  │        ├─ AndroidManifest.xml
         │  │        └─ kotlin
-        │  │           └─ m1
-        │  │              └─ module
-        │  │                 └─ Main.kt
+        │  │           └─ Main.kt
         │  ├─ gradle
         │  │  └─ wrapper
         │  │     └─ gradle-wrapper.properties
@@ -1168,9 +1156,7 @@ final class SkipCommandTests: XCTestCase {
         │  │     └─ main
         │  │        ├─ AndroidManifest.xml
         │  │        └─ kotlin
-        │  │           └─ m1
-        │  │              └─ module
-        │  │                 └─ Main.kt
+        │  │           └─ Main.kt
         │  ├─ gradle
         │  │  └─ wrapper
         │  │     └─ gradle-wrapper.properties
