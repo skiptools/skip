@@ -289,7 +289,19 @@ extension GradleHarness {
             //    > Could not read script '~/Library/Developer/Xcode/DerivedData/Skip-Everything-aqywrhrzhkbvfseiqgxuufbdwdft/SourcePackages/plugins/skipapp-packname.output/PackName/skipstone/settings.gradle.kts' as it does not exist.
             return GradleIssue(kind: .error, message: line2.trimmingCharacters(in: CharacterSet(charactersIn: " >")))
         }
-        
+
+        if line1.hasPrefix("Unable to install ") {
+            // e.g.:
+            // Unable to install /opt/src/github/skiptools/skipapp-showcase/.build/Android/app/outputs/apk/debug/app-debug.apk
+            // com.android.ddmlib.InstallException: INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package org.appfair.app.Showcase signatures do not match newer version; ignoring!
+            return GradleIssue(kind: .error, message: line2.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+
+        if exceptionPattern.firstMatch(in: line1, range: NSRange(line1.startIndex..., in: line1)) != nil {
+            // TODO: do we really want to match all exception messages?
+            //return GradleIssue(kind: .warning, message: line2.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+
         guard let matchResult = gradleFailurePattern.firstMatch(in: line1, range: NSRange(line1.startIndex..., in: line1)) else {
             return nil
         }
@@ -434,6 +446,10 @@ public struct AppLaunchError : LocalizedError {
 /// Gradle-formatted lines start with "e:" or "w:", and the line:column specifer seems to sometimes trail with a colon and other times not
 let gradleIssuePattern = try! NSRegularExpression(pattern: #"^([we]): file://(.*):([0-9]+):([0-9]+)[:]* +(.*)$"#)
 let gradleFailurePattern = try! NSRegularExpression(pattern: #"^/(.*):([0-9]+):([0-9]+)-([0-9]+) (Error|Warning):$"#)
+
+// e.g.: com.xyz.SomeException: Some message
+let exceptionPattern = try! NSRegularExpression(pattern: #"^([a-zA-Z.]*)Exception: +(.*)$"#)
+
 
 extension NSRegularExpression {
     func matches(in string: String, options: MatchingOptions = []) -> [NSTextCheckingResult] {
