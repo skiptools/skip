@@ -10,7 +10,7 @@ final class KotlinBridgeToSwiftVisitor {
     private var swiftDefinitions: [SwiftDefinition] = []
 
     init?(for syntaxTree: KotlinSyntaxTree, options: KotlinBridgeOptions, translator: KotlinTranslator) {
-        guard !syntaxTree.isBridgeFile, let codebaseInfo = translator.codebaseInfo, let outputFile = syntaxTree.source.file.bridgeOutputFile else {
+        guard syntaxTree.bridgeAPI == .none, let codebaseInfo = translator.codebaseInfo, let outputFile = syntaxTree.source.file.bridgeOutputFile else {
             return nil
         }
         self.syntaxTree = syntaxTree

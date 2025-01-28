@@ -66,7 +66,7 @@ final class KotlinStructTransformer: KotlinTransformer {
                         // NOTE: Swift doesn't generate a default constructor even if your only constructor is a custom Decodable
                         // constructor. So this condition shouldn't be here. But we had this "bug" early on in the transpiler, and
                         // we've decided to maintain the previous behavior in case it is being relied upon
-                        if !functionDeclaration.isDecodableConstructor || translator.syntaxTree.isBridgeFile {
+                        if !functionDeclaration.isDecodableConstructor || translator.syntaxTree.bridgeAPI != .none {
                             hasConstructors = true
                         }
                     } else if !isNoCopy && functionDeclaration.modifiers.isMutating {
@@ -85,7 +85,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         }
         // The reason we use a mutable struct copy constructor for bridged generic Swift types is that
         // we can't bridge standard constructors of generic types
-        let needsMutableStructCopyConstructor = isMutable && (classDeclaration.unbridgedMemberKinds.suppressDefaultConstructorGeneration || transformsConstructorParameters || (!needsMemberwiseConstructor && !copyableVariableDeclarations.isEmpty) || (needsMemberwiseConstructor && copyableVariableDeclarations.count > initializableVariableDeclarations.count) || (translator.syntaxTree.isBridgeFile && !classDeclaration.generics.isEmpty))
+        let needsMutableStructCopyConstructor = isMutable && (classDeclaration.unbridgedMemberKinds.suppressDefaultConstructorGeneration || transformsConstructorParameters || (!needsMemberwiseConstructor && !copyableVariableDeclarations.isEmpty) || (needsMemberwiseConstructor && copyableVariableDeclarations.count > initializableVariableDeclarations.count) || (translator.syntaxTree.bridgeAPI != .none && !classDeclaration.generics.isEmpty))
         if needsMutableStructCopyConstructor && !hasMutableStructCopyConstructor {
             addMutableStructCopyConstructor(to: classDeclaration, isOptionSet: isOptionSet, variableDeclarations: copyableVariableDeclarations)
         }

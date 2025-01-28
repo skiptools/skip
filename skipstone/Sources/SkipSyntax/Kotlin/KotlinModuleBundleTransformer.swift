@@ -6,7 +6,7 @@ final class KotlinModuleBundleTransformer: KotlinTransformer {
         guard !needsModuleBundle else {
             return []
         }
-        guard !translator.syntaxTree.isBridgeFile else {
+        guard translator.syntaxTree.bridgeAPI == .none else {
             return []
         }
         // No need to add Bundle.module if not a full build

@@ -1554,7 +1554,7 @@ struct KotlinExtensionDeclaration {
         placement.visibilityAllowsMove = isInSameFile || statement.visibilityAllowsMoveIntoExtendedType
         placement.isInModule = translator.codebaseInfo == nil ? nil : declarationType?.isInModule == true
         guard !placement.canMove || !placement.visibilityAllowsMove || placement.isInModule != true else {
-            if !translator.syntaxTree.isBridgeFile && !isInSameFile && mayUseFilePrivateAPI(statement: statement, in: translator.syntaxTree) {
+            if translator.syntaxTree.bridgeAPI == .none && !isInSameFile && mayUseFilePrivateAPI(statement: statement, in: translator.syntaxTree) {
                 let message: Message = .kotlinExtensionUsingFileprivateAPI(statement, source: translator.syntaxTree.source)
                 kstatements.append(KotlinMessageStatement(message: message, statement: statement))
             }
@@ -1564,7 +1564,7 @@ struct KotlinExtensionDeclaration {
         // Raise an error if user is trying to add protocols to a type defined outside this module.
         // If this is a bridging file we may translate non-public extension in case they have public
         // members that birdge, but we can ignore non-public protocol conformance
-        if !translator.syntaxTree.isBridgeFile || statement.modifiers.visibility >= .public {
+        if translator.syntaxTree.bridgeAPI == .none || statement.modifiers.visibility >= .public {
             if !statement.inherits.isEmpty, let message = Message.kotlinExtensionAddProtocols(statement, extensionPlacement: placement, source: translator.syntaxTree.source) {
                 kstatements.append(KotlinMessageStatement(message: message, statement: statement))
             }
@@ -2875,11 +2875,11 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
 
         // Warnings and fixups
         kstatement.declaredType.appendKotlinMessages(to: kstatement, source: translator.syntaxTree.source)
-        if !translator.syntaxTree.isBridgeFile, kstatement.declaredType == .float || kstatement.declaredType == .int128 || kstatement.declaredType.isUnsigned, let literal = kstatement.value as? KotlinNumericLiteral, literal.suffix.isEmpty {
+        if translator.syntaxTree.bridgeAPI == .none, kstatement.declaredType == .float || kstatement.declaredType == .int128 || kstatement.declaredType.isUnsigned, let literal = kstatement.value as? KotlinNumericLiteral, literal.suffix.isEmpty {
             kstatement.messages.append(.kotlinNumericCast(kstatement, source: translator.syntaxTree.source, type: kstatement.declaredType.kotlin))
         }
         if kstatement.role.isProperty || kstatement.role == .global {
-            if !translator.syntaxTree.isBridgeFile, kstatement.propertyType.isUnwrappedOptional && kstatement.propertyType.kotlinIsNative(primitive: true) {
+            if translator.syntaxTree.bridgeAPI == .none, kstatement.propertyType.isUnwrappedOptional && kstatement.propertyType.kotlinIsNative(primitive: true) {
                 kstatement.messages.append(.kotlinLateinitPrimitive(kstatement, source: translator.syntaxTree.source))
             }
         } else {

@@ -14,7 +14,7 @@ public final class KotlinDynamicObjectTransformer: KotlinTransformer {
     }
 
     public func gather(from syntaxTree: SyntaxTree) {
-        guard syntaxTree.isBridgeFile else {
+        guard syntaxTree.bridgeAPI != .none else {
             return
         }
         syntaxTree.root.visit { node in

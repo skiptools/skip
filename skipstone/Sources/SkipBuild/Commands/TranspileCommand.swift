@@ -301,14 +301,21 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         let buildGradle = moduleRootPath.appending(component: "build.gradle.kts")
 
-        var dependentModuleExports: [CodebaseInfo.ModuleExport] = []
         let codebaseInfo = try await loadCodebaseInfo() // initialize the codebaseinfo and load DependentModuleName.skipcode.json
+        let linksNativeUI = codebaseInfo.dependentModules.contains { $0.moduleName == "SkipFuseUI" }
 
         // load and merge each of the skip.yml files for the dependent modules
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
 
         let isNativeModule = baseSkipConfig.skip?.mode?.lowercased() == "native"
-        let isBridgingEnabled = baseSkipConfig.skip?.isBridgingEnabled() == true
+        let bridgeAPI: BridgeAPI
+        if baseSkipConfig.skip?.isBridgingEnabled() != true {
+            bridgeAPI = .none
+        } else if baseSkipConfig.skip?.isBridgingAutoPublic() == true {
+            bridgeAPI = .public
+        } else {
+            bridgeAPI = .explicit
+        }
         let dynamicRoot = baseSkipConfig.skip?.dynamicroot
 
         // projects with a CMakeLists.txt file are built as a native Android library
@@ -355,17 +362,17 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             try addLink(moduleBasePath.appending(component: buildSrcFolderName), pointingAt: buildSrcFolder, relative: false)
         }
 
-        // feed the transpiler the files to transpile and any compiled files to potentially bridge.
+        // feed the transpiler the files to transpile and any compiled files to potentially bridge
         var transpileFiles: [String] = []
         var swiftFiles: [String] = []
         for sourceFile in sourceURLs.map(\.path).sorted() {
             if !isNativeModule {
                 transpileFiles.append(sourceFile)
-            } else if isBridgingEnabled || dynamicRoot != nil {
+            } else if bridgeAPI != .none || dynamicRoot != nil || linksNativeUI {
                 swiftFiles.append(sourceFile)
             }
         }
-        let transpiler = Transpiler(packageName: packageName, transpileFiles: transpileFiles.map(Source.FilePath.init(path:)), bridgeFiles: swiftFiles.map(Source.FilePath.init(path:)), isBridgeEnabled: isBridgingEnabled, isBridgeGatherEnabled: dynamicRoot != nil, codebaseInfo: codebaseInfo, preprocessorSymbols: Set(inputOptions.symbols), transformers: transformers)
+        let transpiler = Transpiler(packageName: packageName, transpileFiles: transpileFiles.map(Source.FilePath.init(path:)), bridgeFiles: swiftFiles.map(Source.FilePath.init(path:)), bridgeAPI: bridgeAPI, isBridgeGatherEnabled: dynamicRoot != nil, codebaseInfo: codebaseInfo, preprocessorSymbols: Set(inputOptions.symbols), transformers: transformers)
 
         try await transpiler.transpile(handler: handleTranspilation)
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json
@@ -387,6 +394,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         func loadCodebaseInfo() async throws -> CodebaseInfo {
             let decoder = JSONDecoder()
+            var dependentModuleExports: [CodebaseInfo.ModuleExport] = []
 
             // go through the '--link modulename:../../some/path' arguments and try to load the modulename.skipcode.json symbols from the previous module's transpilation output
             for (linkModuleName, relativeLinkPath) in linkNamePaths {

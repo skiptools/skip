@@ -220,6 +220,11 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
         return attributes.first(where: { $0.kind == .state || $0.kind == .stateObject })
     }
 
+    /// Convenience to check whether this member is marked to bridge.
+    var isBridge: Bool {
+        return contains(directive: "bridge") || contains(.bridge)
+    }
+
     /// Convenience to check whether this member is marked to ignore bridging.
     var isNoBridge: Bool {
         return contains(directive: "nobridge") || contains(.bridgeIgnored)
@@ -281,6 +286,7 @@ struct Attribute: Hashable, Codable {
         case available
         case bindable
         case binding
+        case bridge
         case bridgeIgnored
         case deprecated
         case discardableResult
@@ -331,6 +337,8 @@ struct Attribute: Hashable, Codable {
             return .bindable
         case "Binding":
             return .binding
+        case "Bridge":
+            return .bridge
         case "BridgeIgnored":
             return .bridgeIgnored
         case "discardableResult":
@@ -444,7 +452,7 @@ enum Availability: Codable {
     case available
     case deprecated(String?)
     case unavailable(String?)
-
+    
     init(attributes: Attributes) {
         if let unavailable = attributes.attributes.first(where: { $0.kind == .unavailable }) {
             self = .unavailable(unavailable.message)
@@ -454,7 +462,7 @@ enum Availability: Codable {
             self = .available
         }
     }
-
+    
     /// Return the least available of this and the given availability.
     func least(_ other: Availability) -> Availability {
         switch self {

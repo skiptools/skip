@@ -7,18 +7,18 @@ public struct Transpiler {
     private let packageName: String?
     private let transpileFiles: [Source.FilePath]
     private let bridgeFiles: [Source.FilePath]
-    private let isBridgeEnabled: Bool
+    private let bridgeAPI: BridgeAPI
     private let isBridgeGatherEnabled: Bool
     private let codebaseInfo: CodebaseInfo
     public var preprocessorSymbols: Set<String>
     public var transformers: [KotlinTransformer]
 
     /// Supply files to transpile.
-    public init(packageName: String? = nil, transpileFiles: [Source.FilePath], bridgeFiles: [Source.FilePath] = [], isBridgeEnabled: Bool = false, isBridgeGatherEnabled: Bool = false, codebaseInfo: CodebaseInfo, preprocessorSymbols: Set<String> = [], transformers: [KotlinTransformer] = []) {
+    public init(packageName: String? = nil, transpileFiles: [Source.FilePath], bridgeFiles: [Source.FilePath] = [], bridgeAPI: BridgeAPI = .explicit, isBridgeGatherEnabled: Bool = false, codebaseInfo: CodebaseInfo, preprocessorSymbols: Set<String> = [], transformers: [KotlinTransformer] = []) {
         self.packageName = packageName
         self.transpileFiles = transpileFiles
         self.bridgeFiles = bridgeFiles
-        self.isBridgeEnabled = isBridgeEnabled
+        self.bridgeAPI = bridgeAPI
         self.isBridgeGatherEnabled = isBridgeGatherEnabled
         self.codebaseInfo = codebaseInfo
         self.preprocessorSymbols = preprocessorSymbols
@@ -45,16 +45,22 @@ public struct Transpiler {
             for bridgeFile in bridgeFiles {
                 group.addTask {
                     let bridgeSource = try Source(file: bridgeFile)
-                    // We may be able to skip parsing most bridge files if they don't contain public code. Note that
+                    // We may be able to skip parsing most bridge files if they don't contain bridgable code. Note that
                     // we may get errors from unsupported Swift if we're doing a full decode here, but they won't
                     // bubble up to the user because these trees are only used to gather information, and we re-parse
                     // for only bridging below
-                    let shouldBridge = isBridgeEnabled && bridgeSource.content.contains("public") || bridgeSource.content.contains("open") || bridgeSource.content.contains("SkipFuseUI")
+                    var shouldBridge = bridgeSource.content.contains("SkipFuseUI") // Always bridge native views to SkipUI
+                    if bridgeAPI != .none {
+                        shouldBridge = shouldBridge || bridgeSource.content.contains("@bridge")
+                    }
+                    if bridgeAPI == .public {
+                        shouldBridge = shouldBridge || bridgeSource.content.contains("public") || bridgeSource.content.contains("open")
+                    }
                     let bridgeDecodeLevel: DecodeLevel = isBridgeGatherEnabled ? .full : shouldBridge ? .api : .none
                     if bridgeDecodeLevel == .none {
                         return nil
                     } else {
-                        let syntaxTree = SyntaxTree(source: bridgeSource, isBridgeFile: true, decodeLevel: bridgeDecodeLevel, preprocessorSymbols: preprocessorSymbols)
+                        let syntaxTree = SyntaxTree(source: bridgeSource, bridgeAPI: bridgeAPI, decodeLevel: bridgeDecodeLevel, preprocessorSymbols: preprocessorSymbols)
                         return (syntaxTree, !shouldBridge)
                     }
                 }
@@ -67,7 +73,7 @@ public struct Transpiler {
                 transformers.forEach { $0.gather(from: result.syntaxTree) }
                 codebaseInfo.gather(from: result.syntaxTree)
                 if !result.gatherOnly {
-                    if result.syntaxTree.isBridgeFile {
+                    if result.syntaxTree.bridgeAPI != .none {
                         bridgeSources.append(result.syntaxTree.source)
                     } else {
                         sources.append(result.syntaxTree.source)
@@ -92,7 +98,7 @@ public struct Transpiler {
             for bridgeSource in bridgeSources {
                 group.addTask {
                     let start = Date().timeIntervalSinceReferenceDate
-                    let syntaxTree = SyntaxTree(source: bridgeSource, isBridgeFile: true, decodeLevel: .api, preprocessorSymbols: preprocessorSymbols, codebaseInfo: codebaseInfo)
+                    let syntaxTree = SyntaxTree(source: bridgeSource, bridgeAPI: bridgeAPI, decodeLevel: .api, preprocessorSymbols: preprocessorSymbols, codebaseInfo: codebaseInfo)
                     let translator = KotlinTranslator(syntaxTree: syntaxTree)
                     return translator.transpile(codebaseInfo: codebaseInfo, transformers: transformers, startTime: start)
                 }

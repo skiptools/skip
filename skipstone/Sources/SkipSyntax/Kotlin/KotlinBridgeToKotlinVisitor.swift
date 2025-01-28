@@ -11,7 +11,7 @@ final class KotlinBridgeToKotlinVisitor {
     private var cdeclFunctions: [CDeclFunction] = []
 
     init?(for syntaxTree: KotlinSyntaxTree, options: KotlinBridgeOptions, translator: KotlinTranslator) {
-        guard syntaxTree.isBridgeFile, let codebaseInfo = translator.codebaseInfo else {
+        guard syntaxTree.bridgeAPI != .none, let codebaseInfo = translator.codebaseInfo else {
             return nil
         }
         self.syntaxTree = syntaxTree
@@ -235,11 +235,15 @@ final class KotlinBridgeToKotlinVisitor {
             cdeclInstanceParameters = []
         }
         if variableDeclaration.apiFlags.throwsType == .none {
-            cdeclGetterBody.append("return " + valueString)
+            appendMainActorIsolated(&cdeclGetterBody, isolated: variableDeclaration.apiFlags.options.contains(.mainActor), isReturn: true) { body, indentation in
+                body.append(indentation, "return " + valueString)
+            }
         } else {
             cdeclGetterBody.append("do {")
-            cdeclGetterBody.append(1, "let f_return_swift = try " + valueString)
-            cdeclGetterBody.append(1, "return f_return_swift.toJavaObject(options: \(optionsString))")
+            appendMainActorIsolated(&cdeclGetterBody, 1, isolated: variableDeclaration.apiFlags.options.contains(.mainActor), isThrows: true, isReturn: true) { body, indentation in
+                body.append(indentation, "let f_return_swift = try " + valueString)
+                body.append(indentation, "return f_return_swift.toJavaObject(options: \(optionsString))")
+            }
             cdeclGetterBody.append("} catch {")
             cdeclGetterBody.append(1, "JThrowable.throw(error, options: \(optionsString), env: Java_env)")
             cdeclGetterBody.append(1, "return nil")
@@ -267,31 +271,35 @@ final class KotlinBridgeToKotlinVisitor {
             externalFunctionDeclarations.append("private external fun \(externalName)_set(\(setterInstanceParameter)value: \(bridgable.externalType.kotlin))")
 
             var cdeclSetterBody: [String] = []
+            let setValueString: String
             if let classDeclaration {
                 if isInstance {
                     if !classDeclaration.generics.isEmpty {
                         cdeclSetterBody.append("let peer_swift: \(classDeclaration.signature.typeErasedClass) = Swift_peer.pointee()!")
-                        cdeclSetterBody.append("peer_swift.set_\(propertyName)(" + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options) + ")")
+                        setValueString = "peer_swift.set_\(propertyName)(" + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options) + ")"
                     } else if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
                         cdeclSetterBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
-                        cdeclSetterBody.append("peer_swift.\(propertyName) = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options))
+                        setValueString = "peer_swift.\(propertyName) = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options)
                     } else if isNonGenericSealedClassesEnum {
                         cdeclSetterBody.append("let className_swift = String.fromJavaObject(className, options: \(optionsString))")
                         cdeclSetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaClassName(className_swift, Java_target, options: \(optionsString))")
-                        cdeclSetterBody.append("peer_swift.\(propertyName) = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options))
+                        setValueString = "peer_swift.\(propertyName) = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options)
                     } else if isBasicEnum {
                         cdeclSetterBody.append("let name_swift = String.fromJavaObject(name, options: \(optionsString))")
                         cdeclSetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaName(name_swift)")
-                        cdeclSetterBody.append("peer_swift.\(propertyName) = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options))
+                        setValueString = "peer_swift.\(propertyName) = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options)
                     } else {
                         cdeclSetterBody.append("let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!")
-                        cdeclSetterBody.append("peer_swift.value.\(propertyName) = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options))
+                        setValueString = "peer_swift.value.\(propertyName) = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options)
                     }
                 } else {
-                    cdeclSetterBody.append("\(classDeclaration.signature).\(propertyName) = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options))
+                    setValueString = "\(classDeclaration.signature).\(propertyName) = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options)
                 }
             } else {
-                cdeclSetterBody.append(propertyName + " = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options))
+                setValueString = propertyName + " = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options)
+            }
+            appendMainActorIsolated(&cdeclSetterBody, isolated: variableDeclaration.apiFlags.options.contains(.mainActor)) { body, indentation in
+                body.append(indentation, setValueString)
             }
             let cdeclSetter = CDeclFunction(name: cdeclName + "_set", cdecl: cdecl + "_1set", signature: .function(cdeclInstanceParameters + [TypeSignature.Parameter(label: "value", type: bridgable.type.cdecl(strategy: bridgable.strategy, options: options))], .void, APIFlags(), nil), body: cdeclSetterBody)
             cdeclFunctions.append(cdeclSetter)
@@ -538,7 +546,9 @@ final class KotlinBridgeToKotlinVisitor {
             body.append(externalName + "(\(externalArgumentsString))")
             if isThrows {
                 cdeclBody.append("do {")
-                cdeclBody.append(1, "try \(swiftCallTarget)\(swiftFunctionName)\(swiftArgumentsString)")
+                appendMainActorIsolated(&cdeclBody, 1, isolated: functionDeclaration.apiFlags.options.contains(.mainActor), isThrows: true) { body, indentation in
+                    body.append(indentation, "try \(swiftCallTarget)\(swiftFunctionName)\(swiftArgumentsString)")
+                }
                 cdeclBody.append("} catch {")
                 cdeclBody.append(1, "JThrowable.throw(error, options: \(optionsString), env: Java_env)")
                 cdeclBody.append("}")
@@ -551,8 +561,10 @@ final class KotlinBridgeToKotlinVisitor {
             if isThrows {
                 forceUnwrapString = bridgable.return.type.isOptional ? "" : "!!"
                 cdeclBody.append("do {")
-                cdeclBody.append(1, "let f_return_swift = try \(swiftCallTarget)\(swiftFunctionName)\(swiftArgumentsString)")
-                cdeclBody.append(1, "return " + bridgable.return.type.asOptional(true).convertToCDecl(value: "f_return_swift", strategy: bridgable.return.strategy, options: options))
+                appendMainActorIsolated(&cdeclBody, 1, isolated: functionDeclaration.apiFlags.options.contains(.mainActor), isThrows: true, isReturn: true) { body, indentation in
+                    body.append(indentation, "let f_return_swift = try \(swiftCallTarget)\(swiftFunctionName)\(swiftArgumentsString)")
+                    body.append(indentation, "return " + bridgable.return.type.asOptional(true).convertToCDecl(value: "f_return_swift", strategy: bridgable.return.strategy, options: options))
+                }
                 cdeclBody.append("} catch {")
                 cdeclBody.append(1, "JThrowable.throw(error, options: \(optionsString), env: Java_env)")
                 cdeclBody.append(1, "return nil")
@@ -560,8 +572,10 @@ final class KotlinBridgeToKotlinVisitor {
                 cdeclReturnType = bridgable.return.type.asOptional(true).cdecl(strategy: bridgable.return.strategy, options: options)
             } else {
                 forceUnwrapString = ""
-                cdeclBody.append("let f_return_swift = \(swiftCallTarget)\(swiftFunctionName)\(swiftArgumentsString)")
-                cdeclBody.append("return " + functionDeclaration.returnType.convertToCDecl(value: "f_return_swift", strategy: bridgable.return.strategy, options: options))
+                appendMainActorIsolated(&cdeclBody, isolated: functionDeclaration.apiFlags.options.contains(.mainActor), isReturn: true) { body, indentation in
+                    body.append(indentation, "let f_return_swift = \(swiftCallTarget)\(swiftFunctionName)\(swiftArgumentsString)")
+                    body.append(indentation, "return " + functionDeclaration.returnType.convertToCDecl(value: "f_return_swift", strategy: bridgable.return.strategy, options: options))
+                }
                 cdeclReturnType = bridgable.return.type.cdecl(strategy: bridgable.return.strategy, options: options)
             }
             let castString = bridgable.return.genericType == nil ? "" : " as \(bridgable.return.kotlinType.kotlin)"
@@ -657,19 +671,27 @@ final class KotlinBridgeToKotlinVisitor {
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: false, name: "Swift_isequal", translator: translator)
         let cdeclType: TypeSignature = .function([TypeSignature.Parameter(label: "lhs", type: .javaObjectPointer), TypeSignature.Parameter(label: "rhs", type: .javaObjectPointer)], .bool, APIFlags(), nil)
-        let cdeclBody: [String]
+        var cdeclBody: [String]
+        let retString: String
         if !classDeclaration.generics.isEmpty {
             cdeclBody = [
                 "let lhs_swift: \(classDeclaration.signature.typeErasedClass) = lhs.pointee()!",
-                "let rhs_swift: \(classDeclaration.signature.typeErasedClass) = rhs.pointee()!",
-                "return lhs_swift.isequal(rhs_swift)"
+                "let rhs_swift: \(classDeclaration.signature.typeErasedClass) = rhs.pointee()!"
             ]
+            retString = "return lhs_swift.isequal(rhs_swift)"
         } else {
             cdeclBody = [
                 "let lhs_swift = \(classDeclaration.signature).fromJavaObject(lhs, options: \(options.jconvertibleOptions))",
-                "let rhs_swift = \(classDeclaration.signature).fromJavaObject(rhs, options: \(options.jconvertibleOptions))",
-                "return lhs_swift == rhs_swift"
+                "let rhs_swift = \(classDeclaration.signature).fromJavaObject(rhs, options: \(options.jconvertibleOptions))"
             ]
+            retString = "return lhs_swift == rhs_swift"
+        }
+        if functionDeclaration.apiFlags.options.contains(.mainActor) {
+            cdeclBody.append("return MainActor.assumeIsolated {")
+            cdeclBody.append(1, retString)
+            cdeclBody.append("}")
+        } else {
+            cdeclBody.append(retString)
         }
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
         cdeclFunctions.append(cdeclFunction)
@@ -791,21 +813,29 @@ final class KotlinBridgeToKotlinVisitor {
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: false, name: "Swift_islessthan", translator: translator)
         let cdeclType: TypeSignature = .function([TypeSignature.Parameter(label: "lhs", type: .javaObjectPointer), TypeSignature.Parameter(label: "rhs", type: .javaObjectPointer)], .bool, APIFlags(), nil)
-        let cdeclBody: [String]
+        var cdeclBody: [String]
+        let retString: String
         if !classDeclaration.generics.isEmpty {
             cdeclBody = [
                 "let lhs_ptr = SwiftObjectPointer.peer(of: lhs, options: \(options.jconvertibleOptions))",
                 "let lhs_swift: \(classDeclaration.signature.typeErasedClass) = lhs_ptr.pointee()!",
                 "let rhs_ptr = SwiftObjectPointer.peer(of: rhs, options: \(options.jconvertibleOptions))",
-                "let rhs_swift: \(classDeclaration.signature.typeErasedClass) = rhs_ptr.pointee()!",
-                "return lhs_swift.islessthan(rhs_swift)"
+                "let rhs_swift: \(classDeclaration.signature.typeErasedClass) = rhs_ptr.pointee()!"
             ]
+            retString = "return lhs_swift.islessthan(rhs_swift)"
         } else {
             cdeclBody = [
                 "let lhs_swift = \(classDeclaration.signature).fromJavaObject(lhs, options: \(options.jconvertibleOptions))",
-                "let rhs_swift = \(classDeclaration.signature).fromJavaObject(rhs, options: \(options.jconvertibleOptions))",
-                "return lhs_swift < rhs_swift"
+                "let rhs_swift = \(classDeclaration.signature).fromJavaObject(rhs, options: \(options.jconvertibleOptions))"
             ]
+            retString = "return lhs_swift < rhs_swift"
+        }
+        if functionDeclaration.apiFlags.options.contains(.mainActor) {
+            cdeclBody.append("return MainActor.assumeIsolated {")
+            cdeclBody.append(1, retString)
+            cdeclBody.append("}")
+        } else {
+            cdeclBody.append(retString)
         }
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
         cdeclFunctions.append(cdeclFunction)
@@ -1213,26 +1243,27 @@ final class KotlinBridgeToKotlinVisitor {
         for variableDeclaration in variableDeclarations {
             let getter = variableDeclaration.isAppendAsFunction ? variableDeclaration.propertyName : "get_\(variableDeclaration.propertyName)"
             let type: TypeSignature = .any.asOptional(variableDeclaration.propertyType.isOptional)
+            let mainActorString = variableDeclaration.apiFlags.options.contains(.mainActor) ? "@MainActor " : ""
             let asyncString = variableDeclaration.apiFlags.options.contains(.async) ? " async" : ""
             let throwsString = variableDeclaration.apiFlags.throwsType != .none ? " throws" : ""
-            swift.append(1, "var \(getter): (()\(asyncString)\(throwsString) -> \(type))!")
+            swift.append(1, "var \(getter): (\(mainActorString)()\(asyncString)\(throwsString) -> \(type))!")
             if variableDeclaration.apiFlags.options.contains(.writeable) {
-                swift.append(1, "var set_\(variableDeclaration.propertyName): ((\(type)) -> Void)!")
+                swift.append(1, "var set_\(variableDeclaration.propertyName): (\(mainActorString)(\(type)) -> Void)!")
             }
         }
 
-        var hasIsEqual = false
-        var hasIsLessThan = false
+        var isEqualDeclaration: KotlinFunctionDeclaration? = nil
+        var isLessThanDeclaration: KotlinFunctionDeclaration? = nil
         for (functionDeclaration, uniquifier) in functionDeclarations {
             guard !functionDeclaration.isMutableStructCopyConstructor else {
                 continue
             }
             guard !functionDeclaration.isEqualImplementation else {
-                hasIsEqual = true
+                isEqualDeclaration = functionDeclaration
                 continue
             }
             guard !functionDeclaration.isLessThanImplementation else {
-                hasIsLessThan = true
+                isLessThanDeclaration = functionDeclaration
                 continue
             }
             guard !functionDeclaration.isHashImplementation else {
@@ -1253,15 +1284,18 @@ final class KotlinBridgeToKotlinVisitor {
                 let type: TypeSignature = parameter.declaredType.isNamedType ? .any.asOptional(parameter.declaredType.isOptional) : parameter.declaredType
                 return type.description
             }.joined(separator: ", ")
+            let mainActorString = functionDeclaration.apiFlags.options.contains(.mainActor) ? "@MainActor " : ""
             let asyncString = functionDeclaration.apiFlags.options.contains(.async) ? " async" : ""
             let throwsString = functionDeclaration.apiFlags.throwsType != .none ? " throws" : ""
-            swift.append(1, "var \(functionName)\(uniquifierString): ((\(parametersString))\(asyncString)\(throwsString) -> \(returnType))!")
+            swift.append(1, "var \(functionName)\(uniquifierString): (\(mainActorString)(\(parametersString))\(asyncString)\(throwsString) -> \(returnType))!")
         }
-        if hasIsEqual {
-            swift.append(1, "var isequal: ((Any) -> Bool)!")
+        if let isEqualDeclaration {
+            let mainActorString = isEqualDeclaration.apiFlags.options.contains(.mainActor) ? "@MainActor " : ""
+            swift.append(1, "var isequal: (\(mainActorString)(Any) -> Bool)!")
         }
-        if hasIsLessThan {
-            swift.append(1, "var islessthan: ((Any) -> Bool)!")
+        if let isLessThanDeclaration {
+            let mainActorString = isLessThanDeclaration.apiFlags.options.contains(.mainActor) ? "@MainActor " : ""
+            swift.append(1, "var islessthan: (\(mainActorString)(Any) -> Bool)!")
         }
         swift.append("}")
         return SwiftDefinition(swift: swift)
@@ -1391,5 +1425,17 @@ final class KotlinBridgeToKotlinVisitor {
         } else {
             return TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))
         }
+    }
+
+    private func appendMainActorIsolated(_ swift: inout [String], _ indentation: Indentation = 0, isolated: Bool, isThrows: Bool = false, isReturn: Bool = false, block: (inout [String], Indentation) -> Void) {
+        guard isolated else {
+            block(&swift, indentation)
+            return
+        }
+        let tryString = isThrows ? "try " : ""
+        let returnString = isReturn ? "return " : ""
+        swift.append(indentation, "\(returnString)\(tryString)MainActor.assumeIsolated {")
+        block(&swift, indentation.inc())
+        swift.append(indentation, "}")
     }
 }

@@ -598,7 +598,7 @@ final class IfDefined: Statement {
             ifSkipBlockTypes = ifSkipBlocks
             hasNotSkipClause = hasNotSkipClause || negatedIfSkipBlocks.contains(.ifSkip)
 
-            if !isSupported && !syntaxTree.isBridgeFile {
+            if !isSupported && syntaxTree.bridgeAPI == .none {
                 syntaxTree.root.messages.append(.preprocessorTooComplex(ifConfigClause, source: syntaxTree.source))
                 break
             }
@@ -1102,7 +1102,7 @@ final class FunctionDeclaration: Statement {
         let modifiers = Modifiers.for(syntax: initializerDecl.modifiers)
         let decodeLevel = decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
         guard decodeLevel != .none else {
-            if syntaxTree.isBridgeFile {
+            if syntaxTree.bridgeAPI != .none {
                 // We have to note unbridged constructors because they affect default constructor generation and bridging
                 return UnbridgedMemberDeclaration(kind: .constructor, syntax: initializerDecl, extras: extras, in: syntaxTree)
             } else {
@@ -1126,7 +1126,7 @@ final class FunctionDeclaration: Statement {
 
     private static func decodeDeinitializerDeclaration(_ deinitializerDecl: DeinitializerDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> FunctionDeclaration? {
         // Deinit is never bridged
-        guard !syntaxTree.isBridgeFile else {
+        guard syntaxTree.bridgeAPI == .none else {
             return nil
         }
         var attributes = Attributes.for(syntax: deinitializerDecl.attributes, in: syntaxTree)
@@ -1537,7 +1537,7 @@ class TypeDeclaration: Statement {
         var decodeFlags: DecodeFlags = []
         if decodeLevel == .none {
             // We need to decode native views for adapting to SkipFuseUI
-            if syntaxTree.isBridgeFile, let inheritsView {
+            if syntaxTree.bridgeAPI != .none, let inheritsView {
                 decodeLevel = .api
                 decodeFlags.insert(.swiftUIState)
                 // We don't care about other protocols
@@ -1785,7 +1785,7 @@ final class VariableDeclaration: Statement {
         let decodeLevel = decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
         guard decodeLevel != .none else {
             // We must note unbridged, unintialized struct properties because they affect default constructor generation and bridging
-            if syntaxTree.isBridgeFile, context.memberOf?.type == .structDeclaration, !modifiers.isStatic, variableDecl.bindings.first?.initializer?.value == nil {
+            if syntaxTree.bridgeAPI != .none, context.memberOf?.type == .structDeclaration, !modifiers.isStatic, variableDecl.bindings.first?.initializer?.value == nil {
                 return [UnbridgedMemberDeclaration(kind: .uninitializedStructProperty, syntax: syntax, extras: extras, in: syntaxTree)]
             } else {
                 return []

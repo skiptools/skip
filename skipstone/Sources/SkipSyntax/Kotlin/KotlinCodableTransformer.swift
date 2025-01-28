@@ -3,7 +3,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         syntaxTree.root.visit {
             if let classDeclaration = $0 as? KotlinClassDeclaration {
-                if syntaxTree.isBridgeFile {
+                if syntaxTree.bridgeAPI != .none {
                     removeCodable(from: classDeclaration)
                 } else if classDeclaration.declarationType == .enumDeclaration && classDeclaration.inherits.contains(where: \.isCodingKey) {
                     fixupCodingKey(enumDeclaration: classDeclaration, translator: translator)

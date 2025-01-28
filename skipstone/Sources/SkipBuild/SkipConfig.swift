@@ -37,6 +37,17 @@ struct TranspilationConfig : Codable {
         }
     }
 
+    func isBridgingAutoPublic() -> Bool {
+        switch bridging {
+        case .a(let enabled):
+            return enabled
+        case .b(let config):
+            return config.auto == nil || config.auto == "public"
+        default:
+            return false
+        }
+    }
+
     func bridgingOptions() -> [String] {
         switch bridging {
         case .a:
@@ -66,6 +77,7 @@ struct SkipArchitecture : Equatable, Codable {
 
 struct BridgeConfig : Equatable, Codable {
     var enabled: Bool?
+    var auto: String?
     var options: Either<String>.Or<[String]>?
 }
 

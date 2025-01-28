@@ -3,7 +3,7 @@
 /// - Seealso: `SkipUnit/XCTestCase.kt`
 final class KotlinUnitTestTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
-        guard !translator.syntaxTree.isBridgeFile else {
+        guard translator.syntaxTree.bridgeAPI == .none else {
             return []
         }
         guard let codebaseInfo = translator.codebaseInfo else {
