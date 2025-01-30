@@ -8,10 +8,10 @@ public final class SyntaxTree: PrettyPrintable {
     let root: CodeBlock = CodeBlock(statements: [])
 
     /// - Note: `unavailableAPI` is not used when `codebaseInfo` is available
-    public init(source: Source, isBridgeFile: Bool, bridgeAPI: BridgeAPI = .none, decodeLevel: DecodeLevel = .full, preprocessorSymbols: Set<String> = [], codebaseInfo: CodebaseInfo? = nil, unavailableAPI: UnavailableAPI? = nil) {
+    public init(source: Source, isBridgeFile: Bool = false, autoBridge: AutoBridge = .none, decodeLevel: DecodeLevel = .full, preprocessorSymbols: Set<String> = [], codebaseInfo: CodebaseInfo? = nil, unavailableAPI: UnavailableAPI? = nil) {
         self.source = source
         self.isBridgeFile = isBridgeFile
-        self.bridgeAPI = bridgeAPI
+        self.autoBridge = autoBridge
         self.decodeLevel = decodeLevel
         self.preprocessorSymbols = preprocessorSymbols
         var parser = Parser(source.content, experimentalFeatures: [.sendingArgsAndResults])
@@ -35,8 +35,8 @@ public final class SyntaxTree: PrettyPrintable {
     /// Whether this is a file to bridge to Kotlin rather than one to transpile.
     public let isBridgeFile: Bool
 
-    /// What API in this file to bridge.
-    public let bridgeAPI: BridgeAPI
+    /// What API in this file to auto-bridge.
+    public let autoBridge: AutoBridge
 
     /// The decode level to use when processing this file.
     public let decodeLevel: DecodeLevel

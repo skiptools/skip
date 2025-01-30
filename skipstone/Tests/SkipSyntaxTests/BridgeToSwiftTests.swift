@@ -849,13 +849,13 @@ final class BridgeToSwiftTests: XCTestCase {
     func testClosureVar() async throws {
         try await check(swift: """
         #if !SKIP_BRIDGE
-        public var c: (Int) -> String = { _ in "" }
+        public var c: @escaping (Int) -> String = { _ in "" }
         #endif
         """, kotlin: """
         var c: (Int) -> String = { _ -> "" }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
-        public var c: (Int) -> String {
+        public var c: @escaping (Int) -> String {
             get {
                 return jniContext {
                     let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, options: [], args: [])

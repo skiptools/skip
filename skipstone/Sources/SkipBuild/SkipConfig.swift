@@ -26,24 +26,13 @@ struct TranspilationConfig : Codable {
     /// Namespace for code gen of dynamic types
     var dynamicroot: String?
 
-    func isBridgingEnabled() -> Bool {
+    func isAutoBridgingEnabled() -> Bool {
         switch bridging {
         case .a(let enabled):
             return enabled
         case .b(let config):
-            return config.enabled == true
+            return config.auto == true || config.enabled == true
         case nil:
-            return false
-        }
-    }
-
-    func isBridgingAutoPublic() -> Bool {
-        switch bridging {
-        case .a(let enabled):
-            return enabled
-        case .b(let config):
-            return config.auto == nil || config.auto == "public"
-        default:
             return false
         }
     }
@@ -76,8 +65,8 @@ struct SkipArchitecture : Equatable, Codable {
 }
 
 struct BridgeConfig : Equatable, Codable {
-    var enabled: Bool?
-    var auto: String?
+    var enabled: Bool? /// Deprecated: use `auto`
+    var auto: Bool?
     var options: Either<String>.Or<[String]>?
 }
 

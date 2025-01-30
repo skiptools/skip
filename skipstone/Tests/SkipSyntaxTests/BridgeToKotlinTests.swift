@@ -6171,7 +6171,7 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
 
         import SkipFuseUI
-        extension V: BridgedToKotlin, ComposeBridging {
+        extension V: BridgedToKotlin, SkipUIBridging {
             private static let Java_class = try! JClass(name: "V")
             public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
@@ -6184,7 +6184,7 @@ final class BridgeToKotlinTests: XCTestCase {
                 return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
-            public var Java_composable: JavaObjectPointer? {
+            public var Java_view: JavaObjectPointer? {
                 return toJavaObject(options: [])
             }
         }
@@ -6214,7 +6214,7 @@ final class BridgeToKotlinTests: XCTestCase {
             let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
             return MainActor.assumeIsolated {
                 let body = peer_swift.value.body
-                return (body as? ComposeBridging)?.Java_composable
+                return (body as? SkipUIBridging)?.Java_view
             }
         }
         """, transformers: transformers)
@@ -6270,7 +6270,7 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
 
         import SkipFuseUI
-        extension V: BridgedToKotlin, ComposeBridging {
+        extension V: BridgedToKotlin, SkipUIBridging {
             private static let Java_class = try! JClass(name: "V")
             static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
@@ -6283,7 +6283,7 @@ final class BridgeToKotlinTests: XCTestCase {
                 return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
-            var Java_composable: JavaObjectPointer? {
+            var Java_view: JavaObjectPointer? {
                 return toJavaObject(options: [])
             }
         }
@@ -6302,7 +6302,7 @@ final class BridgeToKotlinTests: XCTestCase {
             let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
             return MainActor.assumeIsolated {
                 let body = peer_swift.value.body
-                return (body as? ComposeBridging)?.Java_composable
+                return (body as? SkipUIBridging)?.Java_view
             }
         }
         """, transformers: transformers)

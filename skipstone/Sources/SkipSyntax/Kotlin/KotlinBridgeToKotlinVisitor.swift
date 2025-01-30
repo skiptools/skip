@@ -11,7 +11,7 @@ final class KotlinBridgeToKotlinVisitor {
     private var cdeclFunctions: [CDeclFunction] = []
 
     init?(for syntaxTree: KotlinSyntaxTree, options: KotlinBridgeOptions, translator: KotlinTranslator) {
-        guard syntaxTree.bridgeAPI != .none, let codebaseInfo = translator.codebaseInfo else {
+        guard syntaxTree.isBridgeFile, let codebaseInfo = translator.codebaseInfo else {
             return nil
         }
         self.syntaxTree = syntaxTree
@@ -61,7 +61,7 @@ final class KotlinBridgeToKotlinVisitor {
                 return .recurse(nil)
             } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
                 if update(interfaceDeclaration) {
-                    if let bridgeImplDefinition = KotlinBridgeToSwiftVisitor.protocolBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, options: options, codebaseInfo: codebaseInfo) {
+                    if let bridgeImplDefinition = KotlinBridgeToSwiftVisitor.protocolBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, options: options, autoBridge: syntaxTree.autoBridge, codebaseInfo: codebaseInfo) {
                         swiftDefinitions.append(bridgeImplDefinition)
                     }
                 }
@@ -1105,7 +1105,7 @@ final class KotlinBridgeToKotlinVisitor {
         // Must do this last after determining member generic constraints
         classDeclaration.generics = classDeclaration.generics.filterBridging(codebaseInfo: codebaseInfo)
 
-        let finalMemberVisibility = classDeclaration.modifiers.visibility > .public ? .public : classDeclaration.modifiers.visibility
+        let finalMemberVisibility = min(classDeclaration.modifiers.visibility, .public)
         var additionalSwiftDeclarations: [String] = []
         var additionalCDeclFunctions: [CDeclFunction] = []
         if isView {
@@ -1133,7 +1133,7 @@ final class KotlinBridgeToKotlinVisitor {
             conformances += ", BridgedFinalClass"
         }
         if isView {
-            conformances += ", ComposeBridging"
+            conformances += ", SkipUIBridging"
         }
         var swift: [String] = []
         swift.append("extension \(classDeclaration.signature.withGenerics([])): \(conformances) {")
@@ -1187,7 +1187,7 @@ final class KotlinBridgeToKotlinVisitor {
             if classDeclaration.declarationType != .enumDeclaration {
                 swift.append(1, declareStaticLet("Java_constructor_methodID", ofType: "JavaMethodID", in: classDeclaration.signature, value: "Java_class.getMethodID(name: \"<init>\", sig: \"(JLskip/bridge/kt/SwiftPeerMarker;)V\")!"))
                 if subclassDepth >= 1 {
-                    swift.append(1, declareStaticLet("Java_subclass\(subclassDepth)Constructor", ofType: "(JClass, JavaMethodID)", visibility: "public", in: classDeclaration.signature, value: "(Java_class, Java_constructor_methodID)"))
+                    swift.append(1, declareStaticLet("Java_subclass\(subclassDepth)Constructor", ofType: "(JClass, JavaMethodID)", visibility: finalMemberVisibility.swift(), in: classDeclaration.signature, value: "(Java_class, Java_constructor_methodID)"))
                 }
             }
         }
@@ -1198,7 +1198,7 @@ final class KotlinBridgeToKotlinVisitor {
         swiftDefinitions.append(swiftDefinition)
 
         if !classDeclaration.generics.isEmpty {
-            swiftDefinitions.append(typeErasedPeerSwift(for: classDeclaration, variableDeclarations: bridgedVariableDeclarations, functionDeclarations: bridgedFunctionDeclarations))
+            swiftDefinitions.append(typeErasedPeerSwift(for: classDeclaration, variableDeclarations: bridgedVariableDeclarations, functionDeclarations: bridgedFunctionDeclarations, visibility: finalMemberVisibility))
         }
 
         let customProjection: [String]? = classDeclaration.generics.isEmpty ? nil : [
@@ -1212,10 +1212,11 @@ final class KotlinBridgeToKotlinVisitor {
         return true
     }
 
-    private func typeErasedPeerSwift(for classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], functionDeclarations: [(KotlinFunctionDeclaration, uniquifier: Int?)]) -> SwiftDefinition {
+    private func typeErasedPeerSwift(for classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], functionDeclarations: [(KotlinFunctionDeclaration, uniquifier: Int?)], visibility: Modifiers.Visibility) -> SwiftDefinition {
+        let visibilityString = visibility.swift(suffix: " ")
         var swift: [String] = []
         swift.append("extension \(classDeclaration.signature.withGenerics([])): TypeErasedConvertible {")
-        swift.append(1, "public func toTypeErased() -> AnyObject {")
+        swift.append(1, "\(visibilityString)func toTypeErased() -> AnyObject {")
         swift.append(2, "let typeErased = \(classDeclaration.signature.typeErasedClass)(self)")
         swift.append(2, typeErasedClosureSwift(for: classDeclaration, to: "typeErased", variableDeclarations: variableDeclarations, functionDeclarations: functionDeclarations))
         swift.append(2, "return typeErased")
@@ -1402,13 +1403,13 @@ final class KotlinBridgeToKotlinVisitor {
         cdeclSource.append("let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!")
         cdeclSource.append("return MainActor.assumeIsolated {")
         cdeclSource.append(1, "let body = peer_swift.value.body")
-        cdeclSource.append(1, "return (body as? ComposeBridging)?.Java_composable")
+        cdeclSource.append(1, "return (body as? SkipUIBridging)?.Java_view")
         cdeclSource.append("}")
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
 
         var swift: [String] = []
         let visibilityString = visibility.swift(suffix: " ")
-        swift.append("\(visibilityString)var Java_composable: JavaObjectPointer? {")
+        swift.append("\(visibilityString)var Java_view: JavaObjectPointer? {")
         swift.append(1, "return toJavaObject(options: [])")
         swift.append("}")
 

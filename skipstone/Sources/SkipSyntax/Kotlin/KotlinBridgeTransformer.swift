@@ -43,8 +43,8 @@ public final class KotlinBridgeTransformer: KotlinTransformer {
         // Add attributes marking bridged types so that they're recorded in our codebase info
         syntaxTree.root.visit { node in
             if let typeDeclaration = node as? TypeDeclaration, typeDeclaration.type != .extensionDeclaration {
-                if typeDeclaration.modifiers.visibility >= .public, !typeDeclaration.attributes.isNoBridge {
-                    if syntaxTree.bridgeAPI != .none {
+                if isBridging(attributes: typeDeclaration.attributes, isPublic: typeDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) {
+                    if syntaxTree.isBridgeFile {
                         typeDeclaration.attributes.attributes.append(.bridgeToKotlin)
                     } else {
                         typeDeclaration.attributes.attributes.append(.bridgeToSwift)
@@ -52,8 +52,8 @@ public final class KotlinBridgeTransformer: KotlinTransformer {
                 }
                 return .recurse(nil)
             } else if let typealiasDeclaration = node as? TypealiasDeclaration {
-                if typealiasDeclaration.modifiers.visibility >= .public, !typealiasDeclaration.attributes.isNoBridge {
-                    if syntaxTree.bridgeAPI != .none {
+                if isBridging(attributes: typealiasDeclaration.attributes, isPublic: typealiasDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) {
+                    if syntaxTree.isBridgeFile {
                         typealiasDeclaration.attributes.attributes.append(.bridgeToKotlin)
                     } else {
                         typealiasDeclaration.attributes.attributes.append(.bridgeToSwift)
@@ -69,7 +69,7 @@ public final class KotlinBridgeTransformer: KotlinTransformer {
     }
 
     public func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
-        if syntaxTree.bridgeAPI != .none {
+        if syntaxTree.isBridgeFile {
             guard let visitor = KotlinBridgeToKotlinVisitor(for: syntaxTree, options: options, translator: translator) else {
                 return []
             }

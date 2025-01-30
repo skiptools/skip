@@ -81,8 +81,12 @@ struct JavaClassRef {
 
 /// Code to create a static variable in the given class to store the given value.
 func declareStaticLet(_ identifier: String, ofType: String, visibility: String = "private", in signature: TypeSignature? = nil, value: String) -> String {
+    var visibilityString = visibility
+    if !visibilityString.isEmpty {
+        visibilityString += " "
+    }
     if signature?.generics.isEmpty == false {
-        return "\(visibility) static var \(identifier): \(ofType) { \(value) }"
+        return "\(visibilityString)static var \(identifier): \(ofType) { \(value) }"
     } else {
         return "\(signature == nil ? "\(visibility) let " : "\(visibility) static let ")\(identifier) = \(value)"
     }
@@ -1162,8 +1166,8 @@ extension TypeSignature {
             } else {
                 strategy = .peer
             }
-        } else if typeInfo.declarationType == .protocolDeclaration, let moduleName = typeInfo.moduleName, isSkipModule(name: moduleName) {
-            // Any protocol in a built-in module will have a Swift and Kotlin representation
+        } else if typeInfo.declarationType == .protocolDeclaration, let moduleName = typeInfo.moduleName, moduleName != "SkipUI" && isSkipModule(name: moduleName) {
+            // Any protocol in a built-in module will have a Kotlin representation
             strategy = .protocol
         } else {
             if typeInfo.inherits.contains(where: { $0.isNamed("SwiftCustomBridged", moduleName: "Swift") }) {

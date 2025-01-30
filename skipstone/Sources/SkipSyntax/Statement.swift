@@ -33,36 +33,28 @@ class Statement: SyntaxNode {
         guard syntaxTree.decodeLevel != .full && syntaxTree.decodeLevel != .none else {
             return syntaxTree.decodeLevel
         }
+
         // We need to track state in SwiftUI views regardless of visibility
-        if syntaxTree.bridgeAPI != .none, context.memberOf?.type == .structDeclaration, attributes.stateAttribute != nil || attributes.environmentAttribute != nil || attributes.contains(.focusState) {
+        if syntaxTree.isBridgeFile, context.memberOf?.type == .structDeclaration, attributes.stateAttribute != nil || attributes.environmentAttribute != nil || attributes.contains(.focusState) {
             return .api
         }
         guard context.memberOf?.flags.contains(.swiftUIState) != true else {
             return .none
         }
-        guard syntaxTree.bridgeAPI == .none || !attributes.isNoBridge else {
-            return .none
-        }
-        let isVisible: Bool
+
+        let isPublic: Bool
         if context.memberOf?.type == .protocolDeclaration && !(self is TypeDeclaration.Type) {
-            isVisible = visibility == .default || visibility >= .public
+            isPublic = visibility == .default || visibility >= .public
         } else if context.memberOf?.type == .extensionDeclaration && !(self is TypeDeclaration.Type) {
             let memberVisibility = visibility == .default ? (context.memberOf?.modifiers.visibility ?? visibility) : visibility
-            isVisible = memberVisibility >= .public
+            isPublic = memberVisibility >= .public
         } else if self is ExtensionDeclaration.Type {
             // Extensions with default visibility may contain public members
-            isVisible = visibility >= .public || visibility == .default
+            isPublic = visibility >= .public || visibility == .default
         } else {
-            isVisible = visibility >= .public
+            isPublic = visibility >= .public
         }
-        switch syntaxTree.bridgeAPI {
-        case .none:
-            return isVisible ? .api : .none
-        case .explicit:
-            return attributes.isBridge ? .api : .none
-        case .public:
-            return isVisible || attributes.isBridge ? .api : .none
-        }
+        return isBridging(attributes: attributes, isPublic: isPublic, autoBridge: syntaxTree.autoBridge) ? .api : .none
     }
 }
 

@@ -125,7 +125,7 @@ final class CodebaseInfoTests: XCTestCase {
     func testTrailingClosures() async throws {
         let context = try await setUpContext(swift: """
         class TestClass {
-            func trailingClosureF1(p1: Int, tc1: @escaping (String) -> Int) -> String {
+            func trailingClosureF1(p1: Int, tc1: (String) -> Int) -> String {
                 return ""
             }
 

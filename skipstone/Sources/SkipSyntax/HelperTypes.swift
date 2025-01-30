@@ -165,6 +165,8 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
                 apiFlags.options.insert(.autoclosure)
             case .directive:
                 attributes.append(attribute)
+            case .escaping:
+                attributes.append(attribute)
             case .mainActor:
                 apiFlags.options.insert(.mainActor)
             case .viewBuilder, .toolbarContentBuilder:

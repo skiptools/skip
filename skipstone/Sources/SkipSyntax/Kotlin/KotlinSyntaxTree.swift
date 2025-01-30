@@ -1,13 +1,15 @@
 /// Representation of the Kotlin syntax tree.
 public final class KotlinSyntaxTree {
     let source: Source
-    let bridgeAPI: BridgeAPI
+    let isBridgeFile: Bool
+    let autoBridge: AutoBridge
     let root: KotlinCodeBlock
     var dependencies: KotlinDependencies
 
-    init(source: Source, bridgeAPI: BridgeAPI = .none, root: KotlinCodeBlock, dependencies: KotlinDependencies = KotlinDependencies()) {
+    init(source: Source, isBridgeFile: Bool = false, autoBridge: AutoBridge = .none, root: KotlinCodeBlock, dependencies: KotlinDependencies = KotlinDependencies()) {
         self.source = source
-        self.bridgeAPI = bridgeAPI
+        self.isBridgeFile = isBridgeFile
+        self.autoBridge = autoBridge
         self.root = root
         self.dependencies = dependencies
     }
