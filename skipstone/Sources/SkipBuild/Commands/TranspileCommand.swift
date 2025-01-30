@@ -493,7 +493,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             }
 
             // if the package is to be bridged, then create a src/main/swift folder that links to the source package
-            guard !skipBridgeTranspilations.isEmpty else {
+            guard isNativeModule || !skipBridgeTranspilations.isEmpty else {
                 return
             }
 
