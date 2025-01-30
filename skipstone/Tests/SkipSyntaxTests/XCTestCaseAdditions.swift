@@ -98,7 +98,7 @@ extension XCTestCase {
         }
         let codebaseInfo = CodebaseInfo()
         codebaseInfo.dependentModules = dependentModules
-        let tp = Transpiler(transpileFiles: srcFiles, bridgeFiles: bridgeFiles, isBridgeEnabled: bridgeDecodeLevel == .api, isBridgeGatherEnabled: bridgeDecodeLevel == .full, codebaseInfo: codebaseInfo, transformers: transformers)
+        let tp = Transpiler(transpileFiles: srcFiles, bridgeFiles: bridgeFiles, autoBridge: bridgeDecodeLevel == .api ? .public : .none, isBridgeGatherEnabled: bridgeDecodeLevel == .full, codebaseInfo: codebaseInfo, transformers: transformers)
         var transpilations: [Transpilation] = []
         try await tp.transpile { transpilations.append($0) }
         guard !transpilations.isEmpty else {
@@ -237,7 +237,7 @@ extension XCTestCase {
         if preflight {
             for srcFile in srcFiles {
                 let source = try Source(file: srcFile)
-                let syntaxTree = SyntaxTree(source: source, isBridgeFile: isSwiftBridge, unavailableAPI: KotlinUnavailableAPI())
+                let syntaxTree = SyntaxTree(source: source, isBridgeFile: isSwiftBridge, autoBridge: .public, unavailableAPI: KotlinUnavailableAPI())
                 transformers.forEach { $0.gather(from: syntaxTree) }
                 transformers.forEach { $0.prepareForUse(codebaseInfo: nil) }
                 let translator = KotlinTranslator(syntaxTree: syntaxTree)
@@ -248,8 +248,8 @@ extension XCTestCase {
         } else {
             let codebaseInfo = CodebaseInfo()
             codebaseInfo.dependentModules = dependentModules
-            let isBridgeEnabled = transformers.contains { $0 is KotlinBridgeTransformer }
-            let tp = Transpiler(transpileFiles: isSwiftBridge ? [] : srcFiles, bridgeFiles: isSwiftBridge ? srcFiles : [], isBridgeEnabled: isBridgeEnabled, codebaseInfo: codebaseInfo, transformers: transformers)
+            let autoBridge: AutoBridge = transformers.contains { $0 is KotlinBridgeTransformer } ? .public : .none
+            let tp = Transpiler(transpileFiles: isSwiftBridge ? [] : srcFiles, bridgeFiles: isSwiftBridge ? srcFiles : [], autoBridge: autoBridge, codebaseInfo: codebaseInfo, transformers: transformers)
             try await tp.transpile { transpilation in
                 messages += transpilation.messages
             }

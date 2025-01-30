@@ -27,38 +27,40 @@ final class KotlinBridgeToSwiftVisitor {
         var globalFunctionCount = 0
         syntaxTree.root.visit { node in
             if let variableDeclaration = node as? KotlinVariableDeclaration {
-                if variableDeclaration.role == .global, variableDeclaration.modifiers.visibility >= .public, !variableDeclaration.attributes.isNoBridge {
+                let variableIsBridging = { isBridging(attributes: variableDeclaration.attributes, isPublic: variableDeclaration.modifiers.visibility >= .public, autoBridge: self.syntaxTree.autoBridge) }
+                if variableDeclaration.role == .global, variableIsBridging() {
                     needsGlobalsJavaClass = update(global: variableDeclaration, swiftDefinitions: &swiftDefinitions, globalsClassRef: globalsClassRef) || needsGlobalsJavaClass
                     checkIfNotSkipBridge(variableDeclaration)
-                } else if variableDeclaration.extends != nil {
+                } else if variableDeclaration.extends != nil, variableIsBridging() {
                     variableDeclaration.checkExtensionUnbridgable(translator: translator)
                 }
                 return .skip
             } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
-                if functionDeclaration.role == .global, functionDeclaration.modifiers.visibility >= .public, !functionDeclaration.attributes.isNoBridge {
+                let functionIsBridging = { isBridging(attributes: functionDeclaration.attributes, isPublic: functionDeclaration.modifiers.visibility >= .public, autoBridge: self.syntaxTree.autoBridge) }
+                if functionDeclaration.role == .global, functionIsBridging() {
                     if update(global: functionDeclaration, uniquifier: globalFunctionCount, swiftDefinitions: &swiftDefinitions, globalsClassRef: globalsClassRef) {
                         needsGlobalsJavaClass = true
                         globalFunctionCount += 1
                     }
                     checkIfNotSkipBridge(functionDeclaration)
-                } else if functionDeclaration.extends != nil {
+                } else if functionDeclaration.extends != nil, functionIsBridging() {
                     functionDeclaration.checkExtensionUnbridgable(translator: translator)
                 }
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
-                if classDeclaration.modifiers.visibility >= .public, !classDeclaration.attributes.isNoBridge {
+                if isBridging(attributes: classDeclaration.attributes, isPublic: classDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) {
                     update(classDeclaration, swiftDefinitions: &swiftDefinitions)
                     checkIfNotSkipBridge(classDeclaration)
                 }
                 return .recurse(nil)
             } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
-                if interfaceDeclaration.modifiers.visibility >= .public, !interfaceDeclaration.attributes.isNoBridge {
+                if isBridging(attributes: interfaceDeclaration.attributes, isPublic: interfaceDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) {
                     update(interfaceDeclaration, swiftDefinitions: &swiftDefinitions)
                     checkIfNotSkipBridge(interfaceDeclaration)
                 }
                 return .recurse(nil)
             } else if let typealiasDeclaration = node as? KotlinTypealiasDeclaration {
-                if typealiasDeclaration.modifiers.visibility >= .public, !typealiasDeclaration.attributes.isNoBridge {
+                if isBridging(attributes: typealiasDeclaration.attributes, isPublic:  typealiasDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) {
                     update(typealiasDeclaration, swiftDefinitions: &swiftDefinitions)
                     checkIfNotSkipBridge(typealiasDeclaration)
                 }
@@ -761,7 +763,7 @@ final class KotlinBridgeToSwiftVisitor {
         var swift: [String] = []
         swift.append("\(visibilityString)\(modifiersString)\(isEnum ? "enum" : isStruct ? "struct" : isActor ? "actor" : "class") \(classDeclaration.name)\(classDeclaration.generics.swiftParametersString): \(inheritsString)\(classDeclaration.generics.swiftWhereString) {")
 
-        let finalMemberVisibility = primaryTypeInfo.modifiers.visibility > .public ? .public : primaryTypeInfo.modifiers.visibility
+        let finalMemberVisibility = min(primaryTypeInfo.modifiers.visibility, .public)
         let finalMemberVisibilityString = finalMemberVisibility.swift(suffix: " ")
         swift.append(1, classRef.declaration)
 
@@ -825,7 +827,7 @@ final class KotlinBridgeToSwiftVisitor {
                     enumCases.append(enumCaseDeclaration)
                 }
             } else if let variableDeclaration = member as? KotlinVariableDeclaration {
-                guard variableDeclaration.modifiers.visibility >= .public, !variableDeclaration.isGenerated, !variableDeclaration.attributes.isNoBridge else {
+                guard !variableDeclaration.isGenerated, isBridging(attributes: variableDeclaration.attributes, isPublic: variableDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) else {
                     continue
                 }
                 let info = typeInfos.flatMap({ $0.variables }).first(where: { $0.name == (variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName) && $0.modifiers.visibility >= .fileprivate })
@@ -833,7 +835,7 @@ final class KotlinBridgeToSwiftVisitor {
                     hasBridgedStaticMembers = true
                 }
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
-                guard functionDeclaration.modifiers.visibility >= .public, (!functionDeclaration.isGenerated || functionDeclaration.type == .constructorDeclaration), !functionDeclaration.attributes.isNoBridge else {
+                guard (!functionDeclaration.isGenerated || functionDeclaration.type == .constructorDeclaration), isBridging(attributes: functionDeclaration.attributes, isPublic: functionDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) else {
                     continue
                 }
                 guard !functionDeclaration.isEncode && !functionDeclaration.isDecodableConstructor else {
@@ -1152,13 +1154,13 @@ final class KotlinBridgeToSwiftVisitor {
         var functionCount = 0
         for member in interfaceDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
-                guard !variableDeclaration.attributes.isNoBridge else {
+                guard isBridging(attributes: variableDeclaration.attributes, isPublic: interfaceDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) else {
                     continue
                 }
                 let info = primaryTypeInfo.variables.first(where: { $0.name == variableDeclaration.propertyName })
                 update(member: variableDeclaration, info: info, in: interfaceDeclaration, swiftDefinitions: &memberDefinitions)
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
-                guard !functionDeclaration.attributes.isNoBridge else {
+                guard isBridging(attributes: functionDeclaration.attributes, isPublic: interfaceDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) else {
                     continue
                 }
                 let info = primaryTypeInfo.functions.first(where: { $0.name == functionDeclaration.name && $0.signature == functionDeclaration.functionType && $0.modifiers.visibility >= .fileprivate })
@@ -1171,78 +1173,80 @@ final class KotlinBridgeToSwiftVisitor {
         let definition = swiftDefinition(of: interfaceDeclaration.signature, statement: interfaceDeclaration, swift: swift, members: memberDefinitions)
         swiftDefinitions.append(definition)
 
-        if let bridgeImplDefinition = Self.protocolBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, options: options, codebaseInfo: codebaseInfo) {
+        if let bridgeImplDefinition = Self.protocolBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, options: options, autoBridge: syntaxTree.autoBridge, codebaseInfo: codebaseInfo) {
             swiftDefinitions.append(bridgeImplDefinition)
         }
     }
 
     /// Define an anonymous implementation of a bridged protocol.
-    static func protocolBridgeImplDefinition(forProtocol type: TypeSignature, inPackage packageName: String?, statement: KotlinStatement?, options: KotlinBridgeOptions, codebaseInfo: CodebaseInfo.Context) -> SwiftDefinition? {
+    static func protocolBridgeImplDefinition(forProtocol type: TypeSignature, inPackage packageName: String?, statement: KotlinStatement?, options: KotlinBridgeOptions, autoBridge: AutoBridge, codebaseInfo: CodebaseInfo.Context) -> SwiftDefinition? {
         guard let primaryTypeInfo = codebaseInfo.primaryTypeInfo(forNamed: type) else {
             return nil
         }
+        let protocolVisibility = min(primaryTypeInfo.modifiers.visibility, .public)
         let protocolSignatures = codebaseInfo.global.protocolSignatures(forNamed: type).dropFirst()
         let bridgeImpl = type.protocolBridgeImpl
 
         var swift: [String] = []
-        swift.append("public final class \(bridgeImpl): \(type.withGenerics([])), BridgedFromKotlin {")
+        let visibilityString = protocolVisibility.swift(suffix: " ")
+        swift.append("\(visibilityString)final class \(bridgeImpl): \(type.withGenerics([])), BridgedFromKotlin {")
 
         let classRef = JavaClassRef(for: type, packageName: packageName)
         swift.append(1, classRef.declaration)
-        swift.append(1, "public let Java_peer: JObject")
-        swift.append(1, "public required init(Java_ptr: JavaObjectPointer) {")
+        swift.append(1, "\(visibilityString)let Java_peer: JObject")
+        swift.append(1, "\(visibilityString)required init(Java_ptr: JavaObjectPointer) {")
         swift.append(2, "Java_peer = JObject(Java_ptr)")
         swift.append(1, "}")
 
         var functionCount = 0
-        swift.append(1, self.swift(forProtocolBridgeImplMembers: primaryTypeInfo, options: options, codebaseInfo: codebaseInfo, functionCount: &functionCount))
+        swift.append(1, self.swift(forProtocolBridgeImplMembers: primaryTypeInfo, visibility: protocolVisibility, options: options, codebaseInfo: codebaseInfo, autoBridge: autoBridge, functionCount: &functionCount))
         var seenProtocolSignatures: Set<TypeSignature> = []
         for protocolSignature in protocolSignatures {
             guard seenProtocolSignatures.insert(protocolSignature).inserted else {
                 continue
             }
             if protocolSignature.isEquatable {
-                swift.append(1, self.swift(forEqualsFunctionIn: bridgeImpl, options: options, modifiers: Modifiers(visibility: .public, isStatic: true)))
+                swift.append(1, self.swift(forEqualsFunctionIn: bridgeImpl, options: options, modifiers: Modifiers(visibility: protocolVisibility, isStatic: true)))
             } else if protocolSignature.isHashable {
-                swift.append(1, self.swift(forHashFunctionIn: bridgeImpl, options: options, modifiers: Modifiers(visibility: .public)))
+                swift.append(1, self.swift(forHashFunctionIn: bridgeImpl, options: options, modifiers: Modifiers(visibility: protocolVisibility)))
             } else if protocolSignature.isComparable {
-                swift.append(1, self.swift(forLessThanDeclarationIn: bridgeImpl, options: options, modifiers: Modifiers(visibility: .public, isStatic: true)))
+                swift.append(1, self.swift(forLessThanDeclarationIn: bridgeImpl, options: options, modifiers: Modifiers(visibility: protocolVisibility, isStatic: true)))
             } else if let protocolInfo = codebaseInfo.primaryTypeInfo(forNamed: protocolSignature) {
-                guard protocolInfo.modifiers.visibility >= .public, !protocolInfo.attributes.isNoBridge else {
+                guard isBridging(attributes: protocolInfo.attributes, isPublic: protocolInfo.modifiers.visibility >= .public, autoBridge: autoBridge) else {
                     continue
                 }
-                swift.append(1, self.swift(forProtocolBridgeImplMembers: protocolInfo, options: options, codebaseInfo: codebaseInfo, functionCount: &functionCount))
+                swift.append(1, self.swift(forProtocolBridgeImplMembers: protocolInfo, visibility: protocolVisibility, options: options, codebaseInfo: codebaseInfo, autoBridge: autoBridge, functionCount: &functionCount))
             }
         }
-        swift.append(1, swiftForJConvertibleContract(in: .protocolDeclaration, visibility: .public))
+        swift.append(1, swiftForJConvertibleContract(in: .protocolDeclaration, visibility: protocolVisibility))
 
         swift.append("}")
         return SwiftDefinition(statement: statement, swift: swift)
     }
 
-    private static func swift(forProtocolBridgeImplMembers info: CodebaseInfo.TypeInfo, options: KotlinBridgeOptions, codebaseInfo: CodebaseInfo.Context, functionCount: inout Int) -> [String] {
+    private static func swift(forProtocolBridgeImplMembers info: CodebaseInfo.TypeInfo, visibility: Modifiers.Visibility, options: KotlinBridgeOptions, codebaseInfo: CodebaseInfo.Context, autoBridge: AutoBridge, functionCount: inout Int) -> [String] {
         let inSignature = info.signature.protocolBridgeImpl
         var swift: [String] = []
         for variableInfo in info.variables {
-            guard !variableInfo.attributes.isNoBridge else {
+            guard isBridging(attributes: variableInfo.attributes, isPublic: visibility >= .public, autoBridge: autoBridge) else {
                 continue
             }
             guard let bridgable = variableInfo.signature.checkBridgable(direction: .any, options: options, generics: info.generics, codebaseInfo: codebaseInfo) else {
                 continue
             }
             var modifiers = variableInfo.modifiers
-            modifiers.visibility = .public
+            modifiers.visibility = visibility
             swift += self.swift(forMemberVariableWithName: variableInfo.name, isAppendAsFunction: false, inType: .classDeclaration, inSignature: inSignature, bridgable: bridgable, options: options, modifiers: modifiers, attributes: variableInfo.attributes, apiFlags: variableInfo.apiFlags ?? APIFlags())
         }
         for functionInfo in info.functions {
-            guard !functionInfo.attributes.isNoBridge else {
+            guard isBridging(attributes: functionInfo.attributes, isPublic: visibility >= .public, autoBridge: autoBridge) else {
                 continue
             }
             guard let bridgable = functionInfo.signature.checkFunctionBridgable(direction: .any, isConstructor: functionInfo.declarationType == .initDeclaration, options: options, generics: info.generics.merge(overrides: functionInfo.generics, addNew: true), codebaseInfo: codebaseInfo) else {
                 continue
             }
             var modifiers = functionInfo.modifiers
-            modifiers.visibility = .public
+            modifiers.visibility = visibility
             swift += self.swift(forMemberFunctionWithName: functionInfo.name, type: functionInfo.signature, generics: functionInfo.generics, parameterValues: nil, uniquifier: functionCount, disambiguatingParameterCount: 0, isConstructor: false, isFactory: false, inType: .classDeclaration, inSignature: inSignature, isBridgedSubclass: false, bridgable: bridgable, options: options, modifiers: modifiers, apiFlags: functionInfo.apiFlags ?? APIFlags())
             functionCount += 1
         }

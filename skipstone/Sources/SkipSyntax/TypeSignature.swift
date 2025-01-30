@@ -1962,7 +1962,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
         case .float:
             return "Float"
-        case .function(let parameters, let returnType, let apiFlags, _):
+        case .function(let parameters, let returnType, let apiFlags, let attributes):
             var apiFlagsString = ""
             if apiFlags.options.contains(.async) {
                 apiFlagsString += "async "
@@ -1970,7 +1970,8 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             if apiFlags.throwsType != .none {
                 apiFlagsString += "throws(\(apiFlags.throwsType.descriptionUsing(keyPath))) "
             }
-            return "(\(parameters.map { $0.descriptionUsing(keyPath) }.joined(separator: ", ")))\(apiFlagsString) -> \(returnType[keyPath: keyPath])"
+            let attributesString = attributes?.contains(.escaping) == true ? "@escaping " : ""
+            return "\(attributesString)(\(parameters.map { $0.descriptionUsing(keyPath) }.joined(separator: ", ")))\(apiFlagsString) -> \(returnType[keyPath: keyPath])"
         case .int:
             return "Int"
         case .int8:

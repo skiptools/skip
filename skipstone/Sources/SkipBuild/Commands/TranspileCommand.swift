@@ -266,7 +266,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             try (linkSource.asURL as NSURL).setResourceValue(modTime, forKey: .contentModificationDateKey)
         }
 
-
         // the shared JSON encoder for serializing .skipcode.json codebase and .sourcehash marker contents
         let encoder = JSONEncoder()
         encoder.outputFormatting = [
@@ -301,14 +300,13 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         let buildGradle = moduleRootPath.appending(component: "build.gradle.kts")
 
-        var dependentModuleExports: [CodebaseInfo.ModuleExport] = []
         let codebaseInfo = try await loadCodebaseInfo() // initialize the codebaseinfo and load DependentModuleName.skipcode.json
 
         // load and merge each of the skip.yml files for the dependent modules
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
 
         let isNativeModule = baseSkipConfig.skip?.mode?.lowercased() == "native"
-        let isBridgingEnabled = baseSkipConfig.skip?.isBridgingEnabled() == true
+        let autoBridge: AutoBridge = baseSkipConfig.skip?.isAutoBridgingEnabled() == true ? .public : .none
         let dynamicRoot = baseSkipConfig.skip?.dynamicroot
 
         // projects with a CMakeLists.txt file are built as a native Android library
@@ -355,17 +353,17 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             try addLink(moduleBasePath.appending(component: buildSrcFolderName), pointingAt: buildSrcFolder, relative: false)
         }
 
-        // feed the transpiler the files to transpile and any compiled files to potentially bridge.
+        // feed the transpiler the files to transpile and any compiled files to potentially bridge
         var transpileFiles: [String] = []
         var swiftFiles: [String] = []
         for sourceFile in sourceURLs.map(\.path).sorted() {
-            if !isNativeModule {
-                transpileFiles.append(sourceFile)
-            } else if isBridgingEnabled || dynamicRoot != nil {
+            if isNativeModule {
                 swiftFiles.append(sourceFile)
+            } else {
+                transpileFiles.append(sourceFile)
             }
         }
-        let transpiler = Transpiler(packageName: packageName, transpileFiles: transpileFiles.map(Source.FilePath.init(path:)), bridgeFiles: swiftFiles.map(Source.FilePath.init(path:)), isBridgeEnabled: isBridgingEnabled, isBridgeGatherEnabled: dynamicRoot != nil, codebaseInfo: codebaseInfo, preprocessorSymbols: Set(inputOptions.symbols), transformers: transformers)
+        let transpiler = Transpiler(packageName: packageName, transpileFiles: transpileFiles.map(Source.FilePath.init(path:)), bridgeFiles: swiftFiles.map(Source.FilePath.init(path:)), autoBridge: autoBridge, isBridgeGatherEnabled: dynamicRoot != nil, codebaseInfo: codebaseInfo, preprocessorSymbols: Set(inputOptions.symbols), transformers: transformers)
 
         try await transpiler.transpile(handler: handleTranspilation)
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json
@@ -387,6 +385,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         func loadCodebaseInfo() async throws -> CodebaseInfo {
             let decoder = JSONDecoder()
+            var dependentModuleExports: [CodebaseInfo.ModuleExport] = []
 
             // go through the '--link modulename:../../some/path' arguments and try to load the modulename.skipcode.json symbols from the previous module's transpilation output
             for (linkModuleName, relativeLinkPath) in linkNamePaths {
@@ -494,7 +493,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             }
 
             // if the package is to be bridged, then create a src/main/swift folder that links to the source package
-            if baseSkipConfig.skip?.isBridgingEnabled() != true && baseSkipConfig.skip?.dynamicroot == nil {
+            guard !skipBridgeTranspilations.isEmpty else {
                 return
             }
 
@@ -621,7 +620,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
                     """
 
-                    if configMap[moduleName]?.skip?.isBridgingEnabled() == true {
+                    if configMap[moduleName]?.skip?.mode == "native" {
                         bridgedModules.append(moduleName)
                     }
                 }
@@ -1154,11 +1153,10 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
     func createTransformers(for config: SkipConfig, with moduleMap: [String: SkipConfig]) throws -> [KotlinTransformer] {
         var transformers: [KotlinTransformer] = builtinKotlinTransformers()
 
-        if config.skip?.isBridgingEnabled() == true {
-            let configOptions = config.skip?.bridgingOptions() ?? []
-            let transformerOptions = KotlinBridgeOptions.parse(configOptions)
-            transformers.append(KotlinBridgeTransformer(options: transformerOptions))
-        }
+        let configOptions = config.skip?.bridgingOptions() ?? []
+        let transformerOptions = KotlinBridgeOptions.parse(configOptions)
+        transformers.append(KotlinBridgeTransformer(options: transformerOptions))
+
         if let root = config.skip?.dynamicroot {
             transformers.append(KotlinDynamicObjectTransformer(root: root))
         }

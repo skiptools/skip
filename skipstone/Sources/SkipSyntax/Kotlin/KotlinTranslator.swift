@@ -91,7 +91,7 @@ public final class KotlinTranslator {
         let dependencies = gatherDependencies(from: importsFirstStatements)
         let kotlinRoot = KotlinCodeBlock(statements: importsFirstStatements)
         kotlinRoot.messages = syntaxTree.root.messages
-        let kotlinSyntaxTree = KotlinSyntaxTree(source: syntaxTree.source, isBridgeFile: syntaxTree.isBridgeFile, root: kotlinRoot, dependencies: dependencies)
+        let kotlinSyntaxTree = KotlinSyntaxTree(source: syntaxTree.source, isBridgeFile: syntaxTree.isBridgeFile, autoBridge: syntaxTree.autoBridge, root: kotlinRoot, dependencies: dependencies)
         kotlinSyntaxTree.root.assignParentReferences()
         return kotlinSyntaxTree
     }

@@ -33,6 +33,7 @@ class Statement: SyntaxNode {
         guard syntaxTree.decodeLevel != .full && syntaxTree.decodeLevel != .none else {
             return syntaxTree.decodeLevel
         }
+
         // We need to track state in SwiftUI views regardless of visibility
         if syntaxTree.isBridgeFile, context.memberOf?.type == .structDeclaration, attributes.stateAttribute != nil || attributes.environmentAttribute != nil || attributes.contains(.focusState) {
             return .api
@@ -40,20 +41,20 @@ class Statement: SyntaxNode {
         guard context.memberOf?.flags.contains(.swiftUIState) != true else {
             return .none
         }
-        guard !syntaxTree.isBridgeFile || !attributes.isNoBridge else {
-            return .none
-        }
+
+        let isPublic: Bool
         if context.memberOf?.type == .protocolDeclaration && !(self is TypeDeclaration.Type) {
-            return visibility == .default || visibility >= .public ? .api : .none
+            isPublic = visibility == .default || visibility >= .public
         } else if context.memberOf?.type == .extensionDeclaration && !(self is TypeDeclaration.Type) {
             let memberVisibility = visibility == .default ? (context.memberOf?.modifiers.visibility ?? visibility) : visibility
-            return memberVisibility >= .public ? .api : .none
+            isPublic = memberVisibility >= .public
         } else if self is ExtensionDeclaration.Type {
             // Extensions with default visibility may contain public members
-            return visibility >= .public || visibility == .default ? .api : .none
+            isPublic = visibility >= .public || visibility == .default
         } else {
-            return visibility >= .public ? .api : .none
+            isPublic = visibility >= .public
         }
+        return isBridging(attributes: attributes, isPublic: isPublic, autoBridge: syntaxTree.autoBridge) ? .api : .none
     }
 }
 
