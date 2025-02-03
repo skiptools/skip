@@ -6259,15 +6259,14 @@ final class BridgeToKotlinTests: XCTestCase {
             }
 
             override fun hashCode(): Int = Swift_peer.hashCode()
-        
-            @javax.compose.runtime.Composable
-            override fun ComposeContent(composectx: skip.ui.ComposeContext) {
-                val count = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.StateSupport, Any>) { Swift_initState_count(Swift_peer) }
-                Swift_syncState_count(Swift_peer, count)
 
+            @androidx.compose.runtime.Composable
+            override fun ComposeContent(composectx: skip.ui.ComposeContext) {
+                val count = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_count(Swift_peer)) }
+                Swift_syncState_count(Swift_peer, count.value)
                 super.ComposeContent(composectx)
             }
-            private external fun Swift_initState_count(Swift_peer: skip.bridge.kt.SwiftObjectPointer) -> skip.ui.StateSupport
+            private external fun Swift_initState_count(Swift_peer: skip.bridge.kt.SwiftObjectPointer): skip.ui.StateSupport
             private external fun Swift_syncState_count(Swift_peer: skip.bridge.kt.SwiftObjectPointer, support: skip.ui.StateSupport)
 
             override fun body(): skip.ui.View {
@@ -6294,14 +6293,14 @@ final class BridgeToKotlinTests: XCTestCase {
                 return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
             private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
-            var Java_view: JavaObjectPointer? {
-                return toJavaObject(options: [])
-            }
             func Java_initState_count() -> SkipUI.StateSupport {
-                return count.valueBox.Java_initStateSupport()
+                return $count.valueBox!.Java_initStateSupport()
             }
             func Java_syncState_count(support: SkipUI.StateSupport) {
-                return count.valueBox.Java_syncStateSupport(support)
+                $count.valueBox!.Java_syncStateSupport(support)
+            }
+            var Java_view: JavaObjectPointer? {
+                return toJavaObject(options: [])
             }
         }
         @_cdecl("Java_V_Swift_1release")
@@ -6314,6 +6313,17 @@ final class BridgeToKotlinTests: XCTestCase {
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
         }
+        @_cdecl("Java_V_Swift_1initState_1count")
+        func V_Swift_initState_count(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer {
+            let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
+            return peer_swift.value.Java_initState_count().toJavaObject(options: [])!
+        }
+        @_cdecl("Java_V_Swift_1syncState_1count")
+        func V_Swift_syncState_count(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ support: JavaObjectPointer) {
+            let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
+            let support_swift = SkipUI.StateSupport.fromJavaObject(support, options: [])
+            peer_swift.value.Java_syncState_count(support: support_swift)
+        }
         @_cdecl("Java_V_Swift_1composableBody")
         func V_Swift_composableBody(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer? {
             let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
@@ -6321,17 +6331,6 @@ final class BridgeToKotlinTests: XCTestCase {
                 let body = peer_swift.value.body
                 return (body as? SkipUIBridging)?.Java_view
             }
-        }
-        @_cdecl("Java_V_Swift_1initState_1count")
-        func V_Swift_initState_count(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer {
-            let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
-            return peer_swift.Java_initState_count().toJavaObject(options: [])!
-        }
-        @_cdecl("Java_V_Swift_1syncState_1count")
-        func V_Swift_syncState_count(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ support: JavaObjectPointer) {
-            let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
-            let support_swift = StateSupport.fromJavaObject(support, options: []) 
-            peer_swift.Java_syncState_count(support: support_swift)
         }
         """, transformers: transformers)
     }

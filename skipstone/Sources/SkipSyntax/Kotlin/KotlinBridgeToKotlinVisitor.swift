@@ -1416,8 +1416,8 @@ final class KotlinBridgeToKotlinVisitor {
         var bodyKotlin: [String] = []
         for variableDeclaration in stateVariableDeclarations {
             let name = variableDeclaration.propertyName
-            bodyKotlin.append("val \(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { Swift_initState_\(name)(Swift_peer) }")
-            bodyKotlin.append("Swift_syncState_\(name)(Swift_peer, \(name))")
+            bodyKotlin.append("val \(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_\(name)(Swift_peer)) }")
+            bodyKotlin.append("Swift_syncState_\(name)(Swift_peer, \(name).value)")
         }
         bodyKotlin.append("super.ComposeContent(composectx)")
         functionDeclaration.body = KotlinCodeBlock(statements: bodyKotlin.map { KotlinRawStatement(sourceCode: $0) })
@@ -1432,7 +1432,7 @@ final class KotlinBridgeToKotlinVisitor {
         var source: [String] = []
         source.append("func Java_initState_\(variableDeclaration.propertyName)() -> SkipUI.StateSupport {")
         let name = variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName
-        source.append(1, "return _\(name).valueBox.Java_initStateSupport()")
+        source.append(1, "return $\(name).valueBox!.Java_initStateSupport()")
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
@@ -1453,7 +1453,7 @@ final class KotlinBridgeToKotlinVisitor {
         var source: [String] = []
         source.append("func Java_syncState_\(variableDeclaration.propertyName)(support: SkipUI.StateSupport) {")
         let name = variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName
-        source.append(1, "_\(name).valueBox.Java_syncStateSupport(support)")
+        source.append(1, "$\(name).valueBox!.Java_syncStateSupport(support)")
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
