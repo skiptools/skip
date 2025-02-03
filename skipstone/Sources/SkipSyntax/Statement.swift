@@ -33,15 +33,6 @@ class Statement: SyntaxNode {
         guard syntaxTree.decodeLevel != .full && syntaxTree.decodeLevel != .none else {
             return syntaxTree.decodeLevel
         }
-
-        // We need to track state in SwiftUI views regardless of visibility
-        if syntaxTree.isBridgeFile, context.memberOf?.type == .structDeclaration, attributes.stateAttribute != nil || attributes.environmentAttribute != nil || attributes.contains(.focusState) {
-            return .api
-        }
-        guard context.memberOf?.flags.contains(.swiftUIState) != true else {
-            return .none
-        }
-
         let isPublic: Bool
         if context.memberOf?.type == .protocolDeclaration && !(self is TypeDeclaration.Type) {
             isPublic = visibility == .default || visibility >= .public

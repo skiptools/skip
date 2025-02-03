@@ -6262,8 +6262,8 @@ final class BridgeToKotlinTests: XCTestCase {
 
             @androidx.compose.runtime.Composable
             override fun ComposeContent(composectx: skip.ui.ComposeContext) {
-                val count = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_count(Swift_peer)) }
-                Swift_syncState_count(Swift_peer, count.value)
+                val rememberedcount = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_count(Swift_peer)) }
+                Swift_syncState_count(Swift_peer, rememberedcount.value)
                 super.ComposeContent(composectx)
             }
             private external fun Swift_initState_count(Swift_peer: skip.bridge.kt.SwiftObjectPointer): skip.ui.StateSupport

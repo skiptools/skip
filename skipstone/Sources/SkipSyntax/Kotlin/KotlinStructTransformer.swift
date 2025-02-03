@@ -79,17 +79,17 @@ final class KotlinStructTransformer: KotlinTransformer {
         let isOptionSet = classDeclaration.inherits.contains { $0.isNamed("OptionSet", moduleName: "Swift") }
         isMutable = isMutable || isOptionSet
 
-        let needsMemberwiseConstructor = !classDeclaration.unbridgedMemberKinds.suppressDefaultConstructorGeneration && !hasConstructors && !initializableVariableDeclarations.isEmpty
+        let needsMemberwiseConstructor = !classDeclaration.unbridgedMembers.suppressDefaultConstructorGeneration && !hasConstructors && !initializableVariableDeclarations.isEmpty
         if needsMemberwiseConstructor {
             addMemberwiseConstructor(to: classDeclaration, variableDeclarations: initializableVariableDeclarations, translator: translator)
         }
         // The reason we use a mutable struct copy constructor for bridged generic Swift types is that
         // we can't bridge standard constructors of generic types
-        let needsMutableStructCopyConstructor = isMutable && (classDeclaration.unbridgedMemberKinds.suppressDefaultConstructorGeneration || transformsConstructorParameters || (!needsMemberwiseConstructor && !copyableVariableDeclarations.isEmpty) || (needsMemberwiseConstructor && copyableVariableDeclarations.count > initializableVariableDeclarations.count) || (translator.syntaxTree.isBridgeFile && !classDeclaration.generics.isEmpty))
+        let needsMutableStructCopyConstructor = isMutable && (classDeclaration.unbridgedMembers.suppressDefaultConstructorGeneration || transformsConstructorParameters || (!needsMemberwiseConstructor && !copyableVariableDeclarations.isEmpty) || (needsMemberwiseConstructor && copyableVariableDeclarations.count > initializableVariableDeclarations.count) || (translator.syntaxTree.isBridgeFile && !classDeclaration.generics.isEmpty))
         if needsMutableStructCopyConstructor && !hasMutableStructCopyConstructor {
             addMutableStructCopyConstructor(to: classDeclaration, isOptionSet: isOptionSet, variableDeclarations: copyableVariableDeclarations)
         }
-        if !classDeclaration.unbridgedMemberKinds.suppressDefaultConstructorGeneration && !hasConstructors && !needsMemberwiseConstructor && needsMutableStructCopyConstructor {
+        if !classDeclaration.unbridgedMembers.suppressDefaultConstructorGeneration && !hasConstructors && !needsMemberwiseConstructor && needsMutableStructCopyConstructor {
             // If we add a copy constructor, be sure to also have a default constructor
             addMemberwiseConstructor(to: classDeclaration, variableDeclarations: [], translator: translator)
         }
