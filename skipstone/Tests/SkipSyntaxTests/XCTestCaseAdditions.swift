@@ -102,7 +102,7 @@ extension XCTestCase {
         var transpilations: [Transpilation] = []
         try await tp.transpile { transpilations.append($0) }
         guard !transpilations.isEmpty else {
-            return XCTFail("transpilation produced no result", file: file, line: line)
+            return XCTFail("Transpilation produced no result", file: file, line: line)
         }
         
         var kotlinTranspilations: [Transpilation] = []

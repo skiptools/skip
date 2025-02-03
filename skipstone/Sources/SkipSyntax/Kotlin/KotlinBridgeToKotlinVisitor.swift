@@ -925,6 +925,7 @@ final class KotlinBridgeToKotlinVisitor {
             superclassCall = nil
         }
 
+        let isBridged = isBridging(attributes: classDeclaration.attributes, isPublic: classDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge)
         let isError = classDeclaration.inherits.first?.isNamed("Exception") == true && classDeclaration.inherits.contains { $0.isNamed("Error", moduleName: "Swift", generics: []) }
         var isView = false
         classDeclaration.extras = nil
@@ -1056,14 +1057,18 @@ final class KotlinBridgeToKotlinVisitor {
         var hasHashDeclaration = false
         var functionCount = 0
         var bridgedVariableDeclarations: [KotlinVariableDeclaration] = []
+        var stateVariableDeclarations: [KotlinVariableDeclaration] = []
         var bridgedFunctionDeclarations: [(KotlinFunctionDeclaration, Int?)] = []
         var enumCases: [KotlinEnumCaseDeclaration] = []
         for member in classDeclaration.members {
             if let enumCaseDeclaration = member as? KotlinEnumCaseDeclaration {
                 enumCases.append(enumCaseDeclaration)
             } else if let variableDeclaration = member as? KotlinVariableDeclaration {
-                if isView && variableDeclaration.propertyName == "body" {
-                    // We replace the body with our own
+                if isView && variableDeclaration.attributes.stateAttribute != nil {
+                    stateVariableDeclarations.append(variableDeclaration)
+                }
+                // SwiftUI state variables may be included so that we can process them even when they're not bridging
+                if isView && (!isBridged || variableDeclaration.propertyName == "body" || !isBridging(attributes: variableDeclaration.attributes, isPublic: variableDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge)) {
                     classDeclaration.remove(statement: variableDeclaration)
                 } else if update(variableDeclaration, in: classDeclaration) {
                     bridgedVariableDeclarations.append(variableDeclaration)
@@ -1109,7 +1114,7 @@ final class KotlinBridgeToKotlinVisitor {
         var additionalSwiftDeclarations: [String] = []
         var additionalCDeclFunctions: [CDeclFunction] = []
         if isView {
-            let (statements, swift, cdeclFunctions) = addViewImplementation(to: classDeclaration, visibility: finalMemberVisibility)
+            let (statements, swift, cdeclFunctions) = addViewImplementation(to: classDeclaration, stateVariableDeclarations: stateVariableDeclarations, visibility: finalMemberVisibility)
             insertStatements += statements
             additionalSwiftDeclarations += swift
             additionalCDeclFunctions += cdeclFunctions
@@ -1378,10 +1383,88 @@ final class KotlinBridgeToKotlinVisitor {
         return swift
     }
 
-    private func addViewImplementation(to classDeclaration: KotlinClassDeclaration, visibility: Modifiers.Visibility) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
-        let (bodyStatements, bodySwift, bodyCdeclFunctions) = viewBodyImplementation(for: classDeclaration, visibility: visibility)
+    private func addViewImplementation(to classDeclaration: KotlinClassDeclaration, stateVariableDeclarations: [KotlinVariableDeclaration], visibility: Modifiers.Visibility) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+        var statements: [KotlinStatement] = []
+        var swift: [String] = []
+        var cdeclFunctions: [CDeclFunction] = []
 
-        return (bodyStatements, bodySwift, bodyCdeclFunctions)
+        if !stateVariableDeclarations.isEmpty {
+            statements += viewComposeContent(for: classDeclaration, stateVariableDeclarations: stateVariableDeclarations)
+            for variableDeclaration in stateVariableDeclarations {
+                let (initStatements, initSwift, initCdeclFunctions) = viewInitState(for: variableDeclaration, in: classDeclaration)
+                let (syncStatements, syncSwift, syncCdeclFunctions) = viewSyncState(for: variableDeclaration, in: classDeclaration)
+                statements += initStatements + syncStatements
+                swift += initSwift + syncSwift
+                cdeclFunctions += initCdeclFunctions + syncCdeclFunctions
+            }
+        }
+
+        let (bodyStatements, bodySwift, bodyCdeclFunctions) = viewBodyImplementation(for: classDeclaration, visibility: visibility)
+        statements += bodyStatements
+        swift += bodySwift
+        cdeclFunctions += bodyCdeclFunctions
+
+        return (statements, swift, cdeclFunctions)
+    }
+
+    private func viewComposeContent(for classDeclaration: KotlinClassDeclaration, stateVariableDeclarations: [KotlinVariableDeclaration]) -> [KotlinStatement] {
+        let functionDeclaration = KotlinFunctionDeclaration(name: "ComposeContent")
+        functionDeclaration.parameters = [Parameter<KotlinExpression>(externalLabel: "composectx", declaredType: .named("skip.ui.ComposeContext", []))]
+        functionDeclaration.modifiers = Modifiers(visibility: .public, isOverride: true)
+        functionDeclaration.attributes.attributes.append(Attribute(signature: .named("androidx.compose.runtime.Composable", [])))
+        functionDeclaration.extras = .singleNewline
+        var bodyKotlin: [String] = []
+        for variableDeclaration in stateVariableDeclarations {
+            let name = variableDeclaration.propertyName
+            bodyKotlin.append("val \(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_\(name)(Swift_peer)) }")
+            bodyKotlin.append("Swift_syncState_\(name)(Swift_peer, \(name).value)")
+        }
+        bodyKotlin.append("super.ComposeContent(composectx)")
+        functionDeclaration.body = KotlinCodeBlock(statements: bodyKotlin.map { KotlinRawStatement(sourceCode: $0) })
+        return [functionDeclaration]
+    }
+
+    private func viewInitState(for variableDeclaration: KotlinVariableDeclaration, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+        let externalName = "Swift_initState_\(variableDeclaration.propertyName)"
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.kt.SwiftObjectPointer): skip.ui.StateSupport")
+        externalFunctionDeclaration.parent = classDeclaration
+
+        var source: [String] = []
+        source.append("func Java_initState_\(variableDeclaration.propertyName)() -> SkipUI.StateSupport {")
+        let name = variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName
+        source.append(1, "return $\(name).valueBox!.Java_initStateSupport()")
+        source.append("}")
+
+        let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
+        let cdeclSignature: TypeSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))], .javaObjectPointer, APIFlags(), nil)
+        let cdeclSource: [String] = [
+            "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
+            "return peer_swift.value.Java_initState_\(variableDeclaration.propertyName)().toJavaObject(options: [])!"
+        ]
+        let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
+        return ([externalFunctionDeclaration], source, [cdeclFunction])
+    }
+
+    private func viewSyncState(for variableDeclaration: KotlinVariableDeclaration, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+        let externalName = "Swift_syncState_\(variableDeclaration.propertyName)"
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.kt.SwiftObjectPointer, support: skip.ui.StateSupport)")
+        externalFunctionDeclaration.parent = classDeclaration
+
+        var source: [String] = []
+        source.append("func Java_syncState_\(variableDeclaration.propertyName)(support: SkipUI.StateSupport) {")
+        let name = variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName
+        source.append(1, "$\(name).valueBox!.Java_syncStateSupport(support)")
+        source.append("}")
+
+        let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
+        let cdeclSignature: TypeSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false)), TypeSignature.Parameter(label: "support", type: .javaObjectPointer)], .void, APIFlags(), nil)
+        let cdeclSource: [String] = [
+            "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
+            "let support_swift = SkipUI.StateSupport.fromJavaObject(support, options: [])",
+            "peer_swift.value.Java_syncState_\(variableDeclaration.propertyName)(support: support_swift)"
+        ]
+        let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
+        return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
     private func viewBodyImplementation(for classDeclaration: KotlinClassDeclaration, visibility: Modifiers.Visibility) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
