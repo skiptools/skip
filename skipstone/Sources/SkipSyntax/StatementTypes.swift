@@ -1104,7 +1104,7 @@ final class FunctionDeclaration: Statement {
         guard decodeLevel != .none else {
             if syntaxTree.isBridgeFile {
                 // We have to note unbridged constructors because they affect default constructor generation and bridging
-                return UnbridgedMemberDeclaration(kind: .constructor, syntax: initializerDecl, extras: extras, in: syntaxTree)
+                return UnbridgedMemberDeclaration(member: .constructor, syntax: initializerDecl, extras: extras, in: syntaxTree)
             } else {
                 return nil
             }
@@ -1455,13 +1455,13 @@ class TypeDeclaration: Statement {
     private(set) var modifiers: Modifiers
     private(set) var generics: Generics
     let members: [Statement]
-    let unbridgedMemberKinds: UnbridgedMemberKinds
+    let unbridgedMembers: [UnbridgedMember]
     var signature: TypeSignature {
         return _signature ?? TypeSignature.for(name: name, genericTypes: generics.entries.map(\.namedType))
     }
     private var _signature: TypeSignature?
 
-    init(type: StatementType, name: String, signature: TypeSignature? = nil, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], unbridgedMemberKinds: UnbridgedMemberKinds = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(type: StatementType, name: String, signature: TypeSignature? = nil, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], unbridgedMembers: [UnbridgedMember] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.name = name
         _signature = signature
         self.inherits = inherits
@@ -1469,7 +1469,7 @@ class TypeDeclaration: Statement {
         self.modifiers = modifiers
         self.generics = generics
         self.members = members
-        self.unbridgedMemberKinds = unbridgedMemberKinds
+        self.unbridgedMembers = unbridgedMembers
         super.init(type: type, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
@@ -1521,8 +1521,8 @@ class TypeDeclaration: Statement {
         let name = classDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = classDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: classDecl.genericParameterClause, where: classDecl.genericWhereClause, in: syntaxTree)
-        let (members, unbridgedMemberKinds) = decodeMembers(syntaxListContainer: classDecl.memberBlock, context: context, in: syntaxTree)
-        let statement = TypeDeclaration(type: .classDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, unbridgedMemberKinds: unbridgedMemberKinds, syntax: classDecl, sourceFile: syntaxTree.source.file, sourceRange: classDecl.range(in: syntaxTree.source), extras: extras)
+        let (members, unbridgedMembers) = decodeMembers(syntaxListContainer: classDecl.memberBlock, context: context, in: syntaxTree)
+        let statement = TypeDeclaration(type: .classDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, unbridgedMembers: unbridgedMembers, syntax: classDecl, sourceFile: syntaxTree.source.file, sourceRange: classDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages
         return statement
     }
@@ -1551,8 +1551,8 @@ class TypeDeclaration: Statement {
 
         let name = structDecl.name.text.removingBacktickEscaping
         let (generics, genericsMessages) = Generics.for(syntax: structDecl.genericParameterClause, where: structDecl.genericWhereClause, in: syntaxTree)
-        let (members, unbridgedMemberKinds) = decodeMembers(syntaxListContainer: structDecl.memberBlock, context: context, in: syntaxTree)
-        let statement = TypeDeclaration(type: .structDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, unbridgedMemberKinds: unbridgedMemberKinds, syntax: structDecl, sourceFile: syntaxTree.source.file, sourceRange: structDecl.range(in: syntaxTree.source), extras: extras)
+        let (members, unbridgedMembers) = decodeMembers(syntaxListContainer: structDecl.memberBlock, context: context, in: syntaxTree)
+        let statement = TypeDeclaration(type: .structDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, unbridgedMembers: unbridgedMembers, syntax: structDecl, sourceFile: syntaxTree.source.file, sourceRange: structDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages
         return statement
     }
@@ -1591,8 +1591,8 @@ class TypeDeclaration: Statement {
         let name = enumDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = enumDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: enumDecl.genericParameterClause, where: enumDecl.genericWhereClause, in: syntaxTree)
-        let (members, unbridgedMemberKinds) = decodeMembers(syntaxListContainer: enumDecl.memberBlock, context: context, in: syntaxTree)
-        let statement = TypeDeclaration(type: .enumDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, unbridgedMemberKinds: unbridgedMemberKinds, syntax: enumDecl, sourceFile: syntaxTree.source.file, sourceRange: enumDecl.range(in: syntaxTree.source), extras: extras)
+        let (members, unbridgedMembers) = decodeMembers(syntaxListContainer: enumDecl.memberBlock, context: context, in: syntaxTree)
+        let statement = TypeDeclaration(type: .enumDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, unbridgedMembers: unbridgedMembers, syntax: enumDecl, sourceFile: syntaxTree.source.file, sourceRange: enumDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages
         return statement
     }
@@ -1610,23 +1610,23 @@ class TypeDeclaration: Statement {
         let name = actorDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = actorDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: actorDecl.genericParameterClause, where: actorDecl.genericWhereClause, in: syntaxTree)
-        let (members, unbridgedMemberKinds) = decodeMembers(syntaxListContainer: actorDecl.memberBlock, context: context, in: syntaxTree)
-        let statement = TypeDeclaration(type: .actorDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, unbridgedMemberKinds: unbridgedMemberKinds, syntax: actorDecl, sourceFile: syntaxTree.source.file, sourceRange: actorDecl.range(in: syntaxTree.source), extras: extras)
+        let (members, unbridgedMembers) = decodeMembers(syntaxListContainer: actorDecl.memberBlock, context: context, in: syntaxTree)
+        let statement = TypeDeclaration(type: .actorDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, unbridgedMembers: unbridgedMembers, syntax: actorDecl, sourceFile: syntaxTree.source.file, sourceRange: actorDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages
         return statement
     }
 
-    private static func decodeMembers<ListContainer: SyntaxListContainer>(syntaxListContainer: ListContainer, context: DecodeContext, in syntaxTree: SyntaxTree) -> ([Statement], UnbridgedMemberKinds) {
+    private static func decodeMembers<ListContainer: SyntaxListContainer>(syntaxListContainer: ListContainer, context: DecodeContext, in syntaxTree: SyntaxTree) -> ([Statement], [UnbridgedMember]) {
         let members = StatementDecoder.decode(syntaxListContainer: syntaxListContainer, context: context, in: syntaxTree)
-        var unbridgedMemberKinds: UnbridgedMemberKinds = []
+        var unbridgedMembers: [UnbridgedMember] = []
         let keptMembers = members.filter {
-            guard let unbridgedMember = $0 as? UnbridgedMemberDeclaration else {
+            guard let unbridgedMemberDeclaration = $0 as? UnbridgedMemberDeclaration else {
                 return true
             }
-            unbridgedMemberKinds.formUnion(unbridgedMember.kind)
+            unbridgedMembers.append(unbridgedMemberDeclaration.member)
             return false
         }
-        return (keptMembers, unbridgedMemberKinds)
+        return (keptMembers, unbridgedMembers)
     }
 
     var nonExtensionDeclarationType: StatementType? {
@@ -1683,29 +1683,44 @@ class TypeDeclaration: Statement {
     }
 }
 
-/// Kinds of tracked unbridged members that can affect code transpilation and bridging.
-struct UnbridgedMemberKinds: OptionSet {
-    static let constructor = UnbridgedMemberKinds(rawValue: 1 << 0)
-    static let uninitializedStructProperty = UnbridgedMemberKinds(rawValue: 1 << 1)
+/// Tracked unbridged members that can affect code transpilation and bridging.
+enum UnbridgedMember: Hashable {
+    case constructor
+    case uninitializedStructProperty
+    case swiftUIStateProperty(String, Attributes) // Name, attributes
 
-    let rawValue: Int
-
-    init(rawValue: Int) {
-        self.rawValue = rawValue
+    var isSwiftUIStateProperty: Bool {
+        if case .swiftUIStateProperty = self {
+            return true
+        } else {
+            return false
+        }
     }
+}
 
+extension Array where Element == UnbridgedMember {
     /// Whether this set contains members that should prevent us from creating bridged constructors.
     var suppressDefaultConstructorGeneration: Bool {
-        return contains(.constructor) || contains(.uninitializedStructProperty)
+        for member in self {
+            switch member {
+            case .constructor:
+                return true
+            case .uninitializedStructProperty:
+                return true
+            default:
+                break
+            }
+        }
+        return false
     }
 }
 
 /// A member declaration that was not bridged but needs to be recorded because it may affect transpilation and bridging.
 final class UnbridgedMemberDeclaration: Statement {
-    let kind: UnbridgedMemberKinds
+    let member: UnbridgedMember
 
-    init(kind: UnbridgedMemberKinds, syntax: SyntaxProtocol? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree? = nil) {
-        self.kind = kind
+    init(member: UnbridgedMember, syntax: SyntaxProtocol? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree? = nil) {
+        self.member = member
         super.init(type: .unbridgedMemberDeclaration, syntax: syntax, sourceFile: syntaxTree?.source.file, sourceRange: range, extras: extras)
     }
 
@@ -1784,9 +1799,16 @@ final class VariableDeclaration: Statement {
         let modifiers = Modifiers.for(syntax: variableDecl.modifiers)
         let decodeLevel = decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
         guard decodeLevel != .none else {
-            // We must note unbridged, unintialized struct properties because they affect default constructor generation and bridging
-            if syntaxTree.isBridgeFile, context.memberOf?.type == .structDeclaration, !modifiers.isStatic, variableDecl.bindings.first?.initializer?.value == nil {
-                return [UnbridgedMemberDeclaration(kind: .uninitializedStructProperty, syntax: syntax, extras: extras, in: syntaxTree)]
+            if syntaxTree.isBridgeFile, context.memberOf?.type == .structDeclaration, attributes.stateAttribute != nil || attributes.environmentAttribute != nil || attributes.contains(.focusState), let syntax = variableDecl.bindings.first {
+                // We need to track state in SwiftUI views regardless of visibility
+                guard let optionalName = syntax.pattern.identifierPatterns(in: syntaxTree)?.map(\.name?.removingBacktickEscaping).first, let name = optionalName else {
+                    throw Message.unsupportedSyntax(syntax.pattern, source: syntaxTree.source)
+                }
+                return [UnbridgedMemberDeclaration(member: .swiftUIStateProperty(name, attributes), syntax: syntax, extras: extras, in: syntaxTree)]
+            } else if syntaxTree.isBridgeFile, context.memberOf?.type == .structDeclaration, !modifiers.isStatic, variableDecl.bindings.first?.initializer?.value == nil {
+                // We must note unbridged, unintialized struct properties because they affect default constructor
+                // generation and bridging
+                return [UnbridgedMemberDeclaration(member: .uninitializedStructProperty, syntax: syntax, extras: extras, in: syntaxTree)]
             } else {
                 return []
             }
