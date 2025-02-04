@@ -74,21 +74,18 @@ struct JavaClassRef {
         self.generics = []
     }
 
-    var declaration: String {
-        return declareStaticLet(identifier, ofType: "JClass", in: isFileClass ? nil : .named(className, generics), value: "try! JClass(name: \"\(className)\")")
+    func declaration(visibility: Modifiers.Visibility? = nil, declarationType: StatementType? = nil) -> String {
+        return declareStaticLet(identifier, ofType: "JClass", visibility: visibility, in: isFileClass ? nil : .named(className, generics), declarationType: declarationType, value: "try! JClass(name: \"\(className)\")")
     }
 }
 
 /// Code to create a static variable in the given class to store the given value.
-func declareStaticLet(_ identifier: String, ofType: String, visibility: String = "private", in signature: TypeSignature? = nil, value: String) -> String {
-    var visibilityString = visibility
-    if !visibilityString.isEmpty {
-        visibilityString += " "
-    }
-    if signature?.generics.isEmpty == false {
+func declareStaticLet(_ identifier: String, ofType: String, visibility: Modifiers.Visibility? = nil, in signature: TypeSignature? = nil, declarationType: StatementType? = nil, value: String) -> String {
+    let visibilityString = (visibility ?? .private).swift(suffix: " ")
+    if declarationType == .protocolDeclaration || declarationType == .extensionDeclaration || signature?.generics.isEmpty == false {
         return "\(visibilityString)static var \(identifier): \(ofType) { \(value) }"
     } else {
-        return "\(signature == nil ? "\(visibility) let " : "\(visibility) static let ")\(identifier) = \(value)"
+        return "\(signature == nil ? "\(visibilityString)let " : "\(visibilityString)static let ")\(identifier) = \(value)"
     }
 }
 
@@ -179,19 +176,25 @@ extension KotlinBridgeOptions {
 
 extension TypeSignature {
     static let anyDynamicObject: TypeSignature = .named("AnyDynamicObject", [])
+    static let skipUIView: TypeSignature = .module("SkipUI", .named("View", []))
     static let javaObjectPointer: TypeSignature = .named("JavaObjectPointer", [])
     static let javaString: TypeSignature = .named("JavaString", [])
     static func swiftObjectPointer(kotlin: Bool) -> TypeSignature {
         return kotlin ? .named("skip.bridge.kt.SwiftObjectPointer", []) : .named("SwiftObjectPointer", [])
     }
 
-    /// The generated native type when bridging a protocol with unknown implementation.
+    /// The generated native type used when bridging a protocol with unknown implementation.
     var protocolBridgeImpl: TypeSignature {
         let moduleName = self.moduleName
         return withExistentialMode(.none).withModuleName(nil).withName(name.replacing(".", with: "_") + "_BridgeImpl").withModuleName(moduleName)
     }
 
-    /// The local name of the
+    /// Whether this is a generated native type used when bridging a protocol with unknown implementation.
+    var isProtocolBridgeImpl: Bool {
+        return name.hasSuffix("_BridgeImpl")
+    }
+
+    /// The local name of the type-erased version of a generic class.
     var typeErasedClass: TypeSignature {
         let moduleName = self.moduleName
         return withModuleName(nil).withGenerics([]).withName(name.replacing(".", with: "_") + "_TypeErased").withModuleName(moduleName)
@@ -296,7 +299,11 @@ extension TypeSignature {
         case .any:
             return value + "!"
         default:
-            return value + " as! \(self)"
+            if self.existentialMode == .some {
+                return value + " as! \(self.withExistentialMode(.any))"
+            } else {
+                return value + " as! \(self)"
+            }
         }
     }
 

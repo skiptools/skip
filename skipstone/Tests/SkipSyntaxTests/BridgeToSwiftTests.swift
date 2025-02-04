@@ -3491,6 +3491,97 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testProtocolExtension() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public protocol P {
+            func a(i: Int) -> Int
+        }
+        extension P {
+            public var i: Int {
+                get { 0 }
+                set { }
+            }
+            public func a(i: Int) -> Int {
+                return 0
+            }
+            public func b() {
+            }
+        }
+        #endif
+        """, kotlin: """
+        interface P {
+            fun a(i: Int): Int = 0
+
+            var i: Int
+                get() = 0
+                set(newValue) {
+                }
+            fun b() = Unit
+        }
+        """, swiftBridgeSupport: """
+        public protocol P {
+
+            func a(i p_0: Int) -> Int
+        }
+        public final class P_BridgeImpl: P, BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "P")
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            public func a(i p_0: Int) -> Int {
+                return jniContext {
+                    let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                    let f_return_java: Int32 = try! Java_peer.call(method: Self.Java_a_0_methodID, options: [], args: [p_0_java])
+                    return Int(f_return_java)
+                }
+            }
+            private static let Java_a_0_methodID = Java_class.getMethodID(name: "a", sig: "(I)I")!
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+        }
+        extension P {
+            private static var Java_class: JClass { try! JClass(name: "P") }
+            private var Java_peer: JavaObjectPointer { (self as! JConvertible).toJavaObject(options: [])! }
+            public var i: Int {
+                get {
+                    return jniContext {
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, options: [], args: [])
+                        return Int(value_java)
+                    }
+                }
+                set {
+                    jniContext {
+                        let value_java = Int32(newValue).toJavaParameter(options: [])
+                        try! Java_peer.call(method: Self.Java_set_i_methodID, options: [], args: [value_java])
+                    }
+                }
+            }
+            private static var Java_get_i_methodID: JavaMethodID { Java_class.getMethodID(name: "getI", sig: "()I")! }
+            private static var Java_set_i_methodID: JavaMethodID { Java_class.getMethodID(name: "setI", sig: "(I)V")! }
+            public func a(i p_0: Int) -> Int {
+                return jniContext {
+                    let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                    let f_return_java: Int32 = try! Java_peer.call(method: Self.Java_a_0_methodID, options: [], args: [p_0_java])
+                    return Int(f_return_java)
+                }
+            }
+            private static var Java_a_0_methodID: JavaMethodID { Java_class.getMethodID(name: "a", sig: "(I)I")! }
+            public func b() {
+                jniContext {
+                    try! Java_peer.call(method: Self.Java_b_1_methodID, options: [], args: [])
+                }
+            }
+            private static var Java_b_1_methodID: JavaMethodID { Java_class.getMethodID(name: "b", sig: "()V")! }
+        }
+        """, transformers: transformers)
+    }
+
     func testEnum() async throws {
         try await check(swift: """
         #if !SKIP_BRIDGE
