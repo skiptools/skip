@@ -55,12 +55,12 @@ class SkipCommandTests : XCTestCase {
     func testSkipCreate() async throws {
         let tempDir = try mktmp()
         let projectName = "hello-skip"
+        let dir = tempDir + "/" + projectName + "/"
         let appName = "HelloSkip"
-        let out = try await skip("init", "-jA", "-v", "--show-tree", "-d", tempDir, "--appid", "com.company.HelloSkip", projectName, appName)
+        let out = try await skip("init", "-jA", "-v", "--show-tree", "-d", dir, "--appid", "com.company.HelloSkip", projectName, appName)
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip application \(projectName)", msgs.first)
-        let dir = tempDir + "/" + projectName + "/"
 
         let xcodeproj = "Darwin/" + appName + ".xcodeproj"
         let xcconfig = "Darwin/" + appName + ".xcconfig"
@@ -80,16 +80,33 @@ class SkipCommandTests : XCTestCase {
         │  │        ├─ kotlin
         │  │        │  └─ Main.kt
         │  │        └─ res
+        │  │           ├─ mipmap-anydpi
+        │  │           │  └─ ic_launcher.xml
         │  │           ├─ mipmap-hdpi
-        │  │           │  └─ ic_launcher.png
+        │  │           │  ├─ ic_launcher.png
+        │  │           │  ├─ ic_launcher_background.png
+        │  │           │  ├─ ic_launcher_foreground.png
+        │  │           │  └─ ic_launcher_monochrome.png
         │  │           ├─ mipmap-mdpi
-        │  │           │  └─ ic_launcher.png
+        │  │           │  ├─ ic_launcher.png
+        │  │           │  ├─ ic_launcher_background.png
+        │  │           │  ├─ ic_launcher_foreground.png
+        │  │           │  └─ ic_launcher_monochrome.png
         │  │           ├─ mipmap-xhdpi
-        │  │           │  └─ ic_launcher.png
+        │  │           │  ├─ ic_launcher.png
+        │  │           │  ├─ ic_launcher_background.png
+        │  │           │  ├─ ic_launcher_foreground.png
+        │  │           │  └─ ic_launcher_monochrome.png
         │  │           ├─ mipmap-xxhdpi
-        │  │           │  └─ ic_launcher.png
+        │  │           │  ├─ ic_launcher.png
+        │  │           │  ├─ ic_launcher_background.png
+        │  │           │  ├─ ic_launcher_foreground.png
+        │  │           │  └─ ic_launcher_monochrome.png
         │  │           └─ mipmap-xxxhdpi
-        │  │              └─ ic_launcher.png
+        │  │              ├─ ic_launcher.png
+        │  │              ├─ ic_launcher_background.png
+        │  │              ├─ ic_launcher_foreground.png
+        │  │              └─ ic_launcher_monochrome.png
         │  ├─ fastlane
         │  │  ├─ Appfile
         │  │  ├─ Fastfile
@@ -186,12 +203,12 @@ class SkipCommandTests : XCTestCase {
     func testSkipInit() async throws {
         let tempDir = try mktmp()
         let name = "cool-lib"
-        let out = try await skip("init", "-jA", "-v", "--show-tree", "-d", tempDir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE")
+        let dir = tempDir + "/" + name + "/"
+        let out = try await skip("init", "-jA", "-v", "--show-tree", "-d", dir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE")
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip library \(name)", msgs.first)
 
-        let dir = tempDir + "/" + name + "/"
         for path in ["Package.swift", "Sources/CoolA", "Sources/CoolA", "Sources/CoolE", "Tests", "Tests/CoolATests/Skip/skip.yml"] {
             XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
         }
@@ -278,12 +295,12 @@ class SkipCommandTests : XCTestCase {
     func testSkipExportFramework() async throws {
         let tempDir = try mktmp()
         let name = "demo-framework"
-        let out = try await skip("init", "-jA", "--show-tree", "-v", "-d", tempDir, name, "DemoFramework")
+        let dir = tempDir + "/" + name + "/"
+        let out = try await skip("init", "-jA", "--show-tree", "-v", "-d", dir, name, "DemoFramework")
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip library \(name)", msgs.first)
 
-        let dir = tempDir + "/" + name + "/"
         for path in ["Package.swift", "Sources/DemoFramework", "Tests", "Tests/DemoFrameworkTests/Skip/skip.yml"] {
             XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
         }
@@ -306,12 +323,12 @@ class SkipCommandTests : XCTestCase {
     func testSkipExportApp() async throws {
         let tempDir = try mktmp()
         let name = "demo-app"
-        let out = try await skip("init", "-jA", "--show-tree", "--zero", "--free", "-v", "-d", tempDir, "--appid", "demo.app.App", name, "Demo")
+        let dir = tempDir + "/" + name + "/"
+        let out = try await skip("init", "-jA", "--show-tree", "--zero", "--free", "-v", "-d", dir, "--appid", "demo.app.App", name, "Demo")
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip application \(name)", msgs.first)
 
-        let dir = tempDir + "/" + name + "/"
         for path in ["Package.swift", "Sources/Demo", "Tests", "Tests/DemoTests/Skip/skip.yml"] {
             XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
         }
@@ -339,13 +356,13 @@ class SkipCommandTests : XCTestCase {
     func DISABLEDtestSkipExportAppNative() async throws {
         let tempDir = try mktmp()
         let name = "demo-app-native"
+        let dir = tempDir + "/" + name + "/"
         // create a three-module native app
-        let out = try await skip("init", "-jA", "--show-tree", "--native", "--free", "-v", "-d", tempDir, "--appid", "demo.app.App", name, "Demo", "DemoModel", "DemoLogic")
+        let out = try await skip("init", "-jA", "--show-tree", "--native", "--free", "-v", "-d", dir, "--appid", "demo.app.App", name, "Demo", "DemoModel", "DemoLogic")
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip application \(name)", msgs.first)
 
-        let dir = tempDir + "/" + name + "/"
         for path in ["Package.swift", "Sources/Demo", "Tests", "Tests/DemoTests/Skip/skip.yml"] {
             XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
         }
