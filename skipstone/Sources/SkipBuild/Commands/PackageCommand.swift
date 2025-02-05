@@ -74,6 +74,9 @@ struct CreateOptions : ParsableArguments {
     @Flag(help: ArgumentHelp("Create package with free software license", valueName: "free"))
     var free: Bool = false
 
+    @Flag(help: ArgumentHelp("Create a standard app fair project"))
+    var appfair: Bool = false
+
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary of the new files", valueName: "show"))
     var showTree: Bool = false
 
@@ -85,6 +88,9 @@ struct CreateOptions : ParsableArguments {
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create fastlane metadata", valueName: "enable"))
     var fastlane: Bool = true
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create github metadata", valueName: "enable"))
+    var github: Bool = false
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Validate generated Package.swift files", valueName: "validate"))
     var validatePackage: Bool = true

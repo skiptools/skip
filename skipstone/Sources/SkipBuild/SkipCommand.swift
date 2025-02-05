@@ -73,6 +73,7 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
             AppCreateCommand.self, // skip create is shorthand for skip app create
             LibInitCommand.self, // skip init is shorthand for skip lib init
             VerifyCommand.self,
+            IconCommand.self,
 
             // Conditional on SkipDrive being imported
             GradleCommand.self,
@@ -541,6 +542,8 @@ extension StreamingCommand {
         // TODO: a --warnings-as-errors flag could be useful for running in strict mode
         if let failCount = messageTypes[.fail]?.count, failCount > 0 {
             throw StreamCommandError(errorDescription: "\(failCount) \(failCount == 1 ? "error" : "errors")")
+            //throw StreamCommandError(errorDescription: "\(failCount) \(failCount == 1 ? "error" : "errors"): \(messages.compactMap({ $0.message(term: .plain) }))")
+
         }
     }
 }

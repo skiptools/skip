@@ -54,10 +54,26 @@ final class SkipBuildTests: XCTestCase {
         XCTAssertEqual([5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].slice(5))
     }
 
-    func testCreatePNG() throws {
+    func testCreateIcon() throws {
+        #if canImport(ImageIO)
         for size in [10, 100, 1024] {
-            let _ = createSolidColorPNG(width: size, height: size, hexString: "4994EC") // ?.write(to: URL(fileURLWithPath: "/\(NSTemporaryDirectory())/img_\(size).png"))
+            do { // square
+                let expectedIconSize = size == 10 ? 250 : size == 100 ? 4591 : 208601 // note: implementation details may change
+                XCTAssertEqual(try createAppIcon(width: size, height: size, circular: false, foreground: nil, colors: ["#4994EC"], strokeColor: nil, iconSources: [], iconShadow: nil, iconInset: 0.02).count, expectedIconSize)
+            }
+
+            do { // circular
+                let expectedIconSize = size == 10 ? 291 : size == 100 ? 5262 : 262667 // note: implementation details may change
+                XCTAssertEqual(try createAppIcon(width: size, height: size, circular: true, foreground: nil, colors: ["#ABABAB"], strokeColor: nil, iconSources: [], iconShadow: nil, iconInset: 0.02).count, expectedIconSize)
+            }
         }
+
+        setenv("CORESVG_VERBOSE", "1", 1)
+        XCTAssertNil(SVG("<XXX></XXX>"), "should not have been able to create invalid SVG") // CoreSVG: Error: Reader: Error on line 0: Root XML node does not have "SVG" type
+
+        let svg = try XCTUnwrap(SVG(MaterialIcon.icon_chess.rawValue), "could not create SVG")
+        XCTAssertEqual(40.0, svg.size.width)
+        #endif
     }
 
     func testParseXCConfig() {

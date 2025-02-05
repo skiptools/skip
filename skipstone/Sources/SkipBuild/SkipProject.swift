@@ -33,17 +33,8 @@ class FrameworkProjectLayout {
 
 
     static func createSkipLibrary(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, native: Bool, moduleTests createModuleTests: Bool, packageResolved packageResolvedURL: URL?) throws -> URL {
-        var isDir: Foundation.ObjCBool = false
-        if !FileManager.default.fileExists(atPath: outputFolder.path, isDirectory: &isDir) {
-            throw InitError(errorDescription: "Specified output folder does not exist: \(outputFolder)")
-        }
-        if isDir.boolValue == false {
-            throw InitError(errorDescription: "Specified output folder is not a directory: \(outputFolder)")
-        }
-
-        let projectFolderURL = outputFolder.appendingPathComponent(projectName, isDirectory: true)
-        if FileManager.default.fileExists(atPath: projectFolderURL.path) {
-            throw InitError(errorDescription: "Specified project path already exists: \(projectFolderURL.path)")
+        if modules.isEmpty {
+            throw InitError(errorDescription: "Must specify at least one module name")
         }
 
         let validModuleCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_"))
@@ -53,6 +44,7 @@ class FrameworkProjectLayout {
             }
         }
 
+        let projectFolderURL = outputFolder // .appendingPathComponent(projectName, isDirectory: true)
         try FileManager.default.createDirectory(at: projectFolderURL, withIntermediateDirectories: true)
 
         let sourcesURL = try projectFolderURL.append(path: "Sources", create: true)
@@ -826,7 +818,8 @@ struct TestData : Codable, Hashable {
             var skipModuleDeps: [String] = []
             for modDep in modDeps {
                 if let repoName = modDep.repositoryName {
-                    var packDep = ".package(url: \"https://source.skip.tools/\(repoName).git\", "
+                    let repoURL = modDep.organizationName != nil ? "https://github.com/\(modDep.organizationName!)" : "https://source.skip.tools"
+                    var packDep = ".package(url: \"\(repoURL)/\(repoName).git\", "
 
                     var depVersion = modDep.repositoryVersion ?? "1.0.0" // "1.2.3"..<"1.2.6"
                     // special-case skip modules that may not yet be stable by pinning to 0.0.0..<2.0.0
@@ -1071,6 +1064,7 @@ class AppProjectLayout : FrameworkProjectLayout {
     let androidAppSrcMainRes: URL
     let androidAppSrcMainKotlin: URL
     let androidFastlaneFolder: URL
+    let githubFolder: URL
 
     var androidFastlaneMetadataFolder: URL { androidFastlaneFolder.appendingPathComponent("metadata/android", isDirectory: true) }
     var darwinFastlaneMetadataFolder: URL { darwinFastlaneFolder.appendingPathComponent("metadata", isDirectory: true) }
@@ -1081,6 +1075,7 @@ class AppProjectLayout : FrameworkProjectLayout {
         let optional = Self.noURLChecks
 
         self.skipEnv = try root.resolve("Skip.env", check: check)
+        self.githubFolder = root.resolve(".github", check: optional)
 
         self.sourcesFolder = try root.resolve("Sources/", check: check)
         self.moduleSourcesFolder = try sourcesFolder.resolve(moduleName + "/", check: check)
@@ -1136,7 +1131,7 @@ class AppProjectLayout : FrameworkProjectLayout {
     }
 
 
-    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, iconColor: String?, version: String?, native: Bool, moduleTests: Bool, fastlane: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool) throws -> (baseURL: URL, project: AppProjectLayout) {
+    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, appfair: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, iconColor: String?, iconStrokeColor: String?, iconSources: [String], iconShadow: Double?, iconInset: Double?, version: String?, native: Bool, moduleTests: Bool, github: Bool, fastlane: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool) throws -> (baseURL: URL, project: AppProjectLayout) {
 
         let sourceHeader = free ? freeLicenseHeader(type: nil) : ""
 
@@ -1171,8 +1166,6 @@ class AppProjectLayout : FrameworkProjectLayout {
         let appModuleName = primaryModuleName
         let primaryModuleAppTarget = appModuleName + "App"
         let appModulePackage = KotlinTranslator.packageName(forModule: appModuleName)
-
-        let hasIcon = (iconColor ?? "").count == 6
 
         guard let appid = appid else { // we have specified that an app should be created
             return (projectURL, appProject)
@@ -1315,6 +1308,54 @@ CODE_SIGN_ENTITLEMENTS = Entitlements.plist
         try configContents.write(to: appProject.darwinProjectConfig, atomically: false, encoding: .utf8)
         let xcconfigFileName = appProject.darwinProjectConfig.lastPathComponent
         let _ = xcconfigFileName
+
+        if github {
+            try createGithubConfig()
+        }
+
+        func createGithubConfig() throws {
+            try """
+# This is a GitHub workflow that will build the Skip app whenever
+# a push or release tag is made. In addition, various secrets can be
+# enabled for the repository that will automatically publish
+# releases to the Apple App Store and/or Google Play Store.
+#
+# See the documentation at https://skip.tools/docs for more details.
+name: \(projectName)
+on:
+  push:
+    branches: '*'
+    tags: "[0-9]+.[0-9]+.[0-9]+"
+  # example of daily scheduled build
+  #schedule:
+    #- cron: '0 12 * * *'
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+jobs:
+  call-workflow:
+    uses: skiptools/actions/.github/workflows/skip-app.yml@main
+    secrets:
+      # These optional secrets enable the Android app to be signed
+      KEYSTORE_JKS: ${{ secrets.KEYSTORE_JKS }}
+      KEYSTORE_PROPERTIES: ${{ secrets.KEYSTORE_PROPERTIES }}
+
+      # This secret enables the Android app to be uploaded to the Play Store
+      GOOGLE_PLAY_APIKEY: ${{ secrets.GOOGLE_PLAY_APIKEY }}
+
+      # These optional secrets enable the iOS app to be signed
+      APPLE_CERTIFICATES_P12: ${{ secrets.APPLE_CERTIFICATES_P12 }}
+      APPLE_CERTIFICATES_P12_PASSWORD: ${{ secrets.APPLE_CERTIFICATES_P12_PASSWORD }}
+
+      # This secret enables the iOS app to be uploaded to the App Store
+      APPLE_APPSTORE_APIKEY: ${{ secrets.APPLE_APPSTORE_APIKEY }}
+
+""".write(to: appProject.githubFolder.appendingPathComponent("workflows/\(projectName).yml").createParentDirectory(), atomically: false, encoding: .utf8)
+        }
 
         if fastlane {
             try createFastlaneMetadata()
@@ -1696,11 +1737,35 @@ public extension \(primaryModuleAppTarget) {
         try FileManager.default.createDirectory(at: appModuleApplicationStubFileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try appExtContents.write(to: appModuleApplicationStubFileURL, atomically: false, encoding: .utf8)
 
-        let secondImport = secondModule.flatMap({ "\nimport \($0.moduleName)" }) ?? ""
+        let secondImport = appfair == true ? "\nimport AppFairUI" : ""
+        let thirdImport = secondModule.flatMap({ "\nimport \($0.moduleName)" }) ?? ""
+        let appOrg = appid.split(separator: ".").last?.description ?? appid
+        let appLink = appfair == true ? "https://github.com/\(appOrg)/\(appOrg)" : "https://skip.tools"
+        let settingsFormView = appfair == true ? "AppFairSettings" : "Form"
+        let demoSettingsCode = appfair == true ? "" : """
+
+            HStack {
+                #if SKIP
+                ComposeView { ctx in // Mix in Compose code!
+                    androidx.compose.material3.Text("💚", modifier: ctx.modifier)
+                }
+                #else
+                Text(verbatim: "💙")
+                #endif
+                if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+                   let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
+                    Text("Version \\(version) (\\(buildNumber))")
+                        .foregroundStyle(.gray)
+                }
+                Text("Powered by [Skip](https://skip.tools)")
+            }
+            .foregroundStyle(.gray)
+
+"""
 
         // Sources/Playground/PlaygroundApp.swift
         let contentViewContents = """
-\(sourceHeader)import SwiftUI\(secondImport)
+\(sourceHeader)import SwiftUI\(secondImport)\(thirdImport)
 
 public enum ContentTab: String, Hashable {
     case welcome, home, settings
@@ -1710,104 +1775,102 @@ public struct ContentView: View {
     @AppStorage("tab") var tab = ContentTab.welcome
     @State var viewModel = ViewModel()
     @State var appearance = ""
-    @State var isBeating = false
 
     public init() {
     }
 
     public var body: some View {
         TabView(selection: $tab) {
-            VStack(spacing: 0) {
-                Text("Hello [\\(viewModel.name)](https://skip.tools)!")
-                    .padding()
-                Image(systemName: "heart.fill")
-                    .foregroundStyle(.red)
-                    .scaleEffect(isBeating ? 1.5 : 1.0)
-                    .animation(.easeInOut(duration: 1).repeatForever(), value: isBeating)
-                    .onAppear { isBeating = true }
+            NavigationStack {
+                WelcomeView()
             }
-            .font(.largeTitle)
             .tabItem { Label("Welcome", systemImage: "heart.fill") }
             .tag(ContentTab.welcome)
 
             NavigationStack {
-                List {
-                    ForEach(viewModel.items) { item in
-                        NavigationLink(value: item) {
-                            Label {
-                                Text(item.itemTitle)
-                            } icon: {
-                                if item.favorite {
-                                    Image(systemName: "star.fill")
-                                        .foregroundStyle(.yellow)
-                                }
-                            }
-                        }
-                    }
-                    .onDelete { offsets in
-                        viewModel.items.remove(atOffsets: offsets)
-                    }
-                    .onMove { fromOffsets, toOffset in
-                        viewModel.items.move(fromOffsets: fromOffsets, toOffset: toOffset)
-                    }
-                }
-                .navigationTitle(Text("\\(viewModel.items.count) Items"))
-                .navigationDestination(for: Item.self) { item in
-                    ItemView(item: item, viewModel: $viewModel)
-                        .navigationTitle(item.itemTitle)
-                }
-                .toolbar {
-                    ToolbarItemGroup {
-                        Button {
-                            withAnimation {
-                                viewModel.items.insert(Item(), at: 0)
-                            }
-                        } label: {
-                            Label("Add", systemImage: "plus")
-                        }
-                    }
-                }
+                ItemListView()
+                    .navigationTitle(Text("\\(viewModel.items.count) Items"))
             }
             .tabItem { Label("Home", systemImage: "house.fill") }
             .tag(ContentTab.home)
 
             NavigationStack {
-                Form {
-                    TextField("Name", text: $viewModel.name)
-                    Picker("Appearance", selection: $appearance) {
-                        Text("System").tag("")
-                        Text("Light").tag("light")
-                        Text("Dark").tag("dark")
-                    }
-                    HStack {
-                        #if SKIP
-                        ComposeView { ctx in // Mix in Compose code!
-                            androidx.compose.material3.Text("💚", modifier: ctx.modifier)
-                        }
-                        #else
-                        Text(verbatim: "💙")
-                        #endif
-                        if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
-                           let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
-                            Text("Version \\(version) (\\(buildNumber))")
-                                .foregroundStyle(.gray)
-                        }
-                        Text("Powered by [Skip](https://skip.tools)")
-                    }
-                    .foregroundStyle(.gray)
-                }
-                .navigationTitle("Settings")
+                SettingsView(appearance: $appearance)
+                    .navigationTitle("Settings")
             }
             .tabItem { Label("Settings", systemImage: "gearshape.fill") }
             .tag(ContentTab.settings)
         }
+        .environment(viewModel)
         .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
+    }
+}
+
+struct WelcomeView : View {
+    @State var heartBeating = false
+    @Environment(ViewModel.self) var viewModel: ViewModel
+
+    var body: some View {
+        @Bindable var viewModel = viewModel
+        VStack(spacing: 0) {
+            Text("Hello [\\(viewModel.name)](\(appLink))!")
+                .padding()
+            Image(systemName: "heart.fill")
+                .foregroundStyle(.red)
+                .scaleEffect(heartBeating ? 1.5 : 1.0)
+                .animation(.easeInOut(duration: 1).repeatForever(), value: heartBeating)
+                .onAppear { heartBeating = true }
+        }
+        .font(.largeTitle)
+    }
+}
+
+struct ItemListView : View {
+    @Environment(ViewModel.self) var viewModel: ViewModel
+
+    var body: some View {
+        @Bindable var viewModel = viewModel
+        List {
+            ForEach(viewModel.items) { item in
+                NavigationLink(value: item) {
+                    Label {
+                        Text(item.itemTitle)
+                    } icon: {
+                        if item.favorite {
+                            Image(systemName: "star.fill")
+                                .foregroundStyle(.yellow)
+                        }
+                    }
+                }
+            }
+            .onDelete { offsets in
+                viewModel.items.remove(atOffsets: offsets)
+            }
+            .onMove { fromOffsets, toOffset in
+                viewModel.items.move(fromOffsets: fromOffsets, toOffset: toOffset)
+            }
+        }
+        .navigationDestination(for: Item.self) { item in
+            ItemView(item: item)
+                .navigationTitle(item.itemTitle)
+        }
+        .toolbar {
+            ToolbarItemGroup {
+                Button {
+                    withAnimation {
+                        viewModel.items.insert(Item(), at: 0)
+                    }
+                } label: {
+                    Label("Add", systemImage: "plus")
+                }
+            }
+        }
     }
 }
 
 struct ItemView : View {
     @State var item: Item
-    @Binding var viewModel: ViewModel
+    @Environment(ViewModel.self) var viewModel: ViewModel
     @Environment(\\.dismiss) var dismiss
 
     var body: some View {
@@ -1834,6 +1897,23 @@ struct ItemView : View {
                 }
                 .disabled(!viewModel.isUpdated(item))
             }
+        }
+    }
+}
+
+struct SettingsView : View {
+    @Environment(ViewModel.self) var viewModel: ViewModel
+    @Binding var appearance: String
+
+    var body: some View {
+        @Bindable var viewModel = viewModel
+        \(settingsFormView) {
+            TextField("Name", text: $viewModel.name)
+            Picker("Appearance", selection: $appearance) {
+                Text("System").tag("")
+                Text("Light").tag("light")
+                Text("Dark").tag("dark")
+            }\(demoSettingsCode)
         }
     }
 }
@@ -1886,47 +1966,24 @@ struct ItemView : View {
         try Assets_xcassets_AccentColor_Contents.write(to: Assets_xcassets_AccentColor_ContentsURL, atomically: false, encoding: .utf8)
 
         let Assets_xcassets_AppIcon_Contents: String
+        let hasIcon = true
         if hasIcon {
-            typealias IconInfo = (url: URL, size: Int)
+            let separateLayers = true
+            let icons = try generateIcons(darwinAppIconFolder: appProject.darwinAppIconFolder, androidAppSrcMainRes: appProject.androidAppSrcMainRes, iconColor: iconColor, randomBackground: true, strokeColor: iconStrokeColor ?? IconCommand.defaultIconStroke, iconSources: iconSources, randomIcon: true, shadow: iconShadow ?? IconCommand.defaultIconShadow, iconInset: iconInset ?? IconCommand.defaultIconInset, separateLayers: separateLayers)
+            let _ = icons
 
-            /// the URL for an iOS icon
-            let ios = { appProject.darwinAppIconFolder.appendingPathComponent($0, isDirectory: false) }
+            if !icons.isEmpty && separateLayers == true {
+                // when we split between foreground and background, we also need to write out a mipmap-anydpi/ic_launcher.xml file listing the individual icons
+                let Assets_ic_launcher = appProject.androidAppSrcMainRes.appendingPathComponent("mipmap-anydpi", isDirectory: true).appendingPathComponent("ic_launcher.xml", isDirectory: false)
 
-            /// the URL for an Android icon
-            let android = { appProject.androidAppSrcMainRes.appendingPathComponent($0, isDirectory: false) }
-
-            let iconInfos: [IconInfo] = [
-                IconInfo(url: ios("AppIcon-20@2x.png"), size: 40),
-                IconInfo(url: ios("AppIcon-20@2x~ipad.png"), size: 40),
-                IconInfo(url: ios("AppIcon-20@3x.png"), size: 60),
-                IconInfo(url: ios("AppIcon-20~ipad.png"), size: 20),
-                IconInfo(url: ios("AppIcon-29.png"), size: 29),
-                IconInfo(url: ios("AppIcon-29@2x.png"), size: 58),
-                IconInfo(url: ios("AppIcon-29@2x~ipad.png"), size: 58),
-                IconInfo(url: ios("AppIcon-29@3x.png"), size: 87),
-                IconInfo(url: ios("AppIcon-29~ipad.png"), size: 29),
-                IconInfo(url: ios("AppIcon-40@2x.png"), size: 80),
-                IconInfo(url: ios("AppIcon-40@2x~ipad.png"), size: 80),
-                IconInfo(url: ios("AppIcon-40@3x.png"), size: 120),
-                IconInfo(url: ios("AppIcon-40~ipad.png"), size: 40),
-                IconInfo(url: ios("AppIcon-83.5@2x~ipad.png"), size: 167),
-                IconInfo(url: ios("AppIcon@2x.png"), size: 120),
-                IconInfo(url: ios("AppIcon@2x~ipad.png"), size: 152),
-                IconInfo(url: ios("AppIcon@3x.png"), size: 180),
-                IconInfo(url: ios("AppIcon~ios-marketing.png"), size: 1024),
-                IconInfo(url: ios("AppIcon~ipad.png"), size: 76),
-
-                IconInfo(url: android("mipmap-hdpi/ic_launcher.png"), size: 72),
-                IconInfo(url: android("mipmap-mdpi/ic_launcher.png"), size: 48),
-                IconInfo(url: android("mipmap-xhdpi/ic_launcher.png"), size: 96),
-                IconInfo(url: android("mipmap-xxhdpi/ic_launcher.png"), size: 144),
-                IconInfo(url: android("mipmap-xxxhdpi/ic_launcher.png"), size: 192),
-            ]
-
-            for info in iconInfos {
-                if let imgData = createSolidColorPNG(width: info.size, height: info.size, hexString: iconColor) {
-                    try imgData.write(to: info.url.createParentDirectory())
-                }
+                try """
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />
+</adaptive-icon>
+""".write(to: Assets_ic_launcher.createParentDirectory(), atomically: false, encoding: .utf8)
             }
 
             Assets_xcassets_AppIcon_Contents = """
@@ -2444,6 +2501,13 @@ local.properties
 .kotlin/
 Android/app/keystore.jks
 Android/app/keystore.properties
+
+xcodebuild*.log
+
+default.profraw
+*.mobileprovision
+*.cer
+
 
 # Xcode automatically generates this directory with a .xcworkspacedata file and xcuserdata
 # hence it is not needed unless you have added a package configuration file to your project

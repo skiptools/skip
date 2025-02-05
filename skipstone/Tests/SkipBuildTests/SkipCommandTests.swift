@@ -482,16 +482,33 @@ final class SkipCommandTests: XCTestCase {
         │  │        ├─ kotlin
         │  │        │  └─ Main.kt
         │  │        └─ res
+        │  │           ├─ mipmap-anydpi
+        │  │           │  └─ ic_launcher.xml
         │  │           ├─ mipmap-hdpi
-        │  │           │  └─ ic_launcher.png
+        │  │           │  ├─ ic_launcher.png
+        │  │           │  ├─ ic_launcher_background.png
+        │  │           │  ├─ ic_launcher_foreground.png
+        │  │           │  └─ ic_launcher_monochrome.png
         │  │           ├─ mipmap-mdpi
-        │  │           │  └─ ic_launcher.png
+        │  │           │  ├─ ic_launcher.png
+        │  │           │  ├─ ic_launcher_background.png
+        │  │           │  ├─ ic_launcher_foreground.png
+        │  │           │  └─ ic_launcher_monochrome.png
         │  │           ├─ mipmap-xhdpi
-        │  │           │  └─ ic_launcher.png
+        │  │           │  ├─ ic_launcher.png
+        │  │           │  ├─ ic_launcher_background.png
+        │  │           │  ├─ ic_launcher_foreground.png
+        │  │           │  └─ ic_launcher_monochrome.png
         │  │           ├─ mipmap-xxhdpi
-        │  │           │  └─ ic_launcher.png
+        │  │           │  ├─ ic_launcher.png
+        │  │           │  ├─ ic_launcher_background.png
+        │  │           │  ├─ ic_launcher_foreground.png
+        │  │           │  └─ ic_launcher_monochrome.png
         │  │           └─ mipmap-xxxhdpi
-        │  │              └─ ic_launcher.png
+        │  │              ├─ ic_launcher.png
+        │  │              ├─ ic_launcher_background.png
+        │  │              ├─ ic_launcher_foreground.png
+        │  │              └─ ic_launcher_monochrome.png
         │  ├─ gradle
         │  │  └─ wrapper
         │  │     └─ gradle-wrapper.properties
@@ -876,6 +893,160 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
+    func testLibInitAppFair() async throws {
+        let projectName = "Free-App"
+
+        let (projectURL, projectTree) = try await libInitComand(projectName: projectName, free: false, appfair: true) // appfair should override free
+        XCTAssertEqual(projectTree ?? "", """
+        .
+        ├─ Android
+        │  ├─ app
+        │  │  ├─ build.gradle.kts
+        │  │  ├─ proguard-rules.pro
+        │  │  └─ src
+        │  │     └─ main
+        │  │        ├─ AndroidManifest.xml
+        │  │        └─ kotlin
+        │  │           └─ Main.kt
+        │  ├─ fastlane
+        │  │  ├─ Appfile
+        │  │  ├─ Fastfile
+        │  │  ├─ README.md
+        │  │  └─ metadata
+        │  │     └─ android
+        │  │        └─ en-US
+        │  │           ├─ full_description.txt
+        │  │           ├─ short_description.txt
+        │  │           └─ title.txt
+        │  ├─ gradle
+        │  │  └─ wrapper
+        │  │     └─ gradle-wrapper.properties
+        │  ├─ gradle.properties
+        │  └─ settings.gradle.kts
+        ├─ Darwin
+        │  ├─ Assets.xcassets
+        │  │  ├─ AccentColor.colorset
+        │  │  │  └─ Contents.json
+        │  │  ├─ AppIcon.appiconset
+        │  │  │  └─ Contents.json
+        │  │  └─ Contents.json
+        │  ├─ Entitlements.plist
+        │  ├─ FreeApp.xcconfig
+        │  ├─ FreeApp.xcodeproj
+        │  │  └─ project.pbxproj
+        │  ├─ Info.plist
+        │  ├─ Sources
+        │  │  └─ FreeAppAppMain.swift
+        │  └─ fastlane
+        │     ├─ AppStore.xcconfig
+        │     ├─ Appfile
+        │     ├─ Deliverfile
+        │     ├─ Fastfile
+        │     ├─ README.md
+        │     └─ metadata
+        │        ├─ en-US
+        │        │  ├─ description.txt
+        │        │  ├─ keywords.txt
+        │        │  ├─ privacy_url.txt
+        │        │  ├─ release_notes.txt
+        │        │  ├─ software_url.txt
+        │        │  ├─ subtitle.txt
+        │        │  ├─ support_url.txt
+        │        │  ├─ title.txt
+        │        │  └─ version_whats_new.txt
+        │        └─ rating.json
+        ├─ LICENSE.GPL
+        ├─ Package.swift
+        ├─ README.md
+        ├─ Skip.env
+        ├─ Sources
+        │  ├─ FreeApp
+        │  │  ├─ ContentView.swift
+        │  │  ├─ FreeAppApp.swift
+        │  │  ├─ Resources
+        │  │  │  ├─ Localizable.xcstrings
+        │  │  │  └─ Module.xcassets
+        │  │  │     └─ Contents.json
+        │  │  └─ Skip
+        │  │     └─ skip.yml
+        │  └─ FreeAppModel
+        │     ├─ Resources
+        │     │  └─ Localizable.xcstrings
+        │     ├─ Skip
+        │     │  └─ skip.yml
+        │     └─ ViewModel.swift
+        └─ Tests
+           ├─ FreeAppModelTests
+           │  ├─ FreeAppModelTests.swift
+           │  ├─ Resources
+           │  │  └─ TestData.json
+           │  ├─ Skip
+           │  │  └─ skip.yml
+           │  └─ XCSkipTests.swift
+           └─ FreeAppTests
+              ├─ FreeAppTests.swift
+              ├─ Resources
+              │  └─ TestData.json
+              ├─ Skip
+              │  └─ skip.yml
+              └─ XCSkipTests.swift
+
+        """)
+
+        let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
+
+        let PackageSwift = try load("Package.swift")
+        XCTAssertEqual(PackageSwift, """
+        // swift-tools-version: 5.9
+        // This is a Skip (https://skip.tools) package,
+        // containing a Swift Package Manager project
+        // that will use the Skip build plugin to transpile the
+        // Swift Package, Sources, and Tests into an
+        // Android Gradle Project with Kotlin sources and JUnit tests.
+        import PackageDescription
+
+        let package = Package(
+            name: "free-app-app",
+            defaultLocalization: "en",
+            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            products: [
+                .library(name: "FreeAppApp", type: .dynamic, targets: ["FreeApp"]),
+                .library(name: "FreeAppModel", type: .dynamic, targets: ["FreeAppModel"]),
+            ],
+            dependencies: [
+                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
+                .package(url: "https://github.com/appfair/appfair-app.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-model.git", from: "1.0.0")
+            ],
+            targets: [
+                .target(name: "FreeApp", dependencies: [
+                    "FreeAppModel",
+                    .product(name: "AppFairUI", package: "appfair-app")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .testTarget(name: "FreeAppTests", dependencies: [
+                    "FreeApp",
+                    .product(name: "SkipTest", package: "skip")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "FreeAppModel", dependencies: [
+                    .product(name: "SkipFoundation", package: "skip-foundation"),
+                    .product(name: "SkipModel", package: "skip-model")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .testTarget(name: "FreeAppModelTests", dependencies: [
+                    "FreeAppModel",
+                    .product(name: "SkipTest", package: "skip")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+            ]
+        )
+
+        """)
+
+        //let fastlaneSoftwareUrliOS = try load("Darwin/fastlane/metadata/en-US/software_url.txt")
+        //XCTAssertEqual(fastlaneSoftwareUrliOS, "https://github.com/\(projectName)/\(projectName)")
+
+        //let fastlaneSupportUrliOS = try load("Darwin/fastlane/metadata/en-US/support_url.txt")
+        //XCTAssertEqual(fastlaneSupportUrliOS, "https://github.com/\(projectName)/\(projectName)/issues")
+    }
 
     func testLibInitApp3ModuleCommand() async throws {
         let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: true, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "TOP_MODULE", "MIDDLE_MODULE", "BOTTOM_MODULE")
@@ -1276,7 +1447,7 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
-    func libInitComand(projectName: String, free: Bool? = nil, zero: Bool? = nil, native: Bool? = nil, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, resourcePath: String? = "Resources", iconColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
+    func libInitComand(projectName: String, free: Bool? = nil, zero: Bool? = nil, appfair: Bool? = nil, native: Bool? = nil, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, resourcePath: String? = "Resources", iconColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["lib", "init", "-jA", "--no-build", "--no-test", "--show-tree"]
@@ -1290,6 +1461,13 @@ final class SkipCommandTests: XCTestCase {
             cmd += ["--zero"]
         } else if zero == false {
             cmd += ["--no-zero"]
+        }
+
+        // conventional Skip apps
+        if appfair == true {
+            cmd += ["--appfair"]
+        } else if appfair == false {
+            cmd += ["--no-appfair"]
         }
 
         if native == true {
@@ -1323,7 +1501,7 @@ final class SkipCommandTests: XCTestCase {
         if let appid = appid {
             cmd += ["--appid", appid]
         }
-        cmd += ["-d", tmpDir.path]
+        cmd += ["-d", tmpDir.appendingPathComponent(projectName, isDirectory: true).path]
 
         cmd += [projectName]
         cmd += moduleNames

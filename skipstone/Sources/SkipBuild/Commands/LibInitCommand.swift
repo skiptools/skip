@@ -29,13 +29,25 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, Too
     var projectName: String
 
     @Argument(help: ArgumentHelp("The module name(s) to create"))
-    var moduleNames: [String]
+    var moduleNames: [String] = []
 
     @Option(help: ArgumentHelp("Embed the library as an app with the given bundle id", valueName: "bundleID"))
     var appid: String? = nil
 
+    @Option(help: ArgumentHelp("Path to icon input file (SVG, PDF, PNG)", valueName: "icon"))
+    var icon: [String] = []
+
     @Option(help: ArgumentHelp("RGB hexadecimal color for icon background", valueName: "hex"))
-    var iconColor: String = "4994EC"
+    var iconColor: String? = nil
+
+    @Option(help: ArgumentHelp("RGB hexadecimal color for icon stroke", valueName: "hex"))
+    var iconStroke: String? = nil
+
+    @Option(help: ArgumentHelp("The amount of shadow to draw around the target", valueName: "decimal"))
+    var iconShadow: Double? = nil
+
+    @Option(help: ArgumentHelp("The amount of inset to place on the image", valueName: "decimal"))
+    var iconInset: Double? = nil
 
     @Option(help: ArgumentHelp("Set the initial version to the given value"))
     var version: String? = nil
@@ -77,10 +89,10 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, Too
     func runInit(with out: MessageQueue) async throws {
         await out.yield(MessageBlock(status: nil, "Initializing Skip \(appid == nil ? "library" : "application") \(self.projectName)"))
 
-        let dir = URL(fileURLWithPath: self.createOptions.dir ?? ".", isDirectory: true)
+        let dir = URL(fileURLWithPath: self.createOptions.dir ?? self.projectName, isDirectory: true)
 
         let modules = try self.modules
-        let (createdURL, project, _) = try await initSkipProject(projectName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, verify: buildOptions.verify, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, returnHashes: false, showTree: self.createOptions.showTree, chain: createOptions.chain, gitRepo: createOptions.gitRepo, free: createOptions.free, zero: createOptions.zero, appid: self.appid, iconColor: iconColor, version: self.version, native: self.createOptions.native , moduleTests: self.createOptions.moduleTests, fastlane: self.createOptions.fastlane, validatePackage: self.createOptions.validatePackage, apk: apk, ipa: ipa, with: out)
+        let (createdURL, project, _) = try await initSkipProject(baseName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, verify: buildOptions.verify, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, returnHashes: false, showTree: self.createOptions.showTree, chain: createOptions.chain, gitRepo: createOptions.gitRepo, free: createOptions.free, appfair: createOptions.appfair, zero: createOptions.zero, appid: self.appid, iconColor: iconColor, iconStrokeColor: iconStroke, iconSources: icon, iconShadow: iconShadow, iconInset: iconInset, version: self.version, native: self.createOptions.native, moduleTests: self.createOptions.moduleTests, github: self.createOptions.github, fastlane: self.createOptions.fastlane, validatePackage: self.createOptions.validatePackage, apk: apk, ipa: ipa, with: out)
 
         await out.yield(MessageBlock(status: .pass, "Created module \(modules.map(\.moduleName).joined(separator: ", ")) in \(createdURL.path)"))
 
@@ -249,16 +261,25 @@ extension ToolOptionsCommand {
         return hashes
     }
     
-    func initSkipProject(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: BuildConfiguration, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, appModuleName: String = "app", iconColor: String?, version: String?, native: Bool, moduleTests: Bool, fastlane: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
+    func initSkipProject(baseName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: BuildConfiguration, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, appfair: Bool? = nil, zero skipZeroSupport: Bool, appid: String?, appModuleName: String = "app", iconColor: String?, iconStrokeColor: String?, iconSources: [String], iconShadow: Double?, iconInset: Double?, version: String?, native: Bool, moduleTests: Bool, github: Bool, fastlane: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
 
         // the initial build/test is done with debug configuration regardless of the configuration setting; this is because unit tests don't always run correctly in release mode
         let debugConfiguration = "debug"
         let re = messagePrefix ?? ""
+        let appid = appid ?? (appfair == true ? "io.github.\(baseName)" : nil)
+        let projectNameModule = baseName.replacingOccurrences(of: "-", with: "")
+        let free = appfair == true ? true : free
+        let github = appfair == true ? true : free
+
+        // the `appfair` flag changed the meaning of `baseName` to be the base name of the project and modules: "Sun-Bow" creates the modules "SunBow" and "SubBowModel" and the appid "io.github.Sun-Bow" and the project name "sun-bow-app"
+        let modules = !modules.isEmpty ? modules : (appfair == true ? [PackageModule(moduleName: projectNameModule, dependencies: [PackageModule(organizationName: "appfair", repositoryName: "appfair-app", repositoryVersion: "1.0.0", moduleName: "AppFairUI")]), PackageModule(moduleName: projectNameModule + "Model")] : [])
+        let projectName = appfair == true ? baseName.lowercased() + "-app" : baseName
+
         let primaryModuleName = modules.first?.moduleName ?? "Module"
         // the embedded framework must have a different name from the app name, or else it will try to archive a framework instead of an app
         let primaryModuleFrameworkName = primaryModuleName + "App"
 
-        let (projectURL, project) = try AppProjectLayout.createSkipAppProject(projectName: projectName, productName: primaryModuleFrameworkName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, appid: appid, iconColor: iconColor, version: version, native: native, moduleTests: moduleTests, fastlane: fastlane, packageResolved: packageResolvedURL, apk: apk, ipa: ipa)
+        let (projectURL, project) = try AppProjectLayout.createSkipAppProject(projectName: projectName, productName: primaryModuleFrameworkName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, chain: chain, gitRepo: gitRepo, appfair: appfair == true, free: free, zero: skipZeroSupport, appid: appid, iconColor: iconColor, iconStrokeColor: iconStrokeColor, iconSources: iconSources, iconShadow: iconShadow, iconInset: iconInset, version: version, native: native, moduleTests: moduleTests, github: github, fastlane: fastlane, packageResolved: packageResolvedURL, apk: apk, ipa: ipa)
         let projectPath = try projectURL.absolutePath
 
         if build == true || apk == true {
@@ -301,21 +322,6 @@ extension ToolOptionsCommand {
 
         return (projectURL, project, artifactHashes)
     }
-
-    func initSkipLibrary(projectName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, native: Bool, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL?, with out: MessageQueue) async throws -> URL {
-        let projectFolderURL = try FrameworkProjectLayout.createSkipLibrary(projectName: projectName, productName: nil, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: app, native: native, moduleTests: moduleTests, packageResolved: packageResolvedURL)
-
-
-        if validatePackage {
-            let packageJSONString = try await run(with: out, "Create project \(projectName)", ["swift", "package", "dump-package", "--package-path", projectFolderURL.path]).get().stdout
-
-            let packageJSON = try JSONDecoder().decode(PackageManifest.self, from: Data(packageJSONString.utf8))
-            _ = packageJSON
-        }
-
-        return projectFolderURL
-    }
-
 }
 
 extension ToolOptionsCommand {
@@ -348,7 +354,6 @@ extension ToolOptionsCommand {
         }
         return (try? result.get()) != nil
     }
-
 }
 
 struct CheckStatus {
@@ -357,24 +362,27 @@ struct CheckStatus {
 }
 
 struct PackageModule {
+    var organizationName: String?
+    var repositoryName: String?
     var moduleName: String
-    var organizationName: String? = nil
-    var repositoryName: String? = nil
-    var repositoryVersion: String? = nil
-    var dependencies: [PackageModule] = []
+    var repositoryVersion: String?
+    var dependencies: [PackageModule]
 
-    init(repositoryName: String, moduleName: String) {
+    init(organizationName: String? = nil, repositoryName: String? = nil, repositoryVersion: String? = nil, moduleName: String, dependencies: [PackageModule] = []) {
+        self.organizationName = organizationName
         self.repositoryName = repositoryName
+        self.repositoryVersion = repositoryVersion
         self.moduleName = moduleName
-    }
-
-    init(moduleName: String) {
-        self.moduleName = moduleName
+        self.dependencies = dependencies
     }
 
     init(parse: String) throws {
         let parts = parse.split(separator: ":").map(\.description)
         self.moduleName = parts.first ?? parse
+        self.repositoryName = nil
+        self.repositoryVersion = nil
+        self.organizationName = nil
+        self.dependencies = []
         for dep in parts.dropFirst() {
             // parse PlaygroundModel:skiptools/skip-model/SkipModel:skip-foundation@0.1.0/SkipFoundation
             var depParts = dep.split(separator: "/").map(\.description)
