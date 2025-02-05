@@ -1131,7 +1131,7 @@ class AppProjectLayout : FrameworkProjectLayout {
     }
 
 
-    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, appfair: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, iconColor: String?, iconStrokeColor: String?, iconSources: [String], iconShadow: Double?, iconInset: Double?, version: String?, native: Bool, moduleTests: Bool, github: Bool, fastlane: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool) throws -> (baseURL: URL, project: AppProjectLayout) {
+    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, appfair: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, icon: IconParameters?, version: String?, native: Bool, moduleTests: Bool, github: Bool, fastlane: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool) async throws -> (baseURL: URL, project: AppProjectLayout) {
 
         let sourceHeader = free ? freeLicenseHeader(type: nil) : ""
 
@@ -1966,25 +1966,11 @@ struct SettingsView : View {
         try Assets_xcassets_AccentColor_Contents.write(to: Assets_xcassets_AccentColor_ContentsURL, atomically: false, encoding: .utf8)
 
         let Assets_xcassets_AppIcon_Contents: String
-        let hasIcon = true
+        let hasIcon = icon != nil
         if hasIcon {
             let separateLayers = true
-            let icons = try generateIcons(darwinAppIconFolder: appProject.darwinAppIconFolder, androidAppSrcMainRes: appProject.androidAppSrcMainRes, iconColor: iconColor, randomBackground: true, strokeColor: iconStrokeColor ?? IconCommand.defaultIconStroke, iconSources: iconSources, randomIcon: true, shadow: iconShadow ?? IconCommand.defaultIconShadow, iconInset: iconInset ?? IconCommand.defaultIconInset, separateLayers: separateLayers)
+            let icons = try await generateIcons(darwinAppIconFolder: appProject.darwinAppIconFolder, androidAppSrcMainRes: appProject.androidAppSrcMainRes, backgroundColor: icon?.iconBackgroundColor, randomBackground: true, foregroundColor: icon?.iconForegroundColor ?? IconCommand.defaultIconForeground, iconSources: icon?.iconSources ?? [], randomIcon: true, shadow: icon?.iconShadow ?? IconCommand.defaultIconShadow, iconInset: icon?.iconInset ?? IconCommand.defaultIconInset, separateLayers: separateLayers)
             let _ = icons
-
-            if !icons.isEmpty && separateLayers == true {
-                // when we split between foreground and background, we also need to write out a mipmap-anydpi/ic_launcher.xml file listing the individual icons
-                let Assets_ic_launcher = appProject.androidAppSrcMainRes.appendingPathComponent("mipmap-anydpi", isDirectory: true).appendingPathComponent("ic_launcher.xml", isDirectory: false)
-
-                try """
-<?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@mipmap/ic_launcher_background" />
-    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
-    <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />
-</adaptive-icon>
-""".write(to: Assets_ic_launcher.createParentDirectory(), atomically: false, encoding: .utf8)
-            }
 
             Assets_xcassets_AppIcon_Contents = """
 {

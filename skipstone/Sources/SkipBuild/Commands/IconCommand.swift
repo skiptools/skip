@@ -6,10 +6,38 @@ import struct UniformTypeIdentifiers.UTType
 #endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct IconCommand: MessageCommand, ToolOptionsCommand, StreamingCommand {
+struct IconCommand: MessageCommand, StreamingCommand {
     static var configuration = CommandConfiguration(
         commandName: "icon",
         abstract: "Create and manage app icons",
+        discussion: """
+This command will create and update icons in the Darwin and Android folders of a Skip project.
+
+Examples:
+
+# Resize the given PNG icon for each of the required icon sizes
+skip icon app_icon.png
+
+# Resize separate icons for each of Android and iOS
+skip icon --android app_icon_android.png
+skip icon --darwin app_icon_darwin.png
+
+# Generate a random icon set and open them in Preview.app
+skip icon --open-preview --random-icon --random-background
+
+# Generate new icons with a named color background
+skip icon --open-preview --background skyblue
+
+# Create new icons with a background gradient
+skip icon --open-preview --background #3E8E41-#2F4F4F
+
+# Create new icons with a background gradient overlaid with an SVG image
+skip icon --open-preview --background #5C6BC0-#3B3F54 symbol.svg
+
+# Create new icons with custom image inset and shadow radius
+skip icon --background #F7DC6F-#F2C464 --inset 0.4 --shadow 0.02 symbol.svg
+
+""",
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")
@@ -18,21 +46,9 @@ struct IconCommand: MessageCommand, ToolOptionsCommand, StreamingCommand {
     @Flag(help: ArgumentHelp("Open the generated icons in Preview"))
     var openPreview: Bool = false
 
-//    @OptionGroup(title: "Create Options")
-//    var createOptions: CreateOptions
-
-    @OptionGroup(title: "Tool Options")
-    var toolOptions: ToolOptions
-
-//    @OptionGroup(title: "Build Options")
-//    var buildOptions: BuildOptions
-
     @Option(help: ArgumentHelp("Name or RGB hex color/gradient for icon color", valueName: "color"))
-    var stroke: String = Self.defaultIconStroke
-    static let defaultIconStroke: String = "white"
-
-//    @Option(help: ArgumentHelp("Name or RGB hex color/gradient for icon fill", valueName: "color"))
-//    var fill: String = "white"
+    var foreground: String = Self.defaultIconForeground
+    static let defaultIconForeground: String = "white"
 
     @Option(help: ArgumentHelp("Name or RGB hex color/gradient for icon background", valueName: "color"))
     var background: String?
@@ -54,9 +70,6 @@ struct IconCommand: MessageCommand, ToolOptionsCommand, StreamingCommand {
     @Flag(help: ArgumentHelp("Create a random icon color"))
     var randomBackground: Bool = false
 
-    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Separate into foreground and background layers (Android)"))
-    var separateLayers: Bool = true
-
     @Option(help: ArgumentHelp("Path the Android resources root folder", valueName: "path"))
     var androidPath: String = "Android/app/src/main/res"
 
@@ -69,38 +82,48 @@ struct IconCommand: MessageCommand, ToolOptionsCommand, StreamingCommand {
     @Argument(help: "Path or URL to icon source SVG, PNG, or PDF files")
     var iconSources: [String] = []
 
+    mutating func validate() throws {
+        if iconSources.isEmpty && background == nil && randomIcon == false && randomBackground == false {
+            throw ValidationError("Must specify an icon source or --background or --random-background/--random-icon")
+        }
+    }
+
     func performCommand(with out: MessageQueue) async {
         await withLogStream(with: out) {
             try await runCreateIcon(with: out)
         }
     }
 
-    /// E.g.: for Skip Notes: `skip icon --android --darwin --open-preview --background cyan-teal --inset 0.5 --shadow 0.01 --color white '<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#000000"><path d="M360-200v-80h480v80H360Zm0-240v-80h480v80H360Zm0-240v-80h480v80H360ZM200-160q-33 0-56.5-23.5T120-240q0-33 23.5-56.5T200-320q33 0 56.5 23.5T280-240q0 33-23.5 56.5T200-160Zm0-240q-33 0-56.5-23.5T120-480q0-33 23.5-56.5T200-560q33 0 56.5 23.5T280-480q0 33-23.5 56.5T200-400Zm0-240q-33 0-56.5-23.5T120-720q0-33 23.5-56.5T200-800q33 0 56.5 23.5T280-720q0 33-23.5 56.5T200-640Z"/></svg>'`
+    /// E.g.: for Skip Notes: `skip icon --android --darwin --open-preview --foreground white --background cyan-teal --inset 0.5 --shadow 0.01 '<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#000000"><path d="M360-200v-80h480v80H360Zm0-240v-80h480v80H360Zm0-240v-80h480v80H360ZM200-160q-33 0-56.5-23.5T120-240q0-33 23.5-56.5T200-320q33 0 56.5 23.5T280-240q0 33-23.5 56.5T200-160Zm0-240q-33 0-56.5-23.5T120-480q0-33 23.5-56.5T200-560q33 0 56.5 23.5T280-480q0 33-23.5 56.5T200-400Zm0-240q-33 0-56.5-23.5T120-720q0-33 23.5-56.5T200-800q33 0 56.5 23.5T280-720q0 33-23.5 56.5T200-640Z"/></svg>'`
     func runCreateIcon(with out: MessageQueue) async throws {
         // if neither --darwin nor --android is specified, then we generate both; otherwise, we only generate one
         let androidIcon = android == true || (darwin == nil && android == nil)
         let darwinIcon = darwin == true || (darwin == nil && android == nil)
+        // when generating from a PNG, we do not create separate layers
+        let separateLayers = !iconSources.contains(where: { $0.hasSuffix(".png") || $0.hasSuffix(".gif") || $0.hasSuffix(".jpg") || $0.hasSuffix(".jpeg") })
 
         #if !canImport(ImageIO)
         await out.write(status: .fail, "Icon creation not supported on this platform")
         #else
-        let infos = try generateIcons(darwinAppIconFolder: !darwinIcon ? nil : URL(fileURLWithPath: darwinPath), androidAppSrcMainRes: !androidIcon ? nil : URL(fileURLWithPath: androidPath), iconColor: background, randomBackground: randomBackground, strokeColor: stroke, iconSources: iconSources, randomIcon: randomIcon, shadow: self.shadow, iconInset: self.inset, separateLayers: separateLayers)
-        await out.write(status: .pass, "Generated \(infos.count) icons")
+        let infos = try await generateIcons(darwinAppIconFolder: !darwinIcon ? nil : URL(fileURLWithPath: darwinPath), androidAppSrcMainRes: !androidIcon ? nil : URL(fileURLWithPath: androidPath), backgroundColor: background, randomBackground: randomBackground, foregroundColor: foreground, iconSources: iconSources, randomIcon: randomIcon, shadow: self.shadow, iconInset: self.inset, separateLayers: separateLayers)
 
-        if openPreview {
-            try await run(with: out, "Launching preview for icons", ["open", "-b", "com.apple.Preview"] + infos.compactMap(\.url?.path))
+        let infoURLs = infos.compactMap(\.url)
+        for infoURL in infoURLs {
+            await out.write(status: .pass, "Generated \(infoURL.relativeString)")
         }
-        await out.write(status: .pass, "Created icons")
+
+        if openPreview && !infos.isEmpty {
+            try await run(with: out, "Launching preview for \(infos.count) icons", ["open", "-b", "com.apple.Preview"] + infoURLs.map(\.path))
+        }
+        await out.write(status: .pass, "Created \(infos.count) icons")
         #endif
     }
 }
 
-extension ToolOptionsCommand {
-}
-
+typealias IconParameters = (iconBackgroundColor: String?, iconForegroundColor: String?, iconSources: [String], iconShadow: Double?, iconInset: Double?)
 typealias IconInfo = (url: URL?, size: Int, android: Bool, foreground: Bool?)
 
-func generateIcons(darwinAppIconFolder: URL?, androidAppSrcMainRes: URL?, iconColor: String?, randomBackground: Bool, strokeColor: String?, iconSources: [String], randomIcon: Bool, shadow: Double?, iconInset: Double, separateLayers: Bool) throws -> [IconInfo] {
+func generateIcons(darwinAppIconFolder: URL?, androidAppSrcMainRes: URL?, backgroundColor: String?, randomBackground: Bool, foregroundColor: String?, iconSources: [String], randomIcon: Bool, shadow: Double?, iconInset: Double, separateLayers: Bool) async throws -> [IconInfo] {
     /// the URL for an iOS icon
     let ios = { darwinAppIconFolder?.appendingPathComponent($0, isDirectory: false) }
 
@@ -145,18 +168,35 @@ func generateIcons(darwinAppIconFolder: URL?, androidAppSrcMainRes: URL?, iconCo
         }
     }
 
-    let iconColor = iconColor == nil && randomBackground ? randomIconColors.shuffled().first : (iconColor ?? "4994EC")
-    let iconSources = iconSources.isEmpty && randomIcon ? [MaterialIcon.allCases.shuffled().first!.rawValue] : iconSources
+    if let ic_launcher_xml = android("mipmap-anydpi/ic_launcher.xml") {
+        // add or remove the adaptive-icons metadata file depending on whether we are using separate layers
+        if separateLayers {
+            // when we split between foreground and background, we also need to write out a mipmap-anydpi/ic_launcher.xml file listing the individual icons
 
-    let iconColors = (iconColor ?? "").split(separator: "-").map(\.description)
-    if iconColors.isEmpty {
-        return []
+            try """
+    <?xml version="1.0" encoding="utf-8"?>
+    <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />
+    </adaptive-icon>
+    """.write(to: ic_launcher_xml.createParentDirectory(), atomically: false, encoding: .utf8)
+        } else {
+            // remove the file so we do not accidentally use it
+            try? FileManager.default.removeItem(at: ic_launcher_xml)
+        }
     }
+
+    let randomSource = iconSources.isEmpty && randomIcon
+    let iconSources = randomSource ? [MaterialIcon.allCases.shuffled().first!.rawValue] : iconSources
+    let iconBackground = backgroundColor == nil && (randomBackground || randomSource) ? randomIconColors.shuffled().first : backgroundColor
+
+    let backgroundColors = (iconBackground ?? "").split(separator: "-").map(\.description)
 
     for info in iconInfos {
         if let iconFileURL = info.url {
             #if canImport(ImageIO)
-            let iconImage = try createAppIcon(width: info.size, height: info.size, circular: false, foreground: info.foreground, colors: iconColors, strokeColor: strokeColor, iconSources: iconSources, iconShadow: shadow, iconInset: iconInset)
+            let iconImage = try await createAppIcon(width: info.size, height: info.size, circular: false, foreground: info.foreground, backgroundColors: backgroundColors, foregroundColor: foregroundColor, iconSources: iconSources, iconShadow: shadow, iconInset: iconInset)
             try iconImage.write(to: iconFileURL.createParentDirectory())
             #endif
         }
@@ -408,11 +448,11 @@ public struct IconCommandError : LocalizedError {
 #if canImport(ImageIO)
 
 /// Creates a rectangular PNG filled with the specified
-func createAppIcon(width: Int, height: Int, circular: Bool, foreground: Bool?, colors: [String], strokeColor: String?, iconSources: [String], iconShadow: Double?, iconInset: Double, alpha: Double = 1.0) throws -> Data {
+func createAppIcon(width: Int, height: Int, circular: Bool, foreground: Bool?, backgroundColors: [String], foregroundColor: String?, iconSources: [String], iconShadow: Double?, iconInset: Double, alpha: Double = 1.0) async throws -> Data {
     let size = CGSize(width: width, height: height)
     let rect = CGRect(origin: CGPointZero, size: size)
 
-    let rgbs = try colors.map { colorString in
+    let rgbs = try backgroundColors.map { colorString in
         guard let rgb = RGB(colorString: colorString) else {
             throw IconCommandError(errorDescription: "Could not parse icon color: \(colorString)")
         }
@@ -468,45 +508,68 @@ func createAppIcon(width: Int, height: Int, circular: Bool, foreground: Bool?, c
     context.translateBy(x: inset / 4.0, y: inset / 4.0)
     let iconSize = CGSize(width: CGFloat(width) - (inset / 2.0), height: CGFloat(height) - (inset / 2.0))
 
-    if let strokeColor = strokeColor, let strokeColorRGB = RGB(colorString: strokeColor) {
+    if let foregroundColor = foregroundColor, let foregroundColorRGB = RGB(colorString: foregroundColor) {
         //context.setBlendMode(.sourceIn) // This blend mode replaces the existing color with the new color
-        context.setStrokeColor(red: strokeColorRGB.red, green: strokeColorRGB.green, blue: strokeColorRGB.blue, alpha: alpha)
-        context.setFillColor(red: strokeColorRGB.red, green: strokeColorRGB.green, blue: strokeColorRGB.blue, alpha: alpha)
+        context.setStrokeColor(red: foregroundColorRGB.red, green: foregroundColorRGB.green, blue: foregroundColorRGB.blue, alpha: alpha)
+        context.setFillColor(red: foregroundColorRGB.red, green: foregroundColorRGB.green, blue: foregroundColorRGB.blue, alpha: alpha)
     }
 
     /// Fetch the URL at the given string
-    func fetch(_ path: String) throws -> String {
+    func fetch(_ path: String) async throws -> Data {
         if path.hasPrefix("http"), let pathURL = URL(string: path) {
-            return try String(contentsOf: pathURL, encoding: .utf8)
+            let (data, response) = try await URLSession.shared.data(from: pathURL)
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if !(200..<300).contains(code) {
+                throw IconCommandError(errorDescription: "Download icon url \(path) failed: \(code)")
+            }
+            return data
         } else {
-            return try String(contentsOf: URL(fileURLWithPath: path), encoding: .utf8)
+            return try Data(contentsOf: URL(fileURLWithPath: path))
         }
     }
 
     for iconSource in iconSources {
         let svgFile = iconSource.hasSuffix(".svg")
         if svgFile || iconSource.hasPrefix("<svg") {
-            // raw SVG String
-            var svgData = svgFile ? try fetch(iconSource) : iconSource
-            if let strokeColor = strokeColor {
-                // set the global fill color in the SVG (since setting the context's stroke and fill colors don't seem to work)
-                svgData = svgData.replacing(try Regex("<svg "), with: { match in
-                    "<svg fill=\"\(strokeColor)\" "
-                })
-
-                // also update and individual fill data for any individual paths
-                svgData = svgData.replacing(try Regex("fill=\"([^\"]+)\" "), with: { match in
-                    "fill=\"\(strokeColor)\" "
-                })
-            }
-
-            if foreground != false, let svg = SVG(svgData) {
+            if foreground != false {
+                // raw SVG String
+                let svgData = svgFile ? try await fetch(iconSource) : iconSource.utf8Data
+                var svgString = String(data: svgData, encoding: .utf8) ?? ""
+                if let foregroundColor = foregroundColor {
+                    // also update and individual fill data for any individual paths
+                    let svgString2 = svgString.replacing(try Regex("fill=\"([^\"]+)\""), with: { match in
+                        "fill=\"\(foregroundColor)\""
+                    })
+                    if svgString2 != svgString {
+                        // don't replace twice, otherwise: "Entity: line 1: parser error : Attribute fill redefined"
+                        svgString = svgString2
+                    } else {
+                        // set the global fill color in the SVG (since setting the context's foreground and fill colors don't seem to work)
+                        svgString = svgString.replacing(try Regex("<svg "), with: { match in
+                            "<svg fill=\"\(foregroundColor)\" "
+                        })
+                    }
+                }
+                guard let svg = SVG(svgString) else {
+                    throw IconCommandError(errorDescription: "Could not load SVG image from: \(iconSource)")
+                }
                 svg.draw(in: context, size: iconSize)
             }
-        } else if iconSource.hasSuffix(".pdf") {
-            // TODO: draw PDF context
-        } else if iconSource.hasSuffix(".png") {
-            // TODO: draw PNG context
+        } else { // non-SVG images are written to the background
+            // the icon is drawn to the background, since it is not an overlay image
+            if foreground != true {
+                // try to load the image
+                let pngData = try await fetch(iconSource)
+                guard let imageSource: CGImageSource = CGImageSourceCreateWithData(pngData as CFData, nil) else {
+                    throw IconCommandError(errorDescription: "Could not load image data from \(iconSource)")
+                }
+                guard let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
+                    throw IconCommandError(errorDescription: "Could not create image from \(iconSource)")
+                }
+
+                context.center(size: size, target: size, flip: false)
+                context.draw(cgImage, in: rect)
+            }
         }
     }
 
@@ -526,57 +589,10 @@ func createAppIcon(width: Int, height: Int, circular: Bool, foreground: Bool?, c
     return pngData as Data
 }
 
-
-@objc
-class CGSVGDocument: NSObject { }
-
-private var CGSVGDocumentRetain: (@convention(c) (CGSVGDocument?) -> Unmanaged<CGSVGDocument>?) = loadFunction("CGSVGDocumentRetain")
-private var CGSVGDocumentRelease: (@convention(c) (CGSVGDocument?) -> Void) = loadFunction("CGSVGDocumentRelease")
-private var CGSVGDocumentCreateFromData: (@convention(c) (CFData?, CFDictionary?) -> Unmanaged<CGSVGDocument>?) = loadFunction("CGSVGDocumentCreateFromData")
-private var CGContextDrawSVGDocument: (@convention(c) (CGContext?, CGSVGDocument?) -> Void) = loadFunction("CGContextDrawSVGDocument")
-private var CGSVGDocumentGetCanvasSize: (@convention(c) (CGSVGDocument?) -> CGSize) = loadFunction("CGSVGDocumentGetCanvasSize")
-
-//private typealias ImageWithCGSVGDocument = @convention(c) (AnyObject, Selector, CGSVGDocument) -> UIImage
-//private var ImageWithCGSVGDocumentSEL: Selector = NSSelectorFromString("_imageWithCGSVGDocument:")
-
-
-private let CoreSVG = dlopen("/System/Library/PrivateFrameworks/CoreSVG.framework/CoreSVG", RTLD_NOW)
-
-private func loadFunction<T>(_ name: String) -> T {
-    unsafeBitCast(dlsym(CoreSVG, name), to: T.self)
-}
-
-class SVG {
-    deinit { CGSVGDocumentRelease(document) }
-
-    let document: CGSVGDocument
-
-    convenience init?(_ value: String) {
-        guard let data = value.data(using: .utf8) else { return nil }
-        self.init(data)
-    }
-
-    init?(_ data: Data) {
-        guard let document = CGSVGDocumentCreateFromData(data as CFData, nil)?.takeUnretainedValue() else { return nil }
-        guard CGSVGDocumentGetCanvasSize(document) != .zero else { return nil }
-        self.document = document
-    }
-
-    var size: CGSize {
-        CGSVGDocumentGetCanvasSize(document)
-    }
-
-//    func image() -> UIImage? {
-//        let ImageWithCGSVGDocument = unsafeBitCast(UIImage.self.method(for: ImageWithCGSVGDocumentSEL), to: ImageWithCGSVGDocument.self)
-//        let image = ImageWithCGSVGDocument(UIImage.self, ImageWithCGSVGDocumentSEL, document)
-//        return image
-//    }
-
-    func draw(in context: CGContext) {
-        draw(in: context, size: size)
-    }
-
-    func draw(in context: CGContext, size target: CGSize, flip: Bool = false) {
+extension CGContext {
+    /// Applies a transform to center the `target` size in the canvas `size`, optionally flipping the contents.
+    func center(size: CGSize, target: CGSize, flip: Bool) {
+        let context = self
         var target = target
 
         let ratio = (x: target.width / size.width, y: target.height / size.height)
@@ -607,10 +623,63 @@ class SVG {
         }
         context.concatenate(transform.scale)
         context.concatenate(transform.aspect)
+    }
+}
 
+@objc
+class CGSVGDocument: NSObject { }
+
+private var CGSVGDocumentRetain: (@convention(c) (CGSVGDocument?) -> Unmanaged<CGSVGDocument>?) = loadFunction("CGSVGDocumentRetain")
+private var CGSVGDocumentRelease: (@convention(c) (CGSVGDocument?) -> Void) = loadFunction("CGSVGDocumentRelease")
+private var CGSVGDocumentCreateFromData: (@convention(c) (CFData?, CFDictionary?) -> Unmanaged<CGSVGDocument>?) = loadFunction("CGSVGDocumentCreateFromData")
+private var CGContextDrawSVGDocument: (@convention(c) (CGContext?, CGSVGDocument?) -> Void) = loadFunction("CGContextDrawSVGDocument")
+private var CGSVGDocumentGetCanvasSize: (@convention(c) (CGSVGDocument?) -> CGSize) = loadFunction("CGSVGDocumentGetCanvasSize")
+
+private let CoreSVG = dlopen("/System/Library/PrivateFrameworks/CoreSVG.framework/CoreSVG", RTLD_NOW)
+
+private func loadFunction<T>(_ name: String) -> T {
+    unsafeBitCast(dlsym(CoreSVG, name), to: T.self)
+}
+
+class SVG {
+    deinit { CGSVGDocumentRelease(document) }
+
+    let document: CGSVGDocument
+
+    convenience init?(_ value: String) {
+        guard let data = value.data(using: .utf8) else { return nil }
+        self.init(data)
+    }
+
+    init?(_ data: Data) {
+        guard let document = CGSVGDocumentCreateFromData(data as CFData, nil)?.takeUnretainedValue() else { return nil }
+        guard CGSVGDocumentGetCanvasSize(document) != .zero else { return nil }
+        self.document = document
+    }
+
+    var size: CGSize {
+        CGSVGDocumentGetCanvasSize(document)
+    }
+
+    func draw(in context: CGContext) {
+        draw(in: context, size: size)
+    }
+
+    func draw(in context: CGContext, size target: CGSize, flip: Bool = false) {
+        context.center(size: size, target: target, flip: flip)
         CGContextDrawSVGDocument(context, document)
     }
 }
+
+//private typealias ImageWithCGSVGDocument = @convention(c) (AnyObject, Selector, CGSVGDocument) -> NSImage
+//private var ImageWithCGSVGDocumentSEL: Selector = NSSelectorFromString("_imageWithCGSVGDocument:")
+//extension SVG {
+//    func image() -> NSImage? {
+//        let ImageWithCGSVGDocument = unsafeBitCast(NSImage.self.method(for: ImageWithCGSVGDocumentSEL), to: ImageWithCGSVGDocument.self)
+//        let image = ImageWithCGSVGDocument(NSImage.self, ImageWithCGSVGDocumentSEL, document)
+//        return image
+//    }
+//}
 
 #endif
 

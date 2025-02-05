@@ -43,7 +43,7 @@ struct NoResultOutputError : LocalizedError {
     var errorDescription: String?
 }
 
-extension ToolOptionsCommand {
+extension ToolOptionsCommand where Self : StreamingCommand {
 
     func performVerifyCommand(project projectPath: String, with out: MessageQueue, free: Bool? = nil, fastlane: Bool? = nil) async throws {
         let projectFolderURL = URL(fileURLWithPath: projectPath, isDirectory: true)

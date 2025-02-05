@@ -502,9 +502,18 @@ protocol StreamingCommand: AsyncParsableCommand {
 
     /// Perform the command, which will write messages to the output queue
     func performCommand(with out: MessageQueue) async throws
+
+
+    /// Whether this command should immediately fail on error or not
+    var failFast: Bool { get }
 }
 
 extension StreamingCommand {
+    // By default, all tools will fail fast
+    var failFast: Bool {
+        true
+    }
+
     func writeOutput(message: MessageEncodable) throws {
         try outputOptions.writeOutput(message, error: message is Message ? true : false)
     }
@@ -926,17 +935,9 @@ extension ProjectCommand {
 protocol ToolOptionsCommand : OutputOptionsCommand {
     /// This command's tool options
     var toolOptions: ToolOptions { get set }
-
-    /// Whether this command should immediately fail on error or not
-    var failFast: Bool { get }
 }
 
-extension ToolOptionsCommand {
-    // By default, all tools will fail fast
-    var failFast: Bool {
-        true
-    }
-
+extension ToolOptionsCommand where Self : StreamingCommand {
     /// Run swift package dump-package and return the parsed JSON results
     func parseSwiftPackage(with out: MessageQueue, at projectPath: String, swift swiftCommand: String = "swift") async throws -> PackageManifest {
         try await decodeCommand(with: out, title: "Check Swift Package", cmd: [swiftCommand, "package", "dump-package", "--package-path", projectPath]).get()

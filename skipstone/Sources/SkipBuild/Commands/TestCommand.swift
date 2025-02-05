@@ -368,7 +368,7 @@ extension GradleDriver.TestCase : TestCaseInfo {
 #endif
 
 
-extension ToolOptionsCommand where Self : OutputOptionsCommand {
+extension ToolOptionsCommand where Self : OutputOptionsCommand & StreamingCommand  {
 
     func runSkipTests(in projectFolderURL: URL, configuration: String, swift: Bool, kotlin: Bool, separateModule: String? = "testSkipModule", with out: MessageQueue) async throws {
         let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths // an environment with a default ANDROID_HOME

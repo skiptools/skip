@@ -37,7 +37,7 @@ struct DoctorCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
     }
 }
 
-extension ToolOptionsCommand {
+extension ToolOptionsCommand where Self : StreamingCommand {
     /// Runs the `skip doctor` command and stream the results to the messenger
     func runDoctor(with out: MessageQueue) async throws {
 

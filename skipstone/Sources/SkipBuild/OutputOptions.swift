@@ -243,8 +243,8 @@ extension Date {
 }
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-extension ToolOptionsCommand {
-    
+extension StreamingCommand {
+
     func resultString(_ result: Result<String, Error>?) -> String {
         guard let result = result else {
             return ""
@@ -264,6 +264,14 @@ extension ToolOptionsCommand {
         }
     }
 
+    func findToolPath(for tool: String) throws -> String {
+        if let toolCommand = self as? ToolOptionsCommand {
+            return try toolCommand.toolOptions.toolPath(for: tool)
+        }
+        return try URL.findCommandInPath(toolName: tool, withAdditionalPaths: ProcessInfo.isARM ? ["/opt/homebrew/bin"] : ["/usr/local/bin"]).path
+
+    }
+
     /// Executes a tool with the given arguments and prefix message, waits for the result while showing a progress animation,
     /// and then processes the result and outputs the given message block.
     @discardableResult func run(with messenger: MessageQueue, _ message: String, _ commandArgs: [String], environment: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, additionalEnvironment: [String: String] = [:], in workingDirectory: URL? = nil, watch: Bool = true, resultHandler finalResultHandler: MessageResultHandler<ProcessOutput>? = nil) async throws -> Result<ProcessOutput, Error> {
@@ -274,7 +282,7 @@ extension ToolOptionsCommand {
         var cmd = commandArgs.first ?? ""
         // attempt to resolve the tool command if it is not prefixed with a slash
         if !cmd.hasPrefix("/") {
-            cmd = try toolOptions.toolPath(for: cmd)
+            cmd = try findToolPath(for: cmd)
         }
 
         let args = [cmd] + commandArgs.dropFirst()

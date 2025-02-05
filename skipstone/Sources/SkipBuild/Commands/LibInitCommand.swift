@@ -34,14 +34,17 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, Too
     @Option(help: ArgumentHelp("Embed the library as an app with the given bundle id", valueName: "bundleID"))
     var appid: String? = nil
 
+    @Flag(help: ArgumentHelp("Disable icon generation"))
+    var noIcon: Bool = false
+
     @Option(help: ArgumentHelp("Path to icon input file (SVG, PDF, PNG)", valueName: "icon"))
     var icon: [String] = []
 
     @Option(help: ArgumentHelp("RGB hexadecimal color for icon background", valueName: "hex"))
-    var iconColor: String? = nil
+    var iconBackground: String? = nil
 
-    @Option(help: ArgumentHelp("RGB hexadecimal color for icon stroke", valueName: "hex"))
-    var iconStroke: String? = nil
+    @Option(help: ArgumentHelp("RGB hexadecimal color for icon foreground", valueName: "hex"))
+    var iconForeground: String? = nil
 
     @Option(help: ArgumentHelp("The amount of shadow to draw around the target", valueName: "decimal"))
     var iconShadow: Double? = nil
@@ -92,7 +95,9 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, Too
         let dir = URL(fileURLWithPath: self.createOptions.dir ?? self.projectName, isDirectory: true)
 
         let modules = try self.modules
-        let (createdURL, project, _) = try await initSkipProject(baseName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, verify: buildOptions.verify, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, returnHashes: false, showTree: self.createOptions.showTree, chain: createOptions.chain, gitRepo: createOptions.gitRepo, free: createOptions.free, appfair: createOptions.appfair, zero: createOptions.zero, appid: self.appid, iconColor: iconColor, iconStrokeColor: iconStroke, iconSources: icon, iconShadow: iconShadow, iconInset: iconInset, version: self.version, native: self.createOptions.native, moduleTests: self.createOptions.moduleTests, github: self.createOptions.github, fastlane: self.createOptions.fastlane, validatePackage: self.createOptions.validatePackage, apk: apk, ipa: ipa, with: out)
+        let icon: IconParameters? = noIcon == true ? nil : IconParameters(iconBackgroundColor: iconBackground, iconForegroundColor: iconForeground, iconSources: icon, iconShadow: iconShadow, iconInset: iconInset)
+
+        let (createdURL, project, _) = try await initSkipProject(baseName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, verify: buildOptions.verify, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, returnHashes: false, showTree: self.createOptions.showTree, chain: createOptions.chain, gitRepo: createOptions.gitRepo, free: createOptions.free, appfair: createOptions.appfair, zero: createOptions.zero, appid: self.appid, icon: icon, version: self.version, native: self.createOptions.native, moduleTests: self.createOptions.moduleTests, github: self.createOptions.github, fastlane: self.createOptions.fastlane, validatePackage: self.createOptions.validatePackage, apk: apk, ipa: ipa, with: out)
 
         await out.yield(MessageBlock(status: .pass, "Created module \(modules.map(\.moduleName).joined(separator: ", ")) in \(createdURL.path)"))
 
@@ -120,8 +125,7 @@ enum BuildConfiguration : String, ExpressibleByArgument {
     case debug, release
 }
 
-
-extension ToolOptionsCommand {
+extension ToolOptionsCommand where Self : StreamingCommand {
 
     func createAPK(projectURL: URL, appModuleName: String, configuration: BuildConfiguration, out: MessageQueue, primaryModuleName: String, cfgSuffix: String, returnHashes: Bool, prefix re: String) async throws -> [URL : String?] {
         // assemble the .apk
@@ -260,8 +264,8 @@ extension ToolOptionsCommand {
         }
         return hashes
     }
-    
-    func initSkipProject(baseName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: BuildConfiguration, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, appfair: Bool? = nil, zero skipZeroSupport: Bool, appid: String?, appModuleName: String = "app", iconColor: String?, iconStrokeColor: String?, iconSources: [String], iconShadow: Double?, iconInset: Double?, version: String?, native: Bool, moduleTests: Bool, github: Bool, fastlane: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
+
+    func initSkipProject(baseName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: BuildConfiguration, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, appfair: Bool? = nil, zero skipZeroSupport: Bool, appid: String?, appModuleName: String = "app", icon: IconParameters?, version: String?, native: Bool, moduleTests: Bool, github: Bool, fastlane: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
 
         // the initial build/test is done with debug configuration regardless of the configuration setting; this is because unit tests don't always run correctly in release mode
         let debugConfiguration = "debug"
@@ -279,7 +283,7 @@ extension ToolOptionsCommand {
         // the embedded framework must have a different name from the app name, or else it will try to archive a framework instead of an app
         let primaryModuleFrameworkName = primaryModuleName + "App"
 
-        let (projectURL, project) = try AppProjectLayout.createSkipAppProject(projectName: projectName, productName: primaryModuleFrameworkName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, chain: chain, gitRepo: gitRepo, appfair: appfair == true, free: free, zero: skipZeroSupport, appid: appid, iconColor: iconColor, iconStrokeColor: iconStrokeColor, iconSources: iconSources, iconShadow: iconShadow, iconInset: iconInset, version: version, native: native, moduleTests: moduleTests, github: github, fastlane: fastlane, packageResolved: packageResolvedURL, apk: apk, ipa: ipa)
+        let (projectURL, project) = try await AppProjectLayout.createSkipAppProject(projectName: projectName, productName: primaryModuleFrameworkName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, chain: chain, gitRepo: gitRepo, appfair: appfair == true, free: free, zero: skipZeroSupport, appid: appid, icon: icon, version: version, native: native, moduleTests: moduleTests, github: github, fastlane: fastlane, packageResolved: packageResolvedURL, apk: apk, ipa: ipa)
         let projectPath = try projectURL.absolutePath
 
         if build == true || apk == true {

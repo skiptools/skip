@@ -468,7 +468,7 @@ final class SkipCommandTests: XCTestCase {
         let projectName = "cool-app"
         let moduleName = "APPNAME"
         let appid = "some.cool.app"
-        let (projectURL, projectTree) = try await libInitComand(projectName: projectName, free: true, fastlane: false, appid: appid, iconColor: "4994EC", moduleNames: moduleName)
+        let (projectURL, projectTree) = try await libInitComand(projectName: projectName, free: true, fastlane: false, appid: appid, backgroundColor: "4994EC", moduleNames: moduleName)
         #if os(macOS) // icons are not generated on Linux
         XCTAssertEqual(projectTree ?? "", """
         .
@@ -1447,7 +1447,7 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
-    func libInitComand(projectName: String, free: Bool? = nil, zero: Bool? = nil, appfair: Bool? = nil, native: Bool? = nil, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, resourcePath: String? = "Resources", iconColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
+    func libInitComand(projectName: String, free: Bool? = nil, zero: Bool? = nil, appfair: Bool? = nil, native: Bool? = nil, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, resourcePath: String? = "Resources", backgroundColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["lib", "init", "-jA", "--no-build", "--no-test", "--show-tree"]
@@ -1455,7 +1455,11 @@ final class SkipCommandTests: XCTestCase {
             cmd += ["--resource-path", resourcePath]
         }
 
-        cmd += ["--icon-color", iconColor ?? ""]
+        if let backgroundColor = backgroundColor {
+            cmd += ["--icon-background", backgroundColor]
+        } else {
+            cmd += ["--no-icon"]
+        }
 
         if zero == true {
             cmd += ["--zero"]
