@@ -47,13 +47,15 @@ struct CreateOptions : ParsableArguments {
     @Option(name: [.customShort("c"), .long], help: ArgumentHelp("Configuration debug/release", valueName: "c"))
     var configuration: BuildConfiguration = .debug
 
-    @Option(name: [.long], help: ArgumentHelp("Template name/ID for new project", valueName: "id"))
+    // Template options: Hidden because they are not yet supported
+
+    @Option(name: [.long], help: ArgumentHelp("Template name/ID for new project", valueName: "id", visibility: .hidden))
     var template: String = "skipapp"
 
-    @Option(name: [.long], help: ArgumentHelp("The host name for the template repository", valueName: "host"))
+    @Option(name: [.long], help: ArgumentHelp("The host name for the template repository", valueName: "host", visibility: .hidden))
     var templateHost: String = "https://github.com"
 
-    @Option(name: [.long], help: ArgumentHelp("A path to the template zip file to use", valueName: "zip"))
+    @Option(name: [.long], help: ArgumentHelp("A path to the template zip file to use", valueName: "zip", visibility: .hidden))
     var templateFile: String?
 
 //    @Option(help: ArgumentHelp("The package dependencies for this module"))
@@ -74,7 +76,7 @@ struct CreateOptions : ParsableArguments {
     @Flag(help: ArgumentHelp("Create package with free software license", valueName: "free"))
     var free: Bool = false
 
-    @Flag(help: ArgumentHelp("Create a standard app fair project"))
+    @Flag(help: ArgumentHelp("Create a standard app fair project", visibility: .hidden))
     var appfair: Bool = false
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary of the new files", valueName: "show"))

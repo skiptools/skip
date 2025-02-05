@@ -46,6 +46,18 @@ skip icon --background #F7DC6F-#F2C464 --inset 0.4 --shadow 0.02 symbol.svg
     @Flag(help: ArgumentHelp("Open the generated icons in Preview"))
     var openPreview: Bool = false
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Generate an Android icon set"))
+    var android: Bool? = nil
+
+    @Option(help: ArgumentHelp("Path the Android resources root folder", valueName: "path"))
+    var androidPath: String = "Android/app/src/main/res"
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Generate an Android icon set"))
+    var darwin: Bool? = nil
+
+    @Option(help: ArgumentHelp("Path the Darwin icon assets folder", valueName: "path"))
+    var darwinPath: String = "Darwin/Assets.xcassets/AppIcon.appiconset"
+
     @Option(help: ArgumentHelp("Name or RGB hex color/gradient for icon color", valueName: "color"))
     var foreground: String = Self.defaultIconForeground
     static let defaultIconForeground: String = "white"
@@ -61,23 +73,12 @@ skip icon --background #F7DC6F-#F2C464 --inset 0.4 --shadow 0.02 symbol.svg
     var shadow: Double = Self.defaultIconShadow
     static let defaultIconShadow: Double = 0.01 // 10% feels about right
 
-    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Generate an Android icon set"))
-    var android: Bool? = nil
 
     @Flag(help: ArgumentHelp("Create a random icon shape"))
     var randomIcon: Bool = false
 
     @Flag(help: ArgumentHelp("Create a random icon color"))
     var randomBackground: Bool = false
-
-    @Option(help: ArgumentHelp("Path the Android resources root folder", valueName: "path"))
-    var androidPath: String = "Android/app/src/main/res"
-
-    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Generate an Android icon set"))
-    var darwin: Bool? = nil
-
-    @Option(help: ArgumentHelp("Path the Darwin icon assets folder", valueName: "path"))
-    var darwinPath: String = "Darwin/Assets.xcassets/AppIcon.appiconset"
 
     @Argument(help: "Path or URL to icon source SVG, PNG, or PDF files")
     var iconSources: [String] = []
