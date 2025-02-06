@@ -36,7 +36,7 @@ class Statement: SyntaxNode {
         let isPublic: Bool
         if context.memberOf?.type == .protocolDeclaration && !(self is TypeDeclaration.Type) {
             isPublic = visibility == .default || visibility >= .public
-        } else if context.memberOf?.type == .extensionDeclaration && !(self is TypeDeclaration.Type) {
+        } else if context.memberOf?.type == .extensionDeclaration {
             let memberVisibility = visibility == .default ? (context.memberOf?.modifiers.visibility ?? visibility) : visibility
             isPublic = memberVisibility >= .public
         } else if self is ExtensionDeclaration.Type {
