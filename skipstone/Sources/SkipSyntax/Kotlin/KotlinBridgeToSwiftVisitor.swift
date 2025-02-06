@@ -1212,7 +1212,9 @@ final class KotlinBridgeToSwiftVisitor {
         if let bridgeImpl = Self.protocolBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, options: options, autoBridge: syntaxTree.autoBridge, codebaseInfo: codebaseInfo) {
             swiftDefinitions.append(bridgeImpl)
         }
-        swiftDefinitions += Self.protocolExtensionDefinitions(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, options: options, autoBridge: syntaxTree.autoBridge, codebaseInfo: codebaseInfo)
+        if let extensionImpl = Self.protocolExtensionDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, options: options, autoBridge: syntaxTree.autoBridge, codebaseInfo: codebaseInfo) {
+            swiftDefinitions.append(extensionImpl)
+        }
     }
 
     /// Define an anonymous implementation of a bridged protocol.
@@ -1301,42 +1303,38 @@ final class KotlinBridgeToSwiftVisitor {
         return self.swift(forMemberFunctionWithName: functionInfo.name, type: functionInfo.signature, generics: functionInfo.generics, parameterValues: nil, uniquifier: uniquifier, disambiguatingParameterCount: 0, isConstructor: false, isFactory: false, inType: .classDeclaration, inSignature: inSignature, isBridgedSubclass: false, bridgable: bridgable, options: options, modifiers: modifiers, apiFlags: functionInfo.apiFlags ?? APIFlags())
     }
 
-    private static func protocolExtensionDefinitions(forProtocol type: TypeSignature, inPackage packageName: String?, options: KotlinBridgeOptions, autoBridge: AutoBridge, codebaseInfo: CodebaseInfo.Context) -> [SwiftDefinition] {
-        let extensionInfos = codebaseInfo.typeInfos(forNamed: type).filter { $0.declarationType == .extensionDeclaration }
-        var definitions: [SwiftDefinition] = []
-        for extensionInfo in extensionInfos {
-            if let extensionDefinition = protocolExtensionDefinition(for: extensionInfo, inPackage: packageName, options: options, autoBridge: autoBridge, codebaseInfo: codebaseInfo) {
-                definitions.append(extensionDefinition)
-            }
-        }
-        return definitions
-    }
-
-    private static func protocolExtensionDefinition(for extensionInfo: CodebaseInfo.TypeInfo, inPackage packageName: String?, options: KotlinBridgeOptions, autoBridge: AutoBridge, codebaseInfo: CodebaseInfo.Context) -> SwiftDefinition? {
-        guard extensionInfo.modifiers.visibility >= .default else {
+    private static func protocolExtensionDefinition(forProtocol type: TypeSignature, inPackage packageName: String?, options: KotlinBridgeOptions, autoBridge: AutoBridge, codebaseInfo: CodebaseInfo.Context) -> SwiftDefinition? {
+        let extensionInfos = codebaseInfo.typeInfos(forNamed: type).filter { $0.declarationType == .extensionDeclaration && $0.modifiers.visibility >= .default }
+        guard !extensionInfos.isEmpty else {
             return nil
         }
 
+        // We combine all extensions into a single definition because having multiple extensions with their own private
+        // Java_class and Java_peer causes compile errors
         var swift: [String] = []
-        swift.append("extension \(extensionInfo.name) {")
-        let classRef = JavaClassRef(for: extensionInfo.signature, packageName: packageName)
+        swift.append("extension \(type.withGenerics([])) {")
+        let classRef = JavaClassRef(for: type, packageName: packageName)
         swift.append(1, classRef.declaration(declarationType: .extensionDeclaration))
         swift.append(1, "private var Java_peer: JavaObjectPointer { (self as! JConvertible).toJavaObject(options: [])! }")
 
         var variableCount = 0
-        for variableInfo in extensionInfo.variables {
-            let variableSwift = self.swift(forProtocolExtensionVariable: variableInfo, in: extensionInfo, visibility: min(variableInfo.modifiers.visibility, .public), options: options, codebaseInfo: codebaseInfo, autoBridge: autoBridge)
-            if !variableSwift.isEmpty {
-                swift.append(1, variableSwift)
-                variableCount += 1
+        for extensionInfo in extensionInfos {
+            for variableInfo in extensionInfo.variables {
+                let variableSwift = self.swift(forProtocolExtensionVariable: variableInfo, in: extensionInfo, visibility: min(variableInfo.modifiers.visibility, .public), options: options, codebaseInfo: codebaseInfo, autoBridge: autoBridge)
+                if !variableSwift.isEmpty {
+                    swift.append(1, variableSwift)
+                    variableCount += 1
+                }
             }
         }
         var functionCount = 0
-        for functionInfo in extensionInfo.functions {
-            let functionSwift = self.swift(forProtocolExtensionFunction: functionInfo, in: extensionInfo, visibility: min(functionInfo.modifiers.visibility, .public), options: options, codebaseInfo: codebaseInfo, autoBridge: autoBridge, uniquifier: functionCount)
-            if !functionSwift.isEmpty {
-                swift.append(1, functionSwift)
-                functionCount += 1
+        for extensionInfo in extensionInfos {
+            for functionInfo in extensionInfo.functions {
+                let functionSwift = self.swift(forProtocolExtensionFunction: functionInfo, in: extensionInfo, visibility: min(functionInfo.modifiers.visibility, .public), options: options, codebaseInfo: codebaseInfo, autoBridge: autoBridge, uniquifier: functionCount)
+                if !functionSwift.isEmpty {
+                    swift.append(1, functionSwift)
+                    functionCount += 1
+                }
             }
         }
         guard variableCount > 0 || functionCount > 0 else {
