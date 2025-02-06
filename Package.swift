@@ -25,7 +25,7 @@ let package = Package(
         .target(name: "SkipTest", dependencies: [.target(name: "SkipDrive", condition: .when(platforms: [.macOS]))]),
         .testTarget(name: "SkipTestTests", dependencies: ["SkipTest"]),
         .testTarget(name: "SkipDriveTests", dependencies: ["SkipDrive"]),
-        .binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/1.2.25/skip.zip", checksum: "6c9055643a5b2d1b404cdf61a97cd60abd74908b623142a8d77a74c913ab4bb0")
+        .binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/1.2.26/skip.zip", checksum: "e79395823331a617d3ed3c10d06ea44177238d2f3e76a9604694250e2a95a694")
     ]
 )
 
