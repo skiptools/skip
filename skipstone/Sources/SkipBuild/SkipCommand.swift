@@ -421,8 +421,11 @@ actor MessageQueue {
 extension StreamingCommand {
 
     /// Returns the plugin build output folder with the given module and package names, taking into account changes in the SwiftPM output folder structure between different Swift versions.
-    func buildPluginOutputFolder(forModule moduleName: String, withPackageName packageName: String, inBuildFolder buildFolderAbsolute: AbsolutePath) throws -> AbsolutePath {
-        var buildOutputFolder = buildFolderAbsolute.appending(components: ["plugins", "outputs", packageName, moduleName])
+    func buildPluginOutputFolder(forModule moduleName: String, inBuildFolder buildFolderAbsolute: AbsolutePath) throws -> AbsolutePath {
+        // the plugin outputs are placed in a folder name that matches the root name of the package, irrespective of the actual package name in the Package.swift file
+        let rootFolderName = buildFolderAbsolute.parentDirectory.basename.lowercased()
+
+        var buildOutputFolder = buildFolderAbsolute.appending(components: ["plugins", "outputs", rootFolderName, moduleName])
         // accomodate the change in plugin output folders for Swift 6/Xcode 16:
         // Swift 5: .build/plugins/outputs/skipapp-hello/HelloSkip/skipstone
         // Swift 6: .build/plugins/outputs/skipapp-hello/HelloSkip/destination/skipstone

@@ -98,8 +98,6 @@ extension TestCommand {
 
         let xunit = xunit ?? ".build/xcunit-\(UUID().uuidString).xml"
 
-        let packageName = await Result(catchingAsync: { try await parseSwiftPackage(with: out, at: project).name })
-
         try await run(with: out, "Build Project", ["swift", "build", "--build-tests", "--verbose", "--configuration", configuration, "--package-path", project])
 
         var testResult: Result<ProcessOutput, Error>? = nil
@@ -152,16 +150,8 @@ extension TestCommand {
                 // .build/plugins/outputs/skip-zip/SkipZipTests/skipstone/SkipZip/.build/SkipZip/test-results/testDebugUnitTest/TEST-skip.zip.SkipZipTests.xml
                 junitFolder = URL(fileURLWithPath: junit, isDirectory: true)
             } else {
-                var packageName = try packageName.get()
-                // FIXME: the "name" attribute in the Package.swift file does not seem to dictate the name of the local outputs folder in CLI SPM like it does in Xcode; rather, the outputs seem to go to the enclosing directory name for the package
-                let folderName = URL(fileURLWithPath: project).standardizedFileURL.lastPathComponent
-                if packageName != folderName {
-                    await out.yield(MessageBlock(status: .warn, "Folder name does not match package name in Package.swift"))
-                    packageName = folderName
-                }
-
                 let buildFolderBase = try AbsolutePath(validating: ".build", relativeTo: AbsolutePath(validating: project, relativeTo: AbsolutePath(validating: FileManager.default.currentDirectoryPath)))
-                let testOutputBase = try buildPluginOutputFolder(forModule: skipModule + "Tests", withPackageName: packageName, inBuildFolder: buildFolderBase)
+                let testOutputBase = try buildPluginOutputFolder(forModule: skipModule + "Tests", inBuildFolder: buildFolderBase)
 
                 let testOutput = testOutputBase.appending(components: [skipModule.description, ".build", skipModule.description, "test-results", "test\(configuration.capitalized)UnitTest"])
 

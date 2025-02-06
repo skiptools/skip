@@ -193,7 +193,7 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
         } else { // not an app project; export the individual modules instead
             for moduleName in moduleNames {
                 var gradleArgs: [String] = []
-                let skipOutputFolder = try buildPluginOutputFolder(forModule: moduleName, withPackageName: packageName, inBuildFolder: buildFolderAbsolute)
+                let skipOutputFolder = try buildPluginOutputFolder(forModule: moduleName, inBuildFolder: buildFolderAbsolute)
 
                 if !fs.isDirectory(skipOutputFolder) {
                     throw error("The transpilation output folder \(skipOutputFolder.pathString) does not exist. Please ensure the project can be transpiled by running swift test")
@@ -234,7 +234,7 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
         }
 
         if exportProject, let moduleName = moduleNames.first {
-            let skipOutputFolder = try buildPluginOutputFolder(forModule: moduleName, withPackageName: packageName, inBuildFolder: buildFolderAbsolute)
+            let skipOutputFolder = try buildPluginOutputFolder(forModule: moduleName, inBuildFolder: buildFolderAbsolute)
 
             let projectOutputBaseFolder = outputFolderAbsolute.appending(components: ["project"])
             let projectOutputFolder = projectOutputBaseFolder.appending(components: [moduleName])
