@@ -200,6 +200,170 @@ class SkipCommandTests : XCTestCase {
         """)
     }
 
+    func testSkipFair() async throws {
+        let tempDir = try mktmp()
+        let projectName = "Hello-Skip"
+        let dir = tempDir + "/" + projectName + "/"
+        let appName = "HelloSkip"
+        let out = try await skip("init", "-jA", "-v", "--show-tree", "-d", dir, "--appfair", projectName)
+        let msgs = try out.out.parseJSONMessages()
+
+        XCTAssertEqual("Initializing Skip application \(projectName)", msgs.first)
+
+        let xcodeproj = "Darwin/" + appName + ".xcodeproj"
+        let xcconfig = "Darwin/" + appName + ".xcconfig"
+        for path in ["Package.swift", xcodeproj, xcconfig, "Sources", "Tests"] {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
+        }
+
+        XCTAssertEqual(msgs.dropLast(2).last ?? "", """
+        .
+        ├─ Android
+        │  ├─ app
+        │  │  ├─ build.gradle.kts
+        │  │  ├─ proguard-rules.pro
+        │  │  └─ src
+        │  │     └─ main
+        │  │        ├─ AndroidManifest.xml
+        │  │        ├─ kotlin
+        │  │        │  └─ Main.kt
+        │  │        └─ res
+        │  │           ├─ mipmap-anydpi
+        │  │           │  └─ ic_launcher.xml
+        │  │           ├─ mipmap-hdpi
+        │  │           │  ├─ ic_launcher.png
+        │  │           │  ├─ ic_launcher_background.png
+        │  │           │  ├─ ic_launcher_foreground.png
+        │  │           │  └─ ic_launcher_monochrome.png
+        │  │           ├─ mipmap-mdpi
+        │  │           │  ├─ ic_launcher.png
+        │  │           │  ├─ ic_launcher_background.png
+        │  │           │  ├─ ic_launcher_foreground.png
+        │  │           │  └─ ic_launcher_monochrome.png
+        │  │           ├─ mipmap-xhdpi
+        │  │           │  ├─ ic_launcher.png
+        │  │           │  ├─ ic_launcher_background.png
+        │  │           │  ├─ ic_launcher_foreground.png
+        │  │           │  └─ ic_launcher_monochrome.png
+        │  │           ├─ mipmap-xxhdpi
+        │  │           │  ├─ ic_launcher.png
+        │  │           │  ├─ ic_launcher_background.png
+        │  │           │  ├─ ic_launcher_foreground.png
+        │  │           │  └─ ic_launcher_monochrome.png
+        │  │           └─ mipmap-xxxhdpi
+        │  │              ├─ ic_launcher.png
+        │  │              ├─ ic_launcher_background.png
+        │  │              ├─ ic_launcher_foreground.png
+        │  │              └─ ic_launcher_monochrome.png
+        │  ├─ fastlane
+        │  │  ├─ Appfile
+        │  │  ├─ Fastfile
+        │  │  ├─ README.md
+        │  │  └─ metadata
+        │  │     └─ android
+        │  │        └─ en-US
+        │  │           ├─ full_description.txt
+        │  │           ├─ short_description.txt
+        │  │           └─ title.txt
+        │  ├─ gradle
+        │  │  └─ wrapper
+        │  │     └─ gradle-wrapper.properties
+        │  ├─ gradle.properties
+        │  └─ settings.gradle.kts
+        ├─ Darwin
+        │  ├─ Assets.xcassets
+        │  │  ├─ AccentColor.colorset
+        │  │  │  └─ Contents.json
+        │  │  ├─ AppIcon.appiconset
+        │  │  │  ├─ AppIcon-20@2x.png
+        │  │  │  ├─ AppIcon-20@2x~ipad.png
+        │  │  │  ├─ AppIcon-20@3x.png
+        │  │  │  ├─ AppIcon-20~ipad.png
+        │  │  │  ├─ AppIcon-29.png
+        │  │  │  ├─ AppIcon-29@2x.png
+        │  │  │  ├─ AppIcon-29@2x~ipad.png
+        │  │  │  ├─ AppIcon-29@3x.png
+        │  │  │  ├─ AppIcon-29~ipad.png
+        │  │  │  ├─ AppIcon-40@2x.png
+        │  │  │  ├─ AppIcon-40@2x~ipad.png
+        │  │  │  ├─ AppIcon-40@3x.png
+        │  │  │  ├─ AppIcon-40~ipad.png
+        │  │  │  ├─ AppIcon-83.5@2x~ipad.png
+        │  │  │  ├─ AppIcon@2x.png
+        │  │  │  ├─ AppIcon@2x~ipad.png
+        │  │  │  ├─ AppIcon@3x.png
+        │  │  │  ├─ AppIcon~ios-marketing.png
+        │  │  │  ├─ AppIcon~ipad.png
+        │  │  │  └─ Contents.json
+        │  │  └─ Contents.json
+        │  ├─ Entitlements.plist
+        │  ├─ HelloSkip.xcconfig
+        │  ├─ HelloSkip.xcodeproj
+        │  │  └─ project.pbxproj
+        │  ├─ Info.plist
+        │  ├─ Sources
+        │  │  └─ HelloSkipAppMain.swift
+        │  └─ fastlane
+        │     ├─ AppStore.xcconfig
+        │     ├─ Appfile
+        │     ├─ Deliverfile
+        │     ├─ Fastfile
+        │     ├─ README.md
+        │     └─ metadata
+        │        ├─ en-US
+        │        │  ├─ description.txt
+        │        │  ├─ keywords.txt
+        │        │  ├─ privacy_url.txt
+        │        │  ├─ release_notes.txt
+        │        │  ├─ software_url.txt
+        │        │  ├─ subtitle.txt
+        │        │  ├─ support_url.txt
+        │        │  ├─ title.txt
+        │        │  └─ version_whats_new.txt
+        │        └─ rating.json
+        ├─ LICENSE.GPL
+        ├─ Package.resolved
+        ├─ Package.swift
+        ├─ README.md
+        ├─ Skip.env
+        ├─ Sources
+        │  ├─ HelloSkip
+        │  │  ├─ ContentView.swift
+        │  │  ├─ HelloSkipApp.swift
+        │  │  ├─ Resources
+        │  │  │  ├─ Localizable.xcstrings
+        │  │  │  └─ Module.xcassets
+        │  │  │     └─ Contents.json
+        │  │  └─ Skip
+        │  │     └─ skip.yml
+        │  └─ HelloSkipModel
+        │     ├─ Resources
+        │     │  └─ Localizable.xcstrings
+        │     ├─ Skip
+        │     │  └─ skip.yml
+        │     └─ ViewModel.swift
+        └─ Tests
+           ├─ HelloSkipModelTests
+           │  ├─ HelloSkipModelTests.swift
+           │  ├─ Resources
+           │  │  └─ TestData.json
+           │  ├─ Skip
+           │  │  └─ skip.yml
+           │  └─ XCSkipTests.swift
+           └─ HelloSkipTests
+              ├─ HelloSkipTests.swift
+              ├─ Resources
+              │  └─ TestData.json
+              ├─ Skip
+              │  └─ skip.yml
+              └─ XCSkipTests.swift
+
+        """)
+
+        // make sure we can export it
+        try await checkExportApp(appName: appName, dir: dir)
+    }
+
     func testSkipInit() async throws {
         let tempDir = try mktmp()
         let name = "cool-lib"
@@ -309,7 +473,7 @@ class SkipCommandTests : XCTestCase {
         XCTAssertEqual(name, project.name)
 
         let exportPath = try mktmp()
-        let exported = try await skip("export", "-jA", "-v", "--show-tree", "--project", tempDir + "/" + name, "-d", exportPath)
+        let exported = try await skip("export", "-jA", "-v", "--show-tree", "--project", dir, "-d", exportPath)
         let exportedJSON = try exported.out.parseJSONMessages()
         let fileTree = exportedJSON.dropLast(1).last ?? ""
 
@@ -324,7 +488,8 @@ class SkipCommandTests : XCTestCase {
         let tempDir = try mktmp()
         let name = "demo-app"
         let dir = tempDir + "/" + name + "/"
-        let out = try await skip("init", "-jA", "--show-tree", "--zero", "--free", "-v", "-d", dir, "--appid", "demo.app.App", name, "Demo")
+        let appName = "Demo"
+        let out = try await skip("init", "-jA", "--show-tree", "--zero", "--free", "-v", "-d", dir, "--appid", "demo.app.App", name, appName)
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip application \(name)", msgs.first)
@@ -333,23 +498,27 @@ class SkipCommandTests : XCTestCase {
             XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
         }
 
+        try await checkExportApp(appName: appName, dir: dir)
+    }
+
+    func checkExportApp(appName: String, dir: String) async throws {
         let project = try await loadProjectPackage(dir)
         XCTAssertEqual(name, project.name)
 
         let exportPath = try mktmp()
-        let exported = try await skip("export", "-jA", "-v", "--show-tree", "--project", tempDir + "/" + name, "-d", exportPath)
+        let exported = try await skip("export", "-jA", "-v", "--show-tree", "--project", dir, "-d", exportPath)
         let exportedJSON = try exported.out.parseJSONMessages()
         let fileTree = exportedJSON.dropLast(1).last ?? ""
 
-        XCTAssertTrue(fileTree.contains("Demo-debug.apk"), "missing expected Demo-debug.apk in \(fileTree)")
-        XCTAssertTrue(fileTree.contains("Demo-release.apk"), "missing expected Demo-release.apk in \(fileTree)")
-        XCTAssertTrue(fileTree.contains("Demo-debug.aab"), "missing expected Demo-debug.aab in \(fileTree)")
-        XCTAssertTrue(fileTree.contains("Demo-release.aab"), "missing expected Demo-release.aab in \(fileTree)")
-        XCTAssertTrue(fileTree.contains("Demo-debug.ipa"), "missing expected Demo-debug.ipa in \(fileTree)")
-        XCTAssertTrue(fileTree.contains("Demo-release.ipa"), "missing expected Demo-release.ipa in \(fileTree)")
-        XCTAssertTrue(fileTree.contains("Demo-debug.xcarchive.zip"), "missing expected Demo-debug.xcarchive.zip in \(fileTree)")
-        XCTAssertTrue(fileTree.contains("Demo-release.xcarchive.zip"), "missing expected Demo-release.xcarchive.zip in \(fileTree)")
-        XCTAssertTrue(fileTree.contains("Demo-project.zip"), "missing expected Demo-project.zip in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("\(appName)-debug.apk"), "missing expected \(appName)-debug.apk in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("\(appName)-release.apk"), "missing expected \(appName)-release.apk in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("\(appName)-debug.aab"), "missing expected \(appName)-debug.aab in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("\(appName)-release.aab"), "missing expected \(appName)-release.aab in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("\(appName)-debug.ipa"), "missing expected \(appName)-debug.ipa in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("\(appName)-release.ipa"), "missing expected \(appName)-release.ipa in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("\(appName)-debug.xcarchive.zip"), "missing expected \(appName)-debug.xcarchive.zip in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("\(appName)-release.xcarchive.zip"), "missing expected \(appName)-release.xcarchive.zip in \(fileTree)")
+        XCTAssertTrue(fileTree.contains("\(appName)-project.zip"), "missing expected \(appName)-project.zip in \(fileTree)")
     }
 
     /// This works, but it is very slow, and also required installing the Android toolchain on the Skip CI host
@@ -371,7 +540,7 @@ class SkipCommandTests : XCTestCase {
         XCTAssertEqual(name, project.name)
 
         let exportPath = try mktmp()
-        let exported = try await skip("export", "-jA", "-v", "--show-tree", "--project", tempDir + "/" + name, "-d", exportPath)
+        let exported = try await skip("export", "-jA", "-v", "--show-tree", "--project", dir, "-d", exportPath)
         let exportedJSON = try exported.out.parseJSONMessages()
         let fileTree = exportedJSON.dropLast(1).last ?? ""
 
