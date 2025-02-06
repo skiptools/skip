@@ -40,6 +40,9 @@ skip icon --background #F7DC6F-#F2C464 --inset 0.4 --shadow 0.02 symbol.svg
 """,
         shouldDisplay: true)
 
+    @Option(name: [.customShort("d"), .long], help: ArgumentHelp("Root folder for icon generation", valueName: "directory"))
+    var dir: String?
+
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
@@ -73,7 +76,6 @@ skip icon --background #F7DC6F-#F2C464 --inset 0.4 --shadow 0.02 symbol.svg
     var shadow: Double = Self.defaultIconShadow
     static let defaultIconShadow: Double = 0.01 // 10% feels about right
 
-
     @Flag(help: ArgumentHelp("Create a random icon shape"))
     var randomIcon: Bool = false
 
@@ -106,7 +108,8 @@ skip icon --background #F7DC6F-#F2C464 --inset 0.4 --shadow 0.02 symbol.svg
         #if !canImport(ImageIO)
         await out.write(status: .fail, "Icon creation not supported on this platform")
         #else
-        let infos = try await generateIcons(darwinAppIconFolder: !darwinIcon ? nil : URL(fileURLWithPath: darwinPath), androidAppSrcMainRes: !androidIcon ? nil : URL(fileURLWithPath: androidPath), backgroundColor: background, randomBackground: randomBackground, foregroundColor: foreground, iconSources: iconSources, randomIcon: randomIcon, shadow: self.shadow, iconInset: self.inset, separateLayers: separateLayers)
+        let rootDir = dir.flatMap({ URL(fileURLWithPath: $0, isDirectory: true) })
+        let infos = try await generateIcons(darwinAppIconFolder: !darwinIcon ? nil : URL(fileURLWithPath: darwinPath, relativeTo: rootDir), androidAppSrcMainRes: !androidIcon ? nil : URL(fileURLWithPath: androidPath, relativeTo: rootDir), backgroundColor: background, randomBackground: randomBackground, foregroundColor: foreground, iconSources: iconSources, randomIcon: randomIcon, shadow: self.shadow, iconInset: self.inset, separateLayers: separateLayers)
 
         let infoURLs = infos.compactMap(\.url)
         for infoURL in infoURLs {
