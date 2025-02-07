@@ -124,8 +124,20 @@ skip icon --background #F7DC6F-#F2C464 --inset 0.4 --shadow 0.02 symbol.svg
     }
 }
 
-typealias IconParameters = (iconBackgroundColor: String?, iconForegroundColor: String?, iconSources: [String], iconShadow: Double?, iconInset: Double?)
-typealias IconInfo = (url: URL?, size: Int, android: Bool, foreground: Bool?)
+struct IconParameters {
+    var iconBackgroundColor: String?
+    var iconForegroundColor: String?
+    var iconSources: [String] = []
+    var iconShadow: Double?
+    var iconInset: Double?
+}
+
+struct IconInfo {
+    var url: URL?
+    var size: Int
+    var android: Bool
+    var foreground: Bool?
+}
 
 func generateIcons(darwinAppIconFolder: URL?, androidAppSrcMainRes: URL?, backgroundColor: String?, randomBackground: Bool, foregroundColor: String?, iconSources: [String], randomIcon: Bool, shadow: Double?, iconInset: Double, separateLayers: Bool) async throws -> [IconInfo] {
     /// the URL for an iOS icon
