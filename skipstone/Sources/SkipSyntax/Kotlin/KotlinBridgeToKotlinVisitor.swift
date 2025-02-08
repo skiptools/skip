@@ -1455,9 +1455,20 @@ final class KotlinBridgeToKotlinVisitor {
         }
         if !stateVariables.isEmpty {
             statements += viewComposeContent(for: classDeclaration, stateVariables: stateVariables)
-            for (name, _) in stateVariables {
-                let (initStatements, initSwift, initCdeclFunctions) = viewInitState(for: name, in: classDeclaration)
-                let (syncStatements, syncSwift, syncCdeclFunctions) = viewSyncState(for: name, in: classDeclaration)
+            for (name, attributes) in stateVariables {
+                var initStatements: [KotlinStatement] = []
+                var syncStatements: [KotlinStatement] = []
+                var initSwift: [String] = []
+                var syncSwift: [String] = []
+                var initCdeclFunctions: [CDeclFunction] = []
+                var syncCdeclFunctions: [CDeclFunction] = []
+                if attributes.stateAttribute != nil {
+                    (initStatements, initSwift, initCdeclFunctions) = viewInitState(for: name, in: classDeclaration)
+                    (syncStatements, syncSwift, syncCdeclFunctions) = viewSyncState(for: name, in: classDeclaration)
+                } else if attributes.environmentAttribute != nil {
+                    (initStatements, initSwift, initCdeclFunctions) = viewInitEnvironment(for: name, in: classDeclaration)
+                    (syncStatements, syncSwift, syncCdeclFunctions) = viewSyncEnvironment(for: name, in: classDeclaration)
+                }
                 statements += initStatements + syncStatements
                 swift += initSwift + syncSwift
                 cdeclFunctions += initCdeclFunctions + syncCdeclFunctions
@@ -1479,9 +1490,15 @@ final class KotlinBridgeToKotlinVisitor {
         functionDeclaration.attributes.attributes.append(Attribute(signature: .named("androidx.compose.runtime.Composable", [])))
         functionDeclaration.extras = .singleNewline
         var bodyKotlin: [String] = []
-        for (name, _) in stateVariables {
-            bodyKotlin.append("val remembered\(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_\(name)(Swift_peer)) }")
-            bodyKotlin.append("Swift_syncState_\(name)(Swift_peer, remembered\(name).value)")
+        for (name, attributes) in stateVariables {
+            if attributes.stateAttribute != nil {
+                bodyKotlin.append("val remembered\(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_\(name)(Swift_peer)) }")
+                bodyKotlin.append("Swift_syncState_\(name)(Swift_peer, remembered\(name).value)")
+            } else if attributes.environmentAttribute != nil {
+                bodyKotlin.append("val envkey\(name) = Swift_initEnvironment_\(name)(Swift_peer)")
+                bodyKotlin.append("val envvalue\(name) = skip.ui.EnvironmentValues.shared.bridged(envkey\(name))")
+                bodyKotlin.append("Swift_syncEnvironment_\(name)(Swift_peer, envvalue\(name))")
+            }
         }
         bodyKotlin.append("super.ComposeContent(composectx)")
         functionDeclaration.body = KotlinCodeBlock(statements: bodyKotlin.map { KotlinRawStatement(sourceCode: $0) })
@@ -1524,6 +1541,47 @@ final class KotlinBridgeToKotlinVisitor {
             "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
             "let support_swift = SkipUI.StateSupport.fromJavaObject(support, options: [])",
             "peer_swift.value.Java_syncState_\(name)(support: support_swift)"
+        ]
+        let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
+        return ([externalFunctionDeclaration], source, [cdeclFunction])
+    }
+
+    private func viewInitEnvironment(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+        let externalName = "Swift_initEnvironment_\(name)"
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.kt.SwiftObjectPointer): String")
+        externalFunctionDeclaration.parent = classDeclaration
+
+        var source: [String] = []
+        source.append("func Java_initEnvironment_\(name)() -> String {")
+        source.append(1, "return $\(name).key")
+        source.append("}")
+
+        let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
+        let cdeclSignature: TypeSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))], .javaString, APIFlags(), nil)
+        let cdeclSource: [String] = [
+            "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
+            "return peer_swift.value.Java_initEnvironment_\(name)().toJavaObject(options: [])!"
+        ]
+        let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
+        return ([externalFunctionDeclaration], source, [cdeclFunction])
+    }
+
+    private func viewSyncEnvironment(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+        let externalName = "Swift_syncEnvironment_\(name)"
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.kt.SwiftObjectPointer, support: skip.ui.EnvironmentSupport?)")
+        externalFunctionDeclaration.parent = classDeclaration
+
+        var source: [String] = []
+        source.append("func Java_syncEnvironment_\(name)(support: SkipUI.EnvironmentSupport?) {")
+        source.append(1, "$\(name).Java_syncEnvironmentSupport(support)")
+        source.append("}")
+
+        let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
+        let cdeclSignature: TypeSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false)), TypeSignature.Parameter(label: "support", type: .optional(.javaObjectPointer))], .void, APIFlags(), nil)
+        let cdeclSource: [String] = [
+            "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
+            "let support_swift = SkipUI.EnvironmentSupport.fromJavaObject(support, options: [])",
+            "peer_swift.value.Java_syncEnvironment_\(name)(support: support_swift)"
         ]
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
         return ([externalFunctionDeclaration], source, [cdeclFunction])
