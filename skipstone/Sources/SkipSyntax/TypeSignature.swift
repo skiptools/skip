@@ -1573,7 +1573,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                 for inherit in typeInfo.inherits {
                     // Take away a tenth of a point for each level down the inheritance chain, so that less derived matches score lower.
                     // This will allow another function with a more specific parameter type to score higher
-                    if inherit.withGenerics([]).isSameType(as: target) {
+                    if inherit.withGenerics([]).isSameType(as: target, withoutOptionality: true) {
                         return 2.0 - level * 0.1
                     }
                     queue.append(inherit)
