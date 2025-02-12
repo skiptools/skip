@@ -603,23 +603,29 @@ extension Modifiers.Visibility {
 }
 
 extension Generics {
-    /// Remove generic constraints involving unbridged types.
-    func filterBridging(codebaseInfo: CodebaseInfo.Context) -> Generics {
+    /// Remove generic constraints involving unbridged types and map to Kotlin types.
+    func compactMapBridgable(direction: Bridgable.Direction, options: KotlinBridgeOptions, codebaseInfo: CodebaseInfo.Context) -> Generics {
         let entries = self.entries.map {
-            let inherits = $0.inherits.compactMap { filterBridging($0, codebaseInfo: codebaseInfo) }
-            return Generic(name: $0.name, inherits: inherits, whereEqual: filterBridging($0.whereEqual, codebaseInfo: codebaseInfo))
+            let inherits = $0.inherits.compactMap { compactMapBridgable($0, direction: direction, options: options, codebaseInfo: codebaseInfo) }
+            return Generic(name: $0.name, inherits: inherits, whereEqual: compactMapBridgable($0.whereEqual, direction: direction, options: options, codebaseInfo: codebaseInfo))
         }
         return Generics(entries: entries)
     }
 
-    private func filterBridging(_ type: TypeSignature?, codebaseInfo: CodebaseInfo.Context) -> TypeSignature? {
+    private func compactMapBridgable(_ type: TypeSignature?, direction: Bridgable.Direction, options: KotlinBridgeOptions, codebaseInfo: CodebaseInfo.Context) -> TypeSignature? {
         guard let type else {
             return nil
         }
         guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: type) else {
             return nil
         }
-        return typeInfo.attributes.isBridgeToKotlin || typeInfo.attributes.isBridgeToSwift ? type : nil
+        guard typeInfo.attributes.isBridgeToKotlin || typeInfo.attributes.isBridgeToSwift else {
+            return nil
+        }
+        guard direction == .toKotlin else {
+            return type
+        }
+        return type.checkBridgable(direction: direction, options: options, generics: self, codebaseInfo: codebaseInfo)?.kotlinType ?? type
     }
 
     /// The `<...>` list of used generics in a function or type.
@@ -1195,9 +1201,9 @@ extension TypeSignature {
         } else if typeInfo.declarationType == .protocolDeclaration, let moduleName = typeInfo.moduleName, moduleName != "SkipUI" && isSkipModule(name: moduleName) {
             if moduleName == "SkipLib" && typeInfo.signature.name == "Error" {
                 strategy = .error
-//                if options.contains(.kotlincompat) {
-//                    kotlinType = .named("java.lang.Throwable", [])
-//                }
+                if options.contains(.kotlincompat) {
+                    kotlinType = .named("kotlin.Throwable", [])
+                }
             } else {
                 // Any protocol in a built-in module will have a Kotlin representation
                 strategy = .protocol
@@ -1221,6 +1227,10 @@ extension TypeSignature {
             } else {
                 kotlinType = self.withModuleName(typeInfo.moduleName)
             }
+            let kotlinGenerics = kotlinType.generics.map {
+                $0.checkBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo)?.kotlinType ?? $0
+            }
+            kotlinType = kotlinType.withGenerics(kotlinGenerics)
         }
         var genericType: TypeSignature? = generics == nil ? nil : constrainedTypeWithGenerics(generics!)
         if genericType == self {
