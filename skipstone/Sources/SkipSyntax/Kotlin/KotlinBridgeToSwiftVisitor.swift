@@ -504,7 +504,7 @@ final class KotlinBridgeToSwiftVisitor {
                 }
                 indentation = indentation.inc()
                 swift.append(indentation, "if let f_error {")
-                swift.append(indentation.inc(), "f_continuation.resume(throwing: JThrowable.toError(f_error, options: \(optionsString)))")
+                swift.append(indentation.inc(), "f_continuation.resume(throwing: JThrowable.toError(f_error, options: \(optionsString))!)")
                 swift.append(indentation, "} else {")
                 if callbackType.parameters.count == 1 {
                     swift.append(indentation.inc(), "f_continuation.resume()")

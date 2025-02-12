@@ -563,9 +563,9 @@ final class KotlinBridgeToKotlinVisitor {
                 cdeclBody.append(1, "} catch {")
                 cdeclBody.append(2, "jniContext {")
                 if bridgable.return.type == .void {
-                    cdeclBody.append(3, "f_callback_swift(JThrowable.toThrowable(error, options: \(optionsString)))")
+                    cdeclBody.append(3, "f_callback_swift(JThrowable.toThrowable(error, options: \(optionsString))!)")
                 } else {
-                    cdeclBody.append(3, "f_callback_swift(nil, JThrowable.toThrowable(error, options: \(optionsString)))")
+                    cdeclBody.append(3, "f_callback_swift(nil, JThrowable.toThrowable(error, options: \(optionsString))!)")
                 }
                 cdeclBody.append(2, "}")
                 cdeclBody.append(1, "}")

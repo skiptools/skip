@@ -246,6 +246,9 @@ extension TypeSignature {
             } else if strategy == .protocol || strategy == .unknown {
                 let converted = "((\(value) as? JConvertible)?.toJavaObject(options: \(options.jconvertibleOptions)))"
                 return isOptional ? converted : converted + "!"
+            } else if strategy == .error {
+                let converted = "JThrowable.toThrowable(\(value), options: \(options.jconvertibleOptions))"
+                return isOptional ? converted : converted + "!"
             } else {
                 let converted = value + ".toJavaObject(options: \(options.jconvertibleOptions))"
                 return isOptional ? converted : converted + "!"
@@ -255,15 +258,21 @@ extension TypeSignature {
 
     /// Return code that converts the given value of our `@_cdecl` function type back to this type.
     func convertFromCDecl(value: String, strategy: Bridgable.Strategy, options: KotlinBridgeOptions) -> String {
-        if strategy == .unknown {
+        switch strategy {
+        case .unknown:
             let converted = "AnyBridging.fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
             return castOptionalAny(converted)
-        } else if strategy == .polymorphic {
+        case .polymorphic:
             let converted = "AnyBridging.fromJavaObject(\(value), toBaseType: \(self.asOptional(false)).self, options: \(options.jconvertibleOptions))"
             return converted + (isOptional ? "" : "!")
-        } else if strategy == .protocol {
+        case .protocol:
             let converted = "AnyBridging.fromJavaObject(\(value), options: \(options.jconvertibleOptions)) { \(self.protocolBridgeImpl.description).fromJavaObject(\(value), options: \(options.jconvertibleOptions)) as Any }"
             return castOptionalAny(converted)
+        case .error:
+            let converted = "JThrowable.toError(\(value), options: \(options.jconvertibleOptions))"
+            return converted + (isOptional ? "" : "!")
+        default:
+            break
         }
 
         switch self.asOptional(false) {
@@ -349,6 +358,9 @@ extension TypeSignature {
             } else if strategy == .protocol || strategy == .unknown {
                 let converted = "((\(value) as? JConvertible)?.toJavaObject(options: \(optionsString)))"
                 return isOptional ? converted : converted + "!"
+            } else if strategy == .error {
+                let converted = "JThrowable.toThrowable(\(value), options: \(optionsString)))"
+                return isOptional ? converted : converted + "!"
             } else {
                 let converted = value + ".toJavaObject(options: \(optionsString))"
                 return isOptional ? converted : converted + "!"
@@ -358,15 +370,21 @@ extension TypeSignature {
 
     /// Return code that converts the given value of our Java type back to this type.
     func convertFromJava(value: String, strategy: Bridgable.Strategy, options: KotlinBridgeOptions) -> String {
-        if strategy == .unknown {
+        switch strategy {
+        case .unknown:
             let converted = "AnyBridging.fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
             return castOptionalAny(converted)
-        } else if strategy == .polymorphic {
+        case .polymorphic:
             let converted = "AnyBridging.fromJavaObject(\(value), toBaseType: \(self.asOptional(false)).self, options: \(options.jconvertibleOptions))"
             return converted + (isOptional ? "" : "!")
-        } else if strategy == .protocol {
+        case .protocol:
             let converted = "AnyBridging.fromJavaObject(\(value), options: \(options.jconvertibleOptions)) { \(self.protocolBridgeImpl.description).fromJavaObject(\(value), options: \(options.jconvertibleOptions)) as Any }"
             return castOptionalAny(converted)
+        case .error:
+            let converted = "JThrowable.toError(\(value), options: \(options.jconvertibleOptions))"
+            return converted + (isOptional ? "" : "!")
+        default:
+            break
         }
 
         switch self {
@@ -655,6 +673,7 @@ struct Bridgable {
         case peer
         case polymorphic
         case `protocol`
+        case error
         case unknown
     }
 
@@ -1174,8 +1193,15 @@ extension TypeSignature {
                 strategy = .peer
             }
         } else if typeInfo.declarationType == .protocolDeclaration, let moduleName = typeInfo.moduleName, moduleName != "SkipUI" && isSkipModule(name: moduleName) {
-            // Any protocol in a built-in module will have a Kotlin representation
-            strategy = .protocol
+            if moduleName == "SkipLib" && typeInfo.signature.name == "Error" {
+                strategy = .error
+//                if options.contains(.kotlincompat) {
+//                    kotlinType = .named("java.lang.Throwable", [])
+//                }
+            } else {
+                // Any protocol in a built-in module will have a Kotlin representation
+                strategy = .protocol
+            }
         } else {
             if typeInfo.inherits.contains(where: { $0.isNamed("SwiftCustomBridged", moduleName: "Swift") }) {
                 strategy = .convertible

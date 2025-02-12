@@ -498,7 +498,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 return try await withCheckedThrowingContinuation { f_continuation in
                     let f_return_callback: (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
                         if let f_error {
-                            f_continuation.resume(throwing: JThrowable.toError(f_error, options: []))
+                            f_continuation.resume(throwing: JThrowable.toError(f_error, options: [])!)
                         } else {
                             f_continuation.resume(returning: f_return!)
                         }
@@ -1354,7 +1354,7 @@ final class BridgeToSwiftTests: XCTestCase {
             return try await withCheckedThrowingContinuation { f_continuation in
                 let f_return_callback: (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
                     if let f_error {
-                        f_continuation.resume(throwing: JThrowable.toError(f_error, options: []))
+                        f_continuation.resume(throwing: JThrowable.toError(f_error, options: [])!)
                     } else {
                         f_continuation.resume(returning: f_return!)
                     }
@@ -1393,7 +1393,7 @@ final class BridgeToSwiftTests: XCTestCase {
             return try await withCheckedThrowingContinuation { f_continuation in
                 let f_return_callback: (JavaObjectPointer?) -> Void = { f_error in
                     if let f_error {
-                        f_continuation.resume(throwing: JThrowable.toError(f_error, options: []))
+                        f_continuation.resume(throwing: JThrowable.toError(f_error, options: [])!)
                     } else {
                         f_continuation.resume()
                     }
@@ -4986,7 +4986,7 @@ final class BridgeToSwiftTests: XCTestCase {
             return try await withCheckedThrowingContinuation { f_continuation in
                 let f_return_callback: (T?, JavaObjectPointer?) -> Void = { f_return, f_error in
                     if let f_error {
-                        f_continuation.resume(throwing: JThrowable.toError(f_error, options: []))
+                        f_continuation.resume(throwing: JThrowable.toError(f_error, options: [])!)
                     } else {
                         f_continuation.resume(returning: f_return!)
                     }
