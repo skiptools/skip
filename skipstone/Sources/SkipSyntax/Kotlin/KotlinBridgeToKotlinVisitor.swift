@@ -383,7 +383,7 @@ final class KotlinBridgeToKotlinVisitor {
             return parameter
         }
         functionDeclaration.extras = nil
-        functionDeclaration.generics = functionDeclaration.generics.filterBridging(codebaseInfo: codebaseInfo)
+        functionDeclaration.generics = functionDeclaration.generics.compactMapBridgable(direction: .toKotlin, options: options, codebaseInfo: codebaseInfo)
 
         let (bodyCodeBlock, externalStatements) = addDefinitions(for: functionDeclaration, bridgable: bridgable, in: classDeclaration, isBridgedSubclass: isBridgedSubclass, inExtensionOf: interfaceDeclaration, isMutableStructCopyConstructor: isMutableStructCopyConstructor, uniquifier: uniquifier)
         functionDeclaration.body = bodyCodeBlock
@@ -563,9 +563,9 @@ final class KotlinBridgeToKotlinVisitor {
                 cdeclBody.append(1, "} catch {")
                 cdeclBody.append(2, "jniContext {")
                 if bridgable.return.type == .void {
-                    cdeclBody.append(3, "f_callback_swift(JThrowable.toThrowable(error, options: \(optionsString)))")
+                    cdeclBody.append(3, "f_callback_swift(JThrowable.toThrowable(error, options: \(optionsString))!)")
                 } else {
-                    cdeclBody.append(3, "f_callback_swift(nil, JThrowable.toThrowable(error, options: \(optionsString)))")
+                    cdeclBody.append(3, "f_callback_swift(nil, JThrowable.toThrowable(error, options: \(optionsString))!)")
                 }
                 cdeclBody.append(2, "}")
                 cdeclBody.append(1, "}")
@@ -895,7 +895,15 @@ final class KotlinBridgeToKotlinVisitor {
         let extensions = codebaseInfo.typeInfos(forNamed: interfaceDeclaration.signature).filter { $0.declarationType == .extensionDeclaration }
 
         interfaceDeclaration.extras = nil
-        interfaceDeclaration.inherits = interfaceDeclaration.inherits.filter { $0.isNamed("Comparable") || $0.checkBridgable(direction: .toKotlin, options: options, generics: interfaceDeclaration.generics, codebaseInfo: codebaseInfo) != nil }
+        interfaceDeclaration.inherits = interfaceDeclaration.inherits.compactMap {
+            if $0.isNamed("Comparable") {
+                return $0
+            } else if let bridgable = $0.checkBridgable(direction: .toKotlin, options: options, generics: interfaceDeclaration.generics, codebaseInfo: codebaseInfo) {
+                return bridgable.kotlinType
+            } else {
+                return nil
+            }
+        }
         var extensionFunctionCount = 0
         for member in interfaceDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
@@ -922,7 +930,7 @@ final class KotlinBridgeToKotlinVisitor {
         }
 
         // Must do this last after determining member generic constraints
-        interfaceDeclaration.generics = interfaceDeclaration.generics.filterBridging(codebaseInfo: codebaseInfo)
+        interfaceDeclaration.generics = interfaceDeclaration.generics.compactMapBridgable(direction: .toKotlin, options: options, codebaseInfo: codebaseInfo)
         return true
     }
 
@@ -997,14 +1005,17 @@ final class KotlinBridgeToKotlinVisitor {
                 isView = true
                 return .skipUIView
             }
-            guard (classDeclaration.declarationType == .actorDeclaration && $0.isNamed("Actor"))
+            if (classDeclaration.declarationType == .actorDeclaration && $0.isNamed("Actor"))
                 || (isError && $0.isNamed("Exception"))
+                || (isError && $0.isNamed("Error"))
                 || $0.isNamed("Comparable")
-                || $0.isNamed("MutableStruct")
-                || $0.checkBridgable(direction: .toKotlin, options: options, generics: classDeclaration.generics, codebaseInfo: codebaseInfo) != nil else {
+                || $0.isNamed("MutableStruct") {
+                return $0
+            } else if let bridgable = $0.checkBridgable(direction: .toKotlin, options: options, generics: classDeclaration.generics, codebaseInfo: codebaseInfo) {
+                return bridgable.kotlinType
+            } else {
                 return nil
             }
-            return $0
         }
 
         var insertStatements: [KotlinStatement] = []
@@ -1167,7 +1178,7 @@ final class KotlinBridgeToKotlinVisitor {
             }
         }
         // Must do this last after determining member generic constraints
-        classDeclaration.generics = classDeclaration.generics.filterBridging(codebaseInfo: codebaseInfo)
+        classDeclaration.generics = classDeclaration.generics.compactMapBridgable(direction: .toKotlin, options: options, codebaseInfo: codebaseInfo)
 
         let finalMemberVisibility = min(classDeclaration.modifiers.visibility, .public)
         var additionalSwiftDeclarations: [String] = []

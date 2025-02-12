@@ -1294,4 +1294,28 @@ final class TypeInferenceTests: XCTestCase {
         }
         """)
     }
+
+    func testOptionalProtocol() async throws {
+        try await check(supportingSwift: """
+        extension Int {
+            static var min: Int {
+                return 0
+            }
+        }
+        protocol P {
+        }
+        class C: P {
+        }
+        """, swift: """
+        func f(p: (any P)? = nil) -> Int {
+            return 0
+        }
+        func g(c: C) -> Bool {
+            return f(p: c) == .min
+        }
+        """, kotlin: """
+        internal fun f(p: P? = null): Int = 0
+        internal fun g(c: C): Boolean = f(p = c) == Int.min
+        """)
+    }
 }

@@ -516,7 +516,7 @@ final class BridgeToKotlinTests: XCTestCase {
                     f_callback_swift(f_return_swift, nil)
                 } catch {
                     jniContext {
-                        f_callback_swift(nil, JThrowable.toThrowable(error, options: []))
+                        f_callback_swift(nil, JThrowable.toThrowable(error, options: [])!)
                     }
                 }
             }
@@ -1335,7 +1335,7 @@ final class BridgeToKotlinTests: XCTestCase {
                     f_callback_swift(f_return_swift, nil)
                 } catch {
                     jniContext {
-                        f_callback_swift(nil, JThrowable.toThrowable(error, options: []))
+                        f_callback_swift(nil, JThrowable.toThrowable(error, options: [])!)
                     }
                 }
             }
@@ -1371,7 +1371,7 @@ final class BridgeToKotlinTests: XCTestCase {
                     f_callback_swift(nil)
                 } catch {
                     jniContext {
-                        f_callback_swift(JThrowable.toThrowable(error, options: []))
+                        f_callback_swift(JThrowable.toThrowable(error, options: [])!)
                     }
                 }
             }
@@ -5312,7 +5312,7 @@ final class BridgeToKotlinTests: XCTestCase {
             }
         }
         """, kotlin: """
-        class CustomError: Exception, skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
+        class CustomError: Exception, Error, skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
             var Swift_peer: skip.bridge.kt.SwiftObjectPointer = skip.bridge.kt.SwiftObjectNil
 
             constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?): super() {
@@ -5386,7 +5386,7 @@ final class BridgeToKotlinTests: XCTestCase {
             case case2
         }
         """, kotlin: """
-        sealed class E: Exception(), skip.lib.SwiftProjecting {
+        sealed class E: Exception(), Error, skip.lib.SwiftProjecting {
 
             class Case1Case: E() {
                 override fun equals(other: Any?): Boolean = other is Case1Case
@@ -6197,7 +6197,7 @@ final class BridgeToKotlinTests: XCTestCase {
                     f_callback_swift(f_return_swift, nil)
                 } catch {
                     jniContext {
-                        f_callback_swift(nil, JThrowable.toThrowable(error, options: []))
+                        f_callback_swift(nil, JThrowable.toThrowable(error, options: [])!)
                     }
                 }
             }
