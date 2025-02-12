@@ -159,7 +159,7 @@ extension KotlinStatement {
         guard !statement.isInIfSkipBlock else {
             return attributes
         }
-        let supported: [Attribute] = attributes.attributes.filter { $0.kind != .unknown }
+        let supported: [Attribute] = attributes.attributes.filter { $0.kind != .unknown || $0 == .bridgeIgnored || $0 == .bridgeToKotlin || $0 == .bridgeToSwift }
         if supported.count == attributes.attributes.count {
             return attributes
         } else {
