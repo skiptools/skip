@@ -952,7 +952,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             set {
                 jniContext {
-                    let value_java = ((newValue as? JConvertible)?.toJavaObject(options: []))!.toJavaParameter(options: [])
+                    let value_java = AnyBridging.toJavaObject(newValue, options: [])!.toJavaParameter(options: [])
                     try! Java_SourceKt.callStatic(method: Java_set_a_methodID, options: [], args: [value_java])
                 }
             }
@@ -3456,7 +3456,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
                 set {
                     jniContext {
-                        let value_java = ((newValue as? JConvertible)?.toJavaObject(options: [])).toJavaParameter(options: [])
+                        let value_java = AnyBridging.toJavaObject(newValue, options: []).toJavaParameter(options: [])
                         try! Java_peer.call(method: Self.Java_set_p_methodID, options: [], args: [value_java])
                     }
                 }
@@ -3466,7 +3466,7 @@ final class BridgeToSwiftTests: XCTestCase {
         
             public func f(p p_0: (any P)) -> (any P)? {
                 return jniContext {
-                    let p_0_java = ((p_0 as? JConvertible)?.toJavaObject(options: []))!.toJavaParameter(options: [])
+                    let p_0_java = AnyBridging.toJavaObject(p_0, options: [])!.toJavaParameter(options: [])
                     let f_return_java: JavaObjectPointer? = try! Java_peer.call(method: Self.Java_f_0_methodID, options: [], args: [p_0_java])
                     return AnyBridging.fromJavaObject(f_return_java, options: []) { P_BridgeImpl?.fromJavaObject(f_return_java, options: []) as Any } as! (any P)?
                 }
@@ -4017,6 +4017,35 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         #endif
         """, transformers: transformers)
+
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        extension Int {
+            var zero: Int {
+                return 0
+            }
+        }
+        #endif
+        """, kotlin: """
+        internal val Int.zero: Int
+            get() = 0
+        """, swiftBridgeSupport: """
+        """, transformers: transformers)
+
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        extension Int {
+            // SKIP @nobridge
+            public var zero: Int {
+                return 0
+            }
+        }
+        #endif
+        """, kotlin: """
+        val Int.zero: Int
+            get() = 0
+        """, swiftBridgeSupport: """
+        """, transformers: transformers)
     }
 
     func testActor() async throws {
@@ -4359,7 +4388,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
                 set {
                     jniContext {
-                        let value_java = ((newValue as? JConvertible)?.toJavaObject(options: []))!.toJavaParameter(options: [])
+                        let value_java = AnyBridging.toJavaObject(newValue, options: [])!.toJavaParameter(options: [])
                         try! Java_peer.call(method: Self.Java_set_value_methodID, options: [], args: [value_java])
                     }
                 }
@@ -4376,7 +4405,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
                 set {
                     jniContext {
-                        let value_java = ((newValue as? JConvertible)?.toJavaObject(options: [])).toJavaParameter(options: [])
+                        let value_java = AnyBridging.toJavaObject(newValue, options: []).toJavaParameter(options: [])
                         try! Java_peer.call(method: Self.Java_set_optionalValue_methodID, options: [], args: [value_java])
                     }
                 }
@@ -4395,7 +4424,7 @@ final class BridgeToSwiftTests: XCTestCase {
         
             public init(value p_0: T) {
                 Java_peer = jniContext {
-                    let p_0_java = ((p_0 as? JConvertible)?.toJavaObject(options: []))!.toJavaParameter(options: [])
+                    let p_0_java = AnyBridging.toJavaObject(p_0, options: [])!.toJavaParameter(options: [])
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_1_methodID, options: [], args: [p_0_java])
                     return JObject(ptr)
                 }
@@ -4404,8 +4433,8 @@ final class BridgeToSwiftTests: XCTestCase {
         
             public func identity(p p_0: T, o p_1: T? = nil, _ p_2: Int) -> T {
                 return jniContext {
-                    let p_0_java = ((p_0 as? JConvertible)?.toJavaObject(options: []))!.toJavaParameter(options: [])
-                    let p_1_java = ((p_1 as? JConvertible)?.toJavaObject(options: [])).toJavaParameter(options: [])
+                    let p_0_java = AnyBridging.toJavaObject(p_0, options: [])!.toJavaParameter(options: [])
+                    let p_1_java = AnyBridging.toJavaObject(p_1, options: []).toJavaParameter(options: [])
                     let p_2_java = Int32(p_2).toJavaParameter(options: [])
                     let f_return_java: JavaObjectPointer = try! Java_peer.call(method: Self.Java_identity_2_methodID, options: [], args: [p_0_java, p_1_java, p_2_java])
                     return AnyBridging.fromJavaObject(f_return_java, options: []) as! T
@@ -4499,7 +4528,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
                 set {
                     jniContext {
-                        let value_java = ((newValue as? JConvertible)?.toJavaObject(options: []))!.toJavaParameter(options: [])
+                        let value_java = AnyBridging.toJavaObject(newValue, options: [])!.toJavaParameter(options: [])
                         try! Java_peer.call(method: Self.Java_set_value_methodID, options: [], args: [value_java])
                     }
                 }
@@ -4509,7 +4538,7 @@ final class BridgeToSwiftTests: XCTestCase {
         
             public init(value p_0: T) {
                 Java_peer = jniContext {
-                    let p_0_java = ((p_0 as? JConvertible)?.toJavaObject(options: []))!.toJavaParameter(options: [])
+                    let p_0_java = AnyBridging.toJavaObject(p_0, options: [])!.toJavaParameter(options: [])
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java])
                     return JObject(ptr)
                 }
@@ -4610,7 +4639,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 set {
                     jniContext {
                         Java_peer = try! JObject(Java_peer.call(method: Self.Java_scopy_methodID, options: [], args: []))
-                        let value_java = ((newValue as? JConvertible)?.toJavaObject(options: []))!.toJavaParameter(options: [])
+                        let value_java = AnyBridging.toJavaObject(newValue, options: [])!.toJavaParameter(options: [])
                         try! Java_peer.call(method: Self.Java_set_value_methodID, options: [], args: [value_java])
                     }
                 }
@@ -4620,7 +4649,7 @@ final class BridgeToSwiftTests: XCTestCase {
 
             public init(value p_0: T) {
                 Java_peer = jniContext {
-                    let p_0_java = ((p_0 as? JConvertible)?.toJavaObject(options: []))!.toJavaParameter(options: [])
+                    let p_0_java = AnyBridging.toJavaObject(p_0, options: [])!.toJavaParameter(options: [])
                     let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java])
                     return JObject(ptr)
                 }
@@ -4629,8 +4658,8 @@ final class BridgeToSwiftTests: XCTestCase {
 
             public func identity(p p_0: T, o p_1: T? = nil, _ p_2: Int) -> T {
                 return jniContext {
-                    let p_0_java = ((p_0 as? JConvertible)?.toJavaObject(options: []))!.toJavaParameter(options: [])
-                    let p_1_java = ((p_1 as? JConvertible)?.toJavaObject(options: [])).toJavaParameter(options: [])
+                    let p_0_java = AnyBridging.toJavaObject(p_0, options: [])!.toJavaParameter(options: [])
+                    let p_1_java = AnyBridging.toJavaObject(p_1, options: []).toJavaParameter(options: [])
                     let p_2_java = Int32(p_2).toJavaParameter(options: [])
                     let f_return_java: JavaObjectPointer = try! Java_peer.call(method: Self.Java_identity_1_methodID, options: [], args: [p_0_java, p_1_java, p_2_java])
                     return AnyBridging.fromJavaObject(f_return_java, options: []) as! T
@@ -4649,7 +4678,7 @@ final class BridgeToSwiftTests: XCTestCase {
             public mutating func mutatingRet(p p_0: T) -> Int {
                 return jniContext {
                     Java_peer = try! JObject(Java_peer.call(method: Self.Java_scopy_methodID, options: [], args: []))
-                    let p_0_java = ((p_0 as? JConvertible)?.toJavaObject(options: []))!.toJavaParameter(options: [])
+                    let p_0_java = AnyBridging.toJavaObject(p_0, options: [])!.toJavaParameter(options: [])
                     let f_return_java: Int32 = try! Java_peer.call(method: Self.Java_mutatingRet_3_methodID, options: [], args: [p_0_java])
                     return Int(f_return_java)
                 }
@@ -4705,7 +4734,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
             public func f(p p_0: T) -> T {
                 return jniContext {
-                    let p_0_java = ((p_0 as? JConvertible)?.toJavaObject(options: []))!.toJavaParameter(options: [])
+                    let p_0_java = AnyBridging.toJavaObject(p_0, options: [])!.toJavaParameter(options: [])
                     let f_return_java: JavaObjectPointer = try! Java_peer.call(method: Self.Java_f_0_methodID, options: [], args: [p_0_java])
                     return AnyBridging.fromJavaObject(f_return_java, options: []) as! T
                 }
@@ -4824,7 +4853,7 @@ final class BridgeToSwiftTests: XCTestCase {
             public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                 switch self {
                 case .a(let associated0):
-                    let associated0_java = ((associated0 as? JConvertible)?.toJavaObject(options: options))!.toJavaParameter(options: options)
+                    let associated0_java = AnyBridging.toJavaObject(associated0, options: options)!.toJavaParameter(options: options)
                     return try! Self.Java_Companion.call(method: Self.Java_Companion_a_methodID, options: options, args: [associated0_java])
                 case .b:
                     return try! Self.Java_Companion.call(method: Self.Java_Companion_b_methodID, options: options, args: [])
@@ -4869,7 +4898,7 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public func f<T>(p p_0: T) -> T {
             return jniContext {
-                let p_0_java = ((p_0 as? JConvertible)?.toJavaObject(options: []))!.toJavaParameter(options: [])
+                let p_0_java = AnyBridging.toJavaObject(p_0, options: [])!.toJavaParameter(options: [])
                 let f_return_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_f_0_methodID, options: [], args: [p_0_java])
                 return AnyBridging.fromJavaObject(f_return_java, options: []) as! T
             }
@@ -4993,7 +5022,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
                 jniContext {
                     let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
-                    let p_0_java = ((p_0 as? JConvertible)?.toJavaObject(options: []))!.toJavaParameter(options: [])
+                    let p_0_java = AnyBridging.toJavaObject(p_0, options: [])!.toJavaParameter(options: [])
                     try! Java_SourceKt.callStatic(method: Java_f_0_methodID, options: [], args: [p_0_java, f_return_callback_java])
                 }
             }

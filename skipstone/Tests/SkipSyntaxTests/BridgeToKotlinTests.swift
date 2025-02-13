@@ -926,7 +926,7 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1a")
         func BridgeKt_Swift_a(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
-            return ((a as? JConvertible)?.toJavaObject(options: []))!
+            return AnyBridging.toJavaObject(a, options: [])!
         }
         @_cdecl("Java_BridgeKt_Swift_1a_1set")
         func BridgeKt_Swift_a_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
@@ -4166,7 +4166,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_C_Swift_1p")
         func C_Swift_p(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer? {
             let peer_swift: C = Swift_peer.pointee()!
-            return ((peer_swift.p as? JConvertible)?.toJavaObject(options: []))
+            return AnyBridging.toJavaObject(peer_swift.p, options: [])
         }
         @_cdecl("Java_C_Swift_1p_1set")
         func C_Swift_p_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: JavaObjectPointer?) {
@@ -4178,7 +4178,7 @@ final class BridgeToKotlinTests: XCTestCase {
             let p_0_swift = AnyBridging.fromJavaObject(p_0, options: []) { P_BridgeImpl.fromJavaObject(p_0, options: []) as Any } as! (any P)
             let peer_swift: C = Swift_peer.pointee()!
             let f_return_swift = peer_swift.f(p: p_0_swift)
-            return ((f_return_swift as? JConvertible)?.toJavaObject(options: []))
+            return AnyBridging.toJavaObject(f_return_swift, options: [])
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
         func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
@@ -4780,6 +4780,17 @@ final class BridgeToKotlinTests: XCTestCase {
             }
         }
         """, isSwiftBridge: true, transformers: transformers)
+
+        try await check(swiftBridge: """
+        extension Int {
+            // SKIP @nobridge
+            public var zero: Int {
+                return 0
+            }
+        }
+        """, kotlin: """
+        """, swiftBridgeSupport: """
+        """, transformers: transformers)
     }
 
     func testObservable() async throws {
@@ -5579,7 +5590,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_C_Swift_1value")
         func C_Swift_value(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer {
             let peer_swift: C_TypeErased = Swift_peer.pointee()!
-            return ((peer_swift.get_value() as? JConvertible)?.toJavaObject(options: []))!
+            return AnyBridging.toJavaObject(peer_swift.get_value(), options: [])!
         }
         @_cdecl("Java_C_Swift_1value_1set")
         func C_Swift_value_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: JavaObjectPointer) {
@@ -5589,7 +5600,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_C_Swift_1optionalValue")
         func C_Swift_optionalValue(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer? {
             let peer_swift: C_TypeErased = Swift_peer.pointee()!
-            return ((peer_swift.get_optionalValue() as? JConvertible)?.toJavaObject(options: []))
+            return AnyBridging.toJavaObject(peer_swift.get_optionalValue(), options: [])
         }
         @_cdecl("Java_C_Swift_1optionalValue_1set")
         func C_Swift_optionalValue_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: JavaObjectPointer?) {
@@ -5600,7 +5611,7 @@ final class BridgeToKotlinTests: XCTestCase {
         func C_Swift_mainActorValue(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer {
             let peer_swift: C_TypeErased = Swift_peer.pointee()!
             return MainActor.assumeIsolated {
-                return ((peer_swift.get_mainActorValue() as? JConvertible)?.toJavaObject(options: []))!
+                return AnyBridging.toJavaObject(peer_swift.get_mainActorValue(), options: [])!
             }
         }
         @_cdecl("Java_C_Swift_1mainActorValue_1set")
@@ -5617,7 +5628,7 @@ final class BridgeToKotlinTests: XCTestCase {
             let p_2_swift = Int(p_2)
             let peer_swift: C_TypeErased = Swift_peer.pointee()!
             let f_return_swift = peer_swift.identity_0(p_0_swift, p_1_swift, p_2_swift)
-            return ((f_return_swift as? JConvertible)?.toJavaObject(options: []))!
+            return AnyBridging.toJavaObject(f_return_swift, options: [])!
         }
         @_cdecl("Java_C_Swift_1mainActorIdentity_11")
         func C_Swift_mainActorIdentity_1(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ p_0: JavaObjectPointer) -> JavaObjectPointer {
@@ -5625,7 +5636,7 @@ final class BridgeToKotlinTests: XCTestCase {
             let peer_swift: C_TypeErased = Swift_peer.pointee()!
             return MainActor.assumeIsolated {
                 let f_return_swift = peer_swift.mainActorIdentity_1(p_0_swift)
-                return ((f_return_swift as? JConvertible)?.toJavaObject(options: []))!
+                return AnyBridging.toJavaObject(f_return_swift, options: [])!
             }
         }
         @_cdecl("Java_C_Swift_1isequal")
@@ -5796,7 +5807,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_S_Swift_1value")
         func S_Swift_value(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer {
             let peer_swift: S_TypeErased = Swift_peer.pointee()!
-            return ((peer_swift.get_value() as? JConvertible)?.toJavaObject(options: []))!
+            return AnyBridging.toJavaObject(peer_swift.get_value(), options: [])!
         }
         @_cdecl("Java_S_Swift_1value_1set")
         func S_Swift_value_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: JavaObjectPointer) {
@@ -5810,7 +5821,7 @@ final class BridgeToKotlinTests: XCTestCase {
             let p_2_swift = Int(p_2)
             let peer_swift: S_TypeErased = Swift_peer.pointee()!
             let f_return_swift = peer_swift.identity_0(p_0_swift, p_1_swift, p_2_swift)
-            return ((f_return_swift as? JConvertible)?.toJavaObject(options: []))!
+            return AnyBridging.toJavaObject(f_return_swift, options: [])!
         }
         @_cdecl("Java_S_Swift_1mutatingVoid_11")
         func S_Swift_mutatingVoid_1(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
@@ -5907,7 +5918,7 @@ final class BridgeToKotlinTests: XCTestCase {
                 let setSwift_peerMethodID = Self.Java_class.getMethodID(name: "setSwift_peer", sig: "(J)V")!
                 switch self {
                 case .a(let associated0):
-                    let associated0_java = ((associated0 as? JConvertible)?.toJavaObject(options: options))!.toJavaParameter(options: options)
+                    let associated0_java = AnyBridging.toJavaObject(associated0, options: options)!.toJavaParameter(options: options)
                     let ptr: JavaObjectPointer = try! Self.Java_Companion.call(method: Self.Java_Companion_a_methodID, options: options, args: [associated0_java])
                     try! ptr.call(method: setSwift_peerMethodID, options: options, args: [Swift_peer.toJavaParameter(options: options)])
                     return ptr
@@ -5942,7 +5953,7 @@ final class BridgeToKotlinTests: XCTestCase {
         func E_Swift_aValue_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer? {
             let peer_swift: E_TypeErased = Swift_peer.pointee()!
             let f_return_swift = peer_swift.aValue_0()
-            return ((f_return_swift as? JConvertible)?.toJavaObject(options: []))
+            return AnyBridging.toJavaObject(f_return_swift, options: [])
         }
         @_cdecl("Java_E_Swift_1projectionImpl")
         func E_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
@@ -6015,7 +6026,7 @@ final class BridgeToKotlinTests: XCTestCase {
             }
             public func f(p p_0: T) -> T {
                 return jniContext {
-                    let p_0_java = ((p_0 as? JConvertible)?.toJavaObject(options: []))!.toJavaParameter(options: [])
+                    let p_0_java = AnyBridging.toJavaObject(p_0, options: [])!.toJavaParameter(options: [])
                     let f_return_java: JavaObjectPointer = try! Java_peer.call(method: Self.Java_f_0_methodID, options: [], args: [p_0_java])
                     return AnyBridging.fromJavaObject(f_return_java, options: []) as! T
                 }
@@ -6078,7 +6089,7 @@ final class BridgeToKotlinTests: XCTestCase {
         func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaObjectPointer) -> JavaObjectPointer {
             let p_0_swift = AnyBridging.fromJavaObject(p_0, options: [])!
             let f_return_swift = f(p: p_0_swift)
-            return ((f_return_swift as? JConvertible)?.toJavaObject(options: []))!
+            return AnyBridging.toJavaObject(f_return_swift, options: [])!
         }
         """, transformers: transformers)
     }
@@ -6163,7 +6174,7 @@ final class BridgeToKotlinTests: XCTestCase {
         func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaObjectPointer) -> JavaObjectPointer {
             let p_0_swift = AnyBridging.fromJavaObject(p_0, toBaseType: (P & C).self, options: [])!
             let f_return_swift = f(p: p_0_swift)
-            return ((f_return_swift as? JConvertible)?.toJavaObject(options: []))!
+            return AnyBridging.toJavaObject(f_return_swift, options: [])!
         }
         """, transformers: transformers)
     }

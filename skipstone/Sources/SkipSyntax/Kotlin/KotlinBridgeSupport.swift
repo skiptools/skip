@@ -244,7 +244,7 @@ extension TypeSignature {
             if strategy == .direct && !isOptional {
                 return value
             } else if strategy == .protocol || strategy == .unknown {
-                let converted = "((\(value) as? JConvertible)?.toJavaObject(options: \(options.jconvertibleOptions)))"
+                let converted = "AnyBridging.toJavaObject(\(value), options: \(options.jconvertibleOptions))"
                 return isOptional ? converted : converted + "!"
             } else if strategy == .error {
                 let converted = "JThrowable.toThrowable(\(value), options: \(options.jconvertibleOptions))"
@@ -356,10 +356,10 @@ extension TypeSignature {
             if strategy == .direct {
                 return value
             } else if strategy == .protocol || strategy == .unknown {
-                let converted = "((\(value) as? JConvertible)?.toJavaObject(options: \(optionsString)))"
+                let converted = "AnyBridging.toJavaObject(\(value), options: \(optionsString))"
                 return isOptional ? converted : converted + "!"
             } else if strategy == .error {
-                let converted = "JThrowable.toThrowable(\(value), options: \(optionsString)))"
+                let converted = "JThrowable.toThrowable(\(value), options: \(optionsString))"
                 return isOptional ? converted : converted + "!"
             } else {
                 let converted = value + ".toJavaObject(options: \(optionsString))"
@@ -742,12 +742,6 @@ extension KotlinVariableDeclaration {
         let generics = (parent as? KotlinClassDeclaration)?.generics ?? (parent as? KotlinInterfaceDeclaration)?.generics
         return type.checkBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo, sourceDerived: self, source: translator.syntaxTree.source)
     }
-
-    func checkExtensionUnbridgable(translator: KotlinTranslator) {
-        if isExtensionUnbridgable(translator: translator) {
-            messages.append(.kotlinBridgeExtensionFunction(self, source: translator.syntaxTree.source))
-        }
-    }
 }
 
 extension KotlinFunctionDeclaration {
@@ -808,12 +802,6 @@ extension KotlinFunctionDeclaration {
         }
         return functionType.checkFunctionBridgable(direction: direction, isConstructor: type == .constructorDeclaration, options: options, generics: generics, codebaseInfo: codebaseInfo, sourceDerived: self, source: translator.syntaxTree.source)
     }
-
-    func checkExtensionUnbridgable(translator: KotlinTranslator) {
-        if isExtensionUnbridgable(translator: translator) {
-            messages.append(.kotlinBridgeExtensionFunction(self, source: translator.syntaxTree.source))
-        }
-    }
 }
 
 extension KotlinEnumCaseDeclaration {
@@ -862,34 +850,6 @@ extension KotlinInterfaceDeclaration {
     func checkBridgable(direction: Bridgable.Direction, options: KotlinBridgeOptions, translator: KotlinTranslator) -> Bool {
         guard checkParentBridgable(self, direction: direction, options: options, translator: translator) else {
             return false
-        }
-        return true
-    }
-}
-
-extension KotlinMemberDeclaration {
-    fileprivate func isExtensionUnbridgable(translator: KotlinTranslator) -> Bool {
-        guard let extendsType = extends?.0, !attributes.isNoBridge else {
-            return false
-        }
-        let extendsTypeInfo = translator.codebaseInfo?.primaryTypeInfo(forNamed: extendsType)
-        if let extendsTypeInfo {
-            guard extendsTypeInfo.attributes.isBridgeToKotlin || extendsTypeInfo.attributes.isBridgeToSwift else {
-                return false
-            }
-        } else {
-            guard !extendsType.isNamedType else {
-                return false
-            }
-        }
-        if extendsTypeInfo?.declarationType == .protocolDeclaration {
-            guard visibility == .default || visibility >= .public else {
-                return false
-            }
-        } else {
-            guard visibility >= .public else {
-                return false
-            }
         }
         return true
     }

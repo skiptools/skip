@@ -213,7 +213,7 @@ extension CodebaseInfo.Context {
         guard candidateType.generics.isEmpty && targetType.generics.isEmpty else {
             return true
         }
-        return candidates == targets
+        return candidates.map { $0.withExistentialMode(.none) } == targets.map { $0.withExistentialMode(.none) }
     }
 
     /// Whether the given type may be a mutable struct.
