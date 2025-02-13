@@ -40,7 +40,7 @@ final class KotlinBridgeToKotlinVisitor {
                 if variableDeclaration.role == .global {
                     update(variableDeclaration)
                 } else if variableDeclaration.extends != nil {
-                    variableDeclaration.checkExtensionUnbridgable(translator: translator)
+                    variableDeclaration.messages.append(.kotlinBridgeExtensionFunction(variableDeclaration, source: translator.syntaxTree.source))
                 }
                 return .skip
             } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
@@ -49,7 +49,7 @@ final class KotlinBridgeToKotlinVisitor {
                         globalFunctionCount += 1
                     }
                 } else if functionDeclaration.extends != nil {
-                    functionDeclaration.checkExtensionUnbridgable(translator: translator)
+                    functionDeclaration.messages.append(.kotlinBridgeExtensionFunction(functionDeclaration, source: translator.syntaxTree.source))
                 }
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
@@ -465,8 +465,11 @@ final class KotlinBridgeToKotlinVisitor {
             if !externalArgumentsString.isEmpty {
                 externalArgumentsString += ", "
             }
-            externalArgumentsString += zip(functionDeclaration.parameters, bridgable.parameters).map { parameter, bridgable in
-                return bridgable.genericType == nil ? parameter.internalLabel : "\(parameter.internalLabel) as \(TypeSignature.any.asOptional(bridgable.type.isOptional).kotlin)"
+            externalArgumentsString += zip(functionDeclaration.parameters, bridgable.parameters).enumerated().map { index, zipped in
+                let parameter = zipped.0
+                let bridgable = zipped.1
+                let label = parameter.internalLabel == "_" ? "p\(index)" : parameter.internalLabel
+                return bridgable.genericType == nil ? label : "\(label) as \(TypeSignature.any.asOptional(bridgable.type.isOptional).kotlin)"
             }.joined(separator: ", ")
         }
         let swiftArgumentsString: String
@@ -640,7 +643,8 @@ final class KotlinBridgeToKotlinVisitor {
                 externalParametersString += ", "
             }
             externalParametersString += functionDeclaration.parameters.enumerated().map { index, parameter in
-                return parameter.internalLabel + ": " + bridgable.parameters[index].externalType.kotlin
+                let label = parameter.internalLabel == "_" ? "p\(index)" : parameter.internalLabel
+                return label + ": " + bridgable.parameters[index].externalType.kotlin
             }.joined(separator: ", ")
         }
         if isAsync {

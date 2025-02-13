@@ -2141,7 +2141,7 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
                 output.append("vararg ")
             }
             let label = parameter.externalLabel ?? parameter.internalLabel
-            output.append(label)
+            output.append(label == "_" ? "p\(index)" : label)
             output.append(": ")
             if parameter.isInOut {
                 output.append("InOut<")

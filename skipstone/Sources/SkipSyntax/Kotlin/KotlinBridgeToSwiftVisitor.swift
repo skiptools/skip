@@ -32,7 +32,7 @@ final class KotlinBridgeToSwiftVisitor {
                     needsGlobalsJavaClass = update(global: variableDeclaration, swiftDefinitions: &swiftDefinitions, globalsClassRef: globalsClassRef) || needsGlobalsJavaClass
                     checkIfNotSkipBridge(variableDeclaration)
                 } else if variableDeclaration.extends != nil, variableIsBridging() {
-                    variableDeclaration.checkExtensionUnbridgable(translator: translator)
+                    variableDeclaration.messages.append(.kotlinBridgeExtensionFunction(variableDeclaration, source: translator.syntaxTree.source))
                 }
                 return .skip
             } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
@@ -44,7 +44,7 @@ final class KotlinBridgeToSwiftVisitor {
                     }
                     checkIfNotSkipBridge(functionDeclaration)
                 } else if functionDeclaration.extends != nil, functionIsBridging() {
-                    functionDeclaration.checkExtensionUnbridgable(translator: translator)
+                    functionDeclaration.messages.append(.kotlinBridgeExtensionFunction(functionDeclaration, source: translator.syntaxTree.source))
                 }
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {

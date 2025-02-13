@@ -159,13 +159,12 @@ extension KotlinStatement {
         guard !statement.isInIfSkipBlock else {
             return attributes
         }
-        let supported: [Attribute] = attributes.attributes.filter { $0.kind != .unknown || $0 == .bridgeIgnored || $0 == .bridgeToKotlin || $0 == .bridgeToSwift }
-        if supported.count == attributes.attributes.count {
-            return attributes
-        } else {
+        let withoutMarkers = attributes.attributes.filter { $0 != .bridgeToKotlin && $0 != .bridgeToSwift }
+        let supported = withoutMarkers.filter { $0.kind != .unknown }
+        if supported.count < withoutMarkers.count {
             messages.append(.kotlinAttributeUnsupported(self, source: translator.syntaxTree.source))
-            return Attributes(attributes: supported)
         }
+        return supported.count == attributes.attributes.count ? attributes : Attributes(attributes: supported)
     }
 }
 
