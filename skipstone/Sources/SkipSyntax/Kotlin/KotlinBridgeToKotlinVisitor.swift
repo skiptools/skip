@@ -11,7 +11,7 @@ final class KotlinBridgeToKotlinVisitor {
     private var cdeclFunctions: [CDeclFunction] = []
 
     init?(for syntaxTree: KotlinSyntaxTree, options: KotlinBridgeOptions, translator: KotlinTranslator) {
-        guard syntaxTree.isBridgeFile, let codebaseInfo = translator.codebaseInfo else {
+        guard syntaxTree.isBridgeFile, !syntaxTree.root.isInIfSkipBlock, let codebaseInfo = translator.codebaseInfo else {
             return nil
         }
         self.syntaxTree = syntaxTree
@@ -28,6 +28,9 @@ final class KotlinBridgeToKotlinVisitor {
         var nonKotlinImports: [KotlinStatement] = []
         syntaxTree.root.visit { node in
             if let importDeclaration = node as? KotlinImportDeclaration {
+                guard !importDeclaration.isInIfSkipBlock else {
+                    return .skip
+                }
                 if importDeclaration.unmappedModulePath.first == "SkipFuse" {
                     hasSkipFuseImport = true
                 }
@@ -38,6 +41,9 @@ final class KotlinBridgeToKotlinVisitor {
                 return .skip
             } else if let variableDeclaration = node as? KotlinVariableDeclaration {
                 if variableDeclaration.role == .global {
+                    guard !variableDeclaration.isInIfSkipBlock else {
+                        return .skip
+                    }
                     update(variableDeclaration)
                 } else if variableDeclaration.extends != nil {
                     variableDeclaration.messages.append(.kotlinBridgeExtensionFunction(variableDeclaration, source: translator.syntaxTree.source))
@@ -45,6 +51,9 @@ final class KotlinBridgeToKotlinVisitor {
                 return .skip
             } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
                 if functionDeclaration.role == .global {
+                    guard !functionDeclaration.isInIfSkipBlock else {
+                        return .skip
+                    }
                     if update(functionDeclaration, uniquifier: globalFunctionCount) {
                         globalFunctionCount += 1
                     }
@@ -53,6 +62,9 @@ final class KotlinBridgeToKotlinVisitor {
                 }
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
+                guard !classDeclaration.isInIfSkipBlock else {
+                    return .skip
+                }
                 if update(classDeclaration) {
                     if classDeclaration.attributes.contains(.observable) {
                         bridgedObservables.append(classDeclaration)
@@ -60,6 +72,9 @@ final class KotlinBridgeToKotlinVisitor {
                 }
                 return .recurse(nil)
             } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
+                guard !interfaceDeclaration.isInIfSkipBlock else {
+                    return .skip
+                }
                 if update(interfaceDeclaration) {
                     if let bridgeImpl = KotlinBridgeToSwiftVisitor.protocolBridgeImplDefinition(forProtocol: interfaceDeclaration.signature, inPackage: translator.packageName, statement: interfaceDeclaration, options: options, autoBridge: syntaxTree.autoBridge, codebaseInfo: codebaseInfo) {
                         swiftDefinitions.append(bridgeImpl)

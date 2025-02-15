@@ -6439,4 +6439,19 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         """, transformers: transformers)
     }
+
+    ///~~~
+    func testIfSkipBlock() async throws {
+        try await check(swiftBridge: """
+        #if os(Android)
+        public var x = 1
+        #endif
+        #if SKIP
+        // SKIP @bridge
+        var kotlinX = 2
+        #endif
+        """, kotlin: """
+        """, swiftBridgeSupport: """
+        """, transformers: transformers)
+    }
 }

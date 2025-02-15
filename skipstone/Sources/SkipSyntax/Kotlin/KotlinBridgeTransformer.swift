@@ -69,16 +69,21 @@ public final class KotlinBridgeTransformer: KotlinTransformer {
     }
 
     public func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
-        if syntaxTree.isBridgeFile {
-            guard let visitor = KotlinBridgeToKotlinVisitor(for: syntaxTree, options: options, translator: translator) else {
-                return []
-            }
-            return visitor.visit()
-        } else {
-            guard let visitor = KotlinBridgeToSwiftVisitor(for: syntaxTree, options: options, translator: translator) else {
-                return []
-            }
-            return visitor.visit()
+        var bridgeToKotlinOutputs: [KotlinTransformerOutput] = []
+        if syntaxTree.isBridgeFile, let visitor = KotlinBridgeToKotlinVisitor(for: syntaxTree, options: options, translator: translator) {
+            bridgeToKotlinOutputs = visitor.visit()
         }
+        var bridgeToSwiftOutputs: [KotlinTransformerOutput] = []
+        if let visitor = KotlinBridgeToSwiftVisitor(for: syntaxTree, options: options, translator: translator) {
+            // Combine any bridging Swift definitions
+            for output in visitor.visit() {
+                if let index = bridgeToKotlinOutputs.firstIndex(where: { $0.file == output.file }), let swiftDefinition1 = bridgeToKotlinOutputs[index].node as? SwiftDefinition, let swiftDefinition2 = output.node as? SwiftDefinition {
+                    bridgeToKotlinOutputs[index].node = swiftDefinition1.combined(with: swiftDefinition2)
+                } else {
+                    bridgeToSwiftOutputs.append(output)
+                }
+            }
+        }
+        return bridgeToKotlinOutputs + bridgeToSwiftOutputs
     }
 }

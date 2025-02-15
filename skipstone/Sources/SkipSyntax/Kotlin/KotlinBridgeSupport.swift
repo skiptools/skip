@@ -1,7 +1,7 @@
 /// Used in Swift code generation.
 struct SwiftDefinition: OutputNode {
-    let sourceFile: Source.FilePath?
-    let sourceRange: Source.Range?
+    var sourceFile: Source.FilePath?
+    var sourceRange: Source.Range?
     var children: [SwiftDefinition] = []
     var appendTo: (OutputGenerator, Indentation, [SwiftDefinition]) -> Void = { output, indentation, children in
         children.forEach { $0.append(to: output, indentation: indentation) }
@@ -20,6 +20,14 @@ struct SwiftDefinition: OutputNode {
         self = .init(statement: statement, sourceFile: sourceFile, sourceRange: sourceRange) { output, indentation, _ in
             swift.forEach { output.append(indentation).append($0).append("\n") }
         }
+    }
+
+    func combined(with other: SwiftDefinition) -> SwiftDefinition {
+        var combined = SwiftDefinition()
+        combined.sourceFile = sourceFile ?? other.sourceFile
+        combined.sourceRange = sourceRange ?? other.sourceRange
+        combined.children = [self, other]
+        return combined
     }
 
     func leadingTrivia(indentation: Indentation) -> String {

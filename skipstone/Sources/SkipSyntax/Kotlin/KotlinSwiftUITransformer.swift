@@ -3,9 +3,6 @@
 /// We rely on our UI libraries to provide the implementation of the SwiftUI-like API that this translation will result in.
 final class KotlinSwiftUITransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
-        guard !translator.syntaxTree.isBridgeFile else {
-            return []
-        }
         // No need to transpile SwiftUI if not a full build
         guard translator.codebaseInfo != nil else {
             return []
@@ -27,7 +24,7 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         }
         if needsTranslation {
             let visitor = TranslateVisitor(translator: translator)
-            syntaxTree.root.visit(perform: visitor.visit)
+            syntaxTree.root.visit(ifSkipBlockContent: syntaxTree.isBridgeFile, perform: visitor.visit)
         }
         return []
     }

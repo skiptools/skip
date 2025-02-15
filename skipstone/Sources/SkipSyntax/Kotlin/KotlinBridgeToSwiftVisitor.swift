@@ -10,7 +10,7 @@ final class KotlinBridgeToSwiftVisitor {
     private var swiftDefinitions: [SwiftDefinition] = []
 
     init?(for syntaxTree: KotlinSyntaxTree, options: KotlinBridgeOptions, translator: KotlinTranslator) {
-        guard !syntaxTree.isBridgeFile, let codebaseInfo = translator.codebaseInfo, let outputFile = syntaxTree.source.file.bridgeOutputFile else {
+        guard let codebaseInfo = translator.codebaseInfo, let outputFile = syntaxTree.source.file.bridgeOutputFile else {
             return nil
         }
         self.syntaxTree = syntaxTree
@@ -25,7 +25,7 @@ final class KotlinBridgeToSwiftVisitor {
         var swiftDefinitions: [SwiftDefinition] = []
         var needsGlobalsJavaClass = false
         var globalFunctionCount = 0
-        syntaxTree.root.visit { node in
+        syntaxTree.root.visit(ifSkipBlockContent: syntaxTree.isBridgeFile) { node in
             if let variableDeclaration = node as? KotlinVariableDeclaration {
                 let variableIsBridging = { isBridging(attributes: variableDeclaration.attributes, isPublic: variableDeclaration.modifiers.visibility >= .public, autoBridge: self.syntaxTree.autoBridge) }
                 if variableDeclaration.role == .global, variableIsBridging() {
@@ -95,7 +95,7 @@ final class KotlinBridgeToSwiftVisitor {
     }
 
     private func checkIfNotSkipBridge(_ statement: KotlinStatement) {
-        guard !statement.isInIfNotSkipBridgeBlock else {
+        guard !syntaxTree.isBridgeFile && !statement.isInIfNotSkipBridgeBlock else {
             return
         }
         statement.messages.append(.kotlinBridgeMissingIfNotSkipBridge(statement, source: syntaxTree.source))

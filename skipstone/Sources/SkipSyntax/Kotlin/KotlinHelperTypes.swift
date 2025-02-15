@@ -156,7 +156,7 @@ extension KotlinStatement {
     /// Return supported attributes and add warnings for unsupported attributes.
     func processAttributes(_ attributes: Attributes, from statement: Statement, translator: KotlinTranslator) -> Attributes {
         // Keep Kotlin attributes that devs may use within SKIP blocks
-        guard !statement.isInIfSkipBlock else {
+        guard !statement.isInIfSkipBlock(allowOSAndroid: !translator.syntaxTree.isBridgeFile) else {
             return attributes
         }
         let withoutMarkers = attributes.attributes.filter { $0 != .bridgeToKotlin && $0 != .bridgeToSwift }

@@ -15,14 +15,35 @@ class KotlinSyntaxNode: SourceDerived, OutputNode {
     /// Visit this node and its children depth first, performing the given action.
     ///
     /// - Parameters:
+    ///   - ifSkipBlockContent: Whether to only visit content within `#if SKIP`
     ///   - perform: The action to perform.
-    func visit(perform: (KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode>) {
-        if case .recurse(let onLeave) = perform(self) {
+    func visit(ifSkipBlockContent: Bool = false, perform: (KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode>) {
+        if ifSkipBlockContent {
+            // For top-level invocation on some node, look to see if it is in `#if SKIP` up the chain
+            if (self as? KotlinStatement)?.isInIfSkipBlock == true {
+                visit(perform: perform)
+            } else {
+                for child in children {
+                    // For downstream checks, just look for the start of the `#if SKIP` block
+                    child.visitIfStartSkipBlockContent(perform: perform)
+                }
+            }
+        } else if case .recurse(let onLeave) = perform(self) {
             for child in children {
                 child.visit(perform: perform)
             }
             if let onLeave {
                 onLeave(self)
+            }
+        }
+    }
+
+    private func visitIfStartSkipBlockContent(perform: (KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode>) {
+        if (self as? KotlinStatement)?.extras?.isIfSkipBlock() == true {
+            visit(perform: perform)
+        } else {
+            for child in children {
+                child.visitIfStartSkipBlockContent(perform: perform)
             }
         }
     }
@@ -54,6 +75,18 @@ class KotlinSyntaxNode: SourceDerived, OutputNode {
             current = current?.parent
         }
         return nil
+    }
+
+    /// Whether this node is within an `#if SKIP` block in the source.
+    final var isInIfSkipBlock: Bool {
+        var node: KotlinSyntaxNode? = self
+        while node != nil {
+            if (node as? KotlinStatement)?.extras?.isIfSkipBlock() == true {
+                return true
+            }
+            node = node?.parent
+        }
+        return false
     }
 
     var messages: [Message] = []

@@ -25,9 +25,19 @@ final class KotlinTupleLabelTransformer: KotlinTransformer {
         }
         syntaxTree.root.visit { node in
             if let variableDeclaration = node as? VariableDeclaration {
+                guard !syntaxTree.isBridgeFile || variableDeclaration.isInIfSkipBlock() else {
+                    return .skip
+                }
                 variableDeclaration.variableTypes.forEach { gatherTupleLabels(from: $0, into: &tupleLabels) }
             } else if let functionDeclaration = node as? FunctionDeclaration {
+                guard !syntaxTree.isBridgeFile || functionDeclaration.isInIfSkipBlock() else {
+                    return .skip
+                }
                 gatherTupleLabels(from: functionDeclaration.functionType, into: &tupleLabels)
+            } else if let typeDeclaration = node as? TypeDeclaration {
+                guard !syntaxTree.isBridgeFile || typeDeclaration.isInIfSkipBlock() else {
+                    return .skip
+                }
             }
             return .recurse(nil)
         }
@@ -36,7 +46,7 @@ final class KotlinTupleLabelTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         // This function is invoked concurrently on different syntax trees, so gather labels locally and then merge
         var localLabels: TupleLabels = [:]
-        syntaxTree.root.visit { node in
+        syntaxTree.root.visit(ifSkipBlockContent: syntaxTree.isBridgeFile) { node in
             // Now that we have type information, gather labels from tuples that we see being accessed in code
             if let memberAccess = node as? KotlinMemberAccess {
                 if case .tuple(let labels, _) = memberAccess.baseType, let element = labels.firstIndex(of: memberAccess.member) {
