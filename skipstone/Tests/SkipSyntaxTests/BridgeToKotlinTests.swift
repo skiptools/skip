@@ -6440,7 +6440,6 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
-    ///~~~
     func testIfSkipBlock() async throws {
         try await check(swiftBridge: """
         #if os(Android)
@@ -6451,7 +6450,89 @@ final class BridgeToKotlinTests: XCTestCase {
         var kotlinX = 2
         #endif
         """, kotlin: """
+        var x: Int
+            get() = Swift_x()
+            set(newValue) {
+                Swift_x_set(newValue)
+            }
+        private external fun Swift_x(): Int
+        private external fun Swift_x_set(value: Int)
+        internal var kotlinX = 2
         """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1x")
+        func BridgeKt_Swift_x(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int32 {
+            return Int32(x)
+        }
+        @_cdecl("Java_BridgeKt_Swift_1x_1set")
+        func BridgeKt_Swift_x_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: Int32) {
+            x = Int(value)
+        }
+        import SkipBridge
+
+        private let Java_BridgeKt = try! JClass(name: "BridgeKt")
+        var kotlinX: Int {
+            get {
+                return jniContext {
+                    let value_java: Int32 = try! Java_BridgeKt.callStatic(method: Java_get_kotlinX_methodID, options: [], args: [])
+                    return Int(value_java)
+                }
+            }
+            set {
+                jniContext {
+                    let value_java = Int32(newValue).toJavaParameter(options: [])
+                    try! Java_BridgeKt.callStatic(method: Java_set_kotlinX_methodID, options: [], args: [value_java])
+                }
+            }
+        }
+        private let Java_get_kotlinX_methodID = Java_BridgeKt.getStaticMethodID(name: "getKotlinX", sig: "()I")!
+        private let Java_set_kotlinX_methodID = Java_BridgeKt.getStaticMethodID(name: "setKotlinX", sig: "(I)V")!
+        """, transformers: transformers)
+    }
+
+    func testIfSkipBlockAnyDynamicObject() async throws {
+        try await check(swiftBridge: """
+        #if os(Android)
+        public func readKotlinDate() {
+            let d = kotlinDate
+            try print(d.toString() as String)
+        }
+        #endif
+        #if SKIP
+        // SKIP @bridge
+        var kotlinDate: java.util.Date = java.util.Date()
+        #endif
+        """, kotlin: """
+        fun readKotlinDate(): Unit = Swift_readKotlinDate_0()
+        private external fun Swift_readKotlinDate_0()
+        internal var kotlinDate: java.util.Date = java.util.Date()
+            get() = field.sref({ kotlinDate = it })
+            set(newValue) {
+                field = newValue.sref()
+            }
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1readKotlinDate_10")
+        func BridgeKt_Swift_readKotlinDate_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) {
+            readKotlinDate()
+        }
+        import SkipBridge
+
+        private let Java_BridgeKt = try! JClass(name: "BridgeKt")
+        var kotlinDate: AnyDynamicObject {
+            get {
+                return jniContext {
+                    let value_java: JavaObjectPointer = try! Java_BridgeKt.callStatic(method: Java_get_kotlinDate_methodID, options: [], args: [])
+                    return AnyDynamicObject.fromJavaObject(value_java, options: [])
+                }
+            }
+            set {
+                jniContext {
+                    let value_java = newValue.toJavaObject(options: [])!.toJavaParameter(options: [])
+                    try! Java_BridgeKt.callStatic(method: Java_set_kotlinDate_methodID, options: [], args: [value_java])
+                }
+            }
+        }
+        private let Java_get_kotlinDate_methodID = Java_BridgeKt.getStaticMethodID(name: "getKotlinDate", sig: "()Ljava/util/Date;")!
+        private let Java_set_kotlinDate_methodID = Java_BridgeKt.getStaticMethodID(name: "setKotlinDate", sig: "(Ljava/util/Date;)V")!
         """, transformers: transformers)
     }
 }
