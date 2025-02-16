@@ -85,6 +85,9 @@ struct CreateOptions : ParsableArguments {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create a native model layer", valueName: "native"))
     var native: Bool = false
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether native model should use kotlincompat", valueName: "kotlincompat"))
+    var kotlincompat: Bool = false
+
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create test modules", valueName: "tests"))
     var moduleTests: Bool = true
 

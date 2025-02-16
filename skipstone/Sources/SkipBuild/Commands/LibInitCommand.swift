@@ -97,7 +97,8 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, Too
         let modules = try self.modules
         let icon: IconParameters? = noIcon == true ? nil : IconParameters(iconBackgroundColor: iconBackground, iconForegroundColor: iconForeground, iconSources: icon, iconShadow: iconShadow, iconInset: iconInset)
 
-        let (createdURL, project, _) = try await initSkipProject(baseName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, verify: buildOptions.verify, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, returnHashes: false, showTree: self.createOptions.showTree, chain: createOptions.chain, gitRepo: createOptions.gitRepo, free: createOptions.free, appfair: createOptions.appfair, zero: createOptions.zero, appid: self.appid, icon: icon, version: self.version, native: self.createOptions.native, moduleTests: self.createOptions.moduleTests, github: self.createOptions.github, fastlane: self.createOptions.fastlane, validatePackage: self.createOptions.validatePackage, apk: apk, ipa: ipa, with: out)
+        let mode = self.createOptions.native && self.createOptions.kotlincompat ? ModuleMode.kotlincompat : self.createOptions.native ? .native : .transpiled
+        let (createdURL, project, _) = try await initSkipProject(baseName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, verify: buildOptions.verify, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, returnHashes: false, showTree: self.createOptions.showTree, chain: createOptions.chain, gitRepo: createOptions.gitRepo, free: createOptions.free, appfair: createOptions.appfair, zero: createOptions.zero, appid: self.appid, icon: icon, version: self.version, mode: mode, moduleTests: self.createOptions.moduleTests, github: self.createOptions.github, fastlane: self.createOptions.fastlane, validatePackage: self.createOptions.validatePackage, apk: apk, ipa: ipa, with: out)
 
         await out.yield(MessageBlock(status: .pass, "Created module \(modules.map(\.moduleName).joined(separator: ", ")) in \(createdURL.path)"))
 
@@ -265,7 +266,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         return hashes
     }
 
-    func initSkipProject(baseName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: BuildConfiguration, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, appfair: Bool? = nil, zero skipZeroSupport: Bool, appid: String?, appModuleName: String = "app", icon: IconParameters?, version: String?, native: Bool, moduleTests: Bool, github: Bool, fastlane: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
+    func initSkipProject(baseName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: BuildConfiguration, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, appfair: Bool? = nil, zero skipZeroSupport: Bool, appid: String?, appModuleName: String = "app", icon: IconParameters?, version: String?, mode: ModuleMode, moduleTests: Bool, github: Bool, fastlane: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
 
         // the initial build/test is done with debug configuration regardless of the configuration setting; this is because unit tests don't always run correctly in release mode
         let debugConfiguration = "debug"
@@ -283,7 +284,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         // the embedded framework must have a different name from the app name, or else it will try to archive a framework instead of an app
         let primaryModuleFrameworkName = primaryModuleName + "App"
 
-        let (projectURL, project) = try await AppProjectLayout.createSkipAppProject(projectName: projectName, productName: primaryModuleFrameworkName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, chain: chain, gitRepo: gitRepo, appfair: appfair == true, free: free, zero: skipZeroSupport, appid: appid, icon: icon, version: version, native: native, moduleTests: moduleTests, github: github, fastlane: fastlane, packageResolved: packageResolvedURL, apk: apk, ipa: ipa)
+        let (projectURL, project) = try await AppProjectLayout.createSkipAppProject(projectName: projectName, productName: primaryModuleFrameworkName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, chain: chain, gitRepo: gitRepo, appfair: appfair == true, free: free, zero: skipZeroSupport, appid: appid, icon: icon, version: version, mode: mode, moduleTests: moduleTests, github: github, fastlane: fastlane, packageResolved: packageResolvedURL, apk: apk, ipa: ipa)
         let projectPath = try projectURL.absolutePath
 
         if build == true || apk == true {
