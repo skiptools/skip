@@ -238,6 +238,8 @@ extension ToolOptionsCommand where Self : StreamingCommand {
 </plist>
 """
             // TODO: run xcodebuild -exportArchive -archivePath ARCHIVE.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath ~/Desktop
+
+            // TODO: edit each Payload/HelloSkip.app/Frameworks/HelloSkipApp.framework/Info.plist and Payload/HelloSkip.app/hello-skip_HelloSkip.bundle/Info.plist file and fix the random UUID that seems to get added to the CFBundleIdentifier like: `<string>-cf71430-498e-4613-9daa-84451ab9b11e.HelloSkip.resources</string>`
         }
 
         // if no teamid is specified, then just zip up the output folder

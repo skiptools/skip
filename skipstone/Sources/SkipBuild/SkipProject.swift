@@ -658,7 +658,7 @@ final class \(moduleName)Tests: XCTestCase {
                     testCaseCode += """
     override func setUp() {
         #if os(Android)
-        // needed to load the compiled bridge from the traspiled tests
+        // needed to load the compiled bridge from the transpiled tests
         loadPeerLibrary(packageName: "\(projectName)", moduleName: "\(moduleName)")
         #endif
     }
@@ -707,7 +707,26 @@ final class \(moduleName)Tests: XCTestCase {
                     testCaseCode += """
 
     func testAsyncThrowsFunction() async throws {
+
+"""
+                    if mode == .native {
+                        testCaseCode += """
         let id = UUID()
+
+"""
+                    } else if mode == .kotlincompat {
+                        testCaseCode += """
+        #if SKIP
+        // when the native module is in kotlincompat, types are unwrapped Java classes
+        let id = java.util.UUID.randomUUID()
+        #else
+        let id = UUID()
+        #endif
+
+"""
+                    }
+
+                    testCaseCode += """
         let type: \(moduleName)Module.\(moduleName)Type = try await \(moduleName)Module.create\(moduleName)Type(id: id, delay: 0.001)
         XCTAssertEqual(id, type.id)
     }
