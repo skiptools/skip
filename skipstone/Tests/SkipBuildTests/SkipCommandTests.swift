@@ -681,7 +681,7 @@ final class SkipCommandTests: XCTestCase {
 
         # this is a natively-compiled module
         skip:
-          mode: native
+          mode: 'native'
           bridging: true
         
         """)
@@ -803,7 +803,7 @@ final class SkipCommandTests: XCTestCase {
 
         # this is a natively-compiled module
         skip:
-          mode: native
+          mode: 'native'
           bridging: true
         
         """)

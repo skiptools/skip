@@ -284,7 +284,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         // the embedded framework must have a different name from the app name, or else it will try to archive a framework instead of an app
         let primaryModuleFrameworkName = primaryModuleName + "App"
 
-        let (projectURL, project) = try await AppProjectLayout.createSkipAppProject(projectName: projectName, productName: primaryModuleFrameworkName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, chain: chain, gitRepo: gitRepo, appfair: appfair == true, free: free, zero: skipZeroSupport, appid: appid, icon: icon, version: version, mode: mode, moduleTests: moduleTests, github: github, fastlane: fastlane, packageResolved: packageResolvedURL, apk: apk, ipa: ipa)
+        let (projectURL, project) = try await AppProjectLayout.createSkipAppProject(projectName: projectName, productName: primaryModuleFrameworkName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, chain: chain, gitRepo: gitRepo, appfair: appfair == true, free: free, zero: skipZeroSupport, appid: appid, icon: icon, version: version, mode: mode, moduleTests: moduleTests, github: github, fastlane: fastlane, packageResolved: packageResolvedURL)
         let projectPath = try projectURL.absolutePath
 
         if build == true || apk == true {
