@@ -648,7 +648,7 @@ final class SkipCommandTests: XCTestCase {
         final class SomeModuleTests: XCTestCase {
             override func setUp() {
                 #if os(Android)
-                // needed to load the compiled bridge from the traspiled tests
+                // needed to load the compiled bridge from the transpiled tests
                 loadPeerLibrary(packageName: "basic-project", moduleName: "SomeModule")
                 #endif
             }
@@ -665,7 +665,7 @@ final class SkipCommandTests: XCTestCase {
             }
 
         }
-        
+
         """)
 
         let SkipYML = try load("Sources/SomeModule/Skip/skip.yml")
@@ -681,7 +681,7 @@ final class SkipCommandTests: XCTestCase {
 
         # this is a natively-compiled module
         skip:
-          mode: native
+          mode: 'native'
           bridging: true
         
         """)
@@ -720,6 +720,147 @@ final class SkipCommandTests: XCTestCase {
 
         """)
     }
+
+    func testLibInitKotlincompatCommand() async throws {
+        let (projectURL, projectTree) = try await libInitComand(projectName: "basic-project", native: true, kotlincompat: true, moduleNames: "SomeModule")
+        XCTAssertEqual(projectTree ?? "", """
+        .
+        ├─ Package.swift
+        ├─ README.md
+        ├─ Sources
+        │  └─ SomeModule
+        │     ├─ Skip
+        │     │  └─ skip.yml
+        │     └─ SomeModule.swift
+        └─ Tests
+           └─ SomeModuleTests
+              ├─ Skip
+              │  └─ skip.yml
+              ├─ SomeModuleTests.swift
+              └─ XCSkipTests.swift
+
+        """)
+
+        let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
+
+        let XCSkipTests = try load("Tests/SomeModuleTests/XCSkipTests.swift")
+        XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
+
+        let moduleCode = try load("Sources/SomeModule/SomeModule.swift")
+        XCTAssertEqual(moduleCode, """
+        import Foundation
+
+        public class SomeModuleModule {
+
+            public static func createSomeModuleType(id: UUID, delay: Double? = nil) async throws -> SomeModuleType {
+                if let delay = delay {
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                }
+                return SomeModuleType(id: id)
+            }
+
+            /// An example of a type that can be bridged between Swift and Kotlin
+            public struct SomeModuleType: Identifiable, Hashable, Codable {
+                public var id: UUID
+            }
+        }
+
+        """)
+
+        let testCaseCode = try load("Tests/SomeModuleTests/SomeModuleTests.swift")
+        XCTAssertEqual(testCaseCode, """
+        import XCTest
+        import OSLog
+        import Foundation
+        import SkipBridgeKt
+        @testable import SomeModule
+
+        let logger: Logger = Logger(subsystem: "SomeModule", category: "Tests")
+
+        @available(macOS 13, *)
+        final class SomeModuleTests: XCTestCase {
+            override func setUp() {
+                #if os(Android)
+                // needed to load the compiled bridge from the transpiled tests
+                loadPeerLibrary(packageName: "basic-project", moduleName: "SomeModule")
+                #endif
+            }
+
+            func testSomeModule() throws {
+                logger.log("running testSomeModule")
+                XCTAssertEqual(1 + 2, 3, "basic test")
+            }
+
+            func testAsyncThrowsFunction() async throws {
+                #if SKIP
+                // when the native module is in kotlincompat, types are unwrapped Java classes
+                let id = java.util.UUID.randomUUID()
+                #else
+                let id = UUID()
+                #endif
+                let type: SomeModuleModule.SomeModuleType = try await SomeModuleModule.createSomeModuleType(id: id, delay: 0.001)
+                XCTAssertEqual(id, type.id)
+            }
+
+        }
+
+        """)
+
+        let SkipYML = try load("Sources/SomeModule/Skip/skip.yml")
+        XCTAssertEqual(SkipYML, """
+        # Configuration file for https://skip.tools project
+        #
+        # Kotlin dependencies and Gradle build options for this module can be configured here
+        #build:
+        #  contents:
+        #    - block: 'dependencies'
+        #      contents:
+        #        - 'implementation("androidx.compose.runtime:runtime")'
+
+        # this is a natively-compiled module
+        skip:
+          mode: 'native'
+          bridging:
+            enabled: true
+            options: 'kotlincompat'
+
+        """)
+
+        let PackageSwift = try load("Package.swift")
+        XCTAssertEqual(PackageSwift, """
+        // swift-tools-version: 5.9
+        // This is a Skip (https://skip.tools) package,
+        // containing a Swift Package Manager project
+        // that will use the Skip build plugin to transpile the
+        // Swift Package, Sources, and Tests into an
+        // Android Gradle Project with Kotlin sources and JUnit tests.
+        import PackageDescription
+
+        let package = Package(
+            name: "basic-project",
+            defaultLocalization: "en",
+            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            products: [
+                .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
+            ],
+            dependencies: [
+                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-fuse.git", "0.0.0"..<"2.0.0")
+            ],
+            targets: [
+                .target(name: "SomeModule", dependencies: [
+                    .product(name: "SkipFuse", package: "skip-fuse")
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .testTarget(name: "SomeModuleTests", dependencies: [
+                    "SomeModule",
+                    .product(name: "SkipTest", package: "skip")
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+            ]
+        )
+
+        """)
+    }
+
 
     func testLibInitAppNativeCommand() async throws {
         let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: false, native: true, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "APP_MODULE", "MODEL_MODULE")
@@ -803,7 +944,7 @@ final class SkipCommandTests: XCTestCase {
 
         # this is a natively-compiled module
         skip:
-          mode: native
+          mode: 'native'
           bridging: true
         
         """)
@@ -822,7 +963,7 @@ final class SkipCommandTests: XCTestCase {
         final class MODEL_MODULETests: XCTestCase {
             override func setUp() {
                 #if os(Android)
-                // needed to load the compiled bridge from the traspiled tests
+                // needed to load the compiled bridge from the transpiled tests
                 loadPeerLibrary(packageName: "cool-app", moduleName: "MODEL_MODULE")
                 #endif
             }
@@ -1447,7 +1588,7 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
-    func libInitComand(projectName: String, free: Bool? = nil, zero: Bool? = nil, appfair: Bool? = nil, native: Bool? = nil, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, resourcePath: String? = "Resources", backgroundColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
+    func libInitComand(projectName: String, free: Bool? = nil, zero: Bool? = nil, appfair: Bool? = nil, native: Bool? = nil, kotlincompat: Bool = false, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, resourcePath: String? = "Resources", backgroundColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["lib", "init", "-jA", "--no-build", "--no-test", "--show-tree"]
@@ -1476,6 +1617,9 @@ final class SkipCommandTests: XCTestCase {
 
         if native == true {
             cmd += ["--native"]
+            if kotlincompat == true {
+                cmd += ["--kotlincompat"]
+            }
         } else if native == false {
             cmd += ["--no-native"]
         }

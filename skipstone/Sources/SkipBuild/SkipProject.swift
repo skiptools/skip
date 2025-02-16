@@ -9,6 +9,12 @@ struct AppVerifyError : LocalizedError {
     var errorDescription: String?
 }
 
+enum ModuleMode {
+    case transpiled
+    case native
+    case kotlincompat
+}
+
 class FrameworkProjectLayout {
     var packageSwift: URL
 
@@ -32,7 +38,7 @@ class FrameworkProjectLayout {
     }
 
 
-    static func createSkipLibrary(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, native: Bool, moduleTests createModuleTests: Bool, packageResolved packageResolvedURL: URL?) throws -> URL {
+    static func createSkipLibrary(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, mode: ModuleMode, moduleTests createModuleTests: Bool, packageResolved packageResolvedURL: URL?) throws -> URL {
         if modules.isEmpty {
             throw InitError(errorDescription: "Must specify at least one module name")
         }
@@ -110,6 +116,7 @@ class FrameworkProjectLayout {
             // the model module is the second in the chain
             let isModelModule = app == true && moduleIndex == modules.startIndex + 1
             // a native module is either the second module for an app project, or any module for a non-app --native project
+            let native = mode != .transpiled
             let isNativeModule = native && (isModelModule || !app)
             // we output the model when it is the second module, or when there is only a single top-level app module
             let shouldOutputModel = isModelModule || (app == true && modules.count == 1)
@@ -148,10 +155,23 @@ class FrameworkProjectLayout {
 
                     # this is a natively-compiled module
                     skip:
-                      mode: native
-                      bridging: true
+                      mode: 'native'
 
                     """
+
+                    if mode == .kotlincompat {
+                        skipYamlModule += """
+                          bridging:
+                            enabled: true
+                            options: 'kotlincompat'
+
+                        """
+                    } else {
+                        skipYamlModule += """
+                          bridging: true
+
+                        """
+                    }
                 }
 
                 let skipYamlApp = """
@@ -638,7 +658,7 @@ final class \(moduleName)Tests: XCTestCase {
                     testCaseCode += """
     override func setUp() {
         #if os(Android)
-        // needed to load the compiled bridge from the traspiled tests
+        // needed to load the compiled bridge from the transpiled tests
         loadPeerLibrary(packageName: "\(projectName)", moduleName: "\(moduleName)")
         #endif
     }
@@ -687,7 +707,26 @@ final class \(moduleName)Tests: XCTestCase {
                     testCaseCode += """
 
     func testAsyncThrowsFunction() async throws {
+
+"""
+                    if mode == .native {
+                        testCaseCode += """
         let id = UUID()
+
+"""
+                    } else if mode == .kotlincompat {
+                        testCaseCode += """
+        #if SKIP
+        // when the native module is in kotlincompat, types are unwrapped Java classes
+        let id = java.util.UUID.randomUUID()
+        #else
+        let id = UUID()
+        #endif
+
+"""
+                    }
+
+                    testCaseCode += """
         let type: \(moduleName)Module.\(moduleName)Type = try await \(moduleName)Module.create\(moduleName)Type(id: id, delay: 0.001)
         XCTAssertEqual(id, type.id)
     }
@@ -1131,7 +1170,7 @@ class AppProjectLayout : FrameworkProjectLayout {
     }
 
 
-    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, appfair: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, icon: IconParameters?, version: String?, native: Bool, moduleTests: Bool, github: Bool, fastlane: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool) async throws -> (baseURL: URL, project: AppProjectLayout) {
+    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, appfair: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, icon: IconParameters?, version: String?, mode: ModuleMode, moduleTests: Bool, github: Bool, fastlane: Bool, packageResolved packageResolvedURL: URL? = nil) async throws -> (baseURL: URL, project: AppProjectLayout) {
 
         let sourceHeader = free ? freeLicenseHeader(type: nil) : ""
 
@@ -1141,6 +1180,7 @@ class AppProjectLayout : FrameworkProjectLayout {
             throw InitError(errorDescription: "ModuleName and project-name must be different: \(projectName)")
         }
 
+        let native = mode != .transpiled
         if let appid = appid {
             if !appid.contains(".") {
                 throw InitError(errorDescription: "Appid must be a valid bundle identifier containing at least one dot: \(appid)")
@@ -1150,7 +1190,7 @@ class AppProjectLayout : FrameworkProjectLayout {
             }
         }
 
-        let projectURL = try createSkipLibrary(projectName: projectName, productName: productName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: appid != nil, native: native, moduleTests: moduleTests, packageResolved: packageResolvedURL)
+        let projectURL = try createSkipLibrary(projectName: projectName, productName: productName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: appid != nil, mode: mode, moduleTests: moduleTests, packageResolved: packageResolvedURL)
 
         // the second module should always be imported
         let secondModule = modules.dropFirst().first
