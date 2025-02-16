@@ -18,7 +18,7 @@ final class KotlinBridgeToKotlinVisitor {
         self.options = options
         self.translator = translator
         self.codebaseInfo = codebaseInfo
-        self.includesUI = syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }).contains { $0.modulePath.first == "SkipFuseUI" }
+        self.includesUI = translator.syntaxTree.root.statements.compactMap({ $0 as? ImportDeclaration }).contains { $0.modulePath.first == "SkipFuseUI" }
     }
 
     func visit() -> [KotlinTransformerOutput] {
@@ -108,7 +108,12 @@ final class KotlinBridgeToKotlinVisitor {
             return nil
         }
 
-        let importDeclarations = translator.syntaxTree.root.statements.compactMap { $0 as? ImportDeclaration }
+        let importDeclarations: [ImportDeclaration] = translator.syntaxTree.root.statements.compactMap {
+            guard let importDeclaration = $0 as? ImportDeclaration else {
+                return nil
+            }
+            return importDeclaration.isInIfSkipBlock() ? nil : importDeclaration
+        }
         let swiftDefinitions = self.swiftDefinitions
         let cdeclFunctions = self.cdeclFunctions
         let outputNode = SwiftDefinition { output, indentation, _ in
@@ -1020,7 +1025,7 @@ final class KotlinBridgeToKotlinVisitor {
         var isView = false
         classDeclaration.extras = nil
         classDeclaration.inherits = classDeclaration.inherits.compactMap {
-            guard !includesUI || !$0.isNamed("View", moduleName: "SkipFuseUI", generics: []) else {
+            guard !includesUI || (!$0.isNamed("View", moduleName: "SwiftUI", generics: []) && !$0.isNamed("View", moduleName: "SkipFuseUI", generics: [])) else {
                 isView = true
                 return .skipUIView
             }

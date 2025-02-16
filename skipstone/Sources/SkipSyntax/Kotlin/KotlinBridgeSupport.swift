@@ -1143,7 +1143,8 @@ extension TypeSignature {
             return Bridgable(type: self, kotlinType: self, genericType: constrainedType, isGenericEntry: true, strategy: bridgable?.strategy ?? .unknown)
         }
 
-        guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: self) else {
+        let typeInfos = codebaseInfo.typeInfos(forNamed: self)
+        guard let typeInfo = typeInfos.first(where: { $0.declarationType != .extensionDeclaration }) else {
             // Assume unknown qualified types bridged from Kotlin are Kotlin/Java types and access them as `AnyDynamicObject`
             if direction == .toSwift && appearsToBeQualifiedJavaType {
                 // Convert .member to .named so that we don't think it's an inner class, e.g.
@@ -1177,10 +1178,15 @@ extension TypeSignature {
                 strategy = .protocol
             }
         } else {
-            if typeInfo.inherits.contains(where: { $0.isNamed("SwiftCustomBridged", moduleName: "Swift") }) {
+            if typeInfos.contains(where: { $0.inherits.contains(where: { $0.isNamed("SwiftCustomBridged", moduleName: "Swift") }) }) {
                 strategy = .convertible
-                if options.contains(.kotlincompat), let kotlinConverting = typeInfo.inherits.first(where: { $0.isNamed("KotlinConverting", moduleName: "Swift") }), let kotlinConvertingType = kotlinConverting.generics.first, kotlinConvertingType != .any {
-                    kotlinType = self.kotlinType(forKotlinConverting: kotlinConvertingType, info: typeInfo)
+                if options.contains(.kotlincompat) {
+                    for typeInfo in typeInfos {
+                        if let kotlinConverting = typeInfo.inherits.first(where: { $0.isNamed("KotlinConverting", moduleName: "Swift") }), let kotlinConvertingType = kotlinConverting.generics.first, kotlinConvertingType != .any {
+                            kotlinType = self.kotlinType(forKotlinConverting: kotlinConvertingType, info: typeInfo)
+                            break
+                        }
+                    }
                 }
             } else {
                 if let sourceDerived, let source {

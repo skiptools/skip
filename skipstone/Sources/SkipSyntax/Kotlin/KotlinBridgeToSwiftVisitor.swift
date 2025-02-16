@@ -75,7 +75,6 @@ final class KotlinBridgeToSwiftVisitor {
         }
         if hasContentComposer {
             syntaxTree.dependencies.imports.insert("androidx.compose.runtime.Composable")
-            syntaxTree.dependencies.imports.insert("skip.ui.*")
         }
         guard !swiftDefinitions.isEmpty else {
             return []
