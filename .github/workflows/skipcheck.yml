@@ -24,6 +24,7 @@ jobs:
       #- run: skip checkup --verbose --double-check
       - run: skip init --test demo-module DemoModule
       - run: skip init --test --appid=xyz.skip.Demo demo-app DemoApp DemoModule
+      - run: skip init --appfair DemoFairApp
 
       - run: skip android sdk install --verbose
       - run: skip checkup --verbose --native
