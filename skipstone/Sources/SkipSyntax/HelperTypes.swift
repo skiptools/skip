@@ -764,6 +764,8 @@ struct IdentifierPattern {
 enum IfSkipBlockType {
     /// `#if SKIP`
     case ifSkip
+    /// `#if os(Android)`
+    case ifOSAndroid
     /// `#if !SKIP_BRIDGE`
     case ifNotSkipBridge
     /// `#if canImport(Skip*)`

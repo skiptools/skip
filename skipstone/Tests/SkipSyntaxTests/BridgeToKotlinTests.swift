@@ -6439,4 +6439,248 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         """, transformers: transformers)
     }
+
+    func testIfSkipBlock() async throws {
+        try await check(swiftBridge: """
+        #if os(Android)
+        public var x = 1
+        #endif
+        #if SKIP
+        var kotlinX = 2
+        // SKIP @nobridge
+        var kotlinY = ""
+        #endif
+        """, kotlin: """
+        var x: Int
+            get() = Swift_x()
+            set(newValue) {
+                Swift_x_set(newValue)
+            }
+        private external fun Swift_x(): Int
+        private external fun Swift_x_set(value: Int)
+        internal var kotlinX = 2
+        internal var kotlinY = ""
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1x")
+        func BridgeKt_Swift_x(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int32 {
+            return Int32(x)
+        }
+        @_cdecl("Java_BridgeKt_Swift_1x_1set")
+        func BridgeKt_Swift_x_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: Int32) {
+            x = Int(value)
+        }
+        import SkipBridge
+
+        private let Java_BridgeKt = try! JClass(name: "BridgeKt")
+        var kotlinX: Int {
+            get {
+                return jniContext {
+                    let value_java: Int32 = try! Java_BridgeKt.callStatic(method: Java_get_kotlinX_methodID, options: [], args: [])
+                    return Int(value_java)
+                }
+            }
+            set {
+                jniContext {
+                    let value_java = Int32(newValue).toJavaParameter(options: [])
+                    try! Java_BridgeKt.callStatic(method: Java_set_kotlinX_methodID, options: [], args: [value_java])
+                }
+            }
+        }
+        private let Java_get_kotlinX_methodID = Java_BridgeKt.getStaticMethodID(name: "getKotlinX", sig: "()I")!
+        private let Java_set_kotlinX_methodID = Java_BridgeKt.getStaticMethodID(name: "setKotlinX", sig: "(I)V")!
+        """, transformers: transformers)
+    }
+
+    func testIfSkipBlockAnyDynamicObject() async throws {
+        try await check(swiftBridge: """
+        #if os(Android)
+        public func readKotlinDate() {
+            let d = kotlinDate
+            try print(d.toString() as String)
+        }
+        #endif
+        #if SKIP
+        // SKIP @bridge
+        var kotlinDate: java.util.Date = java.util.Date()
+        #endif
+        """, kotlin: """
+        fun readKotlinDate(): Unit = Swift_readKotlinDate_0()
+        private external fun Swift_readKotlinDate_0()
+        internal var kotlinDate: java.util.Date = java.util.Date()
+            get() = field.sref({ kotlinDate = it })
+            set(newValue) {
+                field = newValue.sref()
+            }
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1readKotlinDate_10")
+        func BridgeKt_Swift_readKotlinDate_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) {
+            readKotlinDate()
+        }
+        import SkipBridge
+
+        private let Java_BridgeKt = try! JClass(name: "BridgeKt")
+        var kotlinDate: AnyDynamicObject {
+            get {
+                return jniContext {
+                    let value_java: JavaObjectPointer = try! Java_BridgeKt.callStatic(method: Java_get_kotlinDate_methodID, options: [], args: [])
+                    return AnyDynamicObject.fromJavaObject(value_java, options: [])
+                }
+            }
+            set {
+                jniContext {
+                    let value_java = newValue.toJavaObject(options: [])!.toJavaParameter(options: [])
+                    try! Java_BridgeKt.callStatic(method: Java_set_kotlinDate_methodID, options: [], args: [value_java])
+                }
+            }
+        }
+        private let Java_get_kotlinDate_methodID = Java_BridgeKt.getStaticMethodID(name: "getKotlinDate", sig: "()Ljava/util/Date;")!
+        private let Java_set_kotlinDate_methodID = Java_BridgeKt.getStaticMethodID(name: "setKotlinDate", sig: "(Ljava/util/Date;)V")!
+        """, transformers: transformers)
+    }
+
+    func testIfSkipBlockContentComposer() async throws {
+        try await check(swiftBridge: """
+        #if os(Android)
+        import SkipFuseUI
+        
+        struct V: View {
+            var body: some View {
+                ComposeView { HelloComposer("hello") }
+            }
+        }
+        #endif
+        #if SKIP
+        struct HelloComposer: ContentComposer {
+            let message: String
+        
+            @Composable func Compose(context: ComposeContext) {
+                androidx.compose.material3.Text(message)
+            }
+        }
+        #endif
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+
+        internal class V: skip.ui.View, skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.kt.SwiftObjectPointer = skip.bridge.kt.SwiftObjectNil
+
+            constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.kt.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.kt.SwiftObjectPointer)
+
+            override fun Swift_peer(): skip.bridge.kt.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.kt.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_peer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            override fun body(): skip.ui.View {
+                return skip.ui.ComposeBuilder { composectx: skip.ui.ComposeContext -> Swift_composableBody(Swift_peer)?.Compose(composectx) ?: skip.ui.ComposeResult.ok }
+            }
+            private external fun Swift_composableBody(Swift_peer: skip.bridge.kt.SwiftObjectPointer): skip.ui.View?
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+        }
+        internal class HelloComposer: ContentComposer, skip.lib.SwiftProjecting {
+            internal val message: String
+
+            @Composable
+            override fun Compose(context: ComposeContext): Unit = androidx.compose.material3.Text(message)
+
+            constructor(message: String) {
+                this.message = message
+            }
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+        }
+        """, swiftBridgeSupport: """
+        import SkipFuseUI
+        extension V: BridgedToKotlin, SkipUIBridging, SkipUI.View {
+            private static let Java_class = try! JClass(name: "V")
+            static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                let box: SwiftValueTypeBox<Self> = ptr.pointee()!
+                return box.value
+            }
+            func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let box = SwiftValueTypeBox(self)
+                let Swift_peer = SwiftObjectPointer.pointer(to: box, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
+            var Java_view: any SkipUI.View {
+                return self
+            }
+        }
+        @_cdecl("Java_V_Swift_1release")
+        func V_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: SwiftValueTypeBox<V>.self)
+        }
+        @_cdecl("Java_V_Swift_1projectionImpl")
+        func V_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = V.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        @_cdecl("Java_V_Swift_1composableBody")
+        func V_Swift_composableBody(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer? {
+            let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
+            return MainActor.assumeIsolated {
+                let body = peer_swift.value.body
+                return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])
+            }
+        }
+        import SkipBridge
+
+        struct HelloComposer: BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "HelloComposer")
+            var Java_peer: JObject
+            init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+
+            var message: String {
+                get {
+                    return jniContext {
+                        let value_java: String = try! Java_peer.call(method: Self.Java_get_message_methodID, options: [], args: [])
+                        return value_java
+                    }
+                }
+            }
+            private static let Java_get_message_methodID = Java_class.getMethodID(name: "getMessage", sig: "()Ljava/lang/String;")!
+
+            public init(message p_0: String) {
+                Java_peer = jniContext {
+                    let p_0_java = p_0.toJavaParameter(options: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java])
+                    return JObject(ptr)
+                }
+            }
+            private static let Java_constructor_0_methodID = Java_class.getMethodID(name: "<init>", sig: "(Ljava/lang/String;)V")!
+        }
+        @_cdecl("Java_HelloComposer_Swift_1projectionImpl")
+        func HelloComposer_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = HelloComposer.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
 }

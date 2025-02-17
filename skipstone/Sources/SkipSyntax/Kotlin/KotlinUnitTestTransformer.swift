@@ -3,14 +3,13 @@
 /// - Seealso: `SkipUnit/XCTestCase.kt`
 final class KotlinUnitTestTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
-        guard !translator.syntaxTree.isBridgeFile else {
-            return []
-        }
         guard let codebaseInfo = translator.codebaseInfo else {
             return []
         }
         var importPackages: Set<String> = []
-        syntaxTree.root.visit { visit($0, codebaseInfo: codebaseInfo, importPackages: &importPackages) }
+        syntaxTree.root.visit(ifSkipBlockContent: syntaxTree.isBridgeFile) {
+            visit($0, codebaseInfo: codebaseInfo, importPackages: &importPackages)
+        }
         syntaxTree.dependencies.imports.formUnion(importPackages)
         return []
     }

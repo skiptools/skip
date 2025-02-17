@@ -257,6 +257,16 @@ struct StatementExtras {
         return false
     }
 
+    /// Whther this begins an `#if SKIP` or `#if os(Android)` block.
+    func isIfSkipBlock(allowOSAndroid: Bool = false) -> Bool {
+        for directive in directives {
+            if case .ifSkipBlock(let blockType) = directive, (blockType == .ifSkip || (allowOSAndroid && blockType == .ifOSAndroid)) {
+                return true
+            }
+        }
+        return false
+    }
+
     /// Leading trivia string, allowing us to preserve original comments and blank lines.
     func leadingTrivia(indentation: Indentation) -> String {
         return join(lines: leadingTrivia, indentation: indentation)

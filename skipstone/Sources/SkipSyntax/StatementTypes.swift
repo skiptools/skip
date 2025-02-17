@@ -496,6 +496,11 @@ final class IfDefined: Statement {
         }
 
         let match = extractClause(from: ifConfigDecl, in: syntaxTree)
+        var context = context
+        if match?.ifSkipBlockTypes.contains(.ifSkip) == true {
+            context.isInIfSkipBlock = true
+        }
+
         var statements = try extractStatements(from: match?.clause, context: context, in: syntaxTree)
         if let endSyntax = match?.endSyntax, let extras = StatementExtras.decode(syntax: endSyntax) {
             let (extraStatements, _) = extras.statements(syntax: endSyntax, in: syntaxTree)
@@ -580,6 +585,7 @@ final class IfDefined: Statement {
         var trueClause: IfConfigClauseSyntax? = nil
         var ifSkipBlockTypes: [IfSkipBlockType] = []
         var hasNotSkipClause = false
+        var hasNotOSAndroidClause = false
         for ifConfigClause in syntax.clauses {
             if let trueClause {
                 return (trueClause, ifSkipBlockTypes, ifConfigClause.poundKeyword)
@@ -589,6 +595,8 @@ final class IfDefined: Statement {
                 trueClause = ifConfigClause
                 if hasNotSkipClause {
                     ifSkipBlockTypes.append(.ifSkip)
+                } else if hasNotOSAndroidClause {
+                    ifSkipBlockTypes.append(.ifOSAndroid)
                 }
                 continue
             }
@@ -597,6 +605,7 @@ final class IfDefined: Statement {
             let (isSupported, isTrue, ifSkipBlocks, negatedIfSkipBlocks) = processConditions(symbol: clauseSymbol, preprocessorSymbols: syntaxTree.preprocessorSymbols)
             ifSkipBlockTypes = ifSkipBlocks
             hasNotSkipClause = hasNotSkipClause || negatedIfSkipBlocks.contains(.ifSkip)
+            hasNotOSAndroidClause = hasNotOSAndroidClause || negatedIfSkipBlocks.contains(.ifOSAndroid)
 
             if !isSupported && !syntaxTree.isBridgeFile {
                 syntaxTree.root.messages.append(.preprocessorTooComplex(ifConfigClause, source: syntaxTree.source))
@@ -641,8 +650,12 @@ final class IfDefined: Statement {
                 let ifSkipBlockType: IfSkipBlockType?
                 let negated: Bool
                 let isTrue: Bool
-                if symbol == "SKIP" || symbol == "os(Android)" {
+                if symbol == "SKIP" {
                     ifSkipBlockType = .ifSkip
+                    negated = isNot
+                    isTrue = !isNot
+                } else if symbol == "os(Android)" {
+                    ifSkipBlockType = .ifOSAndroid
                     negated = isNot
                     isTrue = !isNot
                 } else if symbol == "SKIP_BRIDGE" {

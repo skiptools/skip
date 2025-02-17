@@ -10,7 +10,7 @@ final class KotlinBridgeToSwiftVisitor {
     private var swiftDefinitions: [SwiftDefinition] = []
 
     init?(for syntaxTree: KotlinSyntaxTree, options: KotlinBridgeOptions, translator: KotlinTranslator) {
-        guard !syntaxTree.isBridgeFile, let codebaseInfo = translator.codebaseInfo, let outputFile = syntaxTree.source.file.bridgeOutputFile else {
+        guard let codebaseInfo = translator.codebaseInfo, let outputFile = syntaxTree.source.file.bridgeOutputFile else {
             return nil
         }
         self.syntaxTree = syntaxTree
@@ -25,9 +25,13 @@ final class KotlinBridgeToSwiftVisitor {
         var swiftDefinitions: [SwiftDefinition] = []
         var needsGlobalsJavaClass = false
         var globalFunctionCount = 0
-        syntaxTree.root.visit { node in
+        var hasContentComposer = false
+        syntaxTree.root.visit(ifSkipBlockContent: syntaxTree.isBridgeFile) { node in
             if let variableDeclaration = node as? KotlinVariableDeclaration {
-                let variableIsBridging = { isBridging(attributes: variableDeclaration.attributes, isPublic: variableDeclaration.modifiers.visibility >= .public, autoBridge: self.syntaxTree.autoBridge) }
+                let variableIsBridging = {
+                    return (self.syntaxTree.isBridgeFile && variableDeclaration.modifiers.visibility > .fileprivate && !variableDeclaration.attributes.isNoBridge)
+                    || isBridging(attributes: variableDeclaration.attributes, isPublic: variableDeclaration.modifiers.visibility >= .public, autoBridge: self.syntaxTree.autoBridge)
+                }
                 if variableDeclaration.role == .global, variableIsBridging() {
                     needsGlobalsJavaClass = update(global: variableDeclaration, swiftDefinitions: &swiftDefinitions, globalsClassRef: globalsClassRef) || needsGlobalsJavaClass
                     checkIfNotSkipBridge(variableDeclaration)
@@ -36,7 +40,10 @@ final class KotlinBridgeToSwiftVisitor {
                 }
                 return .skip
             } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
-                let functionIsBridging = { isBridging(attributes: functionDeclaration.attributes, isPublic: functionDeclaration.modifiers.visibility >= .public, autoBridge: self.syntaxTree.autoBridge) }
+                let functionIsBridging = {
+                    return (self.syntaxTree.isBridgeFile && functionDeclaration.modifiers.visibility > .fileprivate && !functionDeclaration.attributes.isNoBridge)
+                    || isBridging(attributes: functionDeclaration.attributes, isPublic: functionDeclaration.modifiers.visibility >= .public, autoBridge: self.syntaxTree.autoBridge)
+                }
                 if functionDeclaration.role == .global, functionIsBridging() {
                     if update(global: functionDeclaration, uniquifier: globalFunctionCount, swiftDefinitions: &swiftDefinitions, globalsClassRef: globalsClassRef) {
                         needsGlobalsJavaClass = true
@@ -48,7 +55,8 @@ final class KotlinBridgeToSwiftVisitor {
                 }
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
-                if isBridging(attributes: classDeclaration.attributes, isPublic: classDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) {
+                hasContentComposer = hasContentComposer || (syntaxTree.isBridgeFile && updateContentComposer(classDeclaration))
+                if (syntaxTree.isBridgeFile && classDeclaration.modifiers.visibility > .fileprivate && !classDeclaration.attributes.isNoBridge) || isBridging(attributes: classDeclaration.attributes, isPublic: classDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) {
                     update(classDeclaration, swiftDefinitions: &swiftDefinitions)
                     checkIfNotSkipBridge(classDeclaration)
                 }
@@ -68,6 +76,9 @@ final class KotlinBridgeToSwiftVisitor {
             } else {
                 return .recurse(nil)
             }
+        }
+        if hasContentComposer {
+            syntaxTree.dependencies.imports.insert("androidx.compose.runtime.Composable")
         }
         guard !swiftDefinitions.isEmpty else {
             return []
@@ -95,7 +106,7 @@ final class KotlinBridgeToSwiftVisitor {
     }
 
     private func checkIfNotSkipBridge(_ statement: KotlinStatement) {
-        guard !statement.isInIfNotSkipBridgeBlock else {
+        guard !syntaxTree.isBridgeFile && !statement.isInIfNotSkipBridgeBlock else {
             return
         }
         statement.messages.append(.kotlinBridgeMissingIfNotSkipBridge(statement, source: syntaxTree.source))
@@ -863,7 +874,10 @@ final class KotlinBridgeToSwiftVisitor {
                     enumCases.append(enumCaseDeclaration)
                 }
             } else if let variableDeclaration = member as? KotlinVariableDeclaration {
-                guard !variableDeclaration.isGenerated, isBridging(attributes: variableDeclaration.attributes, isPublic: variableDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) else {
+                guard !variableDeclaration.isGenerated else {
+                    continue
+                }
+                guard (syntaxTree.isBridgeFile && variableDeclaration.modifiers.visibility > .fileprivate && !variableDeclaration.attributes.isNoBridge) || isBridging(attributes: variableDeclaration.attributes, isPublic: variableDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) else {
                     continue
                 }
                 let info = typeInfos.flatMap({ $0.variables }).first(where: { $0.name == (variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName) && $0.modifiers.visibility >= .fileprivate })
@@ -871,7 +885,14 @@ final class KotlinBridgeToSwiftVisitor {
                     hasBridgedStaticMembers = true
                 }
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
-                guard (!functionDeclaration.isGenerated || functionDeclaration.type == .constructorDeclaration), isBridging(attributes: functionDeclaration.attributes, isPublic: functionDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) else {
+                guard !functionDeclaration.isGenerated || functionDeclaration.type == .constructorDeclaration else {
+                    continue
+                }
+                guard (syntaxTree.isBridgeFile && functionDeclaration.modifiers.visibility > .fileprivate && !functionDeclaration.attributes.isNoBridge) || isBridging(attributes: functionDeclaration.attributes, isPublic: functionDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) else {
+                    continue
+                }
+                // Don't attempt to bridge @Composable functions
+                guard !syntaxTree.isBridgeFile || !functionDeclaration.attributes.attributes.contains(where: { $0.signature.isNamed("Composable") }) else {
                     continue
                 }
                 guard !functionDeclaration.isEncode && !functionDeclaration.isDecodableConstructor else {
@@ -952,6 +973,22 @@ final class KotlinBridgeToSwiftVisitor {
             "return " + projectionFunc.returnType.convertToJava(value: "factory", strategy: .direct, options: options)
         ]
         return CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: swift)
+    }
+
+    private func updateContentComposer(_ classDeclaration: KotlinClassDeclaration) -> Bool {
+        guard classDeclaration.inherits.contains(where: { $0.isNamed("ContentComposer", moduleName: "SkipUI", generics: []) }) else {
+            return false
+        }
+        if let composeFunctionDeclaration = classDeclaration.members.first(where: {
+            guard let functionDeclaration = $0 as? KotlinFunctionDeclaration else {
+                return false
+            }
+            return functionDeclaration.name == "Compose" && functionDeclaration.parameters.count == 1 && functionDeclaration.parameters[0].externalLabel == "context" && functionDeclaration.parameters[0].declaredType.isNamed("ComposeContext")
+        }) as? KotlinFunctionDeclaration {
+            composeFunctionDeclaration.modifiers.isOverride = true
+            composeFunctionDeclaration.modifiers.visibility = .public
+        }
+        return true
     }
 
     private func swiftDefinition(of signature: TypeSignature, statement: KotlinStatement, swift: [String], members: [SwiftDefinition]) -> SwiftDefinition {

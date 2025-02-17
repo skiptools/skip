@@ -6,9 +6,6 @@ final class KotlinModuleBundleTransformer: KotlinTransformer {
         guard !needsModuleBundle else {
             return []
         }
-        guard !translator.syntaxTree.isBridgeFile else {
-            return []
-        }
         // No need to add Bundle.module if not a full build
         guard translator.codebaseInfo != nil else {
             return []
@@ -17,7 +14,7 @@ final class KotlinModuleBundleTransformer: KotlinTransformer {
             return []
         }
 
-        syntaxTree.root.visit { node in
+        syntaxTree.root.visit(ifSkipBlockContent: syntaxTree.isBridgeFile) { node in
             if !needsModuleBundle, let memberAccess = node as? KotlinMemberAccess, memberAccess.member == "module" {
                 needsModuleBundle = memberAccess.isBaseType(named: "Bundle", moduleName: "Foundation")
             }

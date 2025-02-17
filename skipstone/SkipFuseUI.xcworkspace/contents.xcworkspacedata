@@ -32,6 +32,9 @@
       location = "group:../skip-firebase">
    </FileRef>
    <FileRef
+      location = "group:../swift-android-native">
+   </FileRef>
+   <FileRef
       location = "group:../skip-bridge">
    </FileRef>
    <FileRef

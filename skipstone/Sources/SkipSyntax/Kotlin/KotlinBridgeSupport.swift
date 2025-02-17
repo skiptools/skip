@@ -1,7 +1,7 @@
 /// Used in Swift code generation.
 struct SwiftDefinition: OutputNode {
-    let sourceFile: Source.FilePath?
-    let sourceRange: Source.Range?
+    var sourceFile: Source.FilePath?
+    var sourceRange: Source.Range?
     var children: [SwiftDefinition] = []
     var appendTo: (OutputGenerator, Indentation, [SwiftDefinition]) -> Void = { output, indentation, children in
         children.forEach { $0.append(to: output, indentation: indentation) }
@@ -20,6 +20,14 @@ struct SwiftDefinition: OutputNode {
         self = .init(statement: statement, sourceFile: sourceFile, sourceRange: sourceRange) { output, indentation, _ in
             swift.forEach { output.append(indentation).append($0).append("\n") }
         }
+    }
+
+    func combined(with other: SwiftDefinition) -> SwiftDefinition {
+        var combined = SwiftDefinition()
+        combined.sourceFile = sourceFile ?? other.sourceFile
+        combined.sourceRange = sourceRange ?? other.sourceRange
+        combined.children = [self, other]
+        return combined
     }
 
     func leadingTrivia(indentation: Indentation) -> String {
@@ -1135,7 +1143,8 @@ extension TypeSignature {
             return Bridgable(type: self, kotlinType: self, genericType: constrainedType, isGenericEntry: true, strategy: bridgable?.strategy ?? .unknown)
         }
 
-        guard let typeInfo = codebaseInfo.primaryTypeInfo(forNamed: self) else {
+        let typeInfos = codebaseInfo.typeInfos(forNamed: self)
+        guard let typeInfo = typeInfos.first(where: { $0.declarationType != .extensionDeclaration }) else {
             // Assume unknown qualified types bridged from Kotlin are Kotlin/Java types and access them as `AnyDynamicObject`
             if direction == .toSwift && appearsToBeQualifiedJavaType {
                 // Convert .member to .named so that we don't think it's an inner class, e.g.
@@ -1169,10 +1178,15 @@ extension TypeSignature {
                 strategy = .protocol
             }
         } else {
-            if typeInfo.inherits.contains(where: { $0.isNamed("SwiftCustomBridged", moduleName: "Swift") }) {
+            if typeInfos.contains(where: { $0.inherits.contains(where: { $0.isNamed("SwiftCustomBridged", moduleName: "Swift") }) }) {
                 strategy = .convertible
-                if options.contains(.kotlincompat), let kotlinConverting = typeInfo.inherits.first(where: { $0.isNamed("KotlinConverting", moduleName: "Swift") }), let kotlinConvertingType = kotlinConverting.generics.first, kotlinConvertingType != .any {
-                    kotlinType = self.kotlinType(forKotlinConverting: kotlinConvertingType, info: typeInfo)
+                if options.contains(.kotlincompat) {
+                    for typeInfo in typeInfos {
+                        if let kotlinConverting = typeInfo.inherits.first(where: { $0.isNamed("KotlinConverting", moduleName: "Swift") }), let kotlinConvertingType = kotlinConverting.generics.first, kotlinConvertingType != .any {
+                            kotlinType = self.kotlinType(forKotlinConverting: kotlinConvertingType, info: typeInfo)
+                            break
+                        }
+                    }
                 }
             } else {
                 if let sourceDerived, let source {

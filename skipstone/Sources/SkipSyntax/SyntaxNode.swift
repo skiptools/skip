@@ -147,15 +147,11 @@ class SyntaxNode: SourceDerived, PrettyPrintable {
     }
 
     /// Whether this node is within an `#if SKIP` block in the source.
-    final var isInIfSkipBlock: Bool {
+    final func isInIfSkipBlock(allowOSAndroid: Bool = false) -> Bool {
         var node: SyntaxNode? = self
         while node != nil {
-            if let directives = (node as? Statement)?.extras?.directives {
-                for directive in directives {
-                    if case .ifSkipBlock(let blockType) = directive, blockType == .ifSkip {
-                        return true
-                    }
-                }
+            if (node as? Statement)?.extras?.isIfSkipBlock(allowOSAndroid: allowOSAndroid) == true {
+                return true
             }
             node = node?.parent
         }
