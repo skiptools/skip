@@ -258,6 +258,9 @@ fileprivate extension AndroidOperationCommand {
 
             let buildOutputFolderURL = URL(fileURLWithPath: buildOutputFolder)
 
+            // we do not prune executables or tests, since we only analyze shared object dependencies and not the dependencies in executables (although we could…)
+            let prune = toolchainOptions.prune == true && (executable == nil && runTests == false)
+
             /// Returns all the shared object files that will need to be linked to a binary
             ///
             /// e.g.: `~/Library/Developer/Skip/SDKs/swift-5.10.1-android-24-ndk-27-sdk/usr/lib/aarch64-linux-android/*.so`
@@ -297,7 +300,7 @@ fileprivate extension AndroidOperationCommand {
                     .filter({ $0.lastPathComponent.contains(".so") })
                     .filter({ !builtinLibraries.contains($0.lastPathComponent) })
 
-                if !toolchainOptions.prune {
+                if !prune {
                     // just return the unfiltered list if we are not pruning the libraries
                     return buildOutputLibraries + libraries
                 }
