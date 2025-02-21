@@ -6683,4 +6683,37 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         """, transformers: transformers)
     }
+
+    public func testBundleModule() async throws {
+        KotlinBundleTransformer.testSkipFuse = true
+        defer { KotlinBundleTransformer.testSkipFuse = false }
+
+        try await check(swiftBridge: """
+        let x = 1
+        """, kotlin: """
+        """, kotlinPackageSupport: """
+        internal val skip.foundation.Bundle.Companion.module: skip.foundation.Bundle
+            get() = _moduleBundle
+        private val _moduleBundle: skip.foundation.Bundle by lazy {
+            skip.foundation.Bundle(_ModuleBundleLocator::class)
+        }
+        internal class _ModuleBundleLocator {}
+        class _ModuleBundleAccessor_ {
+            val moduleBundle = _moduleBundle
+        }
+        """, swiftBridgeSupport: """
+        import SkipAndroidBridge
+
+        typealias Bundle = SkipAndroidBridge.AndroidBundle
+        extension SkipAndroidBridge.AndroidBundle {
+            static var module: SkipAndroidBridge.AndroidBundle {
+                return _module
+            }
+            private static let _module = {
+                let bundle = try! AnyDynamicObject(className: ".module._ModuleBundleAccessor_").moduleBundle!
+                return SkipAndroidBridge.AndroidBundle(bundle)
+            }()
+        }
+        """, transformers: transformers)
+    }
 }
