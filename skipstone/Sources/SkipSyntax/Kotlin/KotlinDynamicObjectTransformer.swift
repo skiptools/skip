@@ -87,7 +87,7 @@ public final class KotlinDynamicObjectTransformer: KotlinTransformer {
         swift.append("extension \(namespace) {")
         swift.append(1, "final class \(name): AnyDynamicObject {")
         swift.append(2, "init(options: JConvertibleOptions = .kotlincompat, _ arguments: Any?...) throws {")
-        swift.append(3, "try super.init(className: \"\(className)\", arguments: arguments)")
+        swift.append(3, "try super.init(className: \"\(className)\", options: options, arguments: arguments)")
         swift.append(2, "}")
         swift.append(2, "required init(for object: JavaObjectPointer, options: JConvertibleOptions = .kotlincompat) throws {")
         swift.append(3, "try super.init(for: object, options: options)")

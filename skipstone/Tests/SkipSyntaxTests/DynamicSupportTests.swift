@@ -19,36 +19,42 @@ final class DynamicSupportTests: XCTestCase {
         extension X.java { enum math {} }
         extension X.java.math {
             final class BigInteger: AnyDynamicObject {
-                init(_ arguments: Any?...) throws {
-                    try super.init(className: "java.math.BigInteger", arguments: arguments)
+                init(options: JConvertibleOptions = .kotlincompat, _ arguments: Any?...) throws {
+                    try super.init(className: "java.math.BigInteger", options: options, arguments: arguments)
                 }
-                required init(for object: JavaObjectPointer) throws {
-                    try super.init(for: object)
+                required init(for object: JavaObjectPointer, options: JConvertibleOptions = .kotlincompat) throws {
+                    try super.init(for: object, options: options)
                 }
-                static let Companion = try! AnyDynamicObject(forStaticsOfClassName: "java.math.BigInteger")
+                static func Companion(options: JConvertibleOptions = .kotlincompat) -> AnyDynamicObject {
+                    return try! AnyDynamicObject(forStaticsOfClassName: "java.math.BigInteger", options: options)
+                }
             }
         }
         extension X.java { enum util {} }
         extension X.java.util {
             final class Calendar: AnyDynamicObject {
-                init(_ arguments: Any?...) throws {
-                    try super.init(className: "java.util.Calendar", arguments: arguments)
+                init(options: JConvertibleOptions = .kotlincompat, _ arguments: Any?...) throws {
+                    try super.init(className: "java.util.Calendar", options: options, arguments: arguments)
                 }
-                required init(for object: JavaObjectPointer) throws {
-                    try super.init(for: object)
+                required init(for object: JavaObjectPointer, options: JConvertibleOptions = .kotlincompat) throws {
+                    try super.init(for: object, options: options)
                 }
-                static let Companion = try! AnyDynamicObject(forStaticsOfClassName: "java.util.Calendar")
+                static func Companion(options: JConvertibleOptions = .kotlincompat) -> AnyDynamicObject {
+                    return try! AnyDynamicObject(forStaticsOfClassName: "java.util.Calendar", options: options)
+                }
             }
         }
         extension X.java.util {
             final class Date: AnyDynamicObject {
-                init(_ arguments: Any?...) throws {
-                    try super.init(className: "java.util.Date", arguments: arguments)
+                init(options: JConvertibleOptions = .kotlincompat, _ arguments: Any?...) throws {
+                    try super.init(className: "java.util.Date", options: options, arguments: arguments)
                 }
-                required init(for object: JavaObjectPointer) throws {
-                    try super.init(for: object)
+                required init(for object: JavaObjectPointer, options: JConvertibleOptions = .kotlincompat) throws {
+                    try super.init(for: object, options: options)
                 }
-                static let Companion = try! AnyDynamicObject(forStaticsOfClassName: "java.util.Date")
+                static func Companion(options: JConvertibleOptions = .kotlincompat) -> AnyDynamicObject {
+                    return try! AnyDynamicObject(forStaticsOfClassName: "java.util.Date", options: options)
+                }
             }
         }
         """, bridgeDecodeLevel: .full, transformers: transformers)
@@ -67,24 +73,28 @@ final class DynamicSupportTests: XCTestCase {
         extension X.java { enum util {} }
         extension X.java.util {
             final class Calendar: AnyDynamicObject {
-                init(_ arguments: Any?...) throws {
-                    try super.init(className: "java.util.Calendar", arguments: arguments)
+                init(options: JConvertibleOptions = .kotlincompat, _ arguments: Any?...) throws {
+                    try super.init(className: "java.util.Calendar", options: options, arguments: arguments)
                 }
-                required init(for object: JavaObjectPointer) throws {
-                    try super.init(for: object)
+                required init(for object: JavaObjectPointer, options: JConvertibleOptions = .kotlincompat) throws {
+                    try super.init(for: object, options: options)
                 }
-                static let Companion = try! AnyDynamicObject(forStaticsOfClassName: "java.util.Calendar")
+                static func Companion(options: JConvertibleOptions = .kotlincompat) -> AnyDynamicObject {
+                    return try! AnyDynamicObject(forStaticsOfClassName: "java.util.Calendar", options: options)
+                }
             }
         }
         extension X.java.util {
             final class Date: AnyDynamicObject {
-                init(_ arguments: Any?...) throws {
-                    try super.init(className: "java.util.Date", arguments: arguments)
+                init(options: JConvertibleOptions = .kotlincompat, _ arguments: Any?...) throws {
+                    try super.init(className: "java.util.Date", options: options, arguments: arguments)
                 }
-                required init(for object: JavaObjectPointer) throws {
-                    try super.init(for: object)
+                required init(for object: JavaObjectPointer, options: JConvertibleOptions = .kotlincompat) throws {
+                    try super.init(for: object, options: options)
                 }
-                static let Companion = try! AnyDynamicObject(forStaticsOfClassName: "java.util.Date")
+                static func Companion(options: JConvertibleOptions = .kotlincompat) -> AnyDynamicObject {
+                    return try! AnyDynamicObject(forStaticsOfClassName: "java.util.Date", options: options)
+                }
             }
         }
         """, bridgeDecodeLevel: .full, transformers: transformers)
@@ -102,13 +112,15 @@ final class DynamicSupportTests: XCTestCase {
         extension X.java { enum util {} }
         extension X.java.util {
             final class Calendar: AnyDynamicObject {
-                init(_ arguments: Any?...) throws {
-                    try super.init(className: "java.util.Calendar", arguments: arguments)
+                init(options: JConvertibleOptions = .kotlincompat, _ arguments: Any?...) throws {
+                    try super.init(className: "java.util.Calendar", options: options, arguments: arguments)
                 }
-                required init(for object: JavaObjectPointer) throws {
-                    try super.init(for: object)
+                required init(for object: JavaObjectPointer, options: JConvertibleOptions = .kotlincompat) throws {
+                    try super.init(for: object, options: options)
                 }
-                static let Companion = try! AnyDynamicObject(forStaticsOfClassName: "java.util.Calendar")
+                static func Companion(options: JConvertibleOptions = .kotlincompat) -> AnyDynamicObject {
+                    return try! AnyDynamicObject(forStaticsOfClassName: "java.util.Calendar", options: options)
+                }
             }
         }
         """, bridgeDecodeLevel: .full, transformers: transformers)
@@ -132,13 +144,15 @@ final class DynamicSupportTests: XCTestCase {
         extension X.java { enum util {} }
         extension X.java.util {
             final class Calendar: AnyDynamicObject {
-                init(_ arguments: Any?...) throws {
-                    try super.init(className: "java.util.Calendar", arguments: arguments)
+                init(options: JConvertibleOptions = .kotlincompat, _ arguments: Any?...) throws {
+                    try super.init(className: "java.util.Calendar", options: options, arguments: arguments)
                 }
-                required init(for object: JavaObjectPointer) throws {
-                    try super.init(for: object)
+                required init(for object: JavaObjectPointer, options: JConvertibleOptions = .kotlincompat) throws {
+                    try super.init(for: object, options: options)
                 }
-                static let Companion = try! AnyDynamicObject(forStaticsOfClassName: "java.util.Calendar")
+                static func Companion(options: JConvertibleOptions = .kotlincompat) -> AnyDynamicObject {
+                    return try! AnyDynamicObject(forStaticsOfClassName: "java.util.Calendar", options: options)
+                }
             }
         }
         """, bridgeDecodeLevel: .full, transformers: transformers)
