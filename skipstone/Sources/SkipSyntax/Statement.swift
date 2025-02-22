@@ -37,19 +37,18 @@ class Statement: SyntaxNode {
         guard !context.isInIfSkipBlock else {
             return .full
         }
-        let isPublic: Bool
+        let effectiveVisibility: Modifiers.Visibility
         if context.memberOf?.type == .protocolDeclaration && !(self is TypeDeclaration.Type) {
-            isPublic = visibility == .default || visibility >= .public
+            effectiveVisibility = visibility == .default || visibility >= .public ? .public : visibility
         } else if context.memberOf?.type == .extensionDeclaration {
-            let memberVisibility = visibility == .default ? (context.memberOf?.modifiers.visibility ?? visibility) : visibility
-            isPublic = memberVisibility >= .public
+            effectiveVisibility = visibility == .default ? (context.memberOf?.modifiers.visibility ?? visibility) : visibility
         } else if self is ExtensionDeclaration.Type {
             // Extensions with default visibility may contain public members
-            isPublic = visibility >= .public || visibility == .default
+            effectiveVisibility = visibility == .default || visibility >= .public ? .public : visibility
         } else {
-            isPublic = visibility >= .public
+            effectiveVisibility = visibility
         }
-        return isBridging(attributes: attributes, isPublic: isPublic, autoBridge: syntaxTree.autoBridge) ? .api : .none
+        return isBridging(attributes: attributes, visibility: effectiveVisibility, autoBridge: syntaxTree.autoBridge) ? .api : .none
     }
 }
 

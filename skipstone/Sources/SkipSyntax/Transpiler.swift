@@ -52,6 +52,8 @@ public struct Transpiler {
                     var shouldBridge = bridgeSource.content.contains("SKIP") || bridgeSource.content.contains("SkipFuseUI")
                     if autoBridge == .public {
                         shouldBridge = shouldBridge || bridgeSource.content.contains("public") || bridgeSource.content.contains("open")
+                    } else if autoBridge == .internal {
+                        shouldBridge = true
                     }
                     let bridgeDecodeLevel: DecodeLevel = isBridgeGatherEnabled ? .full : shouldBridge ? .api : .none
                     if bridgeDecodeLevel == .none {

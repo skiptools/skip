@@ -34,8 +34,7 @@ public final class KotlinBundleTransformer: KotlinTransformer {
 
     public func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         // Generate Bundle support for any native module using SkipFuse
-        let fuseModuleNames: Set<String> = ["SkipFuse", "SkipFuseUI"]
-        let isFuse = Self.testSkipFuse || translator.codebaseInfo?.global.dependentModules.contains(where: { fuseModuleNames.contains($0.moduleName ?? "") }) == true
+        let isFuse = Self.testSkipFuse || translator.codebaseInfo?.global.isNativeFuseModule == true
         guard needsModuleBundle || isFuse else {
             return []
         }
@@ -91,7 +90,7 @@ public final class KotlinBundleTransformer: KotlinTransformer {
             
             typealias Bundle = AndroidModuleBundle
             class AndroidModuleBundle : AndroidBundle, @unchecked Sendable {
-                required init(_ bundle: AnyDynamicObject) {
+                required init(_ bundle: SkipAndroidBridge.BundleAccess) {
                     super.init(bundle)
                 }
             
@@ -105,6 +104,8 @@ public final class KotlinBundleTransformer: KotlinTransformer {
                     super.init(url: url)
                 }
             }
+            
+            let NSLocalizedString = AndroidLocalizedString()
             """)
         }
         return KotlinTransformerOutput(file: outputFile, node: outputNode, type: .bridgeToSwift)

@@ -639,7 +639,7 @@ import Foundation
 
                 if isNativeModule {
                     testCaseCode += """
-import SkipBridgeKt
+import SkipBridge
 
 """
                 }

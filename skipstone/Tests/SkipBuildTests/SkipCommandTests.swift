@@ -639,7 +639,7 @@ final class SkipCommandTests: XCTestCase {
         import XCTest
         import OSLog
         import Foundation
-        import SkipBridgeKt
+        import SkipBridge
         @testable import SomeModule
 
         let logger: Logger = Logger(subsystem: "SomeModule", category: "Tests")
@@ -772,7 +772,7 @@ final class SkipCommandTests: XCTestCase {
         import XCTest
         import OSLog
         import Foundation
-        import SkipBridgeKt
+        import SkipBridge
         @testable import SomeModule
 
         let logger: Logger = Logger(subsystem: "SomeModule", category: "Tests")
@@ -954,7 +954,7 @@ final class SkipCommandTests: XCTestCase {
         import XCTest
         import OSLog
         import Foundation
-        import SkipBridgeKt
+        import SkipBridge
         @testable import MODEL_MODULE
 
         let logger: Logger = Logger(subsystem: "MODEL_MODULE", category: "Tests")

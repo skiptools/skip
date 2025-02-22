@@ -192,7 +192,7 @@ final class KotlinBridgeToKotlinVisitor {
         let getterParameters: String
         if isInstance {
             getterArguments = isNonGenericSealedClassesEnum ? "(javaClass.name)" : isBasicEnum ? "(name)" : "(Swift_peer)"
-            getterParameters = isNonGenericSealedClassesEnum ? "(className: String)" : isBasicEnum ? "(name: String)" : "(Swift_peer: skip.bridge.kt.SwiftObjectPointer)"
+            getterParameters = isNonGenericSealedClassesEnum ? "(className: String)" : isBasicEnum ? "(name: String)" : "(Swift_peer: skip.bridge.SwiftObjectPointer)"
         } else if isProtocolInstance {
             getterArguments = "(this)"
             getterParameters = "(Java_iface: \(interfaceDeclaration!.name))"
@@ -293,7 +293,7 @@ final class KotlinBridgeToKotlinVisitor {
             let setterInstanceParameter: String
             if isInstance {
                 setterArguments = isNonGenericSealedClassesEnum ? "javaClass.name, newValue\(castString)" : isBasicEnum ? "name, newValue\(castString)" : "Swift_peer, newValue\(castString)"
-                setterInstanceParameter = isNonGenericSealedClassesEnum ? "className: String, " : isBasicEnum ? "name: String, " : "Swift_peer: skip.bridge.kt.SwiftObjectPointer, "
+                setterInstanceParameter = isNonGenericSealedClassesEnum ? "className: String, " : isBasicEnum ? "name: String, " : "Swift_peer: skip.bridge.SwiftObjectPointer, "
             } else if isProtocolInstance {
                 setterArguments = "this, newValue\(castString)"
                 setterInstanceParameter = "Java_iface: \(interfaceDeclaration!.name), "
@@ -645,13 +645,13 @@ final class KotlinBridgeToKotlinVisitor {
         var externalParametersString: String
         if classDeclaration != nil, functionDeclaration.type != .constructorDeclaration && !functionDeclaration.isStatic {
             if classDeclaration?.generics.isEmpty == false {
-                externalParametersString = "Swift_peer: skip.bridge.kt.SwiftObjectPointer"
+                externalParametersString = "Swift_peer: skip.bridge.SwiftObjectPointer"
             } else if classDeclaration?.isSealedClassesEnum == true {
                 externalParametersString = "className: String"
             } else if classDeclaration?.declarationType == .enumDeclaration {
                 externalParametersString = "name: String"
             } else {
-                externalParametersString = "Swift_peer: skip.bridge.kt.SwiftObjectPointer"
+                externalParametersString = "Swift_peer: skip.bridge.SwiftObjectPointer"
             }
         } else if let interfaceDeclaration, !functionDeclaration.isStatic {
             externalParametersString = "Java_iface: \(interfaceDeclaration.name)"
@@ -676,7 +676,7 @@ final class KotlinBridgeToKotlinVisitor {
         externalFunctionDeclaration += externalParametersString
         externalFunctionDeclaration += ")"
         if functionDeclaration.type == .constructorDeclaration {
-            externalFunctionDeclaration += ": skip.bridge.kt.SwiftObjectPointer"
+            externalFunctionDeclaration += ": skip.bridge.SwiftObjectPointer"
         } else if bridgable.return.type != .void && !isAsync {
             var returnType: TypeSignature = bridgable.return.externalType
             if functionDeclaration.apiFlags.throwsType != .none {
@@ -779,10 +779,10 @@ final class KotlinBridgeToKotlinVisitor {
         let sourceCode: [String]
         let cdeclFunction: CDeclFunction?
         if !classDeclaration.generics.isEmpty, classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
-            let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_isequal(lhs: skip.bridge.kt.SwiftObjectPointer, rhs: skip.bridge.kt.SwiftObjectPointer): Boolean")
+            let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_isequal(lhs: skip.bridge.SwiftObjectPointer, rhs: skip.bridge.SwiftObjectPointer): Boolean")
             statements = [equals, externalFunctionDeclaration]
             sourceCode = [
-                "if (other !is skip.bridge.kt.SwiftPeerBridged) return false",
+                "if (other !is skip.bridge.SwiftPeerBridged) return false",
                 "return Swift_isequal(Swift_peer, other.Swift_peer())"
             ]
 
@@ -796,7 +796,7 @@ final class KotlinBridgeToKotlinVisitor {
         } else {
             statements = [equals]
             sourceCode = [
-                "if (other !is skip.bridge.kt.SwiftPeerBridged) return false",
+                "if (other !is skip.bridge.SwiftPeerBridged) return false",
                 "return Swift_peer == other.Swift_peer()"
             ]
             cdeclFunction = nil
@@ -817,7 +817,7 @@ final class KotlinBridgeToKotlinVisitor {
         }
         functionDeclaration.body = KotlinCodeBlock(statements: bodySourceCode.map { KotlinRawStatement(sourceCode: $0) })
 
-        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_hashvalue(Swift_peer: skip.bridge.kt.SwiftObjectPointer): Long")
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_hashvalue(Swift_peer: skip.bridge.SwiftObjectPointer): Long")
         classDeclaration.insert(statements: [externalFunctionDeclaration], after: functionDeclaration)
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: false, name: "Swift_hashvalue", translator: translator)
@@ -851,7 +851,7 @@ final class KotlinBridgeToKotlinVisitor {
         let sourceCode: [String]
         let cdeclFunction: CDeclFunction?
         if !classDeclaration.generics.isEmpty, classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
-            let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_hashvalue(Swift_peer: skip.bridge.kt.SwiftObjectPointer): Long")
+            let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_hashvalue(Swift_peer: skip.bridge.SwiftObjectPointer): Long")
             statements = [hash, externalFunctionDeclaration]
             sourceCode = ["return Swift_hashvalue(Swift_peer).hashCode()"]
 
@@ -1045,7 +1045,7 @@ final class KotlinBridgeToKotlinVisitor {
         var insertStatements: [KotlinStatement] = []
         if !isNonGenericEnum {
             if subclassDepth < 1 {
-                classDeclaration.inherits.append(.named("skip.bridge.kt.SwiftPeerBridged", []))
+                classDeclaration.inherits.append(.named("skip.bridge.SwiftPeerBridged", []))
 
                 let swiftPeerType: TypeSignature = .swiftObjectPointer(kotlin: true)
                 let swiftPeer = KotlinVariableDeclaration(names: ["Swift_peer"], variableTypes: [swiftPeerType])
@@ -1053,7 +1053,7 @@ final class KotlinBridgeToKotlinVisitor {
                 swiftPeer.modifiers.visibility = .public
                 swiftPeer.apiFlags.options = .writeable
                 swiftPeer.declaredType = swiftPeerType
-                swiftPeer.value = KotlinRawExpression(sourceCode: "skip.bridge.kt.SwiftObjectNil")
+                swiftPeer.value = KotlinRawExpression(sourceCode: "skip.bridge.SwiftObjectNil")
                 swiftPeer.isGenerated = true
                 insertStatements.append(swiftPeer)
             }
@@ -1061,7 +1061,7 @@ final class KotlinBridgeToKotlinVisitor {
             if !classDeclaration.isSealedClassesEnum {
                 let swiftPeerConstructor = KotlinFunctionDeclaration(name: "constructor")
                 swiftPeerConstructor.modifiers.visibility = .public
-                swiftPeerConstructor.parameters = [Parameter<KotlinExpression>(externalLabel: "Swift_peer", declaredType: .swiftObjectPointer(kotlin: true)), Parameter<KotlinExpression>(externalLabel: "marker", declaredType: .named("skip.bridge.kt.SwiftPeerMarker", []).asOptional(true))]
+                swiftPeerConstructor.parameters = [Parameter<KotlinExpression>(externalLabel: "Swift_peer", declaredType: .swiftObjectPointer(kotlin: true)), Parameter<KotlinExpression>(externalLabel: "marker", declaredType: .named("skip.bridge.SwiftPeerMarker", []).asOptional(true))]
                 if subclassDepth < 1 {
                     if let superclassCall {
                         swiftPeerConstructor.delegatingConstructorCall = KotlinRawExpression(sourceCode: superclassCall)
@@ -1082,13 +1082,13 @@ final class KotlinBridgeToKotlinVisitor {
                 finalize.modifiers.visibility = .public
                 finalize.body = KotlinCodeBlock(statements: [
                     "Swift_release(Swift_peer)",
-                    "Swift_peer = skip.bridge.kt.SwiftObjectNil"
+                    "Swift_peer = skip.bridge.SwiftObjectNil"
                 ].map { KotlinRawStatement(sourceCode: $0) })
                 finalize.ensureLeadingNewlines(1)
                 finalize.isGenerated = true
                 insertStatements.append(finalize)
 
-                let release = KotlinRawStatement(sourceCode: "private external fun Swift_release(Swift_peer: skip.bridge.kt.SwiftObjectPointer)")
+                let release = KotlinRawStatement(sourceCode: "private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)")
                 insertStatements.append(release)
             }
 
@@ -1110,7 +1110,7 @@ final class KotlinBridgeToKotlinVisitor {
                 insertStatements.append(constructor)
 
                 let externalConstructorName = subclassDepth >= 1 ? "Swift_Companion_constructor" : "Swift_constructor"
-                let externalConstructor = KotlinRawStatement(sourceCode: "private external fun \(externalConstructorName)(): skip.bridge.kt.SwiftObjectPointer")
+                let externalConstructor = KotlinRawStatement(sourceCode: "private external fun \(externalConstructorName)(): skip.bridge.SwiftObjectPointer")
                 externalConstructor.isStatic = subclassDepth >= 1
                 insertStatements.append(externalConstructor)
 
@@ -1284,7 +1284,7 @@ final class KotlinBridgeToKotlinVisitor {
                 swift.append(1, "}")
             }
             if classDeclaration.declarationType != .enumDeclaration {
-                swift.append(1, declareStaticLet("Java_constructor_methodID", ofType: "JavaMethodID", in: classDeclaration.signature, value: "Java_class.getMethodID(name: \"<init>\", sig: \"(JLskip/bridge/kt/SwiftPeerMarker;)V\")!"))
+                swift.append(1, declareStaticLet("Java_constructor_methodID", ofType: "JavaMethodID", in: classDeclaration.signature, value: "Java_class.getMethodID(name: \"<init>\", sig: \"(JLskip/bridge/SwiftPeerMarker;)V\")!"))
                 if subclassDepth >= 1 {
                     swift.append(1, declareStaticLet("Java_subclass\(subclassDepth)Constructor", ofType: "(JClass, JavaMethodID)", visibility: finalMemberVisibility, in: classDeclaration.signature, value: "(Java_class, Java_constructor_methodID)"))
                 }
@@ -1542,7 +1542,7 @@ final class KotlinBridgeToKotlinVisitor {
 
     private func viewInitState(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let externalName = "Swift_initState_\(name)"
-        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.kt.SwiftObjectPointer): skip.ui.StateSupport")
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport")
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
@@ -1562,7 +1562,7 @@ final class KotlinBridgeToKotlinVisitor {
 
     private func viewSyncState(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let externalName = "Swift_syncState_\(name)"
-        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.kt.SwiftObjectPointer, support: skip.ui.StateSupport)")
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.StateSupport)")
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
@@ -1583,7 +1583,7 @@ final class KotlinBridgeToKotlinVisitor {
 
     private func viewInitEnvironment(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let externalName = "Swift_initEnvironment_\(name)"
-        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.kt.SwiftObjectPointer): String")
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer): String")
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
@@ -1603,7 +1603,7 @@ final class KotlinBridgeToKotlinVisitor {
 
     private func viewSyncEnvironment(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let externalName = "Swift_syncEnvironment_\(name)"
-        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.kt.SwiftObjectPointer, support: skip.ui.EnvironmentSupport?)")
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.EnvironmentSupport?)")
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
@@ -1633,7 +1633,7 @@ final class KotlinBridgeToKotlinVisitor {
         functionDeclaration.body?.disallowSingleStatementAppend = true
         functionDeclaration.parent = classDeclaration
 
-        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.kt.SwiftObjectPointer): skip.ui.View?")
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.View?")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: false, name: externalName, translator: translator)
         let cdeclSignature: TypeSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))], .optional(.javaObjectPointer), APIFlags(), nil)

@@ -151,6 +151,14 @@ struct CDeclFunction {
     }
 }
 
+extension CodebaseInfo {
+    /// Whether this module is a native module using SkipFuse.
+    var isNativeFuseModule: Bool {
+        let fuseModuleNames: Set<String> = ["SkipFuse", "SkipFuseUI"]
+        return dependentModules.contains(where: { fuseModuleNames.contains($0.moduleName ?? "") }) == true
+    }
+}
+
 extension Source.FilePath {
     /// Return the JNI class name for this file in the given package.
     func jniClassName(packageName: String?) -> String {
@@ -188,7 +196,7 @@ extension TypeSignature {
     static let javaObjectPointer: TypeSignature = .named("JavaObjectPointer", [])
     static let javaString: TypeSignature = .named("JavaString", [])
     static func swiftObjectPointer(kotlin: Bool) -> TypeSignature {
-        return kotlin ? .named("skip.bridge.kt.SwiftObjectPointer", []) : .named("SwiftObjectPointer", [])
+        return kotlin ? .named("skip.bridge.SwiftObjectPointer", []) : .named("SwiftObjectPointer", [])
     }
 
     /// The generated native type used when bridging a protocol with unknown implementation.
