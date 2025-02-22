@@ -320,9 +320,15 @@ import PackagePlugin
             })
 
             // output additional files for native support code generation
-            outputFiles.append(skipBridgeOutputDir.appending(subpath: "AnyDynamicObject_Support.swift")) // SkipSyntax.KotlinDynamicObjectTransformer.supportFileName
-            outputFiles.append(skipBridgeOutputDir.appending(subpath: "Bundle_Support.swift")) // SkipSyntax.KotlinBundleTransformer.supportFileName
-
+            let nativeSupportFileNames = [
+                "AnyDynamicObject_Support.swift", // SkipSyntax.KotlinDynamicObjectTransformer.supportFileName
+                "Bundle_Support.swift", // SkipSyntax.KotlinBundleTransformer.supportFileName
+                "UserDefaults_Support.swift", // SkipSyntax.KotlinUserDefaultsTransformer.supportFileName
+            ]
+            for fileName in nativeSupportFileNames {
+                outputFiles.append(skipBridgeOutputDir.appending(subpath: fileName))
+            }
+            
             buildArguments += ["--skip-bridge-output", skipBridgeOutputDir.string]
         }
 
