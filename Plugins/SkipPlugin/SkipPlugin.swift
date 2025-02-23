@@ -319,9 +319,16 @@ import PackagePlugin
                 return skipBridgeOutputDir.appending(subpath: bridgeName)
             })
 
-            // output an additional file for dynamic object code generation
-            outputFiles.append(skipBridgeOutputDir.appending(subpath: "AnyDynamicObject_Support.swift")) // SkipSyntax.KotlinDynamicObjectTransformer.supportFileName
-
+            // output additional files for native support code generation
+            let nativeSupportFileNames = [
+                "AnyDynamicObject_Support.swift", // SkipSyntax.KotlinDynamicObjectTransformer.supportFileName
+                "Bundle_Support.swift", // SkipSyntax.KotlinBundleTransformer.supportFileName
+                "UserDefaults_Support.swift", // SkipSyntax.KotlinUserDefaultsTransformer.supportFileName
+            ]
+            for fileName in nativeSupportFileNames {
+                outputFiles.append(skipBridgeOutputDir.appending(subpath: fileName))
+            }
+            
             buildArguments += ["--skip-bridge-output", skipBridgeOutputDir.string]
         }
 
