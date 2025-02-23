@@ -479,15 +479,16 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 }
 
                 // write support files
-                let dynamicSupportFileName = KotlinDynamicObjectTransformer.supportFileName
-                let dynamicSupportContents: String
-                if let dynamicSupportTranspilation = swiftBridgeFileNameTranspilationMap[dynamicSupportFileName] {
-                    dynamicSupportContents = dynamicSupportTranspilation.output.content
-                } else {
-                    dynamicSupportContents = ""
+                for supportFileName in [KotlinDynamicObjectTransformer.supportFileName, KotlinBundleTransformer.supportFileName, KotlinUserDefaultsTransformer.supportFileName] {
+                    let supportContents: String
+                    if let supportTranspilation = swiftBridgeFileNameTranspilationMap[supportFileName] {
+                        supportContents = supportTranspilation.output.content
+                    } else {
+                        supportContents = ""
+                    }
+                    let supportOutputPath = skipBridgeOutputFolder.appending(components: [supportFileName])
+                    try writeChanges(tag: "skipbridge", to: supportOutputPath, contents: supportContents.utf8Data, readOnly: true)
                 }
-                let dynamicSupportOutputPath = skipBridgeOutputFolder.appending(components: [dynamicSupportFileName])
-                try writeChanges(tag: "skipbridge", to: dynamicSupportOutputPath, contents: dynamicSupportContents.utf8Data, readOnly: true)
 
                 return
             }

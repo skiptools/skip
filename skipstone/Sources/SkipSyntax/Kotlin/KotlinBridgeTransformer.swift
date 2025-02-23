@@ -41,10 +41,12 @@ public final class KotlinBridgeTransformer: KotlinTransformer {
 
     public func gather(from syntaxTree: SyntaxTree) {
         // Add attributes marking bridged types so that they're recorded in our codebase info
+        let isBridgeFile = syntaxTree.isBridgeFile
         syntaxTree.root.visit { node in
             if let typeDeclaration = node as? TypeDeclaration, typeDeclaration.type != .extensionDeclaration {
-                if isBridging(attributes: typeDeclaration.attributes, isPublic: typeDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) {
-                    if syntaxTree.isBridgeFile {
+                let isNativeIfSkipBlock = isBridgeFile && typeDeclaration.isInIfSkipBlock()
+                if isBridging(attributes: typeDeclaration.attributes, visibility: typeDeclaration.modifiers.visibility, autoBridge: isNativeIfSkipBlock ? .internal : syntaxTree.autoBridge) {
+                    if isBridgeFile && !isNativeIfSkipBlock {
                         typeDeclaration.attributes.attributes.append(.bridgeToKotlin)
                     } else {
                         typeDeclaration.attributes.attributes.append(.bridgeToSwift)
@@ -52,8 +54,9 @@ public final class KotlinBridgeTransformer: KotlinTransformer {
                 }
                 return .recurse(nil)
             } else if let typealiasDeclaration = node as? TypealiasDeclaration {
-                if isBridging(attributes: typealiasDeclaration.attributes, isPublic: typealiasDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) {
-                    if syntaxTree.isBridgeFile {
+                let isNativeIfSkipBlock = isBridgeFile && typealiasDeclaration.isInIfSkipBlock()
+                if isBridging(attributes: typealiasDeclaration.attributes, visibility: typealiasDeclaration.modifiers.visibility, autoBridge: isNativeIfSkipBlock ? .internal : syntaxTree.autoBridge) {
+                    if isBridgeFile && !isNativeIfSkipBlock {
                         typealiasDeclaration.attributes.attributes.append(.bridgeToKotlin)
                     } else {
                         typealiasDeclaration.attributes.attributes.append(.bridgeToSwift)

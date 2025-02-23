@@ -1,21 +1,23 @@
 /// Determines what API is bridged without being explicitly annotated.
-public enum AutoBridge {
+public enum AutoBridge: Int {
     /// Bridge only API with bridge attribute.
     case none
+    /// Bridge all internal or public API that isn't explicitly excluded.
+    case `internal`
     /// Bridge all public API that isn't explicitly excluded.
     case `public`
 }
 
 /// Whether a declaration is briging.
-func isBridging(attributes: Attributes, isPublic: Bool, autoBridge: AutoBridge) -> Bool {
+func isBridging(attributes: Attributes, visibility: Modifiers.Visibility, autoBridge: AutoBridge) -> Bool {
     guard !attributes.isBridge else {
         return true
     }
-    guard autoBridge == .public else {
+    guard autoBridge != .none else {
         return false
     }
     guard !attributes.isNoBridge else {
         return false
     }
-    return isPublic
+    return visibility >= .public || (autoBridge == .internal && visibility > .fileprivate)
 }

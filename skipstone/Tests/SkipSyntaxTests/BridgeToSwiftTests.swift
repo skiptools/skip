@@ -691,28 +691,28 @@ final class BridgeToSwiftTests: XCTestCase {
         public final class C {
         }
         """, kotlins: ["""
-        class C: skip.bridge.kt.SwiftPeerBridged, skip.lib.SwiftProjecting {
-            var Swift_peer: skip.bridge.kt.SwiftObjectPointer = skip.bridge.kt.SwiftObjectNil
+        class C: skip.bridge.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.SwiftObjectPointer = skip.bridge.SwiftObjectNil
         
-            constructor(Swift_peer: skip.bridge.kt.SwiftObjectPointer, marker: skip.bridge.kt.SwiftPeerMarker?) {
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
                 this.Swift_peer = Swift_peer
             }
         
             fun finalize() {
                 Swift_release(Swift_peer)
-                Swift_peer = skip.bridge.kt.SwiftObjectNil
+                Swift_peer = skip.bridge.SwiftObjectNil
             }
-            private external fun Swift_release(Swift_peer: skip.bridge.kt.SwiftObjectPointer)
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
         
             constructor() {
                 Swift_peer = Swift_constructor()
             }
-            private external fun Swift_constructor(): skip.bridge.kt.SwiftObjectPointer
+            private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer
         
-            override fun Swift_peer(): skip.bridge.kt.SwiftObjectPointer = Swift_peer
+            override fun Swift_peer(): skip.bridge.SwiftObjectPointer = Swift_peer
         
             override fun equals(other: Any?): Boolean {
-                if (other !is skip.bridge.kt.SwiftPeerBridged) return false
+                if (other !is skip.bridge.SwiftPeerBridged) return false
                 return Swift_peer == other.Swift_peer()
             }
         
@@ -737,7 +737,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
                 return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
             }
-            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/kt/SwiftPeerMarker;)V")!
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
         }
         @_cdecl("Java_C_Swift_1constructor")
         func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {

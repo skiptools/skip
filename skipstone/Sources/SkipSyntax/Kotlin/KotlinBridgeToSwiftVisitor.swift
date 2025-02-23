@@ -22,15 +22,15 @@ final class KotlinBridgeToSwiftVisitor {
 
     func visit() -> [KotlinTransformerOutput] {
         let globalsClassRef = JavaClassRef(forFileName: translator.syntaxTree.source.file.name, packageName: translator.packageName)
+        let isBridgeFile = syntaxTree.isBridgeFile
         var swiftDefinitions: [SwiftDefinition] = []
         var needsGlobalsJavaClass = false
         var globalFunctionCount = 0
         var hasContentComposer = false
-        syntaxTree.root.visit(ifSkipBlockContent: syntaxTree.isBridgeFile) { node in
+        syntaxTree.root.visit(ifSkipBlockContent: isBridgeFile) { node in
             if let variableDeclaration = node as? KotlinVariableDeclaration {
                 let variableIsBridging = {
-                    return (self.syntaxTree.isBridgeFile && variableDeclaration.modifiers.visibility > .fileprivate && !variableDeclaration.attributes.isNoBridge)
-                    || isBridging(attributes: variableDeclaration.attributes, isPublic: variableDeclaration.modifiers.visibility >= .public, autoBridge: self.syntaxTree.autoBridge)
+                    return isBridging(attributes: variableDeclaration.attributes, visibility: variableDeclaration.modifiers.visibility, autoBridge: isBridgeFile ? .internal : self.syntaxTree.autoBridge)
                 }
                 if variableDeclaration.role == .global, variableIsBridging() {
                     needsGlobalsJavaClass = update(global: variableDeclaration, swiftDefinitions: &swiftDefinitions, globalsClassRef: globalsClassRef) || needsGlobalsJavaClass
@@ -41,8 +41,7 @@ final class KotlinBridgeToSwiftVisitor {
                 return .skip
             } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
                 let functionIsBridging = {
-                    return (self.syntaxTree.isBridgeFile && functionDeclaration.modifiers.visibility > .fileprivate && !functionDeclaration.attributes.isNoBridge)
-                    || isBridging(attributes: functionDeclaration.attributes, isPublic: functionDeclaration.modifiers.visibility >= .public, autoBridge: self.syntaxTree.autoBridge)
+                    return isBridging(attributes: functionDeclaration.attributes, visibility: functionDeclaration.modifiers.visibility, autoBridge: isBridgeFile ? .internal : self.syntaxTree.autoBridge)
                 }
                 if functionDeclaration.role == .global, functionIsBridging() {
                     if update(global: functionDeclaration, uniquifier: globalFunctionCount, swiftDefinitions: &swiftDefinitions, globalsClassRef: globalsClassRef) {
@@ -56,19 +55,19 @@ final class KotlinBridgeToSwiftVisitor {
                 return .skip
             } else if let classDeclaration = node as? KotlinClassDeclaration {
                 hasContentComposer = hasContentComposer || (syntaxTree.isBridgeFile && updateContentComposer(classDeclaration))
-                if (syntaxTree.isBridgeFile && classDeclaration.modifiers.visibility > .fileprivate && !classDeclaration.attributes.isNoBridge) || isBridging(attributes: classDeclaration.attributes, isPublic: classDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) {
+                if isBridging(attributes: classDeclaration.attributes, visibility: classDeclaration.modifiers.visibility, autoBridge: isBridgeFile ? .internal : syntaxTree.autoBridge) {
                     update(classDeclaration, swiftDefinitions: &swiftDefinitions)
                     checkIfNotSkipBridge(classDeclaration)
                 }
                 return .recurse(nil)
             } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
-                if isBridging(attributes: interfaceDeclaration.attributes, isPublic: interfaceDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) {
+                if isBridging(attributes: interfaceDeclaration.attributes, visibility: interfaceDeclaration.modifiers.visibility, autoBridge: isBridgeFile ? .internal : syntaxTree.autoBridge) {
                     update(interfaceDeclaration, swiftDefinitions: &swiftDefinitions)
                     checkIfNotSkipBridge(interfaceDeclaration)
                 }
                 return .recurse(nil)
             } else if let typealiasDeclaration = node as? KotlinTypealiasDeclaration {
-                if isBridging(attributes: typealiasDeclaration.attributes, isPublic:  typealiasDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) {
+                if isBridging(attributes: typealiasDeclaration.attributes, visibility:  typealiasDeclaration.modifiers.visibility, autoBridge: isBridgeFile ? .internal : syntaxTree.autoBridge) {
                     update(typealiasDeclaration, swiftDefinitions: &swiftDefinitions)
                     checkIfNotSkipBridge(typealiasDeclaration)
                 }
@@ -877,7 +876,7 @@ final class KotlinBridgeToSwiftVisitor {
                 guard !variableDeclaration.isGenerated else {
                     continue
                 }
-                guard (syntaxTree.isBridgeFile && variableDeclaration.modifiers.visibility > .fileprivate && !variableDeclaration.attributes.isNoBridge) || isBridging(attributes: variableDeclaration.attributes, isPublic: variableDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) else {
+                guard isBridging(attributes: variableDeclaration.attributes, visibility: variableDeclaration.modifiers.visibility, autoBridge: syntaxTree.isBridgeFile ? .internal : syntaxTree.autoBridge) else {
                     continue
                 }
                 let info = typeInfos.flatMap({ $0.variables }).first(where: { $0.name == (variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName) && $0.modifiers.visibility >= .fileprivate })
@@ -888,7 +887,7 @@ final class KotlinBridgeToSwiftVisitor {
                 guard !functionDeclaration.isGenerated || functionDeclaration.type == .constructorDeclaration else {
                     continue
                 }
-                guard (syntaxTree.isBridgeFile && functionDeclaration.modifiers.visibility > .fileprivate && !functionDeclaration.attributes.isNoBridge) || isBridging(attributes: functionDeclaration.attributes, isPublic: functionDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) else {
+                guard isBridging(attributes: functionDeclaration.attributes, visibility: functionDeclaration.modifiers.visibility, autoBridge: syntaxTree.isBridgeFile ? .internal : syntaxTree.autoBridge) else {
                     continue
                 }
                 // Don't attempt to bridge @Composable functions
@@ -1227,13 +1226,13 @@ final class KotlinBridgeToSwiftVisitor {
         var functionCount = 0
         for member in interfaceDeclaration.members {
             if let variableDeclaration = member as? KotlinVariableDeclaration {
-                guard isBridging(attributes: variableDeclaration.attributes, isPublic: interfaceDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) else {
+                guard isBridging(attributes: variableDeclaration.attributes, visibility: interfaceDeclaration.modifiers.visibility, autoBridge: syntaxTree.autoBridge) else {
                     continue
                 }
                 let info = primaryTypeInfo.variables.first { $0.name == (variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName) }
                 update(member: variableDeclaration, info: info, in: interfaceDeclaration, swiftDefinitions: &memberDefinitions)
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
-                guard isBridging(attributes: functionDeclaration.attributes, isPublic: interfaceDeclaration.modifiers.visibility >= .public, autoBridge: syntaxTree.autoBridge) else {
+                guard isBridging(attributes: functionDeclaration.attributes, visibility: interfaceDeclaration.modifiers.visibility, autoBridge: syntaxTree.autoBridge) else {
                     continue
                 }
                 let info = primaryTypeInfo.functions.first(where: { $0.name == (functionDeclaration.preEscapedName ?? functionDeclaration.name) && $0.signature == functionDeclaration.functionType && $0.modifiers.visibility >= .fileprivate })
@@ -1288,7 +1287,7 @@ final class KotlinBridgeToSwiftVisitor {
             } else if protocolSignature.isComparable {
                 swift.append(1, self.swift(forLessThanDeclarationIn: bridgeImpl, options: options, modifiers: Modifiers(visibility: protocolVisibility, isStatic: true)))
             } else if let protocolInfo = codebaseInfo.primaryTypeInfo(forNamed: protocolSignature) {
-                guard isBridging(attributes: protocolInfo.attributes, isPublic: protocolInfo.modifiers.visibility >= .public, autoBridge: autoBridge) else {
+                guard isBridging(attributes: protocolInfo.attributes, visibility: protocolInfo.modifiers.visibility, autoBridge: autoBridge) else {
                     continue
                 }
                 swift.append(1, self.swift(forProtocolBridgeImplMembers: protocolInfo, visibility: protocolVisibility, options: options, codebaseInfo: codebaseInfo, autoBridge: autoBridge, functionCount: &functionCount))
@@ -1315,7 +1314,7 @@ final class KotlinBridgeToSwiftVisitor {
     }
 
     private static func swift(forProtocolBridgeImplVariable variableInfo: CodebaseInfo.VariableInfo, in info: CodebaseInfo.TypeInfo, visibility: Modifiers.Visibility, options: KotlinBridgeOptions, codebaseInfo: CodebaseInfo.Context, autoBridge: AutoBridge) -> [String] {
-        guard isBridging(attributes: variableInfo.attributes, isPublic: visibility >= .public, autoBridge: autoBridge) else {
+        guard isBridging(attributes: variableInfo.attributes, visibility: visibility, autoBridge: autoBridge) else {
             return []
         }
         guard let bridgable = variableInfo.signature.checkBridgable(direction: .any, options: options, generics: info.generics, codebaseInfo: codebaseInfo) else {
@@ -1328,7 +1327,7 @@ final class KotlinBridgeToSwiftVisitor {
     }
 
     private static func swift(forProtocolBridgeImplFunction functionInfo: CodebaseInfo.FunctionInfo, in info: CodebaseInfo.TypeInfo, visibility: Modifiers.Visibility, options: KotlinBridgeOptions, codebaseInfo: CodebaseInfo.Context, autoBridge: AutoBridge, uniquifier: Int) -> [String] {
-        guard isBridging(attributes: functionInfo.attributes, isPublic: visibility >= .public, autoBridge: autoBridge) else {
+        guard isBridging(attributes: functionInfo.attributes, visibility: visibility, autoBridge: autoBridge) else {
             return []
         }
         guard let bridgable = functionInfo.signature.checkFunctionBridgable(direction: .any, isConstructor: functionInfo.declarationType == .initDeclaration, options: options, generics: info.generics.merge(overrides: functionInfo.generics, addNew: true), codebaseInfo: codebaseInfo) else {
@@ -1382,7 +1381,7 @@ final class KotlinBridgeToSwiftVisitor {
     }
 
     private static func swift(forProtocolExtensionVariable variableInfo: CodebaseInfo.VariableInfo, in info: CodebaseInfo.TypeInfo, visibility: Modifiers.Visibility, options: KotlinBridgeOptions, codebaseInfo: CodebaseInfo.Context, autoBridge: AutoBridge) -> [String] {
-        guard isBridging(attributes: variableInfo.attributes, isPublic: visibility >= .public, autoBridge: autoBridge) else {
+        guard isBridging(attributes: variableInfo.attributes, visibility: visibility, autoBridge: autoBridge) else {
             return []
         }
         guard let bridgable = variableInfo.signature.checkBridgable(direction: .any, options: options, generics: info.generics, codebaseInfo: codebaseInfo) else {
@@ -1394,7 +1393,7 @@ final class KotlinBridgeToSwiftVisitor {
     }
 
     private static func swift(forProtocolExtensionFunction functionInfo: CodebaseInfo.FunctionInfo, in info: CodebaseInfo.TypeInfo, visibility: Modifiers.Visibility, options: KotlinBridgeOptions, codebaseInfo: CodebaseInfo.Context, autoBridge: AutoBridge, uniquifier: Int) -> [String] {
-        guard isBridging(attributes: functionInfo.attributes, isPublic: visibility >= .public, autoBridge: autoBridge) else {
+        guard isBridging(attributes: functionInfo.attributes, visibility: visibility, autoBridge: autoBridge) else {
             return []
         }
         guard let bridgable = functionInfo.signature.checkFunctionBridgable(direction: .any, isConstructor: functionInfo.declarationType == .initDeclaration, options: options, generics: info.generics.merge(overrides: functionInfo.generics, addNew: true), codebaseInfo: codebaseInfo) else {
