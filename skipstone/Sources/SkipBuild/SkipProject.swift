@@ -964,7 +964,7 @@ struct TestData : Codable, Hashable {
         let readmeURL = projectFolderURL.appending(path: "README.md")
         let primaryModuleName = modules.first?.moduleName ?? "Module"
 
-        let libREADME = """
+        var libREADME = """
         # \(primaryModuleName)
 
         This is a \(free ? "free " : "")[Skip](https://skip.tools) Swift/Kotlin library project containing the following modules:
@@ -993,8 +993,24 @@ struct TestData : Codable, Hashable {
 
         """
 
+        if free {
+            libREADME += """
+            
+            ## License
 
-        let appREADME = """
+            This software is licensed under the
+            [GNU Lesser General Public License v3.0](https://spdx.org/licenses/LGPL-3.0-only.html),
+            with the following
+            [linking exception](https://spdx.org/licenses/LGPL-3.0-linking-exception.html)
+            to clarify that distribution to restricted envrionments (e.g., app stores) is permitted:
+            
+            \("> " + licenseLGPLLinkingExceptionContents.split(separator: "\n").joined(separator: "\n> "))
+            
+            """
+        }
+
+
+        var appREADME = """
         # \(primaryModuleName)
 
         This is a \(free ? "free " : "")[Skip](https://skip.tools) dual-platform app project.
@@ -1040,13 +1056,23 @@ struct TestData : Codable, Hashable {
 
         """
 
+        if free {
+            appREADME += """
+            
+            ## License
+
+            This software is licensed under the [GNU General Public License v3.0](https://spdx.org/licenses/GPL-3.0-only.html).
+
+            """
+        }
+
         try (app ? appREADME : libREADME).write(to: readmeURL, atomically: false, encoding: .utf8)
 
         if free == true {
             if app {
                 try licenseGPLContents.write(to: projectFolderURL.appending(path: "LICENSE.GPL"), atomically: false, encoding: .utf8)
             } else {
-                try licenseLGPLContents.write(to: projectFolderURL.appending(path: "LICENSE.LGPL"), atomically: false, encoding: .utf8)
+                try (licenseLGPLLinkingExceptionContents + licenseLGPLContents).write(to: projectFolderURL.appending(path: "LICENSE.LGPL"), atomically: false, encoding: .utf8)
             }
         }
 
@@ -3205,6 +3231,30 @@ permanent authorization for you to choose that version for the
 Library.
 
 """
+
+let licenseLGPLLinkingExceptionContents = """
+This software is licensed under the LGPL3, included below.
+
+As a special exception to the GNU Lesser General Public License version 3
+("LGPL3"), the copyright holders of this Library give you permission to
+convey to a third party a Combined Work that links statically or dynamically
+to this Library without providing any Minimal Corresponding Source or
+Minimal Application Code as set out in 4d or providing the installation
+information set out in section 4e, provided that you comply with the other
+provisions of LGPL3 and provided that you meet, for the Application the
+terms and conditions of the license(s) which apply to the Application.
+
+Except as stated in this special exception, the provisions of LGPL3 will
+continue to comply in full to this Library. If you modify this Library, you
+may apply this exception to your version of this Library, but you are not
+obliged to do so. If you do not wish to do so, delete this exception
+statement from your version. This exception does not (and cannot) modify any
+license terms which apply to the Application, with which you must still
+comply.
+
+
+"""
+
 
 let licenseGPLContents = """
                     GNU GENERAL PUBLIC LICENSE

@@ -847,7 +847,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                     continue // skip hidden files
                 }
 
-                if path.basename == buildSrcFolderName {
+                if path.basename == buildSrcFolderName || fileName == buildSrcFolderName {
                     continue // don't copy buildSrc into resources
                 }
 
