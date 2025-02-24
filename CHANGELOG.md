@@ -1,0 +1,1 @@
+- Newly created free projects will include SPDX license identifier in header
