@@ -267,13 +267,13 @@ final class SkipCommandTests: XCTestCase {
 
         let XCSkipTests = try load("Tests/FreeModuleTests/XCSkipTests.swift")
         XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
-        XCTAssertTrue(XCSkipTests.contains("This is free software"))
+        XCTAssertTrue(XCSkipTests.hasPrefix(SourceLicense.lgplLinkingException.sourceHeader), "bad source license in: \(XCSkipTests)")
 
         let FreeModuleTests = try load("Tests/FreeModuleTests/FreeModuleTests.swift")
-        XCTAssertTrue(FreeModuleTests.contains("This is free software"))
+        XCTAssertTrue(FreeModuleTests.hasPrefix(SourceLicense.lgplLinkingException.sourceHeader), "bad source license in: \(FreeModuleTests)")
 
         let FreeModule = try load("Sources/FreeModule/FreeModule.swift")
-        XCTAssertTrue(FreeModule.contains("This is free software"))
+        XCTAssertTrue(FreeModule.hasPrefix(SourceLicense.lgplLinkingException.sourceHeader), "bad source license in: \(FreeModule)")
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
@@ -344,7 +344,7 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
         │  └─ Sources
-        │     └─ APPNAMEAppMain.swift
+        │     └─ Main.swift
         ├─ LICENSE.GPL
         ├─ Package.swift
         ├─ README.md
@@ -417,7 +417,7 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
         │  ├─ Sources
-        │  │  └─ APPNAMEAppMain.swift
+        │  │  └─ Main.swift
         │  └─ fastlane
         │     ├─ AppStore.xcconfig
         │     ├─ Appfile
@@ -546,7 +546,7 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
         │  └─ Sources
-        │     └─ APPNAMEAppMain.swift
+        │     └─ Main.swift
         ├─ LICENSE.GPL
         ├─ Package.swift
         ├─ README.md
@@ -893,7 +893,7 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
         │  └─ Sources
-        │     └─ APP_MODULEAppMain.swift
+        │     └─ Main.swift
         ├─ Package.swift
         ├─ README.md
         ├─ Skip.env
@@ -1077,7 +1077,7 @@ final class SkipCommandTests: XCTestCase {
         │  │  └─ project.pbxproj
         │  ├─ Info.plist
         │  ├─ Sources
-        │  │  └─ FreeAppAppMain.swift
+        │  │  └─ Main.swift
         │  └─ fastlane
         │     ├─ AppStore.xcconfig
         │     ├─ Appfile
@@ -1217,7 +1217,7 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
         │  ├─ Sources
-        │  │  └─ TOP_MODULEAppMain.swift
+        │  │  └─ Main.swift
         │  ├─ TOP_MODULE.xcconfig
         │  └─ TOP_MODULE.xcodeproj
         │     └─ project.pbxproj
@@ -1361,7 +1361,7 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ M1.xcodeproj
         │  │  └─ project.pbxproj
         │  └─ Sources
-        │     └─ M1AppMain.swift
+        │     └─ Main.swift
         ├─ Package.swift
         ├─ README.md
         ├─ Skip.env
@@ -1487,7 +1487,7 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ M1.xcodeproj
         │  │  └─ project.pbxproj
         │  └─ Sources
-        │     └─ M1AppMain.swift
+        │     └─ Main.swift
         ├─ Package.swift
         ├─ README.md
         ├─ Skip.env

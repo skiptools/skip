@@ -56,7 +56,7 @@ class FrameworkProjectLayout {
         let sourcesURL = try projectFolderURL.append(path: "Sources", create: true)
 
         // a free app is GPL, a free library is LGPL
-        let sourceHeader = free ? freeLicenseHeader(type: app ? nil : "Lesser") : ""
+        let sourceHeader = free ? (SourceLicense.defaultLicense(app: app).sourceHeader + "\n\n") : ""
 
         // the part of a target parameter that will only include skip when zero is not set
         //let skipCondition = skipZeroSupport ? ", condition: skip" : "" // we don't use the condition parameter of target because it excludes
@@ -1128,7 +1128,7 @@ class AppProjectLayout : FrameworkProjectLayout {
         self.darwinFolder = try root.resolve("Darwin/", check: check)
         self.darwinREADME = darwinFolder.resolve("README.md", check: optional)
         self.darwinSourcesFolder = try darwinFolder.resolve("Sources/", check: check)
-        self.darwinMainAppSwift = try darwinSourcesFolder.resolve(moduleName + "AppMain.swift", check: check)
+        self.darwinMainAppSwift = try darwinSourcesFolder.resolve("Main.swift", check: check)
         self.darwinProjectConfig = try darwinFolder.resolve(moduleName + ".xcconfig", check: check)
         self.darwinProjectFolder = try darwinFolder.resolve(moduleName + ".xcodeproj/", check: check)
         self.darwinProjectContents = try darwinProjectFolder.resolve("project.pbxproj", check: check)
@@ -1172,7 +1172,7 @@ class AppProjectLayout : FrameworkProjectLayout {
 
     static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, appfair: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, icon: IconParameters?, version: String?, mode: ModuleMode, moduleTests: Bool, github: Bool, fastlane: Bool, packageResolved packageResolvedURL: URL? = nil) async throws -> (baseURL: URL, project: AppProjectLayout) {
 
-        let sourceHeader = free ? freeLicenseHeader(type: nil) : ""
+        let sourceHeader = free ? (SourceLicense.defaultLicense(app: true).sourceHeader + "\n\n") : ""
 
         if modules.contains(where: { module in
             module.moduleName.lowercased() == projectName.lowercased()
@@ -1214,9 +1214,6 @@ class AppProjectLayout : FrameworkProjectLayout {
         try appProject.darwinProjectFolder.createDirectory()
 
         let primaryModuleAppMainURL = appProject.darwinMainAppSwift
-        let appMainSwiftFileName = primaryModuleAppMainURL.lastPathComponent
-        let primaryModuleAppMainPath = primaryModuleAppMainURL.deletingLastPathComponent().lastPathComponent + "/" + appMainSwiftFileName
-        let _ = primaryModuleAppMainPath
         let primaryModuleSources = sourcesFolderName + "/" + primaryModuleName
         let entitlements_name = appProject.darwinEntitlementsPlist.lastPathComponent
         let entitlements_path = entitlements_name // same folder
@@ -1304,6 +1301,7 @@ GENERATE_INFOPLIST_FILE = YES
 // The user-visible name of the app (localizable)
 //INFOPLIST_KEY_CFBundleDisplayName = App Name
 //INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.utilities
+//INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app uses your location to …"
 
 // iOS-specific Info.plist property keys
 INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphone*] = YES
@@ -1714,14 +1712,56 @@ New features and better performance.
 
         }
 
-        // Darwin/Sources/MODULEAppMain.swift
+        // Darwin/Sources/Main.swift
         let appMainContents = """
         \(sourceHeader)import SwiftUI
         import \(primaryModuleName)
 
         /// The entry point to the app simply loads the App implementation from SPM module.
-        @main struct AppMain: App, \(primaryModuleAppTarget) {
+        @main struct AppMain: App {
+            #if canImport(UIKit)
+            @UIApplicationDelegateAdaptor(AppMainDelete.self) var appDelegate
+            #endif
+            @Environment(\\.scenePhase) private var scenePhase
+
+            var body: some Scene {
+                WindowGroup {
+                    \(primaryModuleName)RootView()
+                }
+                .onChange(of: scenePhase) { oldPhase, newPhase in
+                    switch newPhase {
+                    case .active:
+                        \(primaryModuleName)AppDelegate.shared.onResume(appDelegate.application!)
+                    case .inactive:
+                        \(primaryModuleName)AppDelegate.shared.onPause(appDelegate.application!)
+                    case .background:
+                        \(primaryModuleName)AppDelegate.shared.onStop(appDelegate.application!)
+                    @unknown default:
+                        print("unknown app phase: \\(newPhase)")
+                    }
+                }
+            }
         }
+
+        #if canImport(UIKit)
+        class AppMainDelete: UIResponder, UIApplicationDelegate {
+            unowned var application: UIApplication? = nil
+
+            func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]?) -> Bool {
+                self.application = application
+                \(primaryModuleName)AppDelegate.shared.onStart(application)
+                return true
+            }
+
+            func applicationWillTerminate(_ application: UIApplication) {
+                \(primaryModuleName)AppDelegate.shared.onDestroy(application)
+            }
+
+            func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
+                \(primaryModuleName)AppDelegate.shared.onLowMemory(application)
+            }
+        }
+        #endif
 
         """
         try appMainContents.write(to: primaryModuleAppMainURL.createParentDirectory(), atomically: false, encoding: .utf8)
@@ -1740,33 +1780,55 @@ let androidSDK = ProcessInfo.processInfo.environment["android.os.Build.VERSION.S
 /// The shared top-level view for the app, loaded from the platform-specific App delegates below.
 ///
 /// The default implementation merely loads the `ContentView` for the app and logs a message.
-public struct RootView : View {
+public struct \(primaryModuleName)RootView : View {
+    @ObservedObject var appDelegate = \(primaryModuleName)AppDelegate.shared
+
     public init() {
     }
 
     public var body: some View {
         ContentView()
             .task {
-                logger.log("Welcome to Skip on \\(androidSDK != nil ? "Android" : "Darwin")!")
-                logger.warning("Skip app logs are viewable in the Xcode console for iOS; Android logs can be viewed in Studio or using adb logcat")
+                logger.info("Welcome to Skip on \\(androidSDK != nil ? "Android" : "Darwin")!")
+                logger.info("Skip app logs are viewable in the Xcode console for iOS; Android logs can be viewed in Studio or using adb logcat")
             }
     }
 }
 
-#if !SKIP
-public protocol \(primaryModuleAppTarget) : App {
-}
+/// Global application delegate functions.
+///
+/// This functions can update a shared observable object to communicate app state changes to interested views.
+/// The sender for each of these functions will be either a `UIApplication` (iOS) or `AppCompatActivity` (Android)
+public class \(primaryModuleName)AppDelegate: ObservableObject {
+    public static let shared = \(primaryModuleName)AppDelegate()
 
-/// The entry point to the \(primaryModuleName) app.
-/// The concrete implementation is in the \(primaryModuleName)App module.
-public extension \(primaryModuleAppTarget) {
-    var body: some Scene {
-        WindowGroup {
-            RootView()
-        }
+    private init() {
+    }
+
+    public func onStart(_ sender: Any) {
+        logger.debug("onStart")
+    }
+
+    public func onResume(_ sender: Any) {
+        logger.debug("onResume")
+    }
+
+    public func onPause(_ sender: Any) {
+        logger.debug("onPause")
+    }
+
+    public func onStop(_ sender: Any) {
+        logger.debug("onStop")
+    }
+
+    public func onDestroy(_ sender: Any) {
+        logger.debug("onDestroy")
+    }
+
+    public func onLowMemory(_ sender: Any) {
+        logger.debug("onLowMemory")
     }
 }
-#endif
 
 """
 
@@ -1807,19 +1869,16 @@ public extension \(primaryModuleAppTarget) {
         let contentViewContents = """
 \(sourceHeader)import SwiftUI\(secondImport)\(thirdImport)
 
-public enum ContentTab: String, Hashable {
+enum ContentTab: String, Hashable {
     case welcome, home, settings
 }
 
-public struct ContentView: View {
+struct ContentView: View {
     @AppStorage("tab") var tab = ContentTab.welcome
     @State var viewModel = ViewModel()
     @State var appearance = ""
 
-    public init() {
-    }
-
-    public var body: some View {
+    var body: some View {
         TabView(selection: $tab) {
             NavigationStack {
                 WelcomeView()
@@ -2210,7 +2269,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
         49231BAC2AC5BCEF00F98ADF /* \(APP)App in Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(APP)App */; };
         49231BAD2AC5BCEF00F98ADF /* \(APP)App in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(APP)App */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
         496BDBEE2B8A7E9C00C09264 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 496BDBED2B8A7E9C00C09264 /* Localizable.xcstrings */; };
-        499CD43B2AC5B799001AE8D8 /* \(APP)AppMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* \(APP)AppMain.swift */; };
+        499CD43B2AC5B799001AE8D8 /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* Main.swift */; };
         499CD4402AC5B799001AE8D8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 49F90C2F2A52156300F06D93 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -2237,7 +2296,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
         496EB72F2A6AE4DE00C1253B /* \(APP).xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = \(APP).xcconfig; sourceTree = "<group>"; };
         496EB72F2A6AE4DE00C1253C /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../README.md; sourceTree = "<group>"; };
         499AB9082B0581F4005E8330 /* plugins */ = {isa = PBXFileReference; lastKnownFileType = folder; name = plugins; path = ../../../SourcePackages/plugins; sourceTree = BUILT_PRODUCTS_DIR; };
-        49F90C2B2A52156200F06D93 /* \(APP)AppMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = \(APP)AppMain.swift; path = Sources/\(APP)AppMain.swift; sourceTree = SOURCE_ROOT; };
+        49F90C2B2A52156200F06D93 /* Main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Main.swift; path = Sources/Main.swift; sourceTree = SOURCE_ROOT; };
         49F90C2F2A52156300F06D93 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
         49F90C312A52156300F06D93 /* Entitlements.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Entitlements.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -2287,7 +2346,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
         49F90C2A2A52156200F06D93 /* App */ = {
             isa = PBXGroup;
             children = (
-                49F90C2B2A52156200F06D93 /* \(APP)AppMain.swift */,
+                49F90C2B2A52156200F06D93 /* Main.swift */,
                 49F90C2F2A52156300F06D93 /* Assets.xcassets */,
                 49F90C312A52156300F06D93 /* Entitlements.plist */,
                 4900101C2BACEA710000DE33 /* Info.plist */,
@@ -2392,7 +2451,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
             isa = PBXSourcesBuildPhase;
             buildActionMask = 2147483647;
             files = (
-                499CD43B2AC5B799001AE8D8 /* \(APP)AppMain.swift in Sources */,
+                499CD43B2AC5B799001AE8D8 /* Main.swift in Sources */,
             );
             runOnlyForDeploymentPostprocessing = 0;
         };
@@ -2845,12 +2904,34 @@ extension FrameworkProjectLayout {
                 //ActivityCompat.requestPermissions(self, permissions.toTypedArray(), requestTag)
             }
 
-            override fun onSaveInstanceState(bundle: android.os.Bundle): Unit = super.onSaveInstanceState(bundle)
+            override fun onStart() {
+                super.onStart()
+                \(appModuleName)AppDelegate.shared.onStart(this)
+            }
 
-            override fun onRestoreInstanceState(bundle: android.os.Bundle) {
-                // Usually you restore your state in onCreate(). It is possible to restore it in onRestoreInstanceState() as well, but not very common. (onRestoreInstanceState() is called after onStart(), whereas onCreate() is called before onStart().
-                logger.info("onRestoreInstanceState")
-                super.onRestoreInstanceState(bundle)
+            override fun onResume() {
+                super.onResume()
+                \(appModuleName)AppDelegate.shared.onResume(this)
+            }
+
+            override fun onPause() {
+                super.onPause()
+                \(appModuleName)AppDelegate.shared.onPause(this)
+            }
+
+            override fun onStop() {
+                super.onStop()
+                \(appModuleName)AppDelegate.shared.onStop(this)
+            }
+
+            override fun onDestroy() {
+                super.onDestroy()
+                \(appModuleName)AppDelegate.shared.onDestroy(this)
+            }
+
+            override fun onLowMemory() {
+                super.onLowMemory()
+                \(appModuleName)AppDelegate.shared.onLowMemory(this)
             }
 
             override fun onRestart() {
@@ -2858,29 +2939,12 @@ extension FrameworkProjectLayout {
                 super.onRestart()
             }
 
-            override fun onStart() {
-                logger.info("onStart")
-                super.onStart()
-            }
+            override fun onSaveInstanceState(bundle: android.os.Bundle): Unit = super.onSaveInstanceState(bundle)
 
-            override fun onResume() {
-                logger.info("onResume")
-                super.onResume()
-            }
-
-            override fun onPause() {
-                logger.info("onPause")
-                super.onPause()
-            }
-
-            override fun onStop() {
-                logger.info("onStop")
-                super.onStop()
-            }
-
-            override fun onDestroy() {
-                logger.info("onDestroy")
-                super.onDestroy()
+            override fun onRestoreInstanceState(bundle: android.os.Bundle) {
+                // Usually you restore your state in onCreate(). It is possible to restore it in onRestoreInstanceState() as well, but not very common. (onRestoreInstanceState() is called after onStart(), whereas onCreate() is called before onStart().
+                logger.info("onRestoreInstanceState")
+                super.onRestoreInstanceState(bundle)
             }
 
             override fun onRequestPermissionsResult(requestCode: Int, permissions: kotlin.Array<String>, grantResults: IntArray) {
@@ -2898,7 +2962,7 @@ extension FrameworkProjectLayout {
             PresentationRoot(defaultColorScheme = colorScheme, context = context) { ctx ->
                 val contentContext = ctx.content()
                 Box(modifier = ctx.modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    RootView().Compose(context = contentContext)
+                    \(appModuleName)RootView().Compose(context = contentContext)
                 }
             }
         }
@@ -2947,6 +3011,14 @@ enum SourceLicense: Equatable, CaseIterable {
     case lgpl
     case lgplLinkingException
     case gpl
+
+    static func defaultLicense(app: Bool) -> SourceLicense {
+        if app {
+            return .gpl
+        } else {
+            return .lgplLinkingException
+        }
+    }
 
     var sourceHeader: String {
         return "// SPDX-License-Identifier: \(self.spdx.identifier)"
@@ -3811,17 +3883,6 @@ Public License instead of this License.  But first, please read
 <https://www.gnu.org/licenses/why-not-lgpl.html>.
 
 """
-
-/// The header that will be inserted into any source files (Kotin or Swift) created by the `skip` tool when the `--free` flag is set.
-func freeLicenseHeader(type: String?) -> String {
-"""
-// This is free software: you can redistribute and/or modify it
-// under the terms of the GNU \(type?.appending(" ") ?? "")General Public License 3.0
-// as published by the Free Software Foundation https://fsf.org
-
-
-"""
-}
 
 // cat SkipLogo.pdf | base64 -b 80 -i - | pbcopy
 // not currently used, but we might populate the Module.xcassets catalog with it,
