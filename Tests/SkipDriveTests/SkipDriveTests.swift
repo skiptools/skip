@@ -154,7 +154,7 @@ class SkipCommandTests : XCTestCase {
         │  │  └─ project.pbxproj
         │  ├─ Info.plist
         │  ├─ Sources
-        │  │  └─ HelloSkipAppMain.swift
+        │  │  └─ Main.swift
         │  └─ fastlane
         │     ├─ AppStore.xcconfig
         │     ├─ Appfile
@@ -258,7 +258,7 @@ class SkipCommandTests : XCTestCase {
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
         │  ├─ Sources
-        │  │  └─ DemoAppMain.swift
+        │  │  └─ Main.swift
         │  └─ fastlane
         │     ├─ AppStore.xcconfig
         │     ├─ Appfile
@@ -374,7 +374,7 @@ class SkipCommandTests : XCTestCase {
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
         │  ├─ Sources
-        │  │  └─ DemoAppMain.swift
+        │  │  └─ Main.swift
         │  └─ fastlane
         │     ├─ AppStore.xcconfig
         │     ├─ Appfile
@@ -496,7 +496,7 @@ class SkipCommandTests : XCTestCase {
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
         │  ├─ Sources
-        │  │  └─ DemoAppMain.swift
+        │  │  └─ Main.swift
         │  └─ fastlane
         │     ├─ AppStore.xcconfig
         │     ├─ Appfile
@@ -635,7 +635,7 @@ class SkipCommandTests : XCTestCase {
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
         │  ├─ Sources
-        │  │  └─ DemoAppMain.swift
+        │  │  └─ Main.swift
         │  └─ fastlane
         │     ├─ AppStore.xcconfig
         │     ├─ Appfile
@@ -785,7 +785,7 @@ class SkipCommandTests : XCTestCase {
         │  │  └─ project.pbxproj
         │  ├─ Info.plist
         │  ├─ Sources
-        │  │  └─ HelloSkipAppMain.swift
+        │  │  └─ Main.swift
         │  └─ fastlane
         │     ├─ AppStore.xcconfig
         │     ├─ Appfile
