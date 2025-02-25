@@ -1,4 +1,4 @@
-// Copyright 2023 Skip
+// Copyright 2023–2025 Skip
 import Foundation
 import PackagePlugin
 
