@@ -66,14 +66,14 @@ extension ToolOptionsCommand where Self : StreamingCommand {
             return fileURLs.first { $0.isReadableFile == true } != nil
         }
 
-        @discardableResult func checkFileContents(_ file: URL, message: String? = nil, length: Range<Int>? = nil, matchContents: String? = nil, isURL: Bool = false) async -> Bool {
+        @discardableResult func checkFileContents(_ file: URL, message: String? = nil, length: Range<Int>? = nil, trailingContents: String? = nil, isURL: Bool = false) async -> Bool {
             await checkFile(file, with: out, title: message) { url in
                 if url.isRegularFile != true {
                     return CheckStatus(status: .fail, message: "Missing file: \(file.relativePath)")
                 }
 
                 let contents = try String(contentsOf: url, encoding: .utf8)
-                if let matchContents, matchContents != contents {
+                if let trailingContents, !contents.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix(trailingContents.trimmingCharacters(in: .whitespacesAndNewlines)) {
                     return CheckStatus(status: .fail, message: "Contents did not match expected contents: \(file.relativePath)")
                 }
 
@@ -111,10 +111,10 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         let licenseLGPL = URL(fileURLWithPath: "LICENSE.LGPL", isDirectory: false, relativeTo: projectFolderURL)
         if flagOrFiles(free, licenseGPL, licenseLGPL) {
             if licenseLGPL.isReadableFile == true {
-                await checkFileContents(licenseLGPL, message: "Verify free software license") // , matchContents: licenseLGPLContents)
+                await checkFileContents(licenseLGPL, message: "Verify free software license", trailingContents: licenseLGPLContents)
             } else {
                 // either GPL or LGPL license file must exist for it to pass the free test
-                await checkFileContents(licenseGPL, message: "Verify free software license") // , matchContents: licenseGPLContents) // content check disabled to accomodate license exceptions
+                await checkFileContents(licenseGPL, message: "Verify free software license", trailingContents: licenseGPLContents)
             }
 
             if await checkFolder(sourcesDir) {
