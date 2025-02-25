@@ -322,7 +322,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let javaOutputFolder = try AbsolutePath(outputFolderPath, validating: "java")
 
         // the standard base name for resources, which will be linked from a path like: src/main/resources/package/name/resname.ext
-        let resourcesOutputFolder = try AbsolutePath(outputFolderPath, validating: "resources")
+        //let resourcesOutputFolder = try AbsolutePath(outputFolderPath, validating: "resources") // traditional Java resources folder
+        let resourcesOutputFolder = try AbsolutePath(outputFolderPath, validating: "assets") // Android AssetManager folder
 
         // Android-specific resources like res/values/strings.xml
         let resOutputFolder = try AbsolutePath(outputFolderPath, validating: "res")
@@ -954,8 +955,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 .appending(components: packageName.split(separator: ".").map(\.description))
                 .appending(component: "Resources")
 
-            var resourcesIndex: [RelativePath] = []
-
             for resourceFile in resourceURLs.map(\.path).sorted() {
                 guard let resourceSourceURL = moduleNamePaths.compactMap({ (_, folder) in
                     resourceFile.hasPrefix(folder) ? URL(fileURLWithPath: resourceFile.dropFirst(folder.count).trimmingCharacters(in: CharacterSet(charactersIn: "/")).description, relativeTo: URL(fileURLWithPath: folder, isDirectory: true)) : nil }).first else {
@@ -983,9 +982,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 } else { // non-processed resources are just linked directly from the package
                     // the Android "res" folder is special: it is intended to store Android-specific resources like values/strings.xml, and will be linked into the archive's res/ folder
                     let isAndroidRes = resourceComponents.first == "res"
-                    if !isAndroidRes {
-                        resourcesIndex.append(resourceSourcePath)
-                    }
                     let destinationPath = (isAndroidRes ? resOutputFolder : resourcesBasePath).appending(resourceSourcePath)
 
                     // only create links for files that exist
@@ -995,17 +991,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                         try addLink(destinationPath, pointingAt: sourcePath, relative: false)
                     }
                 }
-            }
-
-            let indexPath = resourcesBasePath.appending(component: "resources.lst")
-
-            if !resourcesIndex.isEmpty {
-                // write out the resources index file that acts as the directory for Java/Android resources
-                try fs.writeChanges(path: addOutputFile(indexPath), bytes: ByteString(encodingAsUTF8: resourcesIndex.map(\.pathString).sorted().joined(separator: "\n")))
-                info("indexed \(resourcesIndex.count) resources at \(indexPath.pathString)", sourceFile: indexPath.sourceFile)
-            } else {
-                // remove the resources file if it should be empty
-                removePath(indexPath)
             }
 
             func convertStrings(resourceSourceURL: URL, sourcePath: AbsolutePath) throws {
@@ -1043,7 +1028,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                         }
                         info("create \(lproj.pathString) from \(sourcePath.pathString)", sourceFile: destinationPath.sourceFile)
                         try writeChanges(tag: lproj.pathString, to: destinationPath, contents: stringsContent.utf8Data, readOnly: false)
-                        resourcesIndex.append(lproj)
                     }
                 }
             }

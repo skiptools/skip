@@ -111,10 +111,10 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         let licenseLGPL = URL(fileURLWithPath: "LICENSE.LGPL", isDirectory: false, relativeTo: projectFolderURL)
         if flagOrFiles(free, licenseGPL, licenseLGPL) {
             if licenseLGPL.isReadableFile == true {
-                await checkFileContents(licenseLGPL, message: "Verify free software license", matchContents: licenseLGPLContents)
+                await checkFileContents(licenseLGPL, message: "Verify free software license") // , matchContents: licenseLGPLContents)
             } else {
                 // either GPL or LGPL license file must exist for it to pass the free test
-                await checkFileContents(licenseGPL, message: "Verify free software license", matchContents: licenseGPLContents)
+                await checkFileContents(licenseGPL, message: "Verify free software license") // , matchContents: licenseGPLContents) // content check disabled to accomodate license exceptions
             }
 
             if await checkFolder(sourcesDir) {
