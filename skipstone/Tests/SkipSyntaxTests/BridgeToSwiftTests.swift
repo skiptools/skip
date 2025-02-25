@@ -216,6 +216,34 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testIsNamingVar() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public var isMatch = false
+        #endif
+        """, kotlin: """
+        var isMatch = false
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        public var isMatch: Bool {
+            get {
+                return jniContext {
+                    let value_java: Bool = try! Java_SourceKt.callStatic(method: Java_get_isMatch_methodID, options: [], args: [])
+                    return value_java
+                }
+            }
+            set {
+                jniContext {
+                    let value_java = newValue.toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_set_isMatch_methodID, options: [], args: [value_java])
+                }
+            }
+        }
+        private let Java_get_isMatch_methodID = Java_SourceKt.getStaticMethodID(name: "isMatch", sig: "()Z")!
+        private let Java_set_isMatch_methodID = Java_SourceKt.getStaticMethodID(name: "setMatch", sig: "(Z)V")!
+        """, transformers: transformers)
+    }
+
     func testNoBridgeVar() async throws {
         try await check(swift: """
         #if !SKIP_BRIDGE

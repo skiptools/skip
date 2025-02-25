@@ -283,13 +283,12 @@ final class KotlinBridgeToSwiftVisitor {
         }
         let preEscapedPropertyName = propertyName
         let propertyName = preEscapedPropertyName.fixingKeyword(in: KotlinIdentifier.hardKeywords)
-        let capitalizedPropertyName = (propertyName.first?.uppercased() ?? "") + propertyName.dropFirst()
         let callMethodID = inType == nil ? "getStaticMethodID" : "getMethodID"
-        let getMethodID = declareStaticLet(getMethodIdentifier, ofType: "JavaMethodID", in: inSignature, declarationType: inType, value: "\(classIdentifier).\(callMethodID)(name: \"get\(capitalizedPropertyName)\", sig: \"()\(bridgable.jni(options: options))\")!")
+        let getMethodID = declareStaticLet(getMethodIdentifier, ofType: "JavaMethodID", in: inSignature, declarationType: inType, value: "\(classIdentifier).\(callMethodID)(name: \"\(propertyName.getterName)\", sig: \"()\(bridgable.jni(options: options))\")!")
         guard apiFlags.options.contains(.writeable) && (modifiers.setVisibility == .default || modifiers.setVisibility >= .public) else {
             return [getMethodID]
         }
-        let setMethodID = declareStaticLet(setMethodIdentifier, ofType: "JavaMethodID", in: inSignature, declarationType: inType, value: "\(classIdentifier).\(callMethodID)(name: \"set\(capitalizedPropertyName)\", sig: \"(\(bridgable.jni(options: options)))V\")!")
+        let setMethodID = declareStaticLet(setMethodIdentifier, ofType: "JavaMethodID", in: inSignature, declarationType: inType, value: "\(classIdentifier).\(callMethodID)(name: \"\(propertyName.setterName)\", sig: \"(\(bridgable.jni(options: options)))V\")!")
         return [getMethodID, setMethodID]
     }
 
@@ -1187,13 +1186,7 @@ final class KotlinBridgeToSwiftVisitor {
             swift.append(1, "return \(companionCall)")
         }
 
-        let methodName: String
-        if enumCaseDeclaration.associatedValues.isEmpty {
-            let capitalizedPropertyName = (enumCaseDeclaration.name.first?.uppercased() ?? "") + enumCaseDeclaration.name.dropFirst()
-            methodName = "get" + capitalizedPropertyName
-        } else {
-            methodName = enumCaseDeclaration.name
-        }
+        let methodName = enumCaseDeclaration.associatedValues.isEmpty ? enumCaseDeclaration.name.getterName : enumCaseDeclaration.name
         let signature = "(" + bridgables.map { $0.jni(options: options) }.joined() + ")L" + inClassName + ";"
         let declaration = declareStaticLet("Java_Companion_\(caseName)_methodID", ofType: "JavaMethodID", in: .named(inClassName, generics), value: "Java_Companion_class.getMethodID(name: \"\(methodName)\", sig: \"\(signature)\")!")
         return (swift, [declaration])

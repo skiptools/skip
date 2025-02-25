@@ -178,6 +178,32 @@ extension String {
         // TODO: Unicode chars
         return replacing("_", with: "_1").replacing("$", with: "_00024")
     }
+
+    /// Return this property name as the equivalent Java getter.
+    var getterName: String {
+        guard !isEmpty else {
+            return self
+        }
+        // Special case for "isX", which Kotlin uses as-is
+        guard count < 3 || !hasPrefix("is") || !self[index(self.startIndex, offsetBy: 2)].isUppercase else {
+            return self
+        }
+        let capitalizedPropertyName = (first?.uppercased() ?? "") + dropFirst()
+        return "get\(capitalizedPropertyName)"
+    }
+
+    /// Return this property name as the equivalent Java setter.
+    var setterName: String {
+        guard !isEmpty else {
+            return self
+        }
+        // Special case for "isX", which Kotlin maps to "setX"
+        guard count < 3 || !hasPrefix("is") || !self[index(self.startIndex, offsetBy: 2)].isUppercase else {
+            return "set\(self.dropFirst(2))"
+        }
+        let capitalizedPropertyName = (first?.uppercased() ?? "") + dropFirst()
+        return "set\(capitalizedPropertyName)"
+    }
 }
 
 extension KotlinBridgeOptions {

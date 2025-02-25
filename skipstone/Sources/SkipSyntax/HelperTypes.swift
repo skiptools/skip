@@ -328,7 +328,7 @@ struct Attribute: Hashable, Codable {
         case "autoclosure":
             return .autoclosure
         case "available":
-            if tokens.contains("unavailable") {
+            if tokens.count >= 2 && tokens[0] == "*" && tokens[1] == "unavailable" {
                 return .unavailable
             } else if tokens.contains("deprecated") {
                 return .deprecated
