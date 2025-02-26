@@ -842,6 +842,13 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         ///
         /// Any Kotlin files that are overridden will not be transpiled.
         func linkSkipFolder(_ path: AbsolutePath, to outputFilePath: AbsolutePath, topLevel: Bool) throws -> Set<AbsolutePath> {
+            // when we are running with SKIP_BRIDGE, don't link over any files from the skip folder
+            // failure to do this will result in (harmless) .kt files being copied over, but since no subsequent transpilation
+            // will mark those as expected output file, they will raise warnings: "removing stale output file: …"
+            if transpileOptions.skipBridgeOutput != nil {
+                return []
+            }
+
             var copiedFiles: Set<AbsolutePath> = []
             for fileName in try fs.getDirectoryContents(path) {
                 if fileName.hasPrefix(".") {
