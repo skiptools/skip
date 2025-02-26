@@ -47,6 +47,9 @@
       location = "group:../skip-fuse-ui">
    </FileRef>
    <FileRef
+      location = "group:../skip-integ-demo">
+   </FileRef>
+   <FileRef
       location = "group:../skip-kit">
    </FileRef>
    <FileRef
