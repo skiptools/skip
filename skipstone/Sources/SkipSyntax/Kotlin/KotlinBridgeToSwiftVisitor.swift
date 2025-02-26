@@ -283,13 +283,12 @@ final class KotlinBridgeToSwiftVisitor {
         }
         let preEscapedPropertyName = propertyName
         let propertyName = preEscapedPropertyName.fixingKeyword(in: KotlinIdentifier.hardKeywords)
-        let capitalizedPropertyName = (propertyName.first?.uppercased() ?? "") + propertyName.dropFirst()
         let callMethodID = inType == nil ? "getStaticMethodID" : "getMethodID"
-        let getMethodID = declareStaticLet(getMethodIdentifier, ofType: "JavaMethodID", in: inSignature, declarationType: inType, value: "\(classIdentifier).\(callMethodID)(name: \"get\(capitalizedPropertyName)\", sig: \"()\(bridgable.jni(options: options))\")!")
+        let getMethodID = declareStaticLet(getMethodIdentifier, ofType: "JavaMethodID", in: inSignature, declarationType: inType, value: "\(classIdentifier).\(callMethodID)(name: \"\(propertyName.getterName)\", sig: \"()\(bridgable.jni(options: options))\")!")
         guard apiFlags.options.contains(.writeable) && (modifiers.setVisibility == .default || modifiers.setVisibility >= .public) else {
             return [getMethodID]
         }
-        let setMethodID = declareStaticLet(setMethodIdentifier, ofType: "JavaMethodID", in: inSignature, declarationType: inType, value: "\(classIdentifier).\(callMethodID)(name: \"set\(capitalizedPropertyName)\", sig: \"(\(bridgable.jni(options: options)))V\")!")
+        let setMethodID = declareStaticLet(setMethodIdentifier, ofType: "JavaMethodID", in: inSignature, declarationType: inType, value: "\(classIdentifier).\(callMethodID)(name: \"\(propertyName.setterName)\", sig: \"(\(bridgable.jni(options: options)))V\")!")
         return [getMethodID, setMethodID]
     }
 
@@ -769,6 +768,7 @@ final class KotlinBridgeToSwiftVisitor {
             return
         }
         let superclassInfo = classDeclaration.superclassInfo(translator: translator)
+        let isBridgedSubclass = superclassInfo?.attributes.isBridgeToSwift == true
         if let superclassInfo {
             guard !superclassInfo.attributes.isBridgeToKotlin else {
                 classDeclaration.messages.append(.kotlinBridgeSuperclassBridging(classDeclaration, source: translator.syntaxTree.source))
@@ -777,89 +777,6 @@ final class KotlinBridgeToSwiftVisitor {
             guard !superclassInfo.attributes.isBridgeToSwift || (classDeclaration.generics.isEmpty && superclassInfo.generics.isEmpty) else {
                 classDeclaration.messages.append(.kotlinBridgeUnsupportedFeature(classDeclaration, feature: "inheritance of generic classes", source: translator.syntaxTree.source))
                 return
-            }
-        }
-
-        let classRef = JavaClassRef(for: classDeclaration.signature, packageName: translator.packageName)
-
-        let isEnum = classDeclaration.declarationType == .enumDeclaration
-        let isStruct = classDeclaration.declarationType == .structDeclaration
-        let isActor = classDeclaration.declarationType == .actorDeclaration
-        let isBridgedSubclass = superclassInfo?.attributes.isBridgeToSwift == true
-        let visibilityString = primaryTypeInfo.modifiers.visibility.swift(suffix: " ")
-        let modifiersString = primaryTypeInfo.declarationType == .classDeclaration && primaryTypeInfo.modifiers.isFinal ? "final " : ""
-        let optionsString = options.jconvertibleOptions
-        let inherits = typeInfos.flatMap(\.inherits).compactMap {
-            let inherit = $0.withGenerics([])
-            return inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.checkBridgable(direction: .toSwift, options: options, generics: classDeclaration.generics, codebaseInfo: codebaseInfo) != nil ? inherit : nil
-        }
-        var inheritsString = inherits.map { $0.description }.joined(separator: ", ")
-        if !isBridgedSubclass {
-            if !inheritsString.isEmpty {
-                inheritsString += ", "
-            }
-            inheritsString += "BridgedFromKotlin"
-        }
-        if classDeclaration.declarationType == .classDeclaration, classDeclaration.modifiers.isFinal || !classDeclaration.generics.isEmpty {
-            if !inheritsString.isEmpty {
-                inheritsString += ", "
-            }
-            inheritsString += "BridgedFinalClass"
-        }
-        var swift: [String] = []
-        swift.append("\(visibilityString)\(modifiersString)\(isEnum ? "enum" : isStruct ? "struct" : isActor ? "actor" : "class") \(classDeclaration.name)\(classDeclaration.generics.swiftParametersString): \(inheritsString)\(classDeclaration.generics.swiftWhereString) {")
-
-        let finalMemberVisibility = min(primaryTypeInfo.modifiers.visibility, .public)
-        let finalMemberVisibilityString = finalMemberVisibility.swift(suffix: " ")
-        swift.append(1, classRef.declaration())
-
-        if isEnum {
-            swift.append(1, "private var Java_peer: JavaObjectPointer {")
-            swift.append(2, "return toJavaObject(options: \(optionsString))!")
-            swift.append(1, "}")
-        } else {
-            if !isBridgedSubclass {
-                swift.append(1, "\(finalMemberVisibilityString)\(isStruct ? "var" : isActor ? "nonisolated let" : "let") Java_peer: JObject")
-            }
-            swift.append(1, "\(finalMemberVisibilityString)\(isStruct || isActor ? "" : "required ")init(Java_ptr: JavaObjectPointer) {")
-            if isBridgedSubclass {
-                swift.append(2, "super.init(Java_ptr: Java_ptr)")
-            } else {
-                swift.append(2, "Java_peer = JObject(Java_ptr)")
-            }
-            swift.append(1, "}")
-
-            if primaryTypeInfo.declarationType == .classDeclaration && !primaryTypeInfo.modifiers.isFinal {
-                // Create a constructor allowing subclasses to set the peer directly
-                swift.append(1, "\(finalMemberVisibilityString)init(Java_peer: JObject) {")
-                if isBridgedSubclass {
-                    swift.append(2, "super.init(Java_peer: Java_peer)")
-                } else {
-                    swift.append(2, "self.Java_peer = Java_peer")
-                }
-                swift.append(1, "}")
-            }
-
-            let hasConstructors = classDeclaration.members.contains(where: { $0.type == .constructorDeclaration && ($0 as? KotlinFunctionDeclaration)?.isDecodableConstructor == false })
-            if !hasConstructors {
-                swift.append(1, "\(finalMemberVisibilityString)init() {")
-                if isBridgedSubclass {
-                    swift.append(2, "let Java_peer = jniContext {")
-                } else {
-                    swift.append(2, "Java_peer = jniContext {")
-                }
-                swift.append(3, [
-                    "let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: \(optionsString), args: [])",
-                    "return JObject(ptr)"
-                ])
-                swift.append(2, "}")
-                if isBridgedSubclass {
-                    swift.append(2, "super.init(Java_peer: Java_peer)")
-                }
-                swift.append(1, [
-                    "}",
-                    declareStaticLet("Java_constructor_methodID", ofType: "JavaMethodID", in: classDeclaration.signature, value: "Java_class.getMethodID(name: \"<init>\", sig: \"()V\")!")
-                ])
             }
         }
 
@@ -880,8 +797,10 @@ final class KotlinBridgeToSwiftVisitor {
                     continue
                 }
                 let info = typeInfos.flatMap({ $0.variables }).first(where: { $0.name == (variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName) && $0.modifiers.visibility >= .fileprivate })
-                if update(member: variableDeclaration, info: info, in: classDeclaration, swiftDefinitions: &memberDefinitions), variableDeclaration.isStatic {
-                    hasBridgedStaticMembers = true
+                if update(member: variableDeclaration, info: info, in: classDeclaration, swiftDefinitions: &memberDefinitions) {
+                    if variableDeclaration.isStatic {
+                        hasBridgedStaticMembers = true
+                    }
                 }
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
                 guard !functionDeclaration.isGenerated || functionDeclaration.type == .constructorDeclaration else {
@@ -915,6 +834,95 @@ final class KotlinBridgeToSwiftVisitor {
             }
         }
 
+        let classRef = JavaClassRef(for: classDeclaration.signature, packageName: translator.packageName)
+        let isEnum = classDeclaration.declarationType == .enumDeclaration
+        let isEmptyEnum = isEnum && enumCases.isEmpty
+        let isStruct = classDeclaration.declarationType == .structDeclaration
+        let isActor = classDeclaration.declarationType == .actorDeclaration
+        let visibilityString = primaryTypeInfo.modifiers.visibility.swift(suffix: " ")
+        let modifiersString = primaryTypeInfo.declarationType == .classDeclaration && primaryTypeInfo.modifiers.isFinal ? "final " : ""
+        let optionsString = options.jconvertibleOptions
+        let inherits = typeInfos.flatMap(\.inherits).compactMap {
+            let inherit = $0.withGenerics([])
+            return inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.isSendable || inherit.checkBridgable(direction: .toSwift, options: options, generics: classDeclaration.generics, codebaseInfo: codebaseInfo) != nil ? inherit : nil
+        }
+        var inheritsString = inherits.map { $0.description }.joined(separator: ", ")
+        if !isEmptyEnum && !isBridgedSubclass {
+            if !inheritsString.isEmpty {
+                inheritsString += ", "
+            }
+            inheritsString += "BridgedFromKotlin"
+        }
+        if classDeclaration.declarationType == .classDeclaration, classDeclaration.modifiers.isFinal || !classDeclaration.generics.isEmpty {
+            if !inheritsString.isEmpty {
+                inheritsString += ", "
+            }
+            inheritsString += "BridgedFinalClass"
+        }
+        let whereString = classDeclaration.generics.swiftWhereString
+        if !inheritsString.isEmpty || !whereString.isEmpty {
+            inheritsString = ": " + inheritsString
+        }
+        var swift: [String] = []
+        swift.append("\(visibilityString)\(modifiersString)\(isEnum ? "enum" : isStruct ? "struct" : isActor ? "actor" : "class") \(classDeclaration.name)\(classDeclaration.generics.swiftParametersString)\(inheritsString)\(whereString) {")
+
+        let finalMemberVisibility = min(primaryTypeInfo.modifiers.visibility, .public)
+        let finalMemberVisibilityString = finalMemberVisibility.swift(suffix: " ")
+        if !isEmptyEnum || hasBridgedStaticMembers {
+            swift.append(1, classRef.declaration())
+        }
+        if !isEmptyEnum {
+            if isEnum {
+                swift.append(1, "private var Java_peer: JavaObjectPointer {")
+                swift.append(2, "return toJavaObject(options: \(optionsString))!")
+                swift.append(1, "}")
+            } else {
+                if !isBridgedSubclass {
+                    swift.append(1, "\(finalMemberVisibilityString)\(isStruct ? "var" : isActor ? "nonisolated let" : "let") Java_peer: JObject")
+                }
+                swift.append(1, "\(finalMemberVisibilityString)\(isStruct || isActor ? "" : "required ")init(Java_ptr: JavaObjectPointer) {")
+                if isBridgedSubclass {
+                    swift.append(2, "super.init(Java_ptr: Java_ptr)")
+                } else {
+                    swift.append(2, "Java_peer = JObject(Java_ptr)")
+                }
+                swift.append(1, "}")
+
+                if primaryTypeInfo.declarationType == .classDeclaration && !primaryTypeInfo.modifiers.isFinal {
+                    // Create a constructor allowing subclasses to set the peer directly
+                    swift.append(1, "\(finalMemberVisibilityString)init(Java_peer: JObject) {")
+                    if isBridgedSubclass {
+                        swift.append(2, "super.init(Java_peer: Java_peer)")
+                    } else {
+                        swift.append(2, "self.Java_peer = Java_peer")
+                    }
+                    swift.append(1, "}")
+                }
+
+                let hasConstructors = classDeclaration.members.contains(where: { $0.type == .constructorDeclaration && ($0 as? KotlinFunctionDeclaration)?.isDecodableConstructor == false })
+                if !hasConstructors {
+                    swift.append(1, "\(finalMemberVisibilityString)init() {")
+                    if isBridgedSubclass {
+                        swift.append(2, "let Java_peer = jniContext {")
+                    } else {
+                        swift.append(2, "Java_peer = jniContext {")
+                    }
+                    swift.append(3, [
+                        "let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: \(optionsString), args: [])",
+                        "return JObject(ptr)"
+                    ])
+                    swift.append(2, "}")
+                    if isBridgedSubclass {
+                        swift.append(2, "super.init(Java_peer: Java_peer)")
+                    }
+                    swift.append(1, [
+                        "}",
+                        declareStaticLet("Java_constructor_methodID", ofType: "JavaMethodID", in: classDeclaration.signature, value: "Java_class.getMethodID(name: \"<init>\", sig: \"()V\")!")
+                    ])
+                }
+            }
+        }
+
         if classDeclaration.inherits.contains(.named("MutableStruct", [])) {
             swift.append(1, declareStaticLet("Java_scopy_methodID", ofType: "JavaMethodID", in: classDeclaration.signature, value: "Java_class.getMethodID(name: \"scopy\", sig: \"()Lskip/lib/MutableStruct;\")!"))
         }
@@ -922,20 +930,24 @@ final class KotlinBridgeToSwiftVisitor {
             swift.append(1, declareStaticLet("Java_Companion_class", ofType: "JClass", in: classDeclaration.signature, value: "try! JClass(name: \"\(classRef.className)$Companion\")"))
             swift.append(1, declareStaticLet("Java_Companion", ofType: "JObject", in: classDeclaration.signature, value: "JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: \"Companion\", sig: \"L\(classRef.className)$Companion;\")!, options: \(optionsString)))"))
         }
-        if isEnum {
-            swift.append(1, Self.swiftForEnumJConvertibleContract(className: classRef.className, generics: classRef.generics, isSealedClassesEnum: classDeclaration.isSealedClassesEnum, caseDeclarations: enumCases, visibility: finalMemberVisibility, options: options, translator: translator))
-        } else if !isBridgedSubclass {
-            swift.append(1, Self.swiftForJConvertibleContract(in: classDeclaration.declarationType, visibility: finalMemberVisibility))
+        if !isEmptyEnum {
+            if isEnum {
+                swift.append(1, Self.swiftForEnumJConvertibleContract(className: classRef.className, generics: classRef.generics, isSealedClassesEnum: classDeclaration.isSealedClassesEnum, caseDeclarations: enumCases, visibility: finalMemberVisibility, options: options, translator: translator))
+            } else if !isBridgedSubclass {
+                swift.append(1, Self.swiftForJConvertibleContract(in: classDeclaration.declarationType, visibility: finalMemberVisibility))
+            }
         }
 
         let definition = swiftDefinition(of: classDeclaration.signature, statement: classDeclaration, swift: swift, members: memberDefinitions)
         swiftDefinitions.append(definition)
 
-        // Make bridged Kotlin types implement `SwiftProjecting`
-        let cdeclFunction = Self.addSwiftProjecting(to: classDeclaration, isBridgedSubclass: isBridgedSubclass, options: options, translator: translator)
-        swiftDefinitions.append(SwiftDefinition { output, indentation, _ in
-            cdeclFunction.append(to: output, indentation: indentation)
-        })
+        if !isEmptyEnum {
+            // Make bridged Kotlin types implement `SwiftProjecting`
+            let cdeclFunction = Self.addSwiftProjecting(to: classDeclaration, isBridgedSubclass: isBridgedSubclass, options: options, translator: translator)
+            swiftDefinitions.append(SwiftDefinition { output, indentation, _ in
+                cdeclFunction.append(to: output, indentation: indentation)
+            })
+        }
     }
 
     static func addSwiftProjecting(to classDeclaration: KotlinClassDeclaration, isBridgedSubclass: Bool, customProjection: [String]? = nil, options: KotlinBridgeOptions, translator: KotlinTranslator) -> CDeclFunction {
@@ -1187,13 +1199,7 @@ final class KotlinBridgeToSwiftVisitor {
             swift.append(1, "return \(companionCall)")
         }
 
-        let methodName: String
-        if enumCaseDeclaration.associatedValues.isEmpty {
-            let capitalizedPropertyName = (enumCaseDeclaration.name.first?.uppercased() ?? "") + enumCaseDeclaration.name.dropFirst()
-            methodName = "get" + capitalizedPropertyName
-        } else {
-            methodName = enumCaseDeclaration.name
-        }
+        let methodName = enumCaseDeclaration.associatedValues.isEmpty ? enumCaseDeclaration.name.getterName : enumCaseDeclaration.name
         let signature = "(" + bridgables.map { $0.jni(options: options) }.joined() + ")L" + inClassName + ";"
         let declaration = declareStaticLet("Java_Companion_\(caseName)_methodID", ofType: "JavaMethodID", in: .named(inClassName, generics), value: "Java_Companion_class.getMethodID(name: \"\(methodName)\", sig: \"\(signature)\")!")
         return (swift, [declaration])
@@ -1211,7 +1217,7 @@ final class KotlinBridgeToSwiftVisitor {
         let visibilityString = primaryTypeInfo.modifiers.visibility.swift(suffix: " ")
         let inherits = primaryTypeInfo.inherits.compactMap {
             let inherit = $0.withGenerics([])
-            return inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.checkBridgable(direction: .toSwift, options: options, generics: interfaceDeclaration.generics, codebaseInfo: codebaseInfo) != nil ? inherit : nil
+            return inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.isSendable || inherit.checkBridgable(direction: .toSwift, options: options, generics: interfaceDeclaration.generics, codebaseInfo: codebaseInfo) != nil ? inherit : nil
         }
         let inheritsString = inherits.isEmpty ? "" : ": " + inherits.map { $0.description }.joined(separator: ", ")
 

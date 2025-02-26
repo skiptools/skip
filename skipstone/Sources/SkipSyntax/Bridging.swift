@@ -16,7 +16,7 @@ func isBridging(attributes: Attributes, visibility: Modifiers.Visibility, autoBr
     guard autoBridge != .none else {
         return false
     }
-    guard !attributes.isNoBridge else {
+    guard !attributes.isNoBridge && !attributes.contains(.unavailable) else {
         return false
     }
     return visibility >= .public || (autoBridge == .internal && visibility > .fileprivate)

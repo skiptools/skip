@@ -1204,6 +1204,7 @@ final class KotlinBridgeToKotlinVisitor {
         // Must do this last after determining member generic constraints
         classDeclaration.generics = classDeclaration.generics.compactMapBridgable(direction: .toKotlin, options: options, codebaseInfo: codebaseInfo)
 
+        let isEmptyEnum = classDeclaration.declarationType == .enumDeclaration && enumCases.isEmpty
         let finalMemberVisibility = min(classDeclaration.modifiers.visibility, .public)
         var additionalSwiftDeclarations: [String] = []
         var additionalCDeclFunctions: [CDeclFunction] = []
@@ -1217,76 +1218,86 @@ final class KotlinBridgeToKotlinVisitor {
         (classDeclaration.children.first as? KotlinStatement)?.ensureLeadingNewlines(1)
         classDeclaration.insert(statements: insertStatements, after: nil)
 
-        // Conform to `BridgedToKotlin`
-        let classRef = JavaClassRef(for: classDeclaration.signature, packageName: translator.packageName)
+        let classRef: JavaClassRef?
         var conformances: String
-        switch subclassDepth {
-        case -1:
-            conformances = "BridgedToKotlin"
-        case 0:
-            conformances = "BridgedToKotlin, BridgedToKotlinBaseClass"
-        default:
-            conformances = "BridgedToKotlinSubclass\(subclassDepth)"
-        }
-        if classDeclaration.declarationType == .classDeclaration, classDeclaration.modifiers.isFinal || !classDeclaration.generics.isEmpty {
-            conformances += ", BridgedFinalClass"
-        }
-        if isView {
-            conformances += ", SkipUIBridging, SkipUI.View"
+        if isEmptyEnum {
+            classRef = nil
+            conformances = ""
+        } else {
+            // Conform to `BridgedToKotlin`
+            classRef = JavaClassRef(for: classDeclaration.signature, packageName: translator.packageName)
+            switch subclassDepth {
+            case -1:
+                conformances = "BridgedToKotlin"
+            case 0:
+                conformances = "BridgedToKotlin, BridgedToKotlinBaseClass"
+            default:
+                conformances = "BridgedToKotlinSubclass\(subclassDepth)"
+            }
+            if classDeclaration.declarationType == .classDeclaration, classDeclaration.modifiers.isFinal || !classDeclaration.generics.isEmpty {
+                conformances += ", BridgedFinalClass"
+            }
+            if isView {
+                conformances += ", SkipUIBridging, SkipUI.View"
+            }
         }
         var swift: [String] = []
-        swift.append("extension \(classDeclaration.signature.withGenerics([])): \(conformances) {")
-        swift.append(1, classRef.declaration())
-
-        if classDeclaration.declarationType == .enumDeclaration {
-            swift.append(1, declareStaticLet("Java_Companion_class", ofType: "JClass", in: classDeclaration.signature, value: "try! JClass(name: \"\(classRef.className)$Companion\")"))
-            swift.append(1, declareStaticLet("Java_Companion", ofType: "JObject", in: classDeclaration.signature, value: "JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: \"Companion\", sig: \"L\(classRef.className)$Companion;\")!, options: \(options.jconvertibleOptions)))"))
+        if !conformances.isEmpty {
+            conformances = ": " + conformances
         }
-        if isNonGenericEnum {
-            swift.append(1, KotlinBridgeToSwiftVisitor.swiftForEnumJConvertibleContract(className: classRef.className, generics: classRef.generics, isSealedClassesEnum: classDeclaration.isSealedClassesEnum, caseDeclarations: enumCases, visibility: finalMemberVisibility, options: options, translator: translator))
-        } else {
-            let finalMemberVisibilityString = finalMemberVisibility.swift(suffix: " ")
-            if subclassDepth < 1 {
-                swift.append(1, "\(finalMemberVisibilityString)static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {")
-                swift.append(2, "let ptr = SwiftObjectPointer.peer(of: obj!, options: options)")
-                if !classDeclaration.generics.isEmpty {
-                    swift.append(2, "let typeErased: \(classDeclaration.signature.typeErasedClass) = ptr.pointee()!")
-                    swift.append(2, "return typeErased.genericvalue as! Self")
-                } else if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
-                    swift.append(2, "return ptr.pointee()!")
-                } else {
-                    swift.append(2, "let box: SwiftValueTypeBox<Self> = ptr.pointee()!")
-                    swift.append(2, "return box.value")
-                }
-                swift.append(1, "}")
-
-                let isolation = classDeclaration.declarationType == .actorDeclaration ? "nonisolated " : ""
-                swift.append(1, "\(finalMemberVisibilityString)\(isolation)func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {")
-                if !classDeclaration.generics.isEmpty {
-                    swift.append(2, "let typeErased = toTypeErased()")
-                    swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: typeErased, retain: true)")
-                } else if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
-                    swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)")
-                } else {
-                    swift.append(2, "let box = SwiftValueTypeBox(self)")
-                    swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: box, retain: true)")
-                }
-                if classDeclaration.declarationType == .enumDeclaration {
-                    let (code, declarations) = KotlinBridgeToSwiftVisitor.swiftForGenericEnumToJavaObjectSwitch(className: classRef.className, generics: classRef.generics, peerName: "Swift_peer", caseDeclarations: enumCases, visibility: finalMemberVisibility, options: options, translator: translator)
-                    swift.append(2, code)
-                    additionalSwiftDeclarations += declarations
-                } else if subclassDepth == 0 {
-                    swift.append(2, "let constructor = Java_findConstructor(base: Self.Java_class, Self.Java_constructor_methodID)")
-                    swift.append(2, "return try! constructor.cls.create(ctor: constructor.ctor, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])")
-                } else {
-                    swift.append(2, "return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])")
-                }
-                swift.append(1, "}")
+        swift.append("extension \(classDeclaration.signature.withGenerics([]))\(conformances) {")
+        if let classRef {
+            swift.append(1, classRef.declaration())
+            if classDeclaration.declarationType == .enumDeclaration {
+                swift.append(1, declareStaticLet("Java_Companion_class", ofType: "JClass", in: classDeclaration.signature, value: "try! JClass(name: \"\(classRef.className)$Companion\")"))
+                swift.append(1, declareStaticLet("Java_Companion", ofType: "JObject", in: classDeclaration.signature, value: "JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: \"Companion\", sig: \"L\(classRef.className)$Companion;\")!, options: \(options.jconvertibleOptions)))"))
             }
-            if classDeclaration.declarationType != .enumDeclaration {
-                swift.append(1, declareStaticLet("Java_constructor_methodID", ofType: "JavaMethodID", in: classDeclaration.signature, value: "Java_class.getMethodID(name: \"<init>\", sig: \"(JLskip/bridge/SwiftPeerMarker;)V\")!"))
-                if subclassDepth >= 1 {
-                    swift.append(1, declareStaticLet("Java_subclass\(subclassDepth)Constructor", ofType: "(JClass, JavaMethodID)", visibility: finalMemberVisibility, in: classDeclaration.signature, value: "(Java_class, Java_constructor_methodID)"))
+            if isNonGenericEnum {
+                swift.append(1, KotlinBridgeToSwiftVisitor.swiftForEnumJConvertibleContract(className: classRef.className, generics: classRef.generics, isSealedClassesEnum: classDeclaration.isSealedClassesEnum, caseDeclarations: enumCases, visibility: finalMemberVisibility, options: options, translator: translator))
+            } else {
+                let finalMemberVisibilityString = finalMemberVisibility.swift(suffix: " ")
+                if subclassDepth < 1 {
+                    swift.append(1, "\(finalMemberVisibilityString)static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {")
+                    swift.append(2, "let ptr = SwiftObjectPointer.peer(of: obj!, options: options)")
+                    if !classDeclaration.generics.isEmpty {
+                        swift.append(2, "let typeErased: \(classDeclaration.signature.typeErasedClass) = ptr.pointee()!")
+                        swift.append(2, "return typeErased.genericvalue as! Self")
+                    } else if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
+                        swift.append(2, "return ptr.pointee()!")
+                    } else {
+                        swift.append(2, "let box: SwiftValueTypeBox<Self> = ptr.pointee()!")
+                        swift.append(2, "return box.value")
+                    }
+                    swift.append(1, "}")
+
+                    let isolation = classDeclaration.declarationType == .actorDeclaration ? "nonisolated " : ""
+                    swift.append(1, "\(finalMemberVisibilityString)\(isolation)func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {")
+                    if !classDeclaration.generics.isEmpty {
+                        swift.append(2, "let typeErased = toTypeErased()")
+                        swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: typeErased, retain: true)")
+                    } else if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
+                        swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)")
+                    } else {
+                        swift.append(2, "let box = SwiftValueTypeBox(self)")
+                        swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: box, retain: true)")
+                    }
+                    if classDeclaration.declarationType == .enumDeclaration {
+                        let (code, declarations) = KotlinBridgeToSwiftVisitor.swiftForGenericEnumToJavaObjectSwitch(className: classRef.className, generics: classRef.generics, peerName: "Swift_peer", caseDeclarations: enumCases, visibility: finalMemberVisibility, options: options, translator: translator)
+                        swift.append(2, code)
+                        additionalSwiftDeclarations += declarations
+                    } else if subclassDepth == 0 {
+                        swift.append(2, "let constructor = Java_findConstructor(base: Self.Java_class, Self.Java_constructor_methodID)")
+                        swift.append(2, "return try! constructor.cls.create(ctor: constructor.ctor, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])")
+                    } else {
+                        swift.append(2, "return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])")
+                    }
+                    swift.append(1, "}")
+                }
+                if classDeclaration.declarationType != .enumDeclaration {
+                    swift.append(1, declareStaticLet("Java_constructor_methodID", ofType: "JavaMethodID", in: classDeclaration.signature, value: "Java_class.getMethodID(name: \"<init>\", sig: \"(JLskip/bridge/SwiftPeerMarker;)V\")!"))
+                    if subclassDepth >= 1 {
+                        swift.append(1, declareStaticLet("Java_subclass\(subclassDepth)Constructor", ofType: "(JClass, JavaMethodID)", visibility: finalMemberVisibility, in: classDeclaration.signature, value: "(Java_class, Java_constructor_methodID)"))
+                    }
                 }
             }
         }
@@ -1305,8 +1316,10 @@ final class KotlinBridgeToKotlinVisitor {
             "let peer_swift: \(classDeclaration.signature.typeErasedClass) = ptr.pointee()!",
             "let projection = peer_swift.genericvalue"
         ]
-        let cdeclFunction = KotlinBridgeToSwiftVisitor.addSwiftProjecting(to: classDeclaration, isBridgedSubclass: subclassDepth >= 1, customProjection: customProjection, options: options, translator: translator)
-        cdeclFunctions.append(cdeclFunction)
+        if !isEmptyEnum {
+            let cdeclFunction = KotlinBridgeToSwiftVisitor.addSwiftProjecting(to: classDeclaration, isBridgedSubclass: subclassDepth >= 1, customProjection: customProjection, options: options, translator: translator)
+            cdeclFunctions.append(cdeclFunction)
+        }
         cdeclFunctions += additionalCDeclFunctions
         return true
     }

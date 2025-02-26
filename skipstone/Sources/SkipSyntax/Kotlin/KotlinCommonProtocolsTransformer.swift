@@ -39,7 +39,7 @@ final class KotlinCommonProtocolsTransformer: KotlinTransformer {
     private func fixupInherits(_ inherits: [TypeSignature], for type: TypeSignature) -> [TypeSignature] {
         return inherits.compactMap {
             // Filter types that are aliased to Kotlin Any
-            guard !$0.isCustomStringConvertible && !$0.isEquatable && !$0.isHashable else {
+            guard !$0.isCustomStringConvertible && !$0.isEquatable && !$0.isHashable && !$0.isSendable else {
                 return nil
             }
             // Map Comparable to Kotlin's Comparable<T>
