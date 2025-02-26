@@ -152,10 +152,11 @@ struct CDeclFunction {
 }
 
 extension CodebaseInfo {
-    /// Whether this module is a native module using SkipFuse.
-    var isNativeFuseModule: Bool {
-        let fuseModuleNames: Set<String> = ["SkipFuse", "SkipFuseUI"]
-        return dependentModules.contains(where: { fuseModuleNames.contains($0.moduleName ?? "") }) == true
+    /// Whether this module depends on SkipAndroidBridge.
+    var needsAndroidBridge: Bool {
+        // Exclude our own SkipFuse modules, which should not generate their own Bundle, UserDefaults, etc support code.
+        // Doing so lead sto duplicate dex errors
+        return dependentModules.contains { $0.moduleName == "SkipAndroidBridge" } && moduleName?.hasPrefix("SkipFuse") != true
     }
 }
 

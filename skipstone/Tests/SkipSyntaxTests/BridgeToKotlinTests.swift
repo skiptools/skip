@@ -6712,8 +6712,8 @@ final class BridgeToKotlinTests: XCTestCase {
     }
 
     public func testBundleModule() async throws {
-        KotlinBundleTransformer.testSkipFuse = true
-        defer { KotlinBundleTransformer.testSkipFuse = false }
+        KotlinBundleTransformer.testSkipAndroidBridge = true
+        defer { KotlinBundleTransformer.testSkipAndroidBridge = false }
 
         try await check(swiftBridge: """
         let x = 1

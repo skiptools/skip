@@ -3,7 +3,7 @@ public final class KotlinBundleTransformer: KotlinTransformer {
     public static let supportFileName = "Bundle_Support.swift"
 
     private var needsModuleBundle = false
-    public static var testSkipFuse = false // For testing
+    public static var testSkipAndroidBridge = false // For testing
 
     public init() {
     }
@@ -33,9 +33,9 @@ public final class KotlinBundleTransformer: KotlinTransformer {
     }
 
     public func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
-        // Generate Bundle support for any native module using SkipFuse
-        let isFuse = Self.testSkipFuse || translator.codebaseInfo?.global.isNativeFuseModule == true
-        guard needsModuleBundle || isFuse else {
+        // Generate Bundle support for any module using SkipAndroidBridge
+        let needsAndroidBridge = Self.testSkipAndroidBridge || translator.codebaseInfo?.global.needsAndroidBridge == true
+        guard needsModuleBundle || needsAndroidBridge else {
             return []
         }
 
@@ -47,7 +47,7 @@ public final class KotlinBundleTransformer: KotlinTransformer {
         }
         internal class _ModuleBundleLocator {}
         """]
-        if isFuse {
+        if needsAndroidBridge {
             // Native modules need access to our module bundle via reflection
             let className = moduleBundleAccessorClassName(moduleName: translator.codebaseInfo?.global.moduleName ?? "")
             declarations += ["""
@@ -59,7 +59,7 @@ public final class KotlinBundleTransformer: KotlinTransformer {
         let statements = declarations.map { KotlinRawStatement(sourceCode: $0) }
         statements[0].extras = .singleNewline
         syntaxTree.root.insert(statements: statements, after: syntaxTree.root.statements.last)
-        return isFuse ? [bundleSupportOutput(forPackage: syntaxTree, translator: translator)] : []
+        return needsAndroidBridge ? [bundleSupportOutput(forPackage: syntaxTree, translator: translator)] : []
     }
 
     private func moduleBundleAccessorClassName(moduleName: String) -> String {

@@ -10,9 +10,9 @@ public final class KotlinUserDefaultsTransformer: KotlinTransformer {
     }
 
     public func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
-        // Generate UserDefaults support for any native module using SkipFuse
-        let isFuse = translator.codebaseInfo?.global.isNativeFuseModule == true
-        guard isFuse else {
+        // Generate UserDefaults support for any native module using SkipAndroidBridge
+        let needsAndroidBridge = translator.codebaseInfo?.global.needsAndroidBridge == true
+        guard needsAndroidBridge else {
             return []
         }
 
