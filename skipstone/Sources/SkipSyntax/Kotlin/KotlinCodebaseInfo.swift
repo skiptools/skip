@@ -182,7 +182,7 @@ extension CodebaseInfo.Context {
         let parameterTypes = parameters?.map(\.type) ?? []
         for protocolSignature in protocolSignatures {
             // Exclude protocols that do not translate into Kotlin interfaces
-            guard (includeDeclaringType || protocolSignature.name != owningType.name), !protocolSignature.isCustomStringConvertible && !protocolSignature.isEquatable && !protocolSignature.isHashable else {
+            guard (includeDeclaringType || protocolSignature.name != owningType.name), !protocolSignature.isCustomStringConvertible && !protocolSignature.isEquatable && !protocolSignature.isHashable && !protocolSignature.isSendable else {
                 continue
             }
             for protocolInfo in typeInfos(forNamed: protocolSignature) {

@@ -330,6 +330,17 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testUnavailableVar() async throws {
+        try await check(swift: """
+        @available(*, unavailable)
+        public var s = ""
+        """, kotlin: """
+        @Deprecated("This API is not yet available in Skip. Consider placing it within a #if !SKIP block. You can file an issue against the owning library at https://github.com/skiptools, or see the library README for information on adding support", level = DeprecationLevel.ERROR)
+        var s = ""
+        """, swiftBridgeSupport: """
+        """, transformers: transformers)
+    }
+
     func testWillSetDidSet() async throws {
         try await check(swift: """
         #if !SKIP_BRIDGE
@@ -1619,7 +1630,7 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         #endif
         """, kotlin: """
-        enum class A: skip.lib.SwiftProjecting {
+        enum class A {
             ;
             class B: skip.lib.SwiftProjecting {
                 @Suppress("MUST_BE_INITIALIZED")
@@ -1630,58 +1641,34 @@ final class BridgeToSwiftTests: XCTestCase {
                             field = newValue
                             didmutate()
                         }
-        
+
                     constructor(b: A.B = B()) {
                         this.b = b
                     }
-        
+
                     override var supdate: ((Any) -> Unit)? = null
                     override var smutatingcount = 0
                     override fun scopy(): MutableStruct = A.B.C(b)
-        
+
                     override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
                     private external fun Swift_projectionImpl(options: Int): () -> Any
-        
+
                     companion object {
                     }
                 }
-        
+
                 override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
                 private external fun Swift_projectionImpl(options: Int): () -> Any
-        
+
                 companion object {
                 }
             }
-        
-            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
-            private external fun Swift_projectionImpl(options: Int): () -> Any
-        
+
             companion object {
             }
         }
         """, swiftBridgeSupport: """
-        public enum A: BridgedFromKotlin {
-            private static let Java_class = try! JClass(name: "A")
-            private var Java_peer: JavaObjectPointer {
-                return toJavaObject(options: [])!
-            }
-            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
-                let name: String = try! obj!.call(method: Java_name_methodID, options: options, args: [])
-                return fromJavaName(name)
-            }
-            fileprivate static func fromJavaName(_ name: String) -> Self {
-                fatalError()
-            }
-            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
-                fatalError()
-            }
-            private static let Java_name_methodID = Java_class.getMethodID(name: "name", sig: "()Ljava/lang/String;")!
-        }
-        @_cdecl("Java_A_Swift_1projectionImpl")
-        func A_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
-            let projection = A.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
-            let factory: () -> Any = { projection }
-            return SwiftClosure0.javaObject(for: factory, options: [])!
+        public enum A {
         }
         extension A {
             public final class B: BridgedFromKotlin, BridgedFinalClass {
@@ -1725,7 +1712,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
                     return Java_peer.safePointer()
                 }
-        
+
                 public var b: A.B {
                     get {
                         return jniContext {
@@ -1743,7 +1730,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 }
                 private static let Java_get_b_methodID = Java_class.getMethodID(name: "getB", sig: "()LA$B;")!
                 private static let Java_set_b_methodID = Java_class.getMethodID(name: "setB", sig: "(LA$B;)V")!
-        
+
                 public init(b p_0: A.B) {
                     Java_peer = jniContext {
                         let p_0_java = p_0.toJavaObject(options: [])!.toJavaParameter(options: [])
@@ -3736,6 +3723,64 @@ final class BridgeToSwiftTests: XCTestCase {
         @_cdecl("Java_E_Swift_1projectionImpl")
         func E_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = E.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
+    func testNamespaceEnum() async throws {
+        // Empty enums sometimes used as namespaces
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public enum E {
+            public struct S {
+            }
+        }
+        #endif
+        """, kotlin: """
+        enum class E {
+            ;
+            class S: skip.lib.SwiftProjecting {
+
+                override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+                private external fun Swift_projectionImpl(options: Int): () -> Any
+
+                companion object {
+                }
+            }
+
+            companion object {
+            }
+        }
+        """, swiftBridgeSupport: """
+        public enum E {
+        }
+        extension E {
+            public struct S: BridgedFromKotlin {
+                private static let Java_class = try! JClass(name: "E$S")
+                public var Java_peer: JObject
+                public init(Java_ptr: JavaObjectPointer) {
+                    Java_peer = JObject(Java_ptr)
+                }
+                public init() {
+                    Java_peer = jniContext {
+                        let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
+                        return JObject(ptr)
+                    }
+                }
+                private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+                public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                    return .init(Java_ptr: obj!)
+                }
+                public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                    return Java_peer.safePointer()
+                }
+            }
+        }
+        @_cdecl("Java_E_00024S_Swift_1projectionImpl")
+        func E$S_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = E.S.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
         }

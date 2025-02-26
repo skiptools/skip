@@ -2164,6 +2164,10 @@ extension TypeSignature {
         return isNamed("Hashable", moduleName: "Swift", generics: [])
     }
 
+    var isSendable: Bool {
+        return isNamed("Sendable", moduleName: "Swift", generics: [])
+    }
+
     var isKeyPath: Bool {
         return isNamed("KeyPath", moduleName: "Swift")
     }
