@@ -201,14 +201,14 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let _ = primaryModulePath
 
         func buildSourceList() throws -> (sources: [URL], resources: [URL]) {
-            let allProjectFiles: [URL] = try FileManager.default.enumeratedURLs(of: projectFolderPath.asURL)
+            let projectBaseURL = projectFolderPath.asURL
+            let allProjectFiles: [URL] = try FileManager.default.enumeratedURLs(of: projectBaseURL)
 
             let swiftPathExtensions: Set<String> = ["swift"]
-            let resourcePathExclusions: Set<String> = swiftPathExtensions.union(["kt", "java"]) // resource files are anything that isn't a swift file or a kotlin file
-
             let sourceURLs: [URL] = allProjectFiles.filter({ swiftPathExtensions.contains($0.pathExtension) })
-            // also exclude files starting with dot and `skip.yml`
-            let resourceURLs: [URL] = allProjectFiles.filter({ !$0.lastPathComponent.hasPrefix(".") && !resourcePathExclusions.contains($0.pathExtension) && $0.lastPathComponent != "skip.yml" })
+
+            let projectResourcesURL = projectBaseURL.appendingPathComponent("Resources", isDirectory: true)
+            let resourceURLs: [URL] = try FileManager.default.enumeratedURLs(of: projectResourcesURL)
 
             return (sources: sourceURLs, resources: resourceURLs)
         }
