@@ -862,7 +862,7 @@ struct TestData : Codable, Hashable {
 
                     var depVersion = modDep.repositoryVersion ?? "1.0.0" // "1.2.3"..<"1.2.6"
                     // special-case skip modules that may not yet be stable by pinning to 0.0.0..<2.0.0
-                    if repoName.hasPrefix("skip-") && !["skip", "skip-unit", "skip-lib", "skip-foundation", "skip-model", "skip-ui"].contains(repoName) {
+                    if repoName.hasPrefix("skip-") && !["skip", "skip-unit", "skip-lib", "skip-foundation", "skip-model", "skip-ui", "skip-fuse"].contains(repoName) {
                         //#if DEBUG
                         //depVersion = "main"
                         //#else
