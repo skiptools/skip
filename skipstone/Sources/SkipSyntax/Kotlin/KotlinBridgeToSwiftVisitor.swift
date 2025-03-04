@@ -782,6 +782,8 @@ final class KotlinBridgeToSwiftVisitor {
 
         var memberDefinitions: [SwiftDefinition] = []
         var hasBridgedStaticMembers = false
+        var hasEqualsDefinition = false
+        var hasHashDefinition = false
         var functionCount = 0
         var enumCases: [KotlinEnumCaseDeclaration] = []
         for member in classDeclaration.members {
@@ -818,8 +820,10 @@ final class KotlinBridgeToSwiftVisitor {
                 }
                 let info = typeInfos.flatMap({ $0.functions }).first(where: { $0.name == (functionDeclaration.preEscapedName ?? functionDeclaration.name) && $0.signature == functionDeclaration.functionType && $0.modifiers.visibility >= .fileprivate })
                 if functionDeclaration.isEqualImplementation {
+                    hasEqualsDefinition = true
                     updateEqualsDeclaration(functionDeclaration, in: classDeclaration, info: info, swiftDefinitions: &memberDefinitions)
                 } else if functionDeclaration.isHashImplementation {
+                    hasHashDefinition = true
                     updateHashDeclaration(functionDeclaration, in: classDeclaration, info: info, swiftDefinitions: &memberDefinitions)
                 } else if functionDeclaration.isLessThanImplementation {
                     updateLessThanDeclaration(functionDeclaration, in: classDeclaration, info: info, swiftDefinitions: &memberDefinitions)
@@ -929,6 +933,18 @@ final class KotlinBridgeToSwiftVisitor {
         if hasBridgedStaticMembers || classDeclaration.isSealedClassesEnum {
             swift.append(1, declareStaticLet("Java_Companion_class", ofType: "JClass", in: classDeclaration.signature, value: "try! JClass(name: \"\(classRef.className)$Companion\")"))
             swift.append(1, declareStaticLet("Java_Companion", ofType: "JObject", in: classDeclaration.signature, value: "JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: \"Companion\", sig: \"L\(classRef.className)$Companion;\")!, options: \(optionsString)))"))
+        }
+        if inherits.contains(where: { $0.isHashable }) {
+            if !hasEqualsDefinition {
+                swift.append(1, Self.swift(forEqualsFunctionIn: classDeclaration.signature, options: options, modifiers: Modifiers(visibility: classDeclaration.modifiers.visibility, isStatic: true)))
+            }
+            if !hasHashDefinition {
+                swift.append(1, Self.swift(forHashFunctionIn: classDeclaration.signature, options: options, modifiers: Modifiers(visibility: classDeclaration.modifiers.visibility)))
+            }
+        } else if inherits.contains(where: { $0.isEquatable }) {
+            if !hasEqualsDefinition {
+                swift.append(1, Self.swift(forEqualsFunctionIn: classDeclaration.signature, options: options, modifiers: Modifiers(visibility: classDeclaration.modifiers.visibility, isStatic: true)))
+            }
         }
         if !isEmptyEnum {
             if isEnum {

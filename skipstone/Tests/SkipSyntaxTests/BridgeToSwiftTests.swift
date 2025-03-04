@@ -2554,6 +2554,97 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testAddEquatableHashable() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public struct S: Hashable {
+            public let i: Int
+            public init(i: Int) {
+                self.i = i
+            }
+        }
+        #endif
+        """, kotlin: """
+        class S: skip.lib.SwiftProjecting {
+            val i: Int
+            constructor(i: Int) {
+                this.i = i
+            }
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is S) return false
+                return i == other.i
+            }
+
+            override fun hashCode(): Int {
+                var result = 1
+                result = Hasher.combine(result, i)
+                return result
+            }
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        """, swiftBridgeSupport: """
+        public struct S: Hashable, BridgedFromKotlin {
+            private static let Java_class = try! JClass(name: "S")
+            public var Java_peer: JObject
+            public init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            public static func ==(lhs: S, rhs: S) -> Bool {
+                return jniContext {
+                    let lhs_java = lhs.toJavaObject(options: [])!
+                    let rhs_java = rhs.toJavaParameter(options: [])
+                    return try! Bool.call(Java_isequal_methodID, on: lhs_java, options: [], args: [rhs_java])
+                }
+            }
+            private static let Java_isequal_methodID = Java_class.getMethodID(name: "equals", sig: "(Ljava/lang/Object;)Z")!
+            public func hash(into hasher: inout Hasher) {
+                let hashCode: Int32 = jniContext {
+                    return try! Java_peer.call(method: Self.Java_hashCode_methodID, options: [], args: [])
+                }
+                hasher.combine(hashCode)
+            }
+            private static let Java_hashCode_methodID = Java_class.getMethodID(name: "hashCode", sig: "()I")!
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+
+            public var i: Int {
+                get {
+                    return jniContext {
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, options: [], args: [])
+                        return Int(value_java)
+                    }
+                }
+            }
+            private static let Java_get_i_methodID = Java_class.getMethodID(name: "getI", sig: "()I")!
+
+            public init(i p_0: Int) {
+                Java_peer = jniContext {
+                    let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java])
+                    return JObject(ptr)
+                }
+            }
+            private static let Java_constructor_0_methodID = Java_class.getMethodID(name: "<init>", sig: "(I)V")!
+        }
+        @_cdecl("Java_S_Swift_1projectionImpl")
+        func S_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = S.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
     func testCodable() async throws {
         try await check(swift: """
         #if !SKIP_BRIDGE
