@@ -1339,7 +1339,7 @@ final class KotlinClassDeclaration: KotlinStatement {
 
 final class KotlinEnumCaseDeclaration: KotlinStatement {
     /// Names that aren't hard reserved words but cause errors as enum cases.
-    static let disallowedCaseNames: Set<String> = ["const", "data", "description", "header", "internal", "name", "ordinal", "private", "public", "segmented", "value"]
+    static let disallowedCaseNames: Set<String> = ["const", "data", "description", "header", "inline", "internal", "name", "ordinal", "private", "public", "segmented", "value"]
 
     var name: String
     var preEscapedName: String?

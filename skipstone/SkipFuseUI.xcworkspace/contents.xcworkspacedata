@@ -74,6 +74,9 @@
       location = "group:../skipapp-showcase/Darwin/Showcase.xcodeproj">
    </FileRef>
    <FileRef
+      location = "group:../skipapp-showcase-fuse/Darwin/ShowcaseFuse.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "group:../skipapp-bookings/Darwin/TravelBookings.xcodeproj">
    </FileRef>
    <FileRef
