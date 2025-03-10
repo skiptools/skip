@@ -1402,7 +1402,7 @@ permissions:
   attestations: write
 jobs:
   call-workflow:
-    uses: skiptools/actions/.github/workflows/skip-app.yml@main
+    uses: skiptools/actions/.github/workflows/skip-app.yml@v1
     secrets:
       # These optional secrets enable the Android app to be signed
       KEYSTORE_JKS: ${{ secrets.KEYSTORE_JKS }}
@@ -2826,6 +2826,8 @@ extension FrameworkProjectLayout {
                 jniLibs {
                     keepDebugSymbols.add("**/*.so")
                     pickFirsts.add("**/*.so")
+                    // this option will compress .so files, which can reduce .apk size at a performance cost for app startup
+                    //useLegacyPackaging = true
                 }
             }
 

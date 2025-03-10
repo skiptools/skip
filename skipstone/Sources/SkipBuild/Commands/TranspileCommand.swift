@@ -147,13 +147,17 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 .subtracting(outputFiles.map(\.pathString))
             for staleFile in staleFiles.sorted() {
                 let staleFileURL = URL(fileURLWithPath: staleFile, isDirectory: false)
-                msg(.warning, "removing stale output files: \(staleFileURL.lastPathComponent)")
+                if staleFileURL.lastPathComponent == "Package.resolved" {
+                    // Package.resolved is special, because it is output from the native build and removing it would cause an unnecessary rebuild
+                    continue
+                }
+                msg(.warning, "removing stale output file: \(staleFileURL.lastPathComponent)", sourceFile: try? staleFileURL.absolutePath.sourceFile)
 
                 do {
                     // don't actually trash it, since the output files often have read-only permissions set, and that prevents trash from working
                     try FileManager.default.trash(fileURL: staleFileURL, trash: false)
                 } catch {
-                    msg(.warning, "error removing stale output files: \(staleFileURL.lastPathComponent): \(error)")
+                    msg(.warning, "error removing stale output file: \(staleFileURL.lastPathComponent): \(error)")
                 }
             }
         }
