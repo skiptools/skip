@@ -166,12 +166,13 @@ fileprivate extension AndroidOperationCommand {
 
             var env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths
             let toolchainBin = tc.toolchainPath.appendingPathComponent("usr/bin", isDirectory: true)
-            let path = toolchainBin.path + ":" + (env["PATH"] ?? "")
+            // when some older version of ld is earlier in the path, a user reported an error like "ld: unsupported tapi file type '!tapi-tbd' in YAML file" when trying to build; this should in theory avoid that, but there was an error where "/Users/USERNAME/anaconda3/bin/ld" was earlier in the PATH; prepending "/usr/bin/ld" to the PATH should be enough to work around this
+            let path = toolchainBin.path + ":/usr/bin:" + (env["PATH"] ?? "")
             env["PATH"] = path
             // when Xcode invokes gradle which invokes `skip android build` which invokes `swift build`,
             // the inherited SDKROOT will be something like "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator18.0.sdk",
             // which will break the build.
-            // Se we manually clear the SDKROOT environment variable in case it is set.
+            // So we manually clear the SDKROOT environment variable in case it is set.
             env["SDKROOT"] = nil
 
             // manually disable the skipstone plugin from being run again in the derived build; we don't need to transpile and bridge the code a second time, we only need to build the native libraries with the Android toolchain
