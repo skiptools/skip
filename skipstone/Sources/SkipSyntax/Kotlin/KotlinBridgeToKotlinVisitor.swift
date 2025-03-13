@@ -1555,7 +1555,13 @@ final class KotlinBridgeToKotlinVisitor {
 
     private func viewInitState(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let externalName = "Swift_initState_\(name)"
-        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport")
+        let externalSourceCode: String
+        if classDeclaration.declarationType == .enumDeclaration {
+            externalSourceCode = "private external fun \(externalName)(): skip.ui.StateSupport"
+        } else {
+            externalSourceCode = "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport"
+        }
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: externalSourceCode)
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
@@ -1564,18 +1570,34 @@ final class KotlinBridgeToKotlinVisitor {
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
-        let cdeclSignature: TypeSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))], .javaObjectPointer, APIFlags(), nil)
-        let cdeclSource: [String] = [
-            "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
-            "return peer_swift.value.Java_initState_\(name)().toJavaObject(options: [])!"
-        ]
+        let cdeclSignature: TypeSignature
+        let cdeclSource: [String]
+        if classDeclaration.declarationType == .enumDeclaration {
+            cdeclSignature = .function([], .javaObjectPointer, APIFlags(), nil)
+            cdeclSource = [
+                "let peer_swift = \(classDeclaration.signature).fromJavaObject(Java_target, options: [])",
+                "return peer_swift.Java_initState_\(name)().toJavaObject(options: [])!"
+            ]
+        } else {
+            cdeclSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))], .javaObjectPointer, APIFlags(), nil)
+            cdeclSource = [
+                "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
+                "return peer_swift.value.Java_initState_\(name)().toJavaObject(options: [])!"
+            ]
+        }
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
     private func viewSyncState(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let externalName = "Swift_syncState_\(name)"
-        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.StateSupport)")
+        let externalSourceCode: String
+        if classDeclaration.declarationType == .enumDeclaration {
+            externalSourceCode = "private external fun \(externalName)(support: skip.ui.StateSupport)"
+        } else {
+            externalSourceCode = "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.StateSupport)"
+        }
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: externalSourceCode)
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
@@ -1584,19 +1606,36 @@ final class KotlinBridgeToKotlinVisitor {
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
-        let cdeclSignature: TypeSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false)), TypeSignature.Parameter(label: "support", type: .javaObjectPointer)], .void, APIFlags(), nil)
-        let cdeclSource: [String] = [
-            "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
-            "let support_swift = SkipUI.StateSupport.fromJavaObject(support, options: [])",
-            "peer_swift.value.Java_syncState_\(name)(support: support_swift)"
-        ]
+        let cdeclSignature: TypeSignature
+        let cdeclSource: [String]
+        if classDeclaration.declarationType == .enumDeclaration {
+            cdeclSignature = .function([TypeSignature.Parameter(label: "support", type: .javaObjectPointer)], .void, APIFlags(), nil)
+            cdeclSource = [
+                "let peer_swift = \(classDeclaration.signature).fromJavaObject(Java_target, options: [])",
+                "let support_swift = SkipUI.StateSupport.fromJavaObject(support, options: [])",
+                "peer_swift.Java_syncState_\(name)(support: support_swift)"
+            ]
+        } else {
+            cdeclSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false)), TypeSignature.Parameter(label: "support", type: .javaObjectPointer)], .void, APIFlags(), nil)
+            cdeclSource = [
+                "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
+                "let support_swift = SkipUI.StateSupport.fromJavaObject(support, options: [])",
+                "peer_swift.value.Java_syncState_\(name)(support: support_swift)"
+            ]
+        }
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
     private func viewInitEnvironment(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let externalName = "Swift_initEnvironment_\(name)"
-        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer): String")
+        let externalSourceCode: String
+        if classDeclaration.declarationType == .enumDeclaration {
+            externalSourceCode = "private external fun \(externalName)(): String"
+        } else {
+            externalSourceCode = "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer): String"
+        }
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: externalSourceCode)
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
@@ -1605,18 +1644,34 @@ final class KotlinBridgeToKotlinVisitor {
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
-        let cdeclSignature: TypeSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))], .javaString, APIFlags(), nil)
-        let cdeclSource: [String] = [
-            "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
-            "return peer_swift.value.Java_initEnvironment_\(name)().toJavaObject(options: [])!"
-        ]
+        let cdeclSignature: TypeSignature
+        let cdeclSource: [String]
+        if classDeclaration.declarationType == .enumDeclaration {
+            cdeclSignature = .function([], .javaString, APIFlags(), nil)
+            cdeclSource = [
+                "let peer_swift = \(classDeclaration.signature).fromJavaObject(Java_target, options: [])",
+                "return peer_swift.Java_initEnvironment_\(name)().toJavaObject(options: [])!"
+            ]
+        } else {
+            cdeclSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))], .javaString, APIFlags(), nil)
+            cdeclSource = [
+                "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
+                "return peer_swift.value.Java_initEnvironment_\(name)().toJavaObject(options: [])!"
+            ]
+        }
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
     private func viewSyncEnvironment(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let externalName = "Swift_syncEnvironment_\(name)"
-        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.EnvironmentSupport?)")
+        let externalSourceCode: String
+        if classDeclaration.declarationType == .enumDeclaration {
+            externalSourceCode = "private external fun \(externalName)(support: skip.ui.EnvironmentSupport?)"
+        } else {
+            externalSourceCode = "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.EnvironmentSupport?)"
+        }
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: externalSourceCode)
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
@@ -1625,44 +1680,73 @@ final class KotlinBridgeToKotlinVisitor {
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
-        let cdeclSignature: TypeSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false)), TypeSignature.Parameter(label: "support", type: .optional(.javaObjectPointer))], .void, APIFlags(), nil)
-        let cdeclSource: [String] = [
-            "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
-            "let support_swift = SkipUI.EnvironmentSupport.fromJavaObject(support, options: [])",
-            "peer_swift.value.Java_syncEnvironment_\(name)(support: support_swift)"
-        ]
+        let cdeclSignature: TypeSignature
+        let cdeclSource: [String]
+        if classDeclaration.declarationType == .enumDeclaration {
+            cdeclSignature = .function([TypeSignature.Parameter(label: "support", type: .optional(.javaObjectPointer))], .void, APIFlags(), nil)
+            cdeclSource = [
+                "let peer_swift = \(classDeclaration.signature).fromJavaObject(Java_target, options: [])",
+                "let support_swift = SkipUI.EnvironmentSupport.fromJavaObject(support, options: [])",
+                "peer_swift.Java_syncEnvironment_\(name)(support: support_swift)"
+            ]
+        } else {
+            cdeclSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false)), TypeSignature.Parameter(label: "support", type: .optional(.javaObjectPointer))], .void, APIFlags(), nil)
+            cdeclSource = [
+                "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
+                "let support_swift = SkipUI.EnvironmentSupport.fromJavaObject(support, options: [])",
+                "peer_swift.value.Java_syncEnvironment_\(name)(support: support_swift)"
+            ]
+        }
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
     private func viewBodyImplementation(for classDeclaration: KotlinClassDeclaration, visibility: Modifiers.Visibility) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let externalName = "Swift_composableBody"
+        let externalSourceCode: String
+        let functionSourceCode: String
+        if classDeclaration.declarationType == .enumDeclaration {
+            externalSourceCode = "private external fun \(externalName)(): skip.ui.View?"
+            functionSourceCode = "return skip.ui.ComposeBuilder { composectx: skip.ui.ComposeContext -> \(externalName)()?.Compose(composectx) ?: skip.ui.ComposeResult.ok }"
+        } else {
+            externalSourceCode = "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.View?"
+            functionSourceCode = "return skip.ui.ComposeBuilder { composectx: skip.ui.ComposeContext -> \(externalName)(Swift_peer)?.Compose(composectx) ?: skip.ui.ComposeResult.ok }"
+        }
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: externalSourceCode)
+
         let functionDeclaration = KotlinFunctionDeclaration(name: "body")
         functionDeclaration.returnType = .skipUIView
         functionDeclaration.modifiers = Modifiers(visibility: .public, isOverride: true)
         functionDeclaration.extras = .singleNewline
-        let functionSource = "return skip.ui.ComposeBuilder { composectx: skip.ui.ComposeContext -> \(externalName)(Swift_peer)?.Compose(composectx) ?: skip.ui.ComposeResult.ok }"
-        functionDeclaration.body = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: functionSource)])
+        functionDeclaration.body = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: functionSourceCode)])
         functionDeclaration.body?.disallowSingleStatementAppend = true
         functionDeclaration.parent = classDeclaration
-
-        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.View?")
-
-        let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: false, name: externalName, translator: translator)
-        let cdeclSignature: TypeSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))], .optional(.javaObjectPointer), APIFlags(), nil)
-        var cdeclSource: [String] = []
-        cdeclSource.append("let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!")
-        cdeclSource.append("return MainActor.assumeIsolated {")
-        cdeclSource.append(1, "let body = peer_swift.value.body")
-        cdeclSource.append(1, "return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])")
-        cdeclSource.append("}")
-        let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
 
         var swift: [String] = []
         let visibilityString = visibility.swift(suffix: " ")
         swift.append("\(visibilityString)var Java_view: any SkipUI.View {")
         swift.append(1, "return self")
         swift.append("}")
+
+        let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: false, name: externalName, translator: translator)
+        let cdeclSignature: TypeSignature
+        var cdeclSource: [String] = []
+        if classDeclaration.declarationType == .enumDeclaration {
+            cdeclSignature = .function([], .optional(.javaObjectPointer), APIFlags(), nil)
+            cdeclSource.append("let peer_swift = \(classDeclaration.signature).fromJavaObject(Java_target, options: [])")
+            cdeclSource.append("return MainActor.assumeIsolated {")
+            cdeclSource.append(1, "let body = peer_swift.body")
+            cdeclSource.append(1, "return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])")
+            cdeclSource.append("}")
+        } else {
+            cdeclSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))], .optional(.javaObjectPointer), APIFlags(), nil)
+            cdeclSource.append("let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!")
+            cdeclSource.append("return MainActor.assumeIsolated {")
+            cdeclSource.append(1, "let body = peer_swift.value.body")
+            cdeclSource.append(1, "return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])")
+            cdeclSource.append("}")
+        }
+        let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
 
         return ([functionDeclaration, externalFunctionDeclaration], swift, [cdeclFunction])
     }

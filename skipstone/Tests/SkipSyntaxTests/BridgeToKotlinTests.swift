@@ -6467,6 +6467,81 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testEnumView() async throws {
+        try await check(swiftBridge: """
+        #if canImport(SkipFuseUI)
+        import SkipFuseUI
+        #endif
+        public enum E: View {
+            case a
+            public var body: some View {
+                switch self {
+                case .a:
+                    Text("A")
+                }
+            }
+        }
+        """, kotlin: """
+        enum class E: skip.ui.View, skip.lib.SwiftProjecting {
+
+            a;
+
+            override fun body(): skip.ui.View {
+                return skip.ui.ComposeBuilder { composectx: skip.ui.ComposeContext -> Swift_composableBody()?.Compose(composectx) ?: skip.ui.ComposeResult.ok }
+            }
+            private external fun Swift_composableBody(): skip.ui.View?
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        """, swiftBridgeSupport: """
+        import SkipFuseUI
+        extension E: BridgedToKotlin, SkipUIBridging, SkipUI.View {
+            private static let Java_class = try! JClass(name: "E")
+            private static let Java_Companion_class = try! JClass(name: "E$Companion")
+            private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: "Companion", sig: "LE$Companion;")!, options: []))
+            public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let name: String = try! obj!.call(method: Java_name_methodID, options: options, args: [])
+                return fromJavaName(name)
+            }
+            fileprivate static func fromJavaName(_ name: String) -> Self {
+                return switch name {
+                case "a": .a
+                default: fatalError()
+                }
+            }
+            public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let name = switch self {
+                case .a: "a"
+                }
+                return try! Self.Java_class.callStatic(method: Self.Java_valueOf_methodID, options: options, args: [name.toJavaParameter(options: options)])
+            }
+            private static let Java_name_methodID = Java_class.getMethodID(name: "name", sig: "()Ljava/lang/String;")!
+            private static let Java_valueOf_methodID = Java_class.getStaticMethodID(name: "valueOf", sig: "(Ljava/lang/String;)LE;")!
+            public var Java_view: any SkipUI.View {
+                return self
+            }
+        }
+        @_cdecl("Java_E_Swift_1projectionImpl")
+        func E_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = E.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        @_cdecl("Java_E_Swift_1composableBody")
+        func E_Swift_composableBody(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer? {
+            let peer_swift = E.fromJavaObject(Java_target, options: [])
+            return MainActor.assumeIsolated {
+                let body = peer_swift.body
+                return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])
+            }
+        }
+        """, transformers: transformers)
+    }
+
     func testIfSkipBlock() async throws {
         try await check(swiftBridge: """
         #if os(Android)
