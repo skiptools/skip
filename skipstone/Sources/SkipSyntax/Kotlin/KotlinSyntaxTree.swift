@@ -6,7 +6,7 @@ public final class KotlinSyntaxTree {
     let root: KotlinCodeBlock
     var dependencies: KotlinDependencies
 
-    init(source: Source, isBridgeFile: Bool = false, autoBridge: AutoBridge = .none, root: KotlinCodeBlock, dependencies: KotlinDependencies = KotlinDependencies()) {
+    init(source: Source, isBridgeFile: Bool = false, autoBridge: AutoBridge = .default, root: KotlinCodeBlock, dependencies: KotlinDependencies = KotlinDependencies()) {
         self.source = source
         self.isBridgeFile = isBridgeFile
         self.autoBridge = autoBridge

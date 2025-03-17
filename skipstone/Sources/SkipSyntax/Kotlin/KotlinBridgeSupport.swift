@@ -172,6 +172,15 @@ extension Source.FilePath {
 }
 
 extension String {
+    private static let backtickEscapingIdentifiers: Set<String> = [
+        "Any", "_", "as", "associatedtype", "await", "break", "case", "catch", "class", "convenience", "continue", "default", "defer", "deinit", "didSet", "do", "dynamic", "else", "enum", "extension", "fallthrough", "false", "fileprivate", "final", "for", "func", "get", "guard", "if", "import", "infix", "init", "inout", "internal", "indirect", "is", "lazy", "let", "left", "macro", "mutating", "nil", "nonmutating", "open", "operator", "optional", "override", "postfix", "precedence", "prefix", "private", "protocol", "Protocol", "public", "required", "rethrows", "return", "right", "self", "Self", "set", "some", "static", "struct", "subscript", "super", "switch", "throw", "throws", "true", "try", "typealias", "Type", "unowned", "var", "weak", "while", "willSet"
+    ]
+
+    /// Add backticks if this string is a Swift identifier that needs escaping.
+    var addingBacktickEscapingIfNeeded: String {
+        return Self.backtickEscapingIdentifiers.contains(self) ? "`\(self)`" : self
+    }
+
     /// Escape special characters for use in a `@_cdecl` declaration.
     ///
     /// - Warning: Assumes this is an identifier string that does not contain illegal identifier characters like `;`
