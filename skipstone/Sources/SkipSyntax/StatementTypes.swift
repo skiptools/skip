@@ -1595,14 +1595,25 @@ class TypeDeclaration: Statement {
         let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
         var attributes = Attributes.for(syntax: enumDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
-        guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
-            return nil
+        var (inherits, inheritsMessages) = enumDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
+        let inheritsView = inherits.first { $0.isNamed("View", moduleName: "SwiftUI", generics: []) || $0.isNamed("View", moduleName: "SkipFuseUI", generics: []) }
+        var decodeLevel = self.decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        var decodeFlags: DecodeFlags = []
+        if decodeLevel == .none {
+            // We need to decode native views for adapting to SkipFuseUI
+            if syntaxTree.isBridgeFile, let inheritsView {
+                decodeLevel = .api
+                decodeFlags.insert(.swiftUIState)
+                // We don't care about other protocols
+                inherits = [inheritsView]
+            } else {
+                return nil
+            }
         }
         var context = context
-        context.memberOf = (.enumDeclaration, modifiers, [])
+        context.memberOf = (.enumDeclaration, modifiers, decodeFlags)
 
         let name = enumDecl.name.text.removingBacktickEscaping
-        let (inherits, inheritsMessages) = enumDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: enumDecl.genericParameterClause, where: enumDecl.genericWhereClause, in: syntaxTree)
         let (members, unbridgedMembers) = decodeMembers(syntaxListContainer: enumDecl.memberBlock, context: context, in: syntaxTree)
         let statement = TypeDeclaration(type: .enumDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, unbridgedMembers: unbridgedMembers, syntax: enumDecl, sourceFile: syntaxTree.source.file, sourceRange: enumDecl.range(in: syntaxTree.source), extras: extras)
