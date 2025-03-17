@@ -14,7 +14,7 @@ public struct Transpiler {
     public var transformers: [KotlinTransformer]
 
     /// Supply files to transpile.
-    public init(packageName: String? = nil, transpileFiles: [Source.FilePath], bridgeFiles: [Source.FilePath] = [], autoBridge: AutoBridge = .none, isBridgeGatherEnabled: Bool = false, codebaseInfo: CodebaseInfo, preprocessorSymbols: Set<String> = [], transformers: [KotlinTransformer] = []) {
+    public init(packageName: String? = nil, transpileFiles: [Source.FilePath], bridgeFiles: [Source.FilePath] = [], autoBridge: AutoBridge = .default, isBridgeGatherEnabled: Bool = false, codebaseInfo: CodebaseInfo, preprocessorSymbols: Set<String> = [], transformers: [KotlinTransformer] = []) {
         self.packageName = packageName
         self.transpileFiles = transpileFiles
         self.bridgeFiles = bridgeFiles

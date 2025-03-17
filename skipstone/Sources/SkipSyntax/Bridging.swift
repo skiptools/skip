@@ -2,6 +2,8 @@
 public enum AutoBridge: Int {
     /// Bridge only API with bridge attribute.
     case none
+    /// Bridge UI code that isn't explicitly excluded.
+    case `default`
     /// Bridge all internal or public API that isn't explicitly excluded.
     case `internal`
     /// Bridge all public API that isn't explicitly excluded.
@@ -13,7 +15,7 @@ func isBridging(attributes: Attributes, visibility: Modifiers.Visibility, autoBr
     guard !attributes.isBridge else {
         return true
     }
-    guard autoBridge != .none else {
+    guard autoBridge != .none && autoBridge != .default else {
         return false
     }
     guard !attributes.isNoBridge && !attributes.contains(.unavailable) else {

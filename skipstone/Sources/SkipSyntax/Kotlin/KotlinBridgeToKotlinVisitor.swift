@@ -1354,7 +1354,7 @@ final class KotlinBridgeToKotlinVisitor {
         }
 
         for variableDeclaration in variableDeclarations {
-            let getter = variableDeclaration.isAppendAsFunction ? variableDeclaration.propertyName : "get_\(variableDeclaration.propertyName)"
+            let getter = variableDeclaration.isAppendAsFunction ? variableDeclaration.propertyName.addingBacktickEscapingIfNeeded : "get_\(variableDeclaration.propertyName)"
             let type: TypeSignature = .any.asOptional(variableDeclaration.propertyType.isOptional)
             let mainActorString = variableDeclaration.apiFlags.options.contains(.mainActor) ? "@MainActor " : ""
             let asyncString = variableDeclaration.apiFlags.options.contains(.async) ? " async" : ""

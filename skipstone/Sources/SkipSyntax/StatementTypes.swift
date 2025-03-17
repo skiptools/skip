@@ -1545,12 +1545,11 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: structDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         var (inherits, inheritsMessages) = structDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
-        let inheritsView = inherits.first { $0.isNamed("View", moduleName: "SwiftUI", generics: []) || $0.isNamed("View", moduleName: "SkipFuseUI", generics: []) }
         var decodeLevel = self.decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
         var decodeFlags: DecodeFlags = []
         if decodeLevel == .none {
             // We need to decode native views for adapting to SkipFuseUI
-            if syntaxTree.isBridgeFile, let inheritsView {
+            if syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, let inheritsView = inherits.first(where: { $0.isNamed("View", moduleName: "SwiftUI", generics: []) || $0.isNamed("View", moduleName: "SkipFuseUI", generics: []) }) {
                 decodeLevel = .api
                 decodeFlags.insert(.swiftUIState)
                 // We don't care about other protocols
@@ -1596,12 +1595,11 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: enumDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         var (inherits, inheritsMessages) = enumDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
-        let inheritsView = inherits.first { $0.isNamed("View", moduleName: "SwiftUI", generics: []) || $0.isNamed("View", moduleName: "SkipFuseUI", generics: []) }
         var decodeLevel = self.decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
         var decodeFlags: DecodeFlags = []
         if decodeLevel == .none {
             // We need to decode native views for adapting to SkipFuseUI
-            if syntaxTree.isBridgeFile, let inheritsView {
+            if syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, let inheritsView = inherits.first(where: { $0.isNamed("View", moduleName: "SwiftUI", generics: []) || $0.isNamed("View", moduleName: "SkipFuseUI", generics: []) }) {
                 decodeLevel = .api
                 decodeFlags.insert(.swiftUIState)
                 // We don't care about other protocols

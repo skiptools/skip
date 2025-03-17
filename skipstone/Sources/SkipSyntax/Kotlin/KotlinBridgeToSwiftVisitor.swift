@@ -222,7 +222,7 @@ final class KotlinBridgeToSwiftVisitor {
             }
             declarationSuffix += " }"
         }
-        swift.append("\(modifierString)var \(preEscapedPropertyName): \(bridgable.type.description)\(declarationSuffix)")
+        swift.append("\(modifierString)var \(preEscapedPropertyName.addingBacktickEscapingIfNeeded): \(bridgable.type.description)\(declarationSuffix)")
         guard inType != .protocolDeclaration else {
             return swift
         }
@@ -326,7 +326,7 @@ final class KotlinBridgeToSwiftVisitor {
         }
         let propertyName = variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName
         let modifierString = modifiers.swift(suffix: " ")
-        let swift = "\(modifierString)let \(propertyName)\(assignment)"
+        let swift = "\(modifierString)let \(propertyName.addingBacktickEscapingIfNeeded)\(assignment)"
         swiftDefinitions.append(SwiftDefinition(statement: variableDeclaration, swift: [swift]))
         return true
     }
@@ -469,14 +469,14 @@ final class KotlinBridgeToSwiftVisitor {
             } else {
                 returnString += " {"
             }
-            swift.append("\(modifierString)var \(preEscapedName): \(returnString)")
+            swift.append("\(modifierString)var \(preEscapedName.addingBacktickEscapingIfNeeded): \(returnString)")
             if inType != .protocolDeclaration {
                 swift.append(1, "get\(apiOptionsString) {")
             }
         } else {
             let returnString = bridgable.return.type == .void || isFactory ? "" : " -> " + bridgable.return.type.description
             let openBodyString = inType == .protocolDeclaration ? "" : " {"
-            swift.append(modifierString + (isConstructor ? "init" : "func " + preEscapedName) + "\(generics.swiftParametersString)(\(parameterString))\(apiOptionsString)\(returnString)\(generics.swiftWhereString)\(openBodyString)")
+            swift.append(modifierString + (isConstructor ? "init" : "func " + preEscapedName.addingBacktickEscapingIfNeeded) + "\(generics.swiftParametersString)(\(parameterString))\(apiOptionsString)\(returnString)\(generics.swiftWhereString)\(openBodyString)")
         }
         guard inType != .protocolDeclaration else {
             return swift

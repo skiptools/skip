@@ -8,7 +8,7 @@ public final class SyntaxTree: PrettyPrintable {
     let root: CodeBlock = CodeBlock(statements: [])
 
     /// - Note: `unavailableAPI` is not used when `codebaseInfo` is available
-    public init(source: Source, isBridgeFile: Bool = false, autoBridge: AutoBridge = .none, decodeLevel: DecodeLevel = .full, preprocessorSymbols: Set<String> = [], codebaseInfo: CodebaseInfo? = nil, unavailableAPI: UnavailableAPI? = nil) {
+    public init(source: Source, isBridgeFile: Bool = false, autoBridge: AutoBridge = .default, decodeLevel: DecodeLevel = .full, preprocessorSymbols: Set<String> = [], codebaseInfo: CodebaseInfo? = nil, unavailableAPI: UnavailableAPI? = nil) {
         self.source = source
         self.isBridgeFile = isBridgeFile
         self.autoBridge = autoBridge
