@@ -25,6 +25,10 @@ extension GradleHarness {
     public func pluginOutputFolder(moduleName: String, linkingInto linkFolder: URL?) throws -> URL {
         let env = ProcessInfo.processInfo.environment
 
+        func isDir(_ url: URL) -> Bool {
+            (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+        }
+
         // if we are running tests from Xcode, this environment variable should be set; otherwise, assume the .build folder for an SPM build
         // also seems to be __XPC_DYLD_LIBRARY_PATH or __XPC_DYLD_FRAMEWORK_PATH;
         // this will be something like ~/Library/Developer/Xcode/DerivedData/PROJ-ABC/Build/Products/Debug
@@ -38,8 +42,12 @@ extension GradleHarness {
                 .deletingLastPathComponent()
                 .deletingLastPathComponent()
                 .deletingLastPathComponent()
-            let xcodeFolder = buildBaseFolder.appendingPathComponent("SourcePackages/plugins", isDirectory: true)
-            return try findModuleFolder(in: xcodeFolder, extension: "output")
+            var pluginsFolder = buildBaseFolder.appendingPathComponent("SourcePackages/plugins", isDirectory: true)
+            if !isDir(pluginsFolder) {
+                // Xcode 16.3b3 moved this folder
+                pluginsFolder = buildBaseFolder.appendingPathComponent("Build/Intermediates.noindex/BuildToolPluginIntermediates", isDirectory: true)
+            }
+            return try findModuleFolder(in: pluginsFolder, extension: "output")
         } else {
             // when run from the CLI with a custom --build-path, there seems to be no way to know where the gradle folder was output, so we need to also specify it as an environment variable:
             // SWIFTBUILD=/tmp/swiftbuild swift test --build-path /tmp/swiftbuild
@@ -53,10 +61,6 @@ extension GradleHarness {
             for outputFolder in try FileManager.default.contentsOfDirectory(at: pluginOutputFolder, includingPropertiesForKeys: [.isDirectoryKey]) {
                 if !pathExtension.isEmpty && !outputFolder.lastPathComponent.hasSuffix("." + pathExtension) {
                     continue // only check known path extensions (e.g., ".output" with running from Xcode, and no extension from SPM)
-                }
-
-                func isDir(_ url: URL) -> Bool {
-                    (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
                 }
 
                 // check for new "destination" output folder that Xcode16b3's SwiftPM started adding to the plugin output hierarchy
