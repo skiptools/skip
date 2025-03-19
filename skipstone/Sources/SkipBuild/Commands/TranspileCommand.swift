@@ -1010,17 +1010,25 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 let defaultLanguage = xcstrings.sourceLanguage
                 let locales = Set(xcstrings.strings.values.compactMap(\.localizations?.keys).joined())
                 for localeId in locales {
+                    let lprojFolder = resourcesBasePath.appending(component: localeId + ".lproj")
+                    let locBase = sourcePath.basenameWithoutExt
+
                     var locdict: [String: String] = [:]
-                    for key in xcstrings.strings.keys.sorted() {
-                        if let value = xcstrings.strings[key]?.localizations?[localeId]?.stringUnit?.value {
+                    var plurals: [String: [String : LocalizableStringsDictionary.StringUnit]] = [:]
+
+                    for (key, value) in xcstrings.strings {
+                        guard let localized = value.localizations?[localeId] else {
+                            continue
+                        }
+                        if let value = localized.stringUnit?.value {
                             locdict[key] = value
+                        }
+                        if let pluralDict = localized.variations?.plural {
+                            plurals[key] = pluralDict.mapValues(\.stringUnit)
                         }
                     }
 
                     if !locdict.isEmpty {
-                        let lproj = try RelativePath(validating: localeId + ".lproj" + "/" + sourcePath.basenameWithoutExt + ".strings") // e.g., fr.lproj/Localizable.strings
-                        let destinationPath = resourcesBasePath.appending(lproj)
-
                         func escape(_ string: String) throws -> String? {
                             // escape quotes and newlines; we just use a JSON string fragment for this
                             try String(data: JSONSerialization.data(withJSONObject: string, options: [.fragmentsAllowed, .withoutEscapingSlashes]), encoding: .utf8)
@@ -1032,18 +1040,55 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                                 stringsContent += keyString + " = " + valueString + ";\n"
                             }
                         }
-                        try fs.createDirectory(destinationPath.parentDirectory, recursive: true)
+                        try fs.createDirectory(lprojFolder, recursive: true)
                         if localeId == defaultLanguage {
                             // when there is a default language, set up a symbolic link so Android localization can know where to fall back in the case of a missing localization key
-                            try addLink(resourcesBasePath.appending(component: "base.lproj"), pointingAt: destinationPath.parentDirectory, relative: true)
+                            try addLink(lprojFolder.appending(component: "base.lproj"), pointingAt: lprojFolder, relative: true)
                         }
-                        info("create \(lproj.pathString) from \(sourcePath.pathString)", sourceFile: destinationPath.sourceFile)
-                        try writeChanges(tag: lproj.pathString, to: destinationPath, contents: stringsContent.utf8Data, readOnly: false)
+
+                        let localizableStrings = try RelativePath(validating: locBase + ".strings") // e.g., fr.lproj/Localizable.strings
+                        let localizableStringsPath = lprojFolder.appending(localizableStrings)
+                        info("create \(localizableStrings.pathString) from \(sourcePath.pathString)", sourceFile: localizableStringsPath.sourceFile)
+                        try writeChanges(tag: localizableStrings.pathString, to: localizableStringsPath, contents: stringsContent.utf8Data, readOnly: false)
+                    }
+
+                    if !plurals.isEmpty {
+                        let localizableStringsDict = try RelativePath(validating: locBase + ".stringsdict") // e.g., fr.lproj/Localizable.stringsdict
+
+                        var pluralDictNodes: [Universal.XMLNode] = []
+                        for (key, value) in plurals.sorted(by: { $0.key < $1.key }) {
+                            pluralDictNodes.append(Universal.XMLNode(elementName: "key", children: [.content(key)]))
+
+                            var pluralsDict = Universal.XMLNode(elementName: "dict")
+                            pluralsDict.addPlist(key: "NSStringLocalizedFormatKey", stringValue: "%#@value@")
+
+                            pluralsDict.append(Universal.XMLNode(elementName: "key", children: [.content("value")]))
+                            var pluralsSubDict = Universal.XMLNode(elementName: "dict")
+
+                            pluralsSubDict.addPlist(key: "NSStringFormatSpecTypeKey", stringValue: "NSStringPluralRuleType")
+                            pluralsSubDict.addPlist(key: "NSStringFormatValueTypeKey", stringValue: "lld")
+
+                            for (pluralType, stringUnit) in value.sorted(by: { $0.key < $1.key }) {
+                                // pluralType is zero, one, two, few, many, other
+                                if let stringUnitValue = stringUnit.value {
+                                    pluralsSubDict.addPlist(key: pluralType, stringValue: stringUnitValue)
+                                }
+                            }
+                            pluralsDict.append(pluralsSubDict)
+                            pluralDictNodes.append(pluralsDict)
+                        }
+
+                        let pluralDict = Universal.XMLNode(elementName: "dict", children: pluralDictNodes.map({ .element($0) }))
+
+                        let stringsDictPlist = Universal.XMLNode(elementName: "plist", attributes: ["version": "1.0"], children: [.element(pluralDict)])
+                        let stringsDictDocument = Universal.XMLNode(elementName: "", children: [.element(stringsDictPlist)])
+
+                        let localizableStringsDictPath = lprojFolder.appending(localizableStringsDict)
+                        info("create \(localizableStringsDict.pathString) from \(sourcePath.pathString)", sourceFile: localizableStringsDictPath.sourceFile)
+                        try writeChanges(tag: localizableStringsDict.pathString, to: localizableStringsDictPath, contents: stringsDictDocument.xmlString().utf8Data, readOnly: false)
                     }
                 }
             }
-
-
         }
 
         // NOTE: when linking between modules, SPM and Xcode will use different output paths:
@@ -1201,6 +1246,15 @@ struct TranspileCommandOptions: ParsableArguments {
     var skipBridgeOutput: String? = nil
 }
 
+
+extension Universal.XMLNode {
+    mutating func addPlist(key: String, stringValue: String) {
+        append(Universal.XMLNode(elementName: "key", children: [.content(key)]))
+        append(Universal.XMLNode(elementName: "string", children: [.content(stringValue)]))
+    }
+}
+
+
 struct TranspileResult {
 
 }
@@ -1297,6 +1351,36 @@ struct LocalizableStringsDictionary : Decodable {
 
     struct TranslationSet : Decodable {
         let stringUnit: StringUnit?
+
+        /** e.g.:
+         ```
+         "variations" : {
+           "plural" : {
+             "one" : {
+               "stringUnit" : {
+                 "state" : "translated",
+                 "value" : "%lld Goose"
+               }
+             },
+             "other" : {
+               "stringUnit" : {
+                 "state" : "translated",
+                 "value" : "%lld Geese"
+               }
+             }
+           }
+         }
+         ```
+         */
+        let variations: Variations?
+
+        struct Variations: Decodable {
+            let plural: [String: VariationStringUnit]?
+
+            struct VariationStringUnit : Decodable {
+                let stringUnit: StringUnit
+            }
+        }
     }
 
     struct StringUnit: Decodable {
