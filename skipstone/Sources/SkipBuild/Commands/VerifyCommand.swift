@@ -135,7 +135,29 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         let isAppProject = androidDir.fileExists(isDirectory: true) && darwinDir.fileExists(isDirectory: true)
 
         if isAppProject {
-            let project = try AppProjectLayout(moduleName: moduleName, root: projectFolderURL)
+            func validateLayoutURL(url: URL, isDirectory: Bool) throws {
+                if isDirectory {
+                    return // don't bother checking directories (like Resources, which might be empty)
+                }
+
+                if FileManager.default.fileExists(atPath: url.path) {
+                    return
+                }
+
+                // Source code file names have changed between releases, and are permitted to be renamed by the user
+                if url.path.hasSuffix(".swift") || url.path.hasSuffix(".kt") {
+                    return
+                }
+
+                // Resources can be added or removed
+                if url.path.hasSuffix(".json") {
+                    return
+                }
+
+                throw MissingProjectFileError(errorDescription: "Expected path at \(url.path) does not exist")
+            }
+
+            let project = try AppProjectLayout(moduleName: moduleName, root: projectFolderURL, check: validateLayoutURL)
 
             await checkFile(project.skipEnv, with: out) { url in
                 //let plist = try PLIST.parse(Data(contentsOf: url))
