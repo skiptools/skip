@@ -137,7 +137,12 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
         if isAppProject, let appModuleName = moduleNames.first {
             let projectURL = URL(fileURLWithPath: self.project)
 
-            let projectLayout = try AppProjectLayout(moduleName: appModuleName, root: projectURL)
+            func validateLayoutURL(url: URL, isDirectory: Bool) throws {
+                // we do not perform validaton of the project files
+                return
+            }
+
+            let projectLayout = try AppProjectLayout(moduleName: appModuleName, root: projectURL, check: validateLayoutURL)
 
             do { // greate iOS .ipa
                 for variant in variants {
