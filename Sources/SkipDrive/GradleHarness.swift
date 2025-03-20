@@ -42,10 +42,11 @@ extension GradleHarness {
                 .deletingLastPathComponent()
                 .deletingLastPathComponent()
                 .deletingLastPathComponent()
-            var pluginsFolder = buildBaseFolder.appendingPathComponent("SourcePackages/plugins", isDirectory: true)
+            // Xcode 16.3b3 moved this folder
+            var pluginsFolder = buildBaseFolder.appendingPathComponent("Build/Intermediates.noindex/BuildToolPluginIntermediates", isDirectory: true)
             if !isDir(pluginsFolder) {
-                // Xcode 16.3b3 moved this folder
-                pluginsFolder = buildBaseFolder.appendingPathComponent("Build/Intermediates.noindex/BuildToolPluginIntermediates", isDirectory: true)
+                // Xcode 16 plugin output folder
+                pluginsFolder = buildBaseFolder.appendingPathComponent("SourcePackages/plugins", isDirectory: true)
             }
             return try findModuleFolder(in: pluginsFolder, extension: "output")
         } else {
