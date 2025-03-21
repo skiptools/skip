@@ -1043,7 +1043,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                         try fs.createDirectory(lprojFolder, recursive: true)
                         if localeId == defaultLanguage {
                             // when there is a default language, set up a symbolic link so Android localization can know where to fall back in the case of a missing localization key
-                            try addLink(lprojFolder.appending(component: "base.lproj"), pointingAt: lprojFolder, relative: true)
+                            try addLink(resourcesBasePath.appending(component: "base.lproj"), pointingAt: lprojFolder, relative: true)
                         }
 
                         let localizableStrings = try RelativePath(validating: locBase + ".strings") // e.g., fr.lproj/Localizable.strings
