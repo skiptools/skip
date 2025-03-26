@@ -469,7 +469,7 @@ extension TypeSignature {
         let parametersString = (0..<parameters.count).map { "p\($0)" }.joined(separator: ", ")
         let parametersInString = parametersString.isEmpty ? parametersString : parametersString + " in "
         let handleNil = isOptional ? "\(value) == nil ? nil : " : ""
-        return "\(handleNil){ let closure_swift = JavaBackedClosure<\(returnType)>(\(value), options: \(options.jconvertibleOptions)); return { \(parametersInString)try! closure_swift.invoke(\(parametersString)) } }()"
+        return "\(handleNil){ let closure_swift = JavaBackedClosure<\(returnType)>(\(value)\(isOptional ? "!" : ""), options: \(options.jconvertibleOptions)); return { \(parametersInString)try! closure_swift.invoke(\(parametersString)) } }()"
     }
 
     /// Return the JNI signature of this type.
