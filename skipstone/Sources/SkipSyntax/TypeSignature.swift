@@ -1965,10 +1965,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         case .function(let parameters, let returnType, let apiFlags, let attributes):
             var apiFlagsString = ""
             if apiFlags.options.contains(.async) {
-                apiFlagsString += "async "
+                apiFlagsString += " async"
             }
             if apiFlags.throwsType != .none {
-                apiFlagsString += "throws(\(apiFlags.throwsType.descriptionUsing(keyPath))) "
+                apiFlagsString += " throws"
+                if apiFlags.throwsType != .any {
+                    apiFlagsString += "(\(apiFlags.throwsType.descriptionUsing(keyPath)))"
+                }
             }
             let attributesString = attributes?.contains(.escaping) == true ? "@escaping " : ""
             return "\(attributesString)(\(parameters.map { $0.descriptionUsing(keyPath) }.joined(separator: ", ")))\(apiFlagsString) -> \(returnType[keyPath: keyPath])"
