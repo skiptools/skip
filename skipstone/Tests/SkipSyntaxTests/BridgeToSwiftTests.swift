@@ -888,7 +888,7 @@ final class BridgeToSwiftTests: XCTestCase {
     func testClosureVar() async throws {
         try await check(swift: """
         #if !SKIP_BRIDGE
-        public var c: (Int) -> String = { _ in "" }
+        public var c: @escaping (Int) -> String = { _ in "" }
         #endif
         """, kotlin: """
         var c: (Int) -> String = { _ -> "" }
@@ -954,7 +954,7 @@ final class BridgeToSwiftTests: XCTestCase {
             get {
                 return jniContext {
                     let value_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, options: [], args: [])
-                    return value_java == nil ? nil : { let closure_swift = JavaBackedClosure<String>(value_java, options: []); return { p0 in try! closure_swift.invoke(p0) } }()
+                    return value_java == nil ? nil : { let closure_swift = JavaBackedClosure<String>(value_java!, options: []); return { p0 in try! closure_swift.invoke(p0) } }()
                 }
             }
             set {
