@@ -328,9 +328,12 @@ extension TypeSignature {
         }
 
         switch self.asOptional(false) {
-        case .function(let parameters, _, _, _):
+        case .function(let parameters, let signature, let apiFlags, var attributes):
             let converted = "SwiftClosure\(parameters.count).closure(forJavaObject: \(value), options: \(options.jconvertibleOptions))"
-            return "\(converted)\(isOptional ? "" : "!") as \(self)"
+            if let filtered = attributes?.attributes.filter({ $0.kind != .escaping }) {
+                attributes = Attributes(attributes: filtered)
+            }
+            return "\(converted)\(isOptional ? "" : "!") as \(TypeSignature.function(parameters, signature, apiFlags, attributes))"
         case .int:
             if isOptional {
                 return description + ".fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
