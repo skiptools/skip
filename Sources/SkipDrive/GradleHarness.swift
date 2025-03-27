@@ -42,11 +42,9 @@ extension GradleHarness {
                 .deletingLastPathComponent()
                 .deletingLastPathComponent()
                 .deletingLastPathComponent()
-            // Xcode 16.3b3 moved this folder
-            var pluginsFolder = buildBaseFolder.appendingPathComponent("Build/Intermediates.noindex/BuildToolPluginIntermediates", isDirectory: true)
+            var pluginsFolder = buildBaseFolder.appendingPathComponent("Build/Intermediates.noindex/BuildToolPluginIntermediates", isDirectory: true) // Xcode 16.3+
             if !isDir(pluginsFolder) {
-                // Xcode 16 plugin output folder
-                pluginsFolder = buildBaseFolder.appendingPathComponent("SourcePackages/plugins", isDirectory: true)
+                pluginsFolder = buildBaseFolder.appendingPathComponent("SourcePackages/plugins", isDirectory: true) // Xcode 16.2-
             }
             return try findModuleFolder(in: pluginsFolder, extension: "output")
         } else {
@@ -129,102 +127,6 @@ extension GradleHarness {
             packageRootURL = parent
             if isPackageRoot() {
                 return packageRootURL
-            }
-        }
-    }
-
-    /// Uses the system `adb` process to install and launch the given APK, following the
-    /// Note that is currently unused; launching the APK is handled by a custom "launchDebug"/"launchRelease" task in SkipGradlePlugin.kt
-    @available(*, deprecated, message: "unused")
-    private func launchAPK(device: String?, appid: String, log: [String] = [], apk: String, relativeTo sourcePath: StaticString = #file) async throws {
-        let env: [String: String] = [:]
-
-        let apkPath = URL(fileURLWithPath: apk, isDirectory: false, relativeTo: packageBaseFolder(forSourceFile: sourcePath))
-
-        guard FileManager.default.isReadableFile(atPath: apkPath.path) else {
-            throw ADBError(errorDescription: "APK did not exist at \(apkPath.path)")
-        }
-
-        // List of devices attached:
-        // adb-R9TT50AJWEX-F9Ujyu._adb-tls-connect._tcp.    device
-        // emulator-5554    device
-        let adbDevices = [
-            "adb",
-            "devices",
-        ]
-
-        for try await outputLine in Process.streamLines(command: adbDevices, environment: env, includeStdErr: true, onExit: { result in
-            guard case .terminated(0) = result.exitStatus else {
-                // we failed, but did not expect an error
-                throw ADBError(errorDescription: "error listing devices: \(result)")
-            }
-        }) {
-            print("ADB DEVICE>", outputLine)
-        }
-
-        let adb = ["adb"] + (device.flatMap { ["-s", $0] } ?? [])
-
-        // adb install -r Packages/Skip/skipapp.swiftpm.output/AppDemoTests/skip/AppDemo/.build/AppDemo/outputs/apk/debug/AppDemo-debug.apk
-        let adbInstall = adb + [
-            "install",
-            "-r", // replace existing application
-            "-t", // allow test packages
-            apkPath.path,
-        ]
-
-        print("running:", adbInstall.joined(separator: " "))
-
-        for try await outputLine in Process.streamLines(command: adbInstall, environment: env, includeStdErr: true, onExit: { result in
-            guard case .terminated(0) = result.exitStatus else {
-                // we failed, but did not expect an error
-                throw ADBError(errorDescription: "error installing APK: \(result)")
-            }
-        }) {
-            print("ADB>", outputLine)
-        }
-
-        // adb shell am start -n app.demo/.MainActivity
-        let adbStart = adb + [
-            "shell",
-            "am",
-            "start-activity",
-            "-S", // force stop the target app before starting the activity
-            "-W", // wait for launch to complete
-            "-n", appid,
-        ]
-
-        for try await outputLine in Process.streamLines(command: adbStart, environment: env, includeStdErr: true, onExit: { result in
-            guard case .terminated(0) = result.exitStatus else {
-                throw ADBError(errorDescription: "error launching APK: \(result)")
-            }
-        }) {
-            print("ADB>", outputLine)
-        }
-
-        // GOOD:
-        // ADB> Starting: Intent { cmp=app.demo/.MainActivity }
-
-        // BAD:
-        // ADB> Error: Activity not started, unable to resolve Intent { act=android.intent.action.VIEW dat= flg=0x10000000 }
-
-
-        if !log.isEmpty {
-            // adb shell am start -n app.demo/.MainActivity
-            let logcat = adb + [
-                "logcat",
-                "-T", "1000", // start with only the 1000 most recent entries
-                // "-v", "time",
-                // "-d", // dump then exit
-            ]
-            + log // e.g., ["*:W"] or ["app.demo*:E"],
-
-
-            for try await outputLine in Process.streamLines(command: logcat, environment: env, includeStdErr: true, onExit: { result in
-                guard case .terminated(0) = result.exitStatus else {
-                    throw ADBError(errorDescription: "error watching log: \(result)")
-                }
-            }) {
-                print("LOGCAT>", outputLine)
             }
         }
     }
