@@ -172,7 +172,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
                 return (result: result, message: MessageBlock(status: .fail, msg))
             }
         }
-        return try await run(with: out, msg, ["zip", "-\(compressionLevel)", "-r", zipFile.path, folder.lastPathComponent], in: folder.deletingLastPathComponent(), resultHandler: returnFileSize)
+        return try await run(with: out, msg, ["zip", "-\(compressionLevel)", "--symlinks", "-r", zipFile.path, folder.lastPathComponent], in: folder.deletingLastPathComponent(), resultHandler: returnFileSize)
     }
 
     func createIPA(configuration: BuildConfiguration, primaryModuleName: String, sdk: String = "iphoneos", cfgSuffix: String, projectURL: URL, out: MessageQueue, prefix re: String, xcodeProjectURL: URL, ipaURL ipaOutputURL: URL? = nil, xcarchiveURL: URL? = nil, teamID: String? = nil, verifyFile: Bool = true, returnHashes: Bool) async throws -> [URL : String?] {
