@@ -1008,6 +1008,7 @@ final class KotlinBridgeToKotlinVisitor {
         // keep the superclass call because we won't add constructors. This is most common for Error enums calling Exception()
         let isNonGenericEnum = classDeclaration.declarationType == .enumDeclaration && classDeclaration.generics.isEmpty
         let superclassCall: String?
+        var clearSuperclassCall = false
         if isNonGenericEnum {
             superclassCall = nil
         } else if let call = classDeclaration.superclassCall {
@@ -1016,15 +1017,14 @@ final class KotlinBridgeToKotlinVisitor {
             } else {
                 superclassCall = "super()"
             }
-            classDeclaration.superclassCall = nil
+            clearSuperclassCall = true
         } else {
             superclassCall = nil
         }
 
         let isError = classDeclaration.inherits.first?.isNamed("Exception") == true && classDeclaration.inherits.contains { $0.isNamed("Error", moduleName: "Swift", generics: []) }
         var isView = false
-        classDeclaration.extras = nil
-        classDeclaration.inherits = classDeclaration.inherits.compactMap {
+        let mappedInherits: [TypeSignature] = classDeclaration.inherits.compactMap {
             guard !includesUI || (!$0.isNamed("View", moduleName: "SwiftUI", generics: []) && !$0.isNamed("View", moduleName: "SkipFuseUI", generics: [])) else {
                 isView = true
                 return .skipUIView
@@ -1040,6 +1040,16 @@ final class KotlinBridgeToKotlinVisitor {
             } else {
                 return nil
             }
+        }
+        if isView && classDeclaration.modifiers.visibility == .private {
+            classDeclaration.messages.append(.kotlinBridgeViewPrivate(classDeclaration, source: syntaxTree.source))
+            return false
+        }
+
+        classDeclaration.inherits = mappedInherits
+        classDeclaration.extras = nil
+        if clearSuperclassCall {
+            classDeclaration.superclassCall = nil
         }
 
         var insertStatements: [KotlinStatement] = []
@@ -1510,7 +1520,7 @@ final class KotlinBridgeToKotlinVisitor {
                 var syncSwift: [String] = []
                 var initCdeclFunctions: [CDeclFunction] = []
                 var syncCdeclFunctions: [CDeclFunction] = []
-                if attributes.stateAttribute != nil {
+                if attributes.stateAttribute != nil || attributes.contains(.focusState) {
                     (initStatements, initSwift, initCdeclFunctions) = viewInitState(for: name, in: classDeclaration)
                     (syncStatements, syncSwift, syncCdeclFunctions) = viewSyncState(for: name, in: classDeclaration)
                 } else if attributes.environmentAttribute != nil {
@@ -1539,7 +1549,7 @@ final class KotlinBridgeToKotlinVisitor {
         functionDeclaration.extras = .singleNewline
         var bodyKotlin: [String] = []
         for (name, attributes) in stateVariables {
-            if attributes.stateAttribute != nil {
+            if attributes.stateAttribute != nil || attributes.contains(.focusState) {
                 bodyKotlin.append("val remembered\(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_\(name)(Swift_peer)) }")
                 bodyKotlin.append("Swift_syncState_\(name)(Swift_peer, remembered\(name).value)")
             } else if attributes.environmentAttribute != nil {

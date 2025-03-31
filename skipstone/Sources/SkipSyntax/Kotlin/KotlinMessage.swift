@@ -98,6 +98,10 @@ extension Message {
         return Message(kind: .error, message: "This release does not yet support bridging \(feature)", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinBridgeViewPrivate(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "Private views cannot be bridged to Android. Consider making this view internal", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinCatchCaseCast(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "Kotlin only supports catch clauses that use enum cases, 'is <type>', or 'let <e> as <type>' conditions", sourceDerived: sourceDerived, source: source)
     }
