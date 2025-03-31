@@ -1763,7 +1763,7 @@ final class UnbridgedMemberDeclaration: Statement {
 }
 
 /// `let/var v ...`
-final class VariableDeclaration: Statement {
+final class     VariableDeclaration: Statement {
     let names: [String?]
     var propertyName: String {
         return (names.first ?? "") ?? ""
