@@ -45,7 +45,7 @@ struct AndroidSDKInstallCommand: MessageCommand, ToolOptionsCommand {
         shouldDisplay: true)
 
     @Option(help: ArgumentHelp("Version of the Swift Android SDK to install", valueName: "version"))
-    var version: String = "6.0"
+    var version: String = "6.1"
 
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
@@ -224,6 +224,10 @@ fileprivate extension AndroidOperationCommand {
             if toolchainOptions.aggregate {
                 cmd += ["--static-swift-stdlib"]
                 xswiftc += ["-L" + tc.libPathStatic.path]
+                xswiftc += ["-lc++_shared"]
+                xswiftc += ["-llog"]
+                // -Xfrontend -function-sections: enables dead stripping of unused runtime functions.
+                xswiftc += ["-Xfrontend", "-function-sections"]
             }
 
             // always set the TARGET_OS_ANDROID environment and build constant, regardless of bridging
