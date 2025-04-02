@@ -156,7 +156,7 @@ extension CodebaseInfo {
     var needsAndroidBridge: Bool {
         // Exclude our own SkipFuse modules, which should not generate their own Bundle, UserDefaults, etc support code.
         // Doing so lead sto duplicate dex errors
-        return dependentModules.contains { $0.moduleName == "SkipAndroidBridge" } && moduleName?.hasPrefix("SkipFuse") != true
+        return dependentModules.contains { $0.moduleName == "SkipAndroidBridge" } && moduleName?.hasPrefix("SkipFuse") != true && moduleName != "SkipSwiftUI"
     }
 }
 

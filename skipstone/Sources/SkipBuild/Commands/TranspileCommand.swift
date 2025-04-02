@@ -310,7 +310,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
 
         let isNativeModule = baseSkipConfig.skip?.mode?.lowercased() == "native"
-        let autoBridge: AutoBridge = primaryModuleName == "SkipFuseUI" ? .none : baseSkipConfig.skip?.isAutoBridgingEnabled() == true ? .public : .default
+        let autoBridge: AutoBridge = primaryModuleName == "SkipSwiftUI" ? .none : baseSkipConfig.skip?.isAutoBridgingEnabled() == true ? .public : .default
         let dynamicRoot = baseSkipConfig.skip?.dynamicroot
 
         // projects with a CMakeLists.txt file are built as a native Android library

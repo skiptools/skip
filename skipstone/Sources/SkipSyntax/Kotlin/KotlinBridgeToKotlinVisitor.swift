@@ -18,7 +18,7 @@ final class KotlinBridgeToKotlinVisitor {
         self.options = options
         self.translator = translator
         self.codebaseInfo = codebaseInfo
-        self.includesUI = translator.syntaxTree.root.statements.compactMap({ $0 as? ImportDeclaration }).contains { $0.modulePath.first == "SkipFuseUI" }
+        self.includesUI = translator.syntaxTree.root.statements.compactMap({ $0 as? ImportDeclaration }).contains { $0.modulePath.first == "SkipSwiftUI"  || $0.modulePath.first == "SkipFuseUI" }
     }
 
     func visit() -> [KotlinTransformerOutput] {
@@ -1025,7 +1025,7 @@ final class KotlinBridgeToKotlinVisitor {
         let isError = classDeclaration.inherits.first?.isNamed("Exception") == true && classDeclaration.inherits.contains { $0.isNamed("Error", moduleName: "Swift", generics: []) }
         var isView = false
         let mappedInherits: [TypeSignature] = classDeclaration.inherits.compactMap {
-            guard !includesUI || (!$0.isNamed("View", moduleName: "SwiftUI", generics: []) && !$0.isNamed("View", moduleName: "SkipFuseUI", generics: [])) else {
+            guard !includesUI || (!$0.isNamed("View", moduleName: "SwiftUI", generics: []) && !$0.isNamed("View", moduleName: "SkipSwiftUI", generics: [])) else {
                 isView = true
                 return .skipUIView
             }

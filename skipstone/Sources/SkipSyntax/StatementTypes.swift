@@ -1548,8 +1548,8 @@ class TypeDeclaration: Statement {
         var decodeLevel = self.decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
         var decodeFlags: DecodeFlags = []
         if decodeLevel == .none {
-            // We need to decode native views for adapting to SkipFuseUI
-            if syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, let inheritsView = inherits.first(where: { $0.isNamed("View", moduleName: "SwiftUI", generics: []) || $0.isNamed("View", moduleName: "SkipFuseUI", generics: []) }) {
+            // We need to decode native views for adapting to SkipSwiftUI
+            if syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, let inheritsView = inherits.first(where: { $0.isNamed("View", moduleName: "SwiftUI", generics: []) || $0.isNamed("View", moduleName: "SkipSwiftUI", generics: []) }) {
                 decodeLevel = .api
                 decodeFlags.insert(.swiftUIState)
                 // We don't care about other protocols
@@ -1598,8 +1598,8 @@ class TypeDeclaration: Statement {
         var decodeLevel = self.decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
         var decodeFlags: DecodeFlags = []
         if decodeLevel == .none {
-            // We need to decode native views for adapting to SkipFuseUI
-            if syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, let inheritsView = inherits.first(where: { $0.isNamed("View", moduleName: "SwiftUI", generics: []) || $0.isNamed("View", moduleName: "SkipFuseUI", generics: []) }) {
+            // We need to decode native views for adapting to SkipSwiftUI
+            if syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, let inheritsView = inherits.first(where: { $0.isNamed("View", moduleName: "SwiftUI", generics: []) || $0.isNamed("View", moduleName: "SkipSwiftUI", generics: []) }) {
                 decodeLevel = .api
                 decodeFlags.insert(.swiftUIState)
                 // We don't care about other protocols

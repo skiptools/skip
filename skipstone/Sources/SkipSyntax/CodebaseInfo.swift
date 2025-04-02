@@ -40,7 +40,8 @@ public final class CodebaseInfo {
         "OSLog": ["SkipFoundation"],
         "Swift": ["SkipLib"],
         "SwiftUI": ["SkipUI", "SkipFoundation", "SkipModel"],
-        // Native files using SkipFuseUI might also contain transpiled code or bridge SwiftUI types to transpiled code
+        // Native files using SkipSwiftUI might also contain transpiled code or bridge SwiftUI types to transpiled code
+        "SkipSwiftUI": ["SkipUI", "SkipFoundation", "SkipModel"],
         "SkipFuseUI": ["SkipUI", "SkipFoundation", "SkipModel"],
         "UIKit": ["SkipUI", "SkipFoundation", "SkipModel"],
         "UserNotifications": ["SkipUI", "SkipFoundation", "SkipModel"],

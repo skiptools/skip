@@ -6263,7 +6263,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testBridgedView() async throws {
         try await check(swiftBridge: """
-        #if canImport(SkipFuseUI)
+        #if canImport(SkipSwiftUI)
         import SkipFuseUI
         #endif
         public struct V: View {
@@ -6372,9 +6372,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testUnbridgedView() async throws {
         try await check(swiftBridge: """
-        #if canImport(SkipFuseUI)
         import SkipFuseUI
-        #endif
         protocol P {
         }
         struct V: View, P {
@@ -6487,9 +6485,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testEnumView() async throws {
         try await check(swiftBridge: """
-        #if canImport(SkipFuseUI)
-        import SkipFuseUI
-        #endif
+        import SkipSwiftUI
         public enum E: View {
             case a
             public var body: some View {
@@ -6516,7 +6512,7 @@ final class BridgeToKotlinTests: XCTestCase {
             }
         }
         """, swiftBridgeSupport: """
-        import SkipFuseUI
+        import SkipSwiftUI
         extension E: BridgedToKotlin, SkipUIBridging, SkipUI.View {
             private static let Java_class = try! JClass(name: "E")
             private static let Java_Companion_class = try! JClass(name: "E$Companion")
@@ -6562,9 +6558,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testFocusState() async throws {
         try await check(swiftBridge: """
-        #if canImport(SkipFuseUI)
         import SkipFuseUI
-        #endif
         struct V: View {
             @FocusState var focused: Bool
             var body: some View {
