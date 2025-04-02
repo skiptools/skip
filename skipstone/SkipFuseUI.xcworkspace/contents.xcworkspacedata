@@ -53,6 +53,9 @@
       location = "group:../skip-kit">
    </FileRef>
    <FileRef
+      location = "group:../skip-device">
+   </FileRef>
+   <FileRef
       location = "group:../skip-keychain">
    </FileRef>
    <FileRef

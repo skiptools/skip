@@ -17,7 +17,7 @@ public final class KotlinBundleTransformer: KotlinTransformer {
             return []
         }
         let foundationModules: Set<String> = [
-            "Foundation", "SkipFoundation", "SwiftUI", "SkipUI", "SkipFuseUI"
+            "Foundation", "SkipFoundation", "SwiftUI", "SkipUI", "SkipSwiftUI", "SkipFuseUI"
         ]
         guard syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }).contains(where: { foundationModules.contains($0.modulePath.first ?? "") }) else {
             return []
