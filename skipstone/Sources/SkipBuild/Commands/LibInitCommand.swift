@@ -147,17 +147,17 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         let apkPath = outputsPath + "/apk/" + configuration.rawValue + "/" + appModuleName + cfgSuffix + unsigned + ".apk"
         let apkURL = URL(fileURLWithPath: apkPath, isDirectory: false)
         
-        await checkFile(apkURL, with: out, title: "Verify \(apkTitle)") { url in
-            return CheckStatus(status: .pass, message: try "Verify \(apkTitle) \(url.fileSizeString)")
+        await checkFile(apkURL, with: out, title: "Verify \(apkTitle)") { title, url in
+            return CheckStatus(status: .pass, message: try "\(title): \(url.fileSizeString)")
         }
 
         var hashes: [URL : String?] = [:]
         hashes[apkURL] = nil
         if returnHashes {
-            await checkFile(apkURL, with: out, title: "\(re)Checksum Archive") { url in
+            await checkFile(apkURL, with: out, title: "\(re)Checksum Archive") { title, url in
                 let apkHash = try url.SHA256Hash()
                 hashes[apkURL] = apkHash
-                return CheckStatus(status: .pass, message: "APK SHA256: \(apkHash)")
+                return CheckStatus(status: .pass, message: "\(title): SHA256: \(apkHash)")
             }
         }
         return hashes
@@ -251,18 +251,18 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         }
 
         if verifyFile {
-            await checkFile(ipaURL, with: out, title: "\(re)Verifying \(ipaURL.lastPathComponent)") { url in
-                CheckStatus(status: .pass, message: try "Verify \(ipaURL.lastPathComponent) \(url.fileSizeString)")
+            await checkFile(ipaURL, with: out, title: "\(re)Verifying \(ipaURL.lastPathComponent)") { title, url in
+                CheckStatus(status: .pass, message: try "\(title): \(url.fileSizeString)")
             }
         }
 
         var hashes: [URL : String?] = [:]
         hashes[ipaURL] = nil
         if returnHashes {
-            await checkFile(ipaURL, with: out, title: "\(re)Checksum Archive") { url in
+            await checkFile(ipaURL, with: out, title: "\(re)Checksum Archive") { title, url in
                 let ipaHash = try url.SHA256Hash()
                 hashes[ipaURL] = ipaHash
-                return CheckStatus(status: .pass, message: "IPA SHA256: \(ipaHash)")
+                return CheckStatus(status: .pass, message: "\(title): SHA256: \(ipaHash)")
             }
         }
         return hashes
@@ -320,7 +320,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         }
 
         if verify {
-            try await performVerifyCommand(project: projectPath.pathString, with: out.subqueue("Verify Project"), free: free)
+            try await performVerifyCommand(project: projectPath.pathString, autofix: false, free: free, with: out.subqueue("Verify Project"))
         }
 
         if showTree {
@@ -329,43 +329,6 @@ extension ToolOptionsCommand where Self : StreamingCommand {
 
         return (projectURL, project, artifactHashes)
     }
-}
-
-extension ToolOptionsCommand {
-    /// Perform a monitor check on the given URL
-    @discardableResult func check<T, U>(_ item: T, with out: MessageQueue, title: String, handle: @escaping (T) throws -> U) async -> Result<U, Error> {
-        await outputOptions.monitor(with: out, title, resultHandler: { result in
-            return (nil, nil) as (result: Result<U, any Error>?, message: MessageBlock?)
-        }) { line in
-            try handle(item)
-        }
-    }
-
-
-    /// Perform a monitor check on the given URL
-    @discardableResult func checkFile(_ url: URL, with out: MessageQueue, title: String? = nil, handle: @escaping (URL) throws -> CheckStatus) async -> Bool {
-        let title = title ?? "Check \(url.lastPathComponent)"
-        let result = await outputOptions.monitor(with: out, title, resultHandler: { result in
-            do {
-                if let resultURL = try result?.get() {
-                    let handleResult = try handle(resultURL)
-                    return (result, MessageBlock(status: handleResult.status, handleResult.message ?? title))
-                } else {
-                    return (result, nil)
-                }
-            } catch {
-                return (Result.failure(error), nil)
-            }
-        }) { loggingHandler in
-            return url
-        }
-        return (try? result.get()) != nil
-    }
-}
-
-struct CheckStatus {
-    var status: MessageBlock.Status
-    var message: String? = nil
 }
 
 struct PackageModule {

@@ -31,9 +31,12 @@ struct VerifyCommand: SkipCommand, StreamingCommand, ProjectCommand, ToolOptions
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Fail immediately when an error occurs"))
     var failFast: Bool = false
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Attempt to automatically fix issues"))
+    var fix: Bool = false
+
     func performCommand(with out: MessageQueue) async {
         await withLogStream(with: out) {
-            try await performVerifyCommand(project: project, with: out, free: free, fastlane: fastlane)
+            try await performVerifyCommand(project: project, autofix: fix, free: free, fastlane: fastlane, with: out)
         }
     }
 }
@@ -45,11 +48,11 @@ struct NoResultOutputError : LocalizedError {
 
 extension ToolOptionsCommand where Self : StreamingCommand {
 
-    func performVerifyCommand(project projectPath: String, with out: MessageQueue, free: Bool? = nil, fastlane: Bool? = nil) async throws {
+    func performVerifyCommand(project projectPath: String, autofix: Bool, free: Bool? = nil, fastlane: Bool? = nil, with out: MessageQueue) async throws {
         let projectFolderURL = URL(fileURLWithPath: projectPath, isDirectory: true)
 
         func checkFolder(_ dir: URL, _ message: String? = nil) async -> Bool {
-            await checkFile(dir, with: out, title: message ?? "Check folder: \(dir.lastPathComponents(2))") { url in
+            await checkFile(dir, with: out, title: message ?? "Check folder: \(dir.lastPathComponents(2))") { title, url in
                 return CheckStatus(status: url.isDirectoryFile == true ? .pass : .fail, message: message ?? "Check folder: \(dir.lastPathComponents(2))")
             }
         }
@@ -67,7 +70,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         }
 
         @discardableResult func checkFileContents(_ file: URL, message: String? = nil, length: Range<Int>? = nil, trailingContents: String? = nil, isURL: Bool = false) async -> Bool {
-            await checkFile(file, with: out, title: message) { url in
+            await checkFile(file, with: out, title: message) { title, url in
                 if url.isRegularFile != true {
                     return CheckStatus(status: .fail, message: "Missing file: \(file.relativePath)")
                 }
@@ -89,7 +92,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
                     return CheckStatus(status: .fail, message: "Contents not a valid URL: \(file.relativePath)")
                 }
 
-                return CheckStatus(status: .pass, message: message ?? "Verify file: \(file.lastPathComponent)")
+                return CheckStatus(status: .pass, message: message ?? "Verify file: \(file.relativePath)")
             }
         }
 
@@ -118,7 +121,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
             }
 
             if await checkFolder(sourcesDir) {
-                await checkFile(sourcesDir, with: out, title: "Verify source file license headers") { url in
+                await checkFile(sourcesDir, with: out, title: "Verify source file license headers") { title, url in
                     let srcFiles = try FileManager.default.enumeratedURLs(of: url)
                     let (unlicensedSources, _) = try SourceValidator.scanSources(from: srcFiles, in: ["swift"])
                     if unlicensedSources.isEmpty {
@@ -159,12 +162,27 @@ extension ToolOptionsCommand where Self : StreamingCommand {
 
             let project = try AppProjectLayout(moduleName: moduleName, root: projectFolderURL, check: validateLayoutURL)
 
-            await checkFile(project.skipEnv, with: out) { url in
+            await checkFile(project.skipEnv, with: out) { title, url in
                 //let plist = try PLIST.parse(Data(contentsOf: url))
                 return CheckStatus(status: .pass)
             }
 
-            await checkFile(project.androidManifest, with: out) { url in
+            await checkFile(project.androidGradleSettings, with: out) { title, url in
+                let expectedContents = AppProjectLayout.createSettingsGradle()
+                let actualContents = try String(contentsOf: url)
+                if expectedContents.trimmingCharacters(in: .whitespacesAndNewlines) != actualContents.trimmingCharacters(in: .whitespacesAndNewlines) {
+                    if autofix {
+                        try expectedContents.write(to: url, atomically: false, encoding: .utf8)
+                        return CheckStatus(status: .warn, message: "\(title): updated contents")
+                    } else {
+                        return CheckStatus(status: .fail, message: "\(title): contents out of date")
+                    }
+                } else {
+                    return CheckStatus(status: .pass)
+                }
+            }
+
+            await checkFile(project.androidManifest, with: out) { title, url in
                 let node = try XMLNode.parse(data: Data(contentsOf: url), options: [.processNamespaces], entityResolver: nil)
                 guard let manifest = node.elementChildren.first else {
                     return CheckStatus(status: .fail, message: "Verify AndroidManifest.xml: root node is not <manifest>: \(node.elementName)")

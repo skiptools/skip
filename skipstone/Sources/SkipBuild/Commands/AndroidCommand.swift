@@ -155,7 +155,7 @@ fileprivate extension AndroidOperationCommand {
     }
 
     /// Run `swift build` for the given Android architectures, optionally running the test cases on the device or copying all the files to the given `archiveOutputFolder`
-    func runSwiftPM(cleanup: Bool? = nil, execute executable: String? = nil, commandEnvironment: [String] = [], defaultArch: AndroidArchArgument, remoteFolder: String? = nil, copy: [String] = [], archiveOutputFolder: URL? = nil, with out: MessageQueue) async throws {
+    func runSwiftPM(cleanup: Bool? = nil, execute executable: String? = nil, commandEnvironment: [String] = [], defaultArch: AndroidArchArgument, remoteFolder: String? = nil, copy: [String] = [], archiveOutputFolder: URL? = nil, testingLibrary: TestingLibrary?, with out: MessageQueue) async throws {
         let packageDir = toolchainOptions.packagePath ?? "."
         let archs = !toolchainOptions.arch.isEmpty ? toolchainOptions.arch : [defaultArch]
         // pick the default architecture based on the current host; for running executables and tests, this will likely be the one that matches an attached emulator, but for an attached device, we don't know (e.g., an x86_64 host may be connecting to an aarch64 device).
@@ -166,6 +166,7 @@ fileprivate extension AndroidOperationCommand {
 
             var env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths
             let toolchainBin = tc.toolchainPath.appendingPathComponent("usr/bin", isDirectory: true)
+            let toolchainLib = tc.toolchainPath.appendingPathComponent("usr/lib", isDirectory: true)
             // when some older version of ld is earlier in the path, a user reported an error like "ld: unsupported tapi file type '!tapi-tbd' in YAML file" when trying to build; this should in theory avoid that, but there was an error where "/Users/USERNAME/anaconda3/bin/ld" was earlier in the PATH; prepending "/usr/bin/ld" to the PATH should be enough to work around this
             let path = toolchainBin.path + ":/usr/bin:" + (env["PATH"] ?? "")
             env["PATH"] = path
@@ -183,6 +184,7 @@ fileprivate extension AndroidOperationCommand {
                 throw CrossCompilerError(errorDescription: "Could not locate swift command at: \(swiftCmd)")
             }
             var cmd: [String] = []
+            var xswiftc = toolchainOptions.xswiftc
 
             cmd += [swiftCmd]
             cmd += ["build"]
@@ -196,6 +198,8 @@ fileprivate extension AndroidOperationCommand {
             let runTests = cleanup != nil && executable == nil
             if runTests {
                 cmd += ["--build-tests"]
+                // plugin-path is a workaround for https://github.com/swiftlang/swift-package-manager/issues/8362
+                xswiftc += ["-plugin-path", toolchainLib.appendingPathComponent("swift/host/plugins/testing", isDirectory: true).path]
             }
             // pass-through the "--verbose" flag to the underlying build command
             if outputOptions.verbose {
@@ -214,7 +218,6 @@ fileprivate extension AndroidOperationCommand {
                 cmd += ["--configuration", configuration.rawValue]
             }
 
-            var xswiftc = toolchainOptions.xswiftc
             if toolchainOptions.bridge {
                 xswiftc += ["-DSKIP_BRIDGE"]
                 // set the SKIP_BRIDGE flag, which is transferred through to a build #define in SkipBridge and can be used to check whether the current build mode is targetting JNI
@@ -228,6 +231,7 @@ fileprivate extension AndroidOperationCommand {
                 xswiftc += ["-llog"]
                 // -Xfrontend -function-sections: enables dead stripping of unused runtime functions.
                 xswiftc += ["-Xfrontend", "-function-sections"]
+                xswiftc += ["-Osize"]
             }
 
             // always set the TARGET_OS_ANDROID environment and build constant, regardless of bridging
@@ -373,11 +377,43 @@ fileprivate extension AndroidOperationCommand {
 
             var runFailure: Error?
             do {
-                // when not running tests, pass through the specified arguments to the command
-                let cmdArgs = executable != nil ? args.dropFirst() : []
                 // in theory, we should be able to skip individual tests using the _SWIFTPM_SKIP_TESTS_LIST environment variable, but is seems to not work
                 //execCommand = "_SWIFTPM_SKIP_TESTS_LIST=TestClass.testName" + " " + execCommand
-                try await runCommand(command: [adb, "shell", "cd '\(stagingDir)'", "&&"] + commandEnvironment + ["./" + executableBase] + cmdArgs, env: env, with: out)
+                // Pre-6.1 toolchains do not support testing
+                let canUseSwiftTesting = !tc.swiftSDKVersion.hasPrefix("5.") && !tc.swiftSDKVersion.hasPrefix("6.0")
+
+                var usesSwiftTesting = testingLibrary == .testing || testingLibrary == .all
+                if usesSwiftTesting {
+                    // when a test contains the Swift Testing library, the tests need to be executed a second time with a special flag to activate the swift tests
+                    // To determine if the shared object files contain a dependency, look at the ELFFile's needed section
+                    let executableELFFile = try ELFFile(url: executablePath)
+                    let executableDependencies = executableELFFile.dependencies
+                    usesSwiftTesting = executableDependencies.contains("libTesting.so")
+                }
+
+                var cmd = [adb, "shell"]
+                cmd += ["cd '\(stagingDir)'"]
+                cmd += ["&&"]
+                cmd += commandEnvironment
+                cmd += ["./" + executableBase]
+                if executable != nil {
+                    // when not running tests, pass through the specified arguments to the command
+                    cmd += args.dropFirst()
+                } else if canUseSwiftTesting && usesSwiftTesting {
+                    cmd += ["&&"]
+                    cmd += commandEnvironment
+                    cmd += ["./" + executableBase]
+                    cmd += ["--testing-library", "swift-testing"]
+
+                    // need to tack on a special check for the exit code 69, which indicates that there were no tests to run
+                    // EXIT_NO_TESTS_FOUND=EX_UNAVAILABLE=69
+                    // https://github.com/swiftlang/swift-testing/blob/f7705437e5010b262a10e2b3f1ce416ac18794a5/Sources/Testing/ABI/EntryPoints/SwiftPMEntryPoint.swift#L26
+                    // https://github.com/skiptools/swift-android-action/commit/b4286f57fa6ab31714b86ebf9494f3748d4f520f
+                    // && [ \$? -eq 0 ] || [ \$? -eq 69 ]" || true
+                    cmd += ["&&", "[ $? -eq 0 ]", "||", "[ $? -eq 69 ]"]
+                }
+                
+                try await runCommand(command: cmd, env: env, with: out)
             } catch {
                 runFailure = error
             }
@@ -494,7 +530,7 @@ fileprivate extension AndroidOperationCommand {
 
         //let sdkName = sdkPath.deletingPathExtension().lastPathComponent // e.g. "swift-6.0.2-RELEASE-android-24-0.1"
         let sdkName = arch.target(api: apiLevel)
-        let swiftSDKVersion = sdkPath.lastPathComponent.split(separator: "-").dropFirst().first ?? "latest" // e.g.: 6.0.2
+        let swiftSDKVersion = sdkPath.lastPathComponent.split(separator: "-").dropFirst().first?.description ?? "latest" // e.g.: 6.0.2
         let toolchainPath = try swiftToolchainFolder(sdkVersion: swiftSDKVersion.description)
         let sdkRoot = sdkPath.appendingPathComponent("swift-\(swiftSDKVersion)-release-android-\(apiLevel)-sdk", isDirectory: true)
         if !isDir(sdkRoot) {
@@ -540,7 +576,7 @@ fileprivate extension AndroidOperationCommand {
             throw CrossCompilerError(errorDescription: "The Swift Android SDK dybamic library path for \(arch.tripleKey(api: apiLevel)) did not exist at: \(libPathDynamic.path)")
         }
 
-        return ToolchainPaths(toolchainPath: toolchainPath, destinationURL: nil, sdkName: sdkName, libPathDynamic: libPathDynamic, libPathStatic: libPathStatic)
+        return ToolchainPaths(toolchainPath: toolchainPath, swiftSDKVersion: swiftSDKVersion, destinationURL: nil, sdkName: sdkName, libPathDynamic: libPathDynamic, libPathStatic: libPathStatic)
     }
 
     func swiftToolchainFolder(sdkVersion: String) throws -> URL {
@@ -610,7 +646,7 @@ struct AndroidBuildCommand: AndroidOperationCommand {
     var args: [String] = []
 
     func performCommand(with out: MessageQueue) async throws {
-        try await runSwiftPM(defaultArch: .automatic, archiveOutputFolder: dir.flatMap(URL.init(fileURLWithPath:)), with: out)
+        try await runSwiftPM(defaultArch: .automatic, archiveOutputFolder: dir.flatMap(URL.init(fileURLWithPath:)), testingLibrary: nil, with: out)
     }
 }
 
@@ -646,7 +682,7 @@ struct AndroidRunCommand: AndroidOperationCommand {
     var args: [String] = []
 
     func performCommand(with out: MessageQueue) async throws {
-        try await runSwiftPM(cleanup: cleanup, execute: args.first, commandEnvironment: env, defaultArch: .current, remoteFolder: remoteFolder, copy: copy, with: out)
+        try await runSwiftPM(cleanup: cleanup, execute: args.first, commandEnvironment: env, defaultArch: .current, remoteFolder: remoteFolder, copy: copy, testingLibrary: nil, with: out)
     }
 }
 
@@ -678,6 +714,9 @@ struct AndroidTestCommand: AndroidOperationCommand {
     //@Option(help: ArgumentHelp("Run test cases matching regular expression", valueName: "filter"))
     //var filter: [String] = []
 
+    @Option(help: ArgumentHelp("Testing library name", valueName: "library"))
+    var testingLibrary: TestingLibrary = .all
+
     @Option(help: ArgumentHelp("Environment key/value pairs for remote execution", valueName: "key=value"))
     var env: [String] = []
 
@@ -689,7 +728,7 @@ struct AndroidTestCommand: AndroidOperationCommand {
     var args: [String] = []
 
     func performCommand(with out: MessageQueue) async throws {
-        try await runSwiftPM(cleanup: cleanup, commandEnvironment: env, defaultArch: .current, remoteFolder: remoteFolder, copy: copy, with: out)
+        try await runSwiftPM(cleanup: cleanup, commandEnvironment: env, defaultArch: .current, remoteFolder: remoteFolder, copy: copy, testingLibrary: testingLibrary, with: out)
     }
 }
 
@@ -758,11 +797,23 @@ public struct AndroidError : LocalizedError {
 
 struct ToolchainPaths {
     let toolchainPath: URL
+    let swiftSDKVersion: String
     let destinationURL: URL?
     let sdkName: String?
     let libPathDynamic: URL
     let libPathStatic: URL
 }
+
+/// The library for `swift test`
+enum TestingLibrary: String, ExpressibleByArgument {
+    /// Try to use both Testing and XCTest
+    case all
+    /// Test only with the Testling library
+    case testing
+    /// Test only with the XCTest library
+    case xctest
+}
+
 
 enum AndroidArchArgument: String, ExpressibleByArgument, CaseIterable {
     /// When `ONLY_ACTIVE_ARCH` is set, uses `current` otherwise uses the default supported architectures

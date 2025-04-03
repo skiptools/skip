@@ -91,6 +91,7 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
             SkippyCommand.self,
             TranspileCommand.self,
             SnippetCommand.self,
+            PluginCommand.self,
             DumpSwiftCommand.self,
             DumpSkipCommand.self,
         ]
@@ -964,6 +965,44 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         return decodeResult(output)
     }
 }
+
+extension ToolOptionsCommand {
+    /// Perform a monitor check on the given URL
+    @discardableResult func check<T, U>(_ item: T, with out: MessageQueue, title: String, handle: @escaping (T) throws -> U) async -> Result<U, Error> {
+        await outputOptions.monitor(with: out, title, resultHandler: { result in
+            return (nil, nil) as (result: Result<U, any Error>?, message: MessageBlock?)
+        }) { line in
+            try handle(item)
+        }
+    }
+
+
+    /// Perform a monitor check on the given URL
+    @discardableResult func checkFile(_ url: URL, with out: MessageQueue, title: String? = nil, handle: @escaping (_ title: String, _ url: URL) throws -> CheckStatus) async -> Bool {
+        let title = title ?? "Check \(url.relativeString)"
+        let result = await outputOptions.monitor(with: out, title, resultHandler: { result in
+            do {
+                if let resultURL = try result?.get() {
+                    let handleResult = try handle(title, resultURL)
+                    return (result, MessageBlock(status: handleResult.status, handleResult.message ?? title))
+                } else {
+                    return (result, nil)
+                }
+            } catch {
+                return (Result.failure(error), nil)
+            }
+        }) { loggingHandler in
+            return url
+        }
+        return (try? result.get()) != nil
+    }
+}
+
+struct CheckStatus {
+    var status: MessageBlock.Status
+    var message: String? = nil
+}
+
 
 struct ToolOptions: ParsableArguments {
     @Option(help: ArgumentHelp("Xcode command path", valueName: "path"))

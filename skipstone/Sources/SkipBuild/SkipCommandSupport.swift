@@ -30,14 +30,25 @@ extension ToolOptionsCommand {
 }
 
 extension AsyncLineOutput {
-    /// Gather all the output from the command and parse it as a single JSON blob into the given format
-    func parseJSON<T: Decodable>() async throws -> T {
+    func readLines() async throws -> [AsyncLineOutput.Element] {
         var lines = [AsyncLineOutput.Element]()
         for try await line in self {
             lines.append(line)
         }
+        return lines
+    }
 
+    /// Reads all the lines of the output and returns a tuple of the standard out and standard error.
+    func readOutput() async throws -> (stdout: String, stderr: String) {
+        let lines = try await readLines()
         let stdout = lines.filter({ $0.err == false }).map(\.line).joined(separator: "\n")
+        let stderr = lines.filter({ $0.err == true }).map(\.line).joined(separator: "\n")
+        return (stdout: stdout, stderr: stderr)
+    }
+
+    /// Gather all the output from the command and parse it as a single JSON blob into the given format
+    func parseJSON<T: Decodable>() async throws -> T {
+        let stdout = try await readOutput().stdout
         return try JSONDecoder().decode(T.self, from: stdout.utf8Data)
     }
 }
