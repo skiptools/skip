@@ -49,7 +49,10 @@ public struct Transpiler {
                     // we may get errors from unsupported Swift if we're doing a full decode here, but they won't
                     // bubble up to the user because these trees are only used to gather information, and we re-parse
                     // for only bridging below. Look for e.g. '#if SKIP' or '// SKIP @bridge' or Views that auto-bridge
-                    var shouldBridge = bridgeSource.content.contains("SKIP") || bridgeSource.content.contains("SkipFuseUI") || bridgeSource.content.contains("SkipSwiftUI")
+                    var shouldBridge = bridgeSource.content.contains("SKIP")
+                        || bridgeSource.content.contains("SkipFuseUI")
+                        || bridgeSource.content.contains("SkipSwiftUI")
+                        || bridgeSource.content.contains("@Observable")
                     if autoBridge == .public {
                         shouldBridge = shouldBridge || bridgeSource.content.contains("public") || bridgeSource.content.contains("open")
                     } else if autoBridge == .internal {
