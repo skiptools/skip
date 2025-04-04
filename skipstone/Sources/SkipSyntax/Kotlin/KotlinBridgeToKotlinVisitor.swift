@@ -23,7 +23,7 @@ final class KotlinBridgeToKotlinVisitor {
 
     func visit() -> [KotlinTransformerOutput] {
         var globalFunctionCount = 0
-        var bridgedObservables: [KotlinStatement] = []
+        var hasObservables = false
         var hasSkipFuseImport = false
         var nonKotlinImports: [KotlinStatement] = []
         syntaxTree.root.visit { node in
@@ -65,11 +65,8 @@ final class KotlinBridgeToKotlinVisitor {
                 guard !classDeclaration.isInIfSkipBlock else {
                     return .skip
                 }
-                if update(classDeclaration) {
-                    if classDeclaration.attributes.contains(.observable) {
-                        bridgedObservables.append(classDeclaration)
-                    }
-                }
+                update(classDeclaration)
+                hasObservables = hasObservables || classDeclaration.attributes.contains(.observable) || classDeclaration.unbridgedMembers.contains(where: { $0.isObservable })
                 return .recurse(nil)
             } else if let interfaceDeclaration = node as? KotlinInterfaceDeclaration {
                 guard !interfaceDeclaration.isInIfSkipBlock else {
@@ -81,16 +78,20 @@ final class KotlinBridgeToKotlinVisitor {
                     }
                 }
                 return .recurse(nil)
+            } else if let codeBlock = node as? KotlinCodeBlock {
+                guard !codeBlock.isInIfSkipBlock else {
+                    return .skip
+                }
+                hasObservables = hasObservables || codeBlock.unbridgedMembers.contains(where: { $0.isObservable })
+                return .recurse(nil)
             } else {
                 return .recurse(nil)
             }
         }
         nonKotlinImports.forEach { syntaxTree.root.remove(statement: $0) }
 
-        if !hasSkipFuseImport {
-            for statement in bridgedObservables {
-                statement.messages.append(.kotlinBridgeObservableMissingImport(statement, source: syntaxTree.source))
-            }
+        if hasObservables && !hasSkipFuseImport && !includesUI && (KotlinBridgeTransformer.testSkipAndroidBridge || codebaseInfo.global.needsAndroidBridge) {
+            syntaxTree.root.messages.append(.kotlinBridgeObservableMissingImport(syntaxTree.root, source: syntaxTree.source))
         }
 
         var outputs: [KotlinTransformerOutput] = []
@@ -1520,9 +1521,18 @@ final class KotlinBridgeToKotlinVisitor {
                 var syncSwift: [String] = []
                 var initCdeclFunctions: [CDeclFunction] = []
                 var syncCdeclFunctions: [CDeclFunction] = []
-                if attributes.stateAttribute != nil || attributes.contains(.focusState) {
-                    (initStatements, initSwift, initCdeclFunctions) = viewInitState(for: name, in: classDeclaration)
-                    (syncStatements, syncSwift, syncCdeclFunctions) = viewSyncState(for: name, in: classDeclaration)
+                if attributes.stateAttribute != nil || attributes.contains(.focusState) || attributes.contains(.appStorage) {
+                    let supportTypeName: String
+                    let boxName: String
+                    if attributes.contains(.appStorage) {
+                        supportTypeName = "AppStorageSupport"
+                        boxName = "appStorageBox"
+                    } else {
+                        supportTypeName = "StateSupport"
+                        boxName = "valueBox"
+                    }
+                    (initStatements, initSwift, initCdeclFunctions) = viewInitState(for: name, in: classDeclaration, supportTypeName: supportTypeName, boxName: boxName)
+                    (syncStatements, syncSwift, syncCdeclFunctions) = viewSyncState(for: name, in: classDeclaration, supportTypeName: supportTypeName, boxName: boxName)
                 } else if attributes.environmentAttribute != nil {
                     (initStatements, initSwift, initCdeclFunctions) = viewInitEnvironment(for: name, in: classDeclaration)
                     (syncStatements, syncSwift, syncCdeclFunctions) = viewSyncEnvironment(for: name, in: classDeclaration)
@@ -1549,8 +1559,12 @@ final class KotlinBridgeToKotlinVisitor {
         functionDeclaration.extras = .singleNewline
         var bodyKotlin: [String] = []
         for (name, attributes) in stateVariables {
-            if attributes.stateAttribute != nil || attributes.contains(.focusState) {
-                bodyKotlin.append("val remembered\(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_\(name)(Swift_peer)) }")
+            if attributes.stateAttribute != nil || attributes.contains(.focusState) || attributes.contains(.appStorage) {
+                let supportTypeName = attributes.contains(.appStorage) ? "AppStorageSupport" : "StateSupport"
+                bodyKotlin.append("val remembered\(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.\(supportTypeName), Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_\(name)(Swift_peer)) }")
+                bodyKotlin.append("Swift_syncState_\(name)(Swift_peer, remembered\(name).value)")
+            } else if attributes.contains(.appStorage) {
+                bodyKotlin.append("val remembered\(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.AppStorageSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_\(name)(Swift_peer)) }")
                 bodyKotlin.append("Swift_syncState_\(name)(Swift_peer, remembered\(name).value)")
             } else if attributes.environmentAttribute != nil {
                 bodyKotlin.append("val envkey\(name) = Swift_initEnvironment_\(name)(Swift_peer)")
@@ -1563,20 +1577,20 @@ final class KotlinBridgeToKotlinVisitor {
         return [functionDeclaration]
     }
 
-    private func viewInitState(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func viewInitState(for name: String, in classDeclaration: KotlinClassDeclaration, supportTypeName: String, boxName: String) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let externalName = "Swift_initState_\(name)"
         let externalSourceCode: String
         if classDeclaration.declarationType == .enumDeclaration {
-            externalSourceCode = "private external fun \(externalName)(): skip.ui.StateSupport"
+            externalSourceCode = "private external fun \(externalName)(): skip.ui.\(supportTypeName)"
         } else {
-            externalSourceCode = "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport"
+            externalSourceCode = "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.\(supportTypeName)"
         }
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: externalSourceCode)
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
-        source.append("func Java_initState_\(name)() -> SkipUI.StateSupport {")
-        source.append(1, "return $\(name).valueBox!.Java_initStateSupport()")
+        source.append("func Java_initState_\(name)() -> SkipUI.\(supportTypeName) {")
+        source.append(1, "return $\(name).\(boxName)!.Java_initStateSupport()")
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
@@ -1599,20 +1613,20 @@ final class KotlinBridgeToKotlinVisitor {
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
-    private func viewSyncState(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func viewSyncState(for name: String, in classDeclaration: KotlinClassDeclaration, supportTypeName: String, boxName: String) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let externalName = "Swift_syncState_\(name)"
         let externalSourceCode: String
         if classDeclaration.declarationType == .enumDeclaration {
-            externalSourceCode = "private external fun \(externalName)(support: skip.ui.StateSupport)"
+            externalSourceCode = "private external fun \(externalName)(support: skip.ui.\(supportTypeName))"
         } else {
-            externalSourceCode = "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.StateSupport)"
+            externalSourceCode = "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.\(supportTypeName))"
         }
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: externalSourceCode)
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
-        source.append("func Java_syncState_\(name)(support: SkipUI.StateSupport) {")
-        source.append(1, "$\(name).valueBox!.Java_syncStateSupport(support)")
+        source.append("func Java_syncState_\(name)(support: SkipUI.\(supportTypeName)) {")
+        source.append(1, "$\(name).\(boxName)!.Java_syncStateSupport(support)")
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
@@ -1622,14 +1636,14 @@ final class KotlinBridgeToKotlinVisitor {
             cdeclSignature = .function([TypeSignature.Parameter(label: "support", type: .javaObjectPointer)], .void, APIFlags(), nil)
             cdeclSource = [
                 "let peer_swift = \(classDeclaration.signature).fromJavaObject(Java_target, options: [])",
-                "let support_swift = SkipUI.StateSupport.fromJavaObject(support, options: [])",
+                "let support_swift = SkipUI.\(supportTypeName).fromJavaObject(support, options: [])",
                 "peer_swift.Java_syncState_\(name)(support: support_swift)"
             ]
         } else {
             cdeclSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false)), TypeSignature.Parameter(label: "support", type: .javaObjectPointer)], .void, APIFlags(), nil)
             cdeclSource = [
                 "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
-                "let support_swift = SkipUI.StateSupport.fromJavaObject(support, options: [])",
+                "let support_swift = SkipUI.\(supportTypeName).fromJavaObject(support, options: [])",
                 "peer_swift.value.Java_syncState_\(name)(support: support_swift)"
             ]
         }

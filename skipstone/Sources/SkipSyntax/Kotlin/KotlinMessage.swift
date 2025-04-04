@@ -71,7 +71,7 @@ extension Message {
     }
 
     static func kotlinBridgeObservableMissingImport(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .warning, message: "This bridged @Observable will not be able to power your Android UI unless you 'import SkipFuse'", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .warning, message: "This file contains @Observables, but they will not be able to power your Android UI unless you 'import SkipFuse' or 'import SkipFuseUI'", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinBridgeSuperclassBridging(_ sourceDerived: SourceDerived, source: Source) -> Message {

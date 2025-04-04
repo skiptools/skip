@@ -4928,6 +4928,9 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         """, transformers: transformers)
 
+        KotlinBridgeTransformer.testSkipAndroidBridge = true
+        defer { KotlinBridgeTransformer.testSkipAndroidBridge = false }
+        
         try await checkProducesMessage(swift: """
         @Observable
         public class C {
@@ -6651,6 +6654,113 @@ final class BridgeToKotlinTests: XCTestCase {
             let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
             let support_swift = SkipUI.StateSupport.fromJavaObject(support, options: [])
             peer_swift.value.Java_syncState_focused(support: support_swift)
+        }
+        @_cdecl("Java_V_Swift_1composableBody")
+        func V_Swift_composableBody(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer? {
+            let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
+            return MainActor.assumeIsolated {
+                let body = peer_swift.value.body
+                return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])
+            }
+        }
+        """, transformers: transformers)
+    }
+
+    func testAppStorage() async throws {
+        try await check(swiftBridge: """
+        import SkipFuseUI
+        struct V: View {
+            @AppStorage var value = false
+            var body: some View {
+                Text("Hello")
+            }
+        }
+        """, kotlin: """
+        internal class V: skip.ui.View, skip.bridge.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.SwiftObjectPointer = skip.bridge.SwiftObjectNil
+
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
+
+            override fun Swift_peer(): skip.bridge.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_peer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            @androidx.compose.runtime.Composable
+            override fun ComposeContent(composectx: skip.ui.ComposeContext) {
+                val rememberedvalue = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.AppStorageSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_value(Swift_peer)) }
+                Swift_syncState_value(Swift_peer, rememberedvalue.value)
+                super.ComposeContent(composectx)
+            }
+            private external fun Swift_initState_value(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.AppStorageSupport
+            private external fun Swift_syncState_value(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.AppStorageSupport)
+
+            override fun body(): skip.ui.View {
+                return skip.ui.ComposeBuilder { composectx: skip.ui.ComposeContext -> Swift_composableBody(Swift_peer)?.Compose(composectx) ?: skip.ui.ComposeResult.ok }
+            }
+            private external fun Swift_composableBody(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.View?
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+        }
+        """, swiftBridgeSupport: """
+
+        import SkipFuseUI
+        extension V: BridgedToKotlin, SkipUIBridging, SkipUI.View {
+            private static let Java_class = try! JClass(name: "V")
+            static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                let box: SwiftValueTypeBox<Self> = ptr.pointee()!
+                return box.value
+            }
+            func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let box = SwiftValueTypeBox(self)
+                let Swift_peer = SwiftObjectPointer.pointer(to: box, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+            func Java_initState_value() -> SkipUI.AppStorageSupport {
+                return $value.appStorageBox!.Java_initStateSupport()
+            }
+            func Java_syncState_value(support: SkipUI.AppStorageSupport) {
+                $value.appStorageBox!.Java_syncStateSupport(support)
+            }
+            var Java_view: any SkipUI.View {
+                return self
+            }
+        }
+        @_cdecl("Java_V_Swift_1release")
+        func V_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: SwiftValueTypeBox<V>.self)
+        }
+        @_cdecl("Java_V_Swift_1projectionImpl")
+        func V_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = V.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        @_cdecl("Java_V_Swift_1initState_1value")
+        func V_Swift_initState_value(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer {
+            let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
+            return peer_swift.value.Java_initState_value().toJavaObject(options: [])!
+        }
+        @_cdecl("Java_V_Swift_1syncState_1value")
+        func V_Swift_syncState_value(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ support: JavaObjectPointer) {
+            let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
+            let support_swift = SkipUI.AppStorageSupport.fromJavaObject(support, options: [])
+            peer_swift.value.Java_syncState_value(support: support_swift)
         }
         @_cdecl("Java_V_Swift_1composableBody")
         func V_Swift_composableBody(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer? {

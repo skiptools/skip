@@ -1521,17 +1521,20 @@ class TypeDeclaration: Statement {
         return nil
     }
 
-    private static func decodeClassDeclaration(_ classDecl: ClassDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+    private static func decodeClassDeclaration(_ classDecl: ClassDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> Statement? {
+        let name = classDecl.name.text.removingBacktickEscaping
         let modifiers = Modifiers.for(syntax: classDecl.modifiers)
         var attributes = Attributes.for(syntax: classDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
+            if syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, attributes.contains(.observable) {
+                return UnbridgedMemberDeclaration(member: .observableType(name), syntax: classDecl, extras: extras, in: syntaxTree)
+            }
             return nil
         }
         var context = context
         context.memberOf = (.classDeclaration, modifiers, [])
 
-        let name = classDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = classDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: classDecl.genericParameterClause, where: classDecl.genericWhereClause, in: syntaxTree)
         let (members, unbridgedMembers) = decodeMembers(syntaxListContainer: classDecl.memberBlock, context: context, in: syntaxTree)
@@ -1710,9 +1713,18 @@ enum UnbridgedMember: Hashable {
     case constructor
     case uninitializedStructProperty
     case swiftUIStateProperty(String, Attributes) // Name, attributes
+    case observableType(String)
 
     var isSwiftUIStateProperty: Bool {
         if case .swiftUIStateProperty = self {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    var isObservable: Bool {
+        if case .observableType = self {
             return true
         } else {
             return false
@@ -1821,7 +1833,7 @@ final class     VariableDeclaration: Statement {
         let modifiers = Modifiers.for(syntax: variableDecl.modifiers)
         let decodeLevel = decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
         guard decodeLevel != .none else {
-            if syntaxTree.isBridgeFile, context.memberOf?.type == .structDeclaration, attributes.stateAttribute != nil || attributes.environmentAttribute != nil || attributes.contains(.focusState), let syntax = variableDecl.bindings.first {
+            if syntaxTree.isBridgeFile, context.memberOf?.type == .structDeclaration, attributes.stateAttribute != nil || attributes.environmentAttribute != nil || attributes.contains(.focusState) || attributes.contains(.appStorage), let syntax = variableDecl.bindings.first {
                 // We need to track state in SwiftUI views regardless of visibility
                 guard let optionalName = syntax.pattern.identifierPatterns(in: syntaxTree)?.map(\.name?.removingBacktickEscaping).first, let name = optionalName else {
                     throw Message.unsupportedSyntax(syntax.pattern, source: syntaxTree.source)

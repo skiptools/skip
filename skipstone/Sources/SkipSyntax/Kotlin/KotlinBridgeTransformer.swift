@@ -29,6 +29,8 @@ public struct KotlinBridgeOptions: OptionSet {
 
 /// Generate bridging code and transformations.
 public final class KotlinBridgeTransformer: KotlinTransformer {
+    public static var testSkipAndroidBridge = false // For testing
+
     private let options: KotlinBridgeOptions
 
     public init(options: KotlinBridgeOptions) {

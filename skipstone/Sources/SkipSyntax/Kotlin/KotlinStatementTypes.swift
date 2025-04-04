@@ -62,6 +62,7 @@ final class KotlinBreak: KotlinStatement, KotlinSingleStatementAppendable {
 
 final class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
     var statements: [KotlinStatement]
+    var unbridgedMembers: [UnbridgedMember] = []
 
     /// The number of defer statements in this block.
     var deferCount = 0
@@ -100,8 +101,17 @@ final class KotlinCodeBlock: KotlinStatement, KotlinSingleStatementAppendable {
     }
 
     static func translate(statement: CodeBlock, translator: KotlinTranslator) -> KotlinCodeBlock {
-        let kstatements = statement.statements.flatMap { translator.translateStatement($0) }
+        var kstatements: [KotlinStatement] = []
+        var unbridgedMembers: [UnbridgedMember] = []
+        for s in statement.statements {
+            if s.type == .unbridgedMemberDeclaration, let member = (s as? UnbridgedMemberDeclaration)?.member {
+                unbridgedMembers.append(member)
+            } else {
+                kstatements += translator.translateStatement(s)
+            }
+        }
         let kcodeBlock = KotlinCodeBlock(statements: kstatements)
+        kcodeBlock.unbridgedMembers = unbridgedMembers
         let kdefers = kstatements.compactMap { $0 as? KotlinDefer }
         kcodeBlock.deferCount = kdefers.count
         kdefers.forEach { $0.codeBlock = kcodeBlock }
