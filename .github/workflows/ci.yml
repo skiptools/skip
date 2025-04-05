@@ -38,6 +38,6 @@ jobs:
         #run: SKIPLOCAL=${PWD}/../skipstone swift test
         #run: brew install skiptools/skip/skip && swift test
         # running locally against skipstone checkout broken as of
-        run: PATH=$PWD/.build/plugins/tools/debug SKIPLOCAL=${PWD}/../skipstone swift test
+        run: PATH=$PWD/.build/plugins/tools/debug:$PATH SKIPLOCAL=${PWD}/../skipstone swift test
 
 
