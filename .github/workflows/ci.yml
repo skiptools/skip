@@ -35,9 +35,9 @@ jobs:
 
       - name: Swift Test
         working-directory: skip
-        # running locally against skipstone checkout broken as of
-        # https://github.com/skiptools/skipstone/commit/894d583af85c18ed8295e35ddcb5012a08cc23b0
         #run: SKIPLOCAL=${PWD}/../skipstone swift test
-        run: brew install skiptools/skip/skip && swift test
+        #run: brew install skiptools/skip/skip && swift test
+        # running locally against skipstone checkout broken as of
+        run: PATH=$PWD/.build/plugins/tools/debug SKIPLOCAL=${PWD}/../skipstone swift test
 
 

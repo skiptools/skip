@@ -1069,7 +1069,7 @@ class SkipCommandTests : XCTestCase {
 
         // the default SPM location of the current skip CLI for testing
         var skiptools = [
-            ".build/artifacts/skip/skip/skip.artifactbundle/macos/skip",
+            //".build/artifacts/skip/skip/skip.artifactbundle/macos/skip",
             //".build/artifactbundle/skip.artifactbundle/macos/skip",
             ".build/plugins/tools/debug/skip", // the SKIPLOCAL build path
         ]
