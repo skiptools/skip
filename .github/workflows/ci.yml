@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  DEVELOPER_DIR: /Applications/Xcode_16.3.app/Contents/Developer
+  DEVELOPER_DIR: /Applications/Xcode_16.3.app
 
 jobs:
   skip-init:
