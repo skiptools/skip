@@ -107,6 +107,7 @@ class FrameworkProjectLayout {
         for moduleIndex in modules.indices {
             let module = modules[moduleIndex]
             let moduleName = module.moduleName
+            let modulePackage = KotlinTranslator.packageName(forModule: moduleName)
             // the isAppModule is the initial module in the list when we specify we want to create an app module
             let isAppModule = app == true && moduleIndex == modules.startIndex
             // the model module is the second in the chain
@@ -183,35 +184,44 @@ class FrameworkProjectLayout {
                 try moduleYaml.write(to: sourceSkipYamlFile, atomically: false, encoding: .utf8)
             }
 
+            let viewModelInAppModule = modules.count <= 1
+            // when the viewModel is part of the same package as the main app, do not include
+            let viewModelLog = viewModelInAppModule ? "" : """
+            import \(native ? "SkipFuse" : "OSLog")
+
+            /// A logger for the \(moduleName) module.
+            let logger: Logger = Logger(subsystem: "\(modulePackage)", category: "\(moduleName)")
+
+            """
+
+            let viewModelPublic = viewModelInAppModule ? "" : "public "
+
             let viewModelSourceFile = sourceDir.appending(path: "ViewModel.swift")
             let viewModelCode = """
 \(sourceHeader)import Foundation
 import Observation
-import \(native ? "SkipFuse" : "OSLog")
-
-fileprivate let logger: Logger = Logger(subsystem: "\(moduleName)", category: "\(moduleName)")
-
+\(viewModelLog)
 /// The Observable ViewModel used by the application.
 @Observable public class ViewModel {
-    public var name = "Skipper"
-    public var items: [Item] = loadItems() {
+    \(viewModelPublic)var name = "Skipper"
+    \(viewModelPublic)var items: [Item] = loadItems() {
         didSet { saveItems() }
     }
 
-    public init() {
+    \(viewModelPublic)init() {
     }
 
-    public func clear() {
+    \(viewModelPublic)func clear() {
         items.removeAll()
     }
 
-    public func isUpdated(_ item: Item) -> Bool {
+    \(viewModelPublic)func isUpdated(_ item: Item) -> Bool {
         item != items.first { i in
             i.id == item.id
         }
     }
 
-    public func save(item: Item) {
+    \(viewModelPublic)func save(item: Item) {
         items = items.map { i in
             i.id == item.id ? item : i
         }
@@ -219,14 +229,14 @@ fileprivate let logger: Logger = Logger(subsystem: "\(moduleName)", category: "\
 }
 
 /// An individual item held by the ViewModel
-public struct Item : Identifiable, Hashable, Codable {
-    public let id: UUID
-    public var date: Date
-    public var favorite: Bool
-    public var title: String
-    public var notes: String
+\(viewModelPublic)struct Item : Identifiable, Hashable, Codable {
+    \(viewModelPublic)let id: UUID
+    \(viewModelPublic)var date: Date
+    \(viewModelPublic)var favorite: Bool
+    \(viewModelPublic)var title: String
+    \(viewModelPublic)var notes: String
 
-    public init(id: UUID = UUID(), date: Date = .now, favorite: Bool = false, title: String = "", notes: String = "") {
+    \(viewModelPublic)init(id: UUID = UUID(), date: Date = .now, favorite: Bool = false, title: String = "", notes: String = "") {
         self.id = id
         self.date = date
         self.favorite = favorite
@@ -234,15 +244,15 @@ public struct Item : Identifiable, Hashable, Codable {
         self.notes = notes
     }
 
-    public var itemTitle: String {
+    \(viewModelPublic)var itemTitle: String {
         !title.isEmpty ? title : dateString
     }
 
-    public var dateString: String {
+    \(viewModelPublic)var dateString: String {
         date.formatted(date: .complete, time: .omitted)
     }
 
-    public var dateTimeString: String {
+    \(viewModelPublic)var dateTimeString: String {
         date.formatted(date: .abbreviated, time: .shortened)
     }
 }
@@ -2031,6 +2041,7 @@ New features and better performance.
         }
 
         let swiftUIImport = nativeMode.contains(.nativeApp) ? "import SkipFuseUI" : "import SwiftUI"
+        let osLogImport = nativeMode.contains(.nativeApp) ? "import SkipFuse" : "import OSLog"
 
         // Darwin/Sources/Main.swift
         let appMainContents = """
@@ -2103,25 +2114,14 @@ New features and better performance.
         """
         try appMainContents.write(to: primaryModuleAppMainURL.createParentDirectory(), atomically: false, encoding: .utf8)
 
-        let osLogImport = nativeMode.contains(.nativeApp) ? """
-        #if os(Android)
-        import AndroidLogging
-        #else
-        import OSLog
-        #endif
-
-        """ : """
-        import OSLog
-
-        """
-
         // Sources/Playground/PlaygroundApp.swift
         let appExtContents = """
 \(sourceHeader)import Foundation
 \(osLogImport)
 \(swiftUIImport)
 
-fileprivate let logger: Logger = Logger(subsystem: "\(appid)", category: "\(primaryModuleName)")
+/// A logger for the \(primaryModuleName) module.
+let logger: Logger = Logger(subsystem: "\(appid)", category: "\(primaryModuleName)")
 
 /// The shared top-level view for the app, loaded from the platform-specific App delegates below.
 ///
@@ -2140,7 +2140,7 @@ public struct \(primaryModuleName)RootView : View {
 
 /// Global application delegate functions.
 ///
-/// This functions can update a shared observable object to communicate app state changes to interested views.
+/// These functions can update a shared observable object to communicate app state changes to interested views.
 /// The sender for each of these functions will be either a `UIApplication` (iOS) or `AppCompatActivity` (Android)
 public class \(primaryModuleName)AppDelegate {
     public static let shared = \(primaryModuleName)AppDelegate()
