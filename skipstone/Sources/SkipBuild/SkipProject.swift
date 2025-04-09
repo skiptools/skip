@@ -38,7 +38,7 @@ class FrameworkProjectLayout {
     }
 
 
-    static func createSkipLibrary(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, mode: ModuleMode, moduleTests createModuleTests: Bool, packageResolved packageResolvedURL: URL?) throws -> URL {
+    static func createSkipLibrary(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, swiftVersion: String, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests createModuleTests: Bool, packageResolved packageResolvedURL: URL?) throws -> URL {
         if modules.isEmpty {
             throw InitError(errorDescription: "Must specify at least one module name")
         }
@@ -79,16 +79,12 @@ class FrameworkProjectLayout {
         let skipPackageVersion = skipVersion
 #endif
         var packageHeader = """
-        // swift-tools-version: 5.9
+        // swift-tools-version: \(swiftVersion)
 
         """
 
         packageHeader += """
-        // This is a Skip (https://skip.tools) package,
-        // containing a Swift Package Manager project
-        // that will use the Skip build plugin to transpile the
-        // Swift Package, Sources, and Tests into an
-        // Android Gradle Project with Kotlin sources and JUnit tests.
+        // This is a Skip (https://skip.tools) package.
 
         """
 
@@ -116,8 +112,9 @@ class FrameworkProjectLayout {
             // the model module is the second in the chain
             let isModelModule = app == true && moduleIndex == modules.startIndex + 1
             // a native module is either the second module for an app project, or any module for a non-app --native project
-            let native = mode != .transpiled
-            let isNativeModule = native && (isModelModule || !app)
+            let native = moduleMode != .transpiled
+            let isNativeAppModule = isAppModule && nativeMode.contains(.nativeApp)
+            let isNativeModule = native && (isModelModule || !app || isNativeAppModule)
             // we output the model when it is the second module, or when there is only a single top-level app module
             let shouldOutputModel = isModelModule || (app == true && modules.count == 1)
             // this is the final module in the chain, which will add a dependency on SkipFoundation
@@ -132,7 +129,7 @@ class FrameworkProjectLayout {
             // modules that are dependent on the native module do not run the skipstone plugin or have resources
             let isDependentNativeModule = native && moduleIndex > 1
 
-            if !isDependentNativeModule {
+            if isNativeAppModule || !isDependentNativeModule {
                 let sourceSkipDir = try sourceDir.append(path: "Skip", create: true)
 
                 let sourceSkipYamlFile = sourceSkipDir.appending(path: "skip.yml")
@@ -159,7 +156,7 @@ class FrameworkProjectLayout {
 
                     """
 
-                    if mode == .kotlincompat {
+                    if moduleMode == .kotlincompat {
                         skipYamlModule += """
                           bridging:
                             enabled: true
@@ -174,14 +171,16 @@ class FrameworkProjectLayout {
                     }
                 }
 
-                let skipYamlApp = """
+                let skipYamlAppTranspiled = """
                 # Configuration file for https://skip.tools project
                 build:
                   contents:
 
                 """
 
-                try (isAppModule ? skipYamlApp : skipYamlModule).write(to: sourceSkipYamlFile, atomically: false, encoding: .utf8)
+                // transpiled app modules ignore native specifications
+                let moduleYaml = isAppModule && !isNativeAppModule ? skipYamlAppTranspiled : skipYamlModule
+                try moduleYaml.write(to: sourceSkipYamlFile, atomically: false, encoding: .utf8)
             }
 
             let viewModelSourceFile = sourceDir.appending(path: "ViewModel.swift")
@@ -325,14 +324,74 @@ public class \(moduleName)Module {
             }
 
             var resourcesAttribute: String = ""
-            if !isDependentNativeModule, !isNativeModule, let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
+            if !isDependentNativeModule, (!isNativeModule || isNativeAppModule),
+               let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
                 let sourceResourcesDir = try sourceDir.append(path: resourceFolder, create: true)
                 let sourceResourcesFile = sourceResourcesDir.appending(path: "Localizable.xcstrings")
                 try """
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%lld Items" : {
+      "comment" : "Header title for a list that contains the number of items",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld elementos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld éléments"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アイテム数 %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个条目"
+          }
+        }
+      }
+    },
+    "Add" : {
+      "comment" : "Button in items list that will cause a new item to be added",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加"
+          }
+        }
+      }
+    },
     "Appearance" : {
+      "comment" : "Settings select label for the interface style of the controls (light, dark, or default)",
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -360,7 +419,37 @@ public class \(moduleName)Module {
         }
       }
     },
+    "Cancel" : {
+      "comment" : "Button title indicating that the operation should be cancelled",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annuler"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キャンセル"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消"
+          }
+        }
+      }
+    },
     "Dark" : {
+      "comment" : "Menu item indicating that the appearance should be in dark mode",
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -383,12 +472,71 @@ public class \(moduleName)Module {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "暗"
+            "value" : "深色"
+          }
+        }
+      }
+    },
+    "Date" : {
+      "comment" : "Item editor form label for the Date field",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fecha"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Date"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日付"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日期"
+          }
+        }
+      }
+    },
+    "Favorite" : {
+      "comment" : "Item editor title label for marking the item as a favorite",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favorito"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favori"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : " favouri"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收藏"
           }
         }
       }
     },
     "Hello [%@](https://skip.tools)!" : {
+      "comment" : "Welcome tab contents",
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -405,18 +553,19 @@ public class \(moduleName)Module {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "こんにちは、[%@](https://skip.tools)!"
+            "value" : "こんにちは [%@](https://skip.tools)"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你好，[%@](https://skip.tools)!"
+            "value" : "你好 [%@](https://skip.tools)"
           }
         }
       }
     },
     "Home" : {
+      "comment" : "Tab bar item title for the Home tab",
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -439,12 +588,13 @@ public class \(moduleName)Module {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "主页"
+            "value" : "首页"
           }
         }
       }
     },
     "Light" : {
+      "comment" : "Menu item indicating that the appearance should be in light mode",
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -461,18 +611,19 @@ public class \(moduleName)Module {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ライト"
+            "value" : "明るい"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "光"
+            "value" : "浅色"
           }
         }
       }
     },
     "Name" : {
+      "comment" : "Placeholder title for the Name field in a form",
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -500,35 +651,95 @@ public class \(moduleName)Module {
         }
       }
     },
-    "Powered by Skip and %@" : {
+    "Notes" : {
+      "comment" : "Item editor form label for the Notes field",
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Potenciado por %@"
+            "value" : "Notas"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Propulsé par %@"
+            "value" : "Notes"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@動力"
+            "value" : "ノート"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "由%@提供动力"
+            "value" : "笔记"
+          }
+        }
+      }
+    },
+    "Powered by [Skip](https://skip.tools)" : {
+      "comment" : "Link markdown text for the Powered by… label",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impulsado por [Skip](https://skip.tools)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fonctionnalités offertes par [Skip](https://skip.tools)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "[Skip](https://skip.tools) を使って動かしています"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由[Skip](https://skip.tools)提供支持"
+          }
+        }
+      }
+    },
+    "Save" : {
+      "comment" : "Button title indicating that the current contents should be saved",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guardar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrer"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存"
           }
         }
       }
     },
     "Settings" : {
+      "comment" : "Tab bar item title for the Settings tab",
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -557,6 +768,7 @@ public class \(moduleName)Module {
       }
     },
     "System" : {
+      "comment" : "Menu item indicating that the appearance should be in the default system mode",
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -584,7 +796,72 @@ public class \(moduleName)Module {
         }
       }
     },
+    "Title" : {
+      "comment" : "Label for the item editor form indicating the title of the item",
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Título"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Titre"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タイトル"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标题"
+          }
+        }
+      }
+    },
+    "Version %@ (%@)" : {
+      "comment" : "Settings label showing the current version of the app",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Version %1$@ (%2$@)"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Versión %1$@ (%2$@)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version %1$@ (%2$@)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バージョン %1$@ (%2$@)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本 %1$@ (%2$@)"
+          }
+        }
+      }
+    },
     "Welcome" : {
+      "comment" : "Tab bar item title for the Welcome tab",
       "localizations" : {
         "es" : {
           "stringUnit" : {
@@ -615,14 +892,14 @@ public class \(moduleName)Module {
   },
   "version" : "1.0"
 }
+
 """.write(to: sourceResourcesFile, atomically: false, encoding: .utf8)
             }
 
-
             // only create tests if we have specified to do so, and we are not a dependent native module
-            let moduleTests = createModuleTests && !isDependentNativeModule
+            let createTestModule = createModuleTests && !isDependentNativeModule && !isNativeAppModule
 
-            if moduleTests {
+            if createTestModule {
                 let testsURL = try projectFolderURL.append(path: "Tests", create: true)
                 let testDir = try testsURL.append(path: moduleName + "Tests", create: true)
                 let testSkipDir = try testDir.append(path: "Skip", create: true)
@@ -688,7 +965,7 @@ final class \(moduleName)Tests: XCTestCase {
 """
                 }
 
-                if isNativeModule && isModelModule {
+                if isNativeModule && (isModelModule || isNativeAppModule) {
                     testCaseCode += """
 
     func testViewModel() async throws {
@@ -709,12 +986,12 @@ final class \(moduleName)Tests: XCTestCase {
     func testAsyncThrowsFunction() async throws {
 
 """
-                    if mode == .native {
+                    if moduleMode == .native {
                         testCaseCode += """
         let id = UUID()
 
 """
-                    } else if mode == .kotlincompat {
+                    } else if moduleMode == .kotlincompat {
                         testCaseCode += """
         #if SKIP
         // when the native module is in kotlincompat, types are unwrapped Java classes
@@ -835,7 +1112,11 @@ struct TestData : Codable, Hashable {
             if modDeps.isEmpty {
                 // add implicit dependency on SkipUI (for app target), SkipModel, and SkipFoundation, based in their position in the chain
                 if isAppModule {
-                    modDeps.append(PackageModule(repositoryName: "skip-ui", moduleName: "SkipUI"))
+                    if isNativeAppModule {
+                        modDeps.append(PackageModule(repositoryName: "skip-fuse-ui", moduleName: "SkipFuseUI"))
+                    } else {
+                        modDeps.append(PackageModule(repositoryName: "skip-ui", moduleName: "SkipUI"))
+                    }
                 } else if (isFinalModule || chain == false) && !isDependentNativeModule {
                     // only add SkipFoundation to the innermost module
                     if isNativeModule {
@@ -914,7 +1195,7 @@ struct TestData : Codable, Hashable {
 
             """
 
-            if moduleTests {
+            if createTestModule {
                 let skipTestProduct = #".product(name: "SkipTest", package: "skip")"#
                 let skipTestDependency = skipZeroSupport
                     ? "] + (zero ? [] : [\(skipTestProduct)])"
@@ -1048,7 +1329,7 @@ struct TestData : Codable, Hashable {
         Android Studio's Device Manager.
 
         To run both the Swift and Kotlin apps simultaneously,
-        launch the \(primaryModuleName)App target from Xcode.
+        launch the \(primaryModuleName) target from Xcode.
         A build phases runs the "Launch Android APK" script that
         will deploy the transpiled app a running Android emulator or connected device.
         Logging output for the iOS app can be viewed in the Xcode console, and in
@@ -1061,7 +1342,7 @@ struct TestData : Codable, Hashable {
             
             ## License
 
-            This software is licensed under the [GNU General Public License v3.0](https://spdx.org/licenses/GPL-3.0-only.html).
+            This software is licensed under the [GNU General Public License v2.0 or later](https://spdx.org/licenses/GPL-2.0-or-later.html).
 
             """
         }
@@ -1070,7 +1351,7 @@ struct TestData : Codable, Hashable {
 
         if free == true {
             if app {
-                try licenseGPLContents.write(to: projectFolderURL.appending(path: "LICENSE.GPL"), atomically: false, encoding: .utf8)
+                try licenseGPL2Contents.write(to: projectFolderURL.appending(path: "LICENSE.GPL"), atomically: false, encoding: .utf8)
             } else {
                 try (licenseLGPLLinkingExceptionContents + licenseLGPLContents).write(to: projectFolderURL.appending(path: "LICENSE.LGPL"), atomically: false, encoding: .utf8)
             }
@@ -1081,6 +1362,13 @@ struct TestData : Codable, Hashable {
 }
 
 class AppProjectLayout : FrameworkProjectLayout {
+    // the suffix for the product name; this needs to be different from the Xcode project's scheme name or else trying to build the app name target will randomly alternate between trying to build the Xcode app or the SwiftPM app framework
+    //static let appProductSuffix = "App"
+    static let appProductSuffix = ""
+
+    // the suffix for the Xcode project, which enables us to disambiguate the target name from the Xcode side
+    static let appTargetSuffix = " App"
+
     let moduleName: String
 
     let skipEnv: URL
@@ -1195,9 +1483,7 @@ class AppProjectLayout : FrameworkProjectLayout {
         try super.init(root: root, check: check)
     }
 
-
-    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, appfair: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, icon: IconParameters?, version: String?, mode: ModuleMode, moduleTests: Bool, github: Bool, fastlane: Bool, packageResolved packageResolvedURL: URL? = nil) async throws -> (baseURL: URL, project: AppProjectLayout) {
-
+    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, appfair: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, icon: IconParameters?, version: String?, swiftVersion: String, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests: Bool, github: Bool, fastlane: Bool, packageResolved packageResolvedURL: URL? = nil) async throws -> (baseURL: URL, project: AppProjectLayout) {
         let sourceHeader = free ? (SourceLicense.defaultLicense(app: true).sourceHeader + "\n\n") : ""
 
         if modules.contains(where: { module in
@@ -1206,17 +1492,16 @@ class AppProjectLayout : FrameworkProjectLayout {
             throw InitError(errorDescription: "ModuleName and project-name must be different: \(projectName)")
         }
 
-        let native = mode != .transpiled
         if let appid = appid {
             if !appid.contains(".") {
                 throw InitError(errorDescription: "Appid must be a valid bundle identifier containing at least one dot: \(appid)")
             }
-            if native && modules.count < 2 {
-                throw InitError(errorDescription: "skip init --native requires at least two modules")
+            if nativeMode.contains(.nativeModel) && modules.count < 2 {
+                throw InitError(errorDescription: "skip init --native-model requires at least two modules")
             }
         }
 
-        let projectURL = try createSkipLibrary(projectName: projectName, productName: productName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: appid != nil, mode: mode, moduleTests: moduleTests, packageResolved: packageResolvedURL)
+        let projectURL = try createSkipLibrary(projectName: projectName, productName: productName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: appid != nil, swiftVersion: swiftVersion, nativeMode: nativeMode, moduleMode: moduleMode, moduleTests: moduleTests, packageResolved: packageResolvedURL)
 
         // the second module should always be imported
         let secondModule = modules.dropFirst().first
@@ -1230,8 +1515,14 @@ class AppProjectLayout : FrameworkProjectLayout {
 
         let sourcesFolderName = "Sources"
         let appModuleName = primaryModuleName
-        let primaryModuleAppTarget = appModuleName + "App"
         let appModulePackage = KotlinTranslator.packageName(forModule: appModuleName)
+
+        // The Xcode name for the app
+        let APP_NAME = appModuleName
+        // The Xcode target/scheme name for the app
+        let APP_TARGET = "\(APP_NAME)\(AppProjectLayout.appTargetSuffix)"
+        // The Xcode product name for the app
+        let APP_PRODUCT = "\(APP_NAME)\(AppProjectLayout.appProductSuffix)" // note: blank for new scheme
 
         guard let appid = appid else { // we have specified that an app should be created
             return (projectURL, appProject)
@@ -1576,6 +1867,7 @@ lane :assemble do |options|
   # only build the iOS side of the app
   ENV["SKIP_ZERO"] = "true"
   build_app(
+    scheme: "\(APP_TARGET)",
     sdk: "iphoneos",
     xcconfig: "fastlane/AppStore.xcconfig",
     xcargs: "-skipPackagePluginValidation -skipMacroValidation",
@@ -1738,6 +2030,8 @@ New features and better performance.
 
         }
 
+        let swiftUIImport = nativeMode.contains(.nativeApp) ? "import SkipFuseUI" : "import SwiftUI"
+
         // Darwin/Sources/Main.swift
         let appMainContents = """
         \(sourceHeader)import SwiftUI
@@ -1755,11 +2049,11 @@ New features and better performance.
                 .onChange(of: scenePhase) { oldPhase, newPhase in
                     switch newPhase {
                     case .active:
-                        AppDelegate.shared.onResume(appDelegate.application)
+                        AppDelegate.shared.onResume()
                     case .inactive:
-                        AppDelegate.shared.onPause(appDelegate.application)
+                        AppDelegate.shared.onPause()
                     case .background:
-                        AppDelegate.shared.onStop(appDelegate.application)
+                        AppDelegate.shared.onStop()
                     @unknown default:
                         print("unknown app phase: \\(newPhase)")
                     }
@@ -1783,24 +2077,24 @@ New features and better performance.
 
             #if canImport(UIKit)
             func application(_ application: UIApplication, willFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
-                AppDelegate.shared.onStart(application)
+                AppDelegate.shared.onStart()
                 return true
             }
 
             func applicationWillTerminate(_ application: UIApplication) {
-                AppDelegate.shared.onDestroy(application)
+                AppDelegate.shared.onDestroy()
             }
 
             func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
-                AppDelegate.shared.onLowMemory(application)
+                AppDelegate.shared.onLowMemory()
             }
             #elseif canImport(AppKit)
             func applicationWillFinishLaunching(_ notification: Notification) {
-                AppDelegate.shared.onStart(application)
+                AppDelegate.shared.onStart()
             }
 
             func applicationWillTerminate(_ application: Notification) {
-                AppDelegate.shared.onDestroy(application)
+                AppDelegate.shared.onDestroy()
             }
             #endif
 
@@ -1809,30 +2103,36 @@ New features and better performance.
         """
         try appMainContents.write(to: primaryModuleAppMainURL.createParentDirectory(), atomically: false, encoding: .utf8)
 
+        let osLogImport = nativeMode.contains(.nativeApp) ? """
+        #if os(Android)
+        import AndroidLogging
+        #else
+        import OSLog
+        #endif
+
+        """ : """
+        import OSLog
+
+        """
+
         // Sources/Playground/PlaygroundApp.swift
         let appExtContents = """
 \(sourceHeader)import Foundation
-import OSLog
-import SwiftUI
+\(osLogImport)
+\(swiftUIImport)
 
 fileprivate let logger: Logger = Logger(subsystem: "\(appid)", category: "\(primaryModuleName)")
-
-/// The Android SDK number we are running against, or `nil` if not running on Android
-let androidSDK = ProcessInfo.processInfo.environment["android.os.Build.VERSION.SDK_INT"].flatMap({ Int($0) })
 
 /// The shared top-level view for the app, loaded from the platform-specific App delegates below.
 ///
 /// The default implementation merely loads the `ContentView` for the app and logs a message.
 public struct \(primaryModuleName)RootView : View {
-    @ObservedObject var appDelegate = \(primaryModuleName)AppDelegate.shared
-
     public init() {
     }
 
     public var body: some View {
         ContentView()
             .task {
-                logger.info("Welcome to Skip on \\(androidSDK != nil ? "Android" : "Darwin")!")
                 logger.info("Skip app logs are viewable in the Xcode console for iOS; Android logs can be viewed in Studio or using adb logcat")
             }
     }
@@ -1842,40 +2142,40 @@ public struct \(primaryModuleName)RootView : View {
 ///
 /// This functions can update a shared observable object to communicate app state changes to interested views.
 /// The sender for each of these functions will be either a `UIApplication` (iOS) or `AppCompatActivity` (Android)
-public class \(primaryModuleName)AppDelegate: ObservableObject {
+public class \(primaryModuleName)AppDelegate {
     public static let shared = \(primaryModuleName)AppDelegate()
 
     private init() {
     }
 
-    public func onStart(_ sender: Any) {
+    public func onStart() {
         logger.debug("onStart")
     }
 
-    public func onResume(_ sender: Any) {
+    public func onResume() {
         logger.debug("onResume")
     }
 
-    public func onPause(_ sender: Any) {
+    public func onPause() {
         logger.debug("onPause")
     }
 
-    public func onStop(_ sender: Any) {
+    public func onStop() {
         logger.debug("onStop")
     }
 
-    public func onDestroy(_ sender: Any) {
+    public func onDestroy() {
         logger.debug("onDestroy")
     }
 
-    public func onLowMemory(_ sender: Any) {
+    public func onLowMemory() {
         logger.debug("onLowMemory")
     }
 }
 
 """
 
-        let appModuleApplicationStubFileBase = primaryModuleAppTarget + ".swift"
+        let appModuleApplicationStubFileBase = appModuleName + "App.swift"
         let appModuleApplicationStubFilePath = primaryModuleSources + "/" + appModuleApplicationStubFileBase
 
         let appModuleApplicationStubFileURL = projectURL.appending(path: appModuleApplicationStubFilePath)
@@ -1910,7 +2210,7 @@ public class \(primaryModuleName)AppDelegate: ObservableObject {
 
         // Sources/Playground/PlaygroundApp.swift
         let contentViewContents = """
-\(sourceHeader)import SwiftUI\(secondImport)\(thirdImport)
+\(sourceHeader)\(swiftUIImport)\(secondImport)\(thirdImport)
 
 enum ContentTab: String, Hashable {
     case welcome, home, settings
@@ -2277,16 +2577,16 @@ struct SettingsView : View {
             // the .xcodeproj file is located in the Darwin/ folder
             let skipGradleLaunchScript = """
 if [ "${SKIP_ZERO}" != "" ]; then
-    echo "note: skipping skip due to SKIP_ZERO"
-    exit 0
+  echo "note: skipping skip due to SKIP_ZERO"
+  exit 0
 elif [ "${ENABLE_PREVIEWS}" == "YES" ]; then
-    echo "note: skipping skip due to ENABLE_PREVIEWS"
-    exit 0
+  echo "note: skipping skip due to ENABLE_PREVIEWS"
+  exit 0
 elif [ "${ACTION}" == "install" ]; then
-    echo "note: skipping skip due to archive install"
-    exit 0
+  echo "note: skipping skip due to archive install"
+  exit 0
 else
-    SKIP_ACTION="${SKIP_ACTION:-launch}"
+  SKIP_ACTION="${SKIP_ACTION:-launch}"
 fi
 PATH=${BUILD_ROOT}/Debug:${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin
 echo "note: running gradle build with: $(which skip) gradle -p ${PWD}/../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}"
@@ -2295,9 +2595,6 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 """
     .replacingOccurrences(of: "\n", with: "\\n")
     .replacingOccurrences(of: "\"", with: "\\\"")
-
-
-            let APP = appModuleName
 
             return """
 // !$*UTF8*$!
@@ -2309,8 +2606,8 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
     objects = {
 
 /* Begin PBXBuildFile section */
-        49231BAC2AC5BCEF00F98ADF /* \(APP)App in Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(APP)App */; };
-        49231BAD2AC5BCEF00F98ADF /* \(APP)App in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 49231BAB2AC5BCEF00F98ADF /* \(APP)App */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+        491F27822DA55B72004926EE /* \(APP_PRODUCT) in Frameworks */ = {isa = PBXBuildFile; productRef = 491F27812DA55B72004926EE /* \(APP_PRODUCT) */; };
+        491F27832DA55B72004926EE /* \(APP_PRODUCT) in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 491F27812DA55B72004926EE /* \(APP_PRODUCT) */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
         496BDBEE2B8A7E9C00C09264 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 496BDBED2B8A7E9C00C09264 /* Localizable.xcstrings */; };
         499CD43B2AC5B799001AE8D8 /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49F90C2B2A52156200F06D93 /* Main.swift */; };
         499CD4402AC5B799001AE8D8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 49F90C2F2A52156300F06D93 /* Assets.xcassets */; };
@@ -2323,7 +2620,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
             dstPath = "";
             dstSubfolderSpec = 10;
             files = (
-                49231BAD2AC5BCEF00F98ADF /* \(APP)App in Embed Frameworks */,
+                491F27832DA55B72004926EE /* \(APP_PRODUCT) in Embed Frameworks */,
             );
             name = "Embed Frameworks";
             runOnlyForDeploymentPostprocessing = 0;
@@ -2331,12 +2628,12 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-        493609562A6B7EAE00C401E2 /* \(APP) */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = \(APP); path = ..; sourceTree = "<group>"; };
-        496BDBEB2B89A47800C09264 /* \(APP).app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = \(APP).app; sourceTree = BUILT_PRODUCTS_DIR; };
-        4900101C2BACEA710000DE33 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Info.plist"; sourceTree = "<group>"; };
-        496BDBED2B8A7E9C00C09264 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = Localizable.xcstrings; path = ../Sources/\(APP)/Resources/Localizable.xcstrings; sourceTree = "<group>"; };
+        4900101C2BACEA710000DE33 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+        493609562A6B7EAE00C401E2 /* \(APP_NAME) */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = \(APP_NAME); path = ..; sourceTree = "<group>"; };
+        496BDBEB2B89A47800C09264 /* \(APP_NAME).app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = \(APP_NAME).app; sourceTree = BUILT_PRODUCTS_DIR; };
+        496BDBED2B8A7E9C00C09264 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; name = Localizable.xcstrings; path = ../Sources/\(APP_NAME)/Resources/Localizable.xcstrings; sourceTree = "<group>"; };
         496EB72F2A6AE4DE00C1253A /* Skip.env */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Skip.env; path = ../Skip.env; sourceTree = "<group>"; };
-        496EB72F2A6AE4DE00C1253B /* \(APP).xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = \(APP).xcconfig; sourceTree = "<group>"; };
+        496EB72F2A6AE4DE00C1253B /* \(APP_NAME).xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = \(APP_NAME).xcconfig; sourceTree = "<group>"; };
         496EB72F2A6AE4DE00C1253C /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../README.md; sourceTree = "<group>"; };
         499AB9082B0581F4005E8330 /* plugins */ = {isa = PBXFileReference; lastKnownFileType = folder; name = plugins; path = ../../../SourcePackages/plugins; sourceTree = BUILT_PRODUCTS_DIR; };
         49F90C2B2A52156200F06D93 /* Main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Main.swift; path = Sources/Main.swift; sourceTree = SOURCE_ROOT; };
@@ -2349,7 +2646,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
             isa = PBXFrameworksBuildPhase;
             buildActionMask = 2147483647;
             files = (
-                49231BAC2AC5BCEF00F98ADF /* \(APP)App in Frameworks */,
+                491F27822DA55B72004926EE /* \(APP_PRODUCT) in Frameworks */,
             );
             runOnlyForDeploymentPostprocessing = 0;
         };
@@ -2359,7 +2656,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
         496BDBEC2B89A47800C09264 /* Products */ = {
             isa = PBXGroup;
             children = (
-                496BDBEB2B89A47800C09264 /* \(APP).app */,
+                496BDBEB2B89A47800C09264 /* \(APP_NAME).app */,
             );
             name = Products;
             sourceTree = "<group>";
@@ -2377,9 +2674,9 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
             children = (
                 496EB72F2A6AE4DE00C1253C /* README.md */,
                 496EB72F2A6AE4DE00C1253A /* Skip.env */,
-                496EB72F2A6AE4DE00C1253B /* \(APP).xcconfig */,
+                496EB72F2A6AE4DE00C1253B /* \(APP_NAME).xcconfig */,
                 496BDBED2B8A7E9C00C09264 /* Localizable.xcstrings */,
-                493609562A6B7EAE00C401E2 /* \(APP) */,
+                493609562A6B7EAE00C401E2 /* \(APP_NAME) */,
                 49F90C2A2A52156200F06D93 /* App */,
                 49AB54462B066A7E007B79B2 /* SkipStone */,
                 496BDBEC2B89A47800C09264 /* Products */,
@@ -2400,9 +2697,9 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-        499CD4382AC5B799001AE8D8 /* \(APP) */ = {
+        499CD4382AC5B799001AE8D8 /* \(APP_TARGET) */ = {
             isa = PBXNativeTarget;
-            buildConfigurationList = 499CD4412AC5B799001AE8D8 /* Build configuration list for PBXNativeTarget "\(APP)" */;
+            buildConfigurationList = 499CD4412AC5B799001AE8D8 /* Build configuration list for PBXNativeTarget "\(APP_TARGET)" */;
             buildPhases = (
                 499CD43A2AC5B799001AE8D8 /* Sources */,
                 499CD43C2AC5B799001AE8D8 /* Frameworks */,
@@ -2414,12 +2711,12 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
             );
             dependencies = (
             );
-            name = \(APP);
+            name = "\(APP_TARGET)";
             packageProductDependencies = (
-                49231BAB2AC5BCEF00F98ADF /* \(APP)App */,
+                491F27812DA55B72004926EE /* \(APP_PRODUCT) */,
             );
             productName = App;
-            productReference = 496BDBEB2B89A47800C09264 /* \(APP).app */;
+            productReference = 496BDBEB2B89A47800C09264 /* \(APP_NAME).app */;
             productType = "com.apple.product-type.application";
         };
 /* End PBXNativeTarget section */
@@ -2430,9 +2727,9 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
             attributes = {
                 BuildIndependentTargetsInParallel = 1;
                 LastSwiftUpdateCheck = 1430;
-                LastUpgradeCheck = 1540;
+                LastUpgradeCheck = 1630;
             };
-            buildConfigurationList = 49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(APP)" */;
+            buildConfigurationList = 49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(APP_NAME)" */;
             compatibilityVersion = "Xcode 14.0";
             developmentRegion = en;
             hasScannedForEncodings = 0;
@@ -2450,7 +2747,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
             projectDirPath = "";
             projectRoot = "";
             targets = (
-                499CD4382AC5B799001AE8D8 /* \(APP) */,
+                499CD4382AC5B799001AE8D8 /* \(APP_TARGET) */,
             );
         };
 /* End PBXProject section */
@@ -2503,7 +2800,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 /* Begin XCBuildConfiguration section */
         499CD4422AC5B799001AE8D8 /* Debug */ = {
             isa = XCBuildConfiguration;
-            baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(APP).xcconfig */;
+            baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(APP_NAME).xcconfig */;
             buildSettings = {
                 ENABLE_PREVIEWS = YES;
                 LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
@@ -2513,7 +2810,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
         };
         499CD4432AC5B799001AE8D8 /* Release */ = {
             isa = XCBuildConfiguration;
-            baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(APP).xcconfig */;
+            baseConfigurationReference = 496EB72F2A6AE4DE00C1253B /* \(APP_NAME).xcconfig */;
             buildSettings = {
                 ENABLE_PREVIEWS = YES;
                 LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
@@ -2560,7 +2857,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-        499CD4412AC5B799001AE8D8 /* Build configuration list for PBXNativeTarget "\(APP)" */ = {
+        499CD4412AC5B799001AE8D8 /* Build configuration list for PBXNativeTarget "\(APP_TARGET)" */ = {
             isa = XCConfigurationList;
             buildConfigurations = (
                 499CD4422AC5B799001AE8D8 /* Debug */,
@@ -2569,7 +2866,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
             defaultConfigurationIsVisible = 0;
             defaultConfigurationName = Release;
         };
-        49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(APP)" */ = {
+        49F90C232A52156200F06D93 /* Build configuration list for PBXProject "\(APP_NAME)" */ = {
             isa = XCConfigurationList;
             buildConfigurations = (
                 49F90C4B2A52156300F06D93 /* Debug */,
@@ -2581,9 +2878,9 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 /* End XCConfigurationList section */
 
 /* Begin XCSwiftPackageProductDependency section */
-        49231BAB2AC5BCEF00F98ADF /* \(APP)App */ = {
+        491F27812DA55B72004926EE /* \(APP_PRODUCT) */ = {
             isa = XCSwiftPackageProductDependency;
-            productName = \(APP)App;
+            productName = \(APP_PRODUCT);
         };
 /* End XCSwiftPackageProductDependency section */
     };
@@ -2609,7 +2906,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 
         let sourceMainKotlinPackage = appProject.androidAppSrcMainKotlin
         let sourceMainKotlinSourceFile = sourceMainKotlinPackage.appendingPathComponent("Main.kt")
-        try createKotlinMain(appModulePackage: appModulePackage, appModuleName: appModuleName, nativeLibrary: native ? secondModule?.moduleName : nil).write(to: sourceMainKotlinSourceFile.createParentDirectory(), atomically: false, encoding: .utf8)
+        try createKotlinMain(appModulePackage: appModulePackage, appModuleName: appModuleName, nativeLibrary: nativeMode.contains(.nativeModel) ? secondModule?.moduleName : nil).write(to: sourceMainKotlinSourceFile.createParentDirectory(), atomically: false, encoding: .utf8)
 
         // create the .gitignore file; https://github.com/orgs/skiptools/discussions/208#discussioncomment-10505250
         let gitignore = """
@@ -2924,32 +3221,32 @@ extension FrameworkProjectLayout {
 
             override fun onStart() {
                 super.onStart()
-                \(appModuleName)AppDelegate.shared.onStart(this)
+                \(appModuleName)AppDelegate.shared.onStart()
             }
 
             override fun onResume() {
                 super.onResume()
-                \(appModuleName)AppDelegate.shared.onResume(this)
+                \(appModuleName)AppDelegate.shared.onResume()
             }
 
             override fun onPause() {
                 super.onPause()
-                \(appModuleName)AppDelegate.shared.onPause(this)
+                \(appModuleName)AppDelegate.shared.onPause()
             }
 
             override fun onStop() {
                 super.onStop()
-                \(appModuleName)AppDelegate.shared.onStop(this)
+                \(appModuleName)AppDelegate.shared.onStop()
             }
 
             override fun onDestroy() {
                 super.onDestroy()
-                \(appModuleName)AppDelegate.shared.onDestroy(this)
+                \(appModuleName)AppDelegate.shared.onDestroy()
             }
 
             override fun onLowMemory() {
                 super.onLowMemory()
-                \(appModuleName)AppDelegate.shared.onLowMemory(this)
+                \(appModuleName)AppDelegate.shared.onLowMemory()
             }
 
             override fun onRestart() {
@@ -3051,7 +3348,7 @@ enum SourceLicense: Equatable, CaseIterable {
         case .lgplLinkingException:
             return ("LGPL-3.0 Linking Exception", "LGPL-3.0-only WITH LGPL-3.0-linking-exception") // https://spdx.org/licenses/LGPL-3.0-linking-exception.html
         case .gpl:
-            return ("GNU General Public License v3.0 only", "GPL-3.0-only") // https://spdx.org/licenses/GPL-3.0-only.html
+            return ("GNU General Public License v2.0 or later", "GPL-2.0-or-later") // https://spdx.org/licenses/GPL-2.0-or-later.html
         }
     }
 }
@@ -3249,8 +3546,350 @@ comply.
 
 """
 
+let licenseGPL2Contents = """
+                    GNU GENERAL PUBLIC LICENSE
+                       Version 2, June 1991
 
-let licenseGPLContents = """
+ Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
+ <https://fsf.org/>
+ Everyone is permitted to copy and distribute verbatim copies
+ of this license document, but changing it is not allowed.
+
+                            Preamble
+
+  The licenses for most software are designed to take away your
+freedom to share and change it.  By contrast, the GNU General Public
+License is intended to guarantee your freedom to share and change free
+software--to make sure the software is free for all its users.  This
+General Public License applies to most of the Free Software
+Foundation's software and to any other program whose authors commit to
+using it.  (Some other Free Software Foundation software is covered by
+the GNU Lesser General Public License instead.)  You can apply it to
+your programs, too.
+
+  When we speak of free software, we are referring to freedom, not
+price.  Our General Public Licenses are designed to make sure that you
+have the freedom to distribute copies of free software (and charge for
+this service if you wish), that you receive source code or can get it
+if you want it, that you can change the software or use pieces of it
+in new free programs; and that you know you can do these things.
+
+  To protect your rights, we need to make restrictions that forbid
+anyone to deny you these rights or to ask you to surrender the rights.
+These restrictions translate to certain responsibilities for you if you
+distribute copies of the software, or if you modify it.
+
+  For example, if you distribute copies of such a program, whether
+gratis or for a fee, you must give the recipients all the rights that
+you have.  You must make sure that they, too, receive or can get the
+source code.  And you must show them these terms so they know their
+rights.
+
+  We protect your rights with two steps: (1) copyright the software, and
+(2) offer you this license which gives you legal permission to copy,
+distribute and/or modify the software.
+
+  Also, for each author's protection and ours, we want to make certain
+that everyone understands that there is no warranty for this free
+software.  If the software is modified by someone else and passed on, we
+want its recipients to know that what they have is not the original, so
+that any problems introduced by others will not reflect on the original
+authors' reputations.
+
+  Finally, any free program is threatened constantly by software
+patents.  We wish to avoid the danger that redistributors of a free
+program will individually obtain patent licenses, in effect making the
+program proprietary.  To prevent this, we have made it clear that any
+patent must be licensed for everyone's free use or not licensed at all.
+
+  The precise terms and conditions for copying, distribution and
+modification follow.
+
+                    GNU GENERAL PUBLIC LICENSE
+   TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+
+  0. This License applies to any program or other work which contains
+a notice placed by the copyright holder saying it may be distributed
+under the terms of this General Public License.  The "Program", below,
+refers to any such program or work, and a "work based on the Program"
+means either the Program or any derivative work under copyright law:
+that is to say, a work containing the Program or a portion of it,
+either verbatim or with modifications and/or translated into another
+language.  (Hereinafter, translation is included without limitation in
+the term "modification".)  Each licensee is addressed as "you".
+
+Activities other than copying, distribution and modification are not
+covered by this License; they are outside its scope.  The act of
+running the Program is not restricted, and the output from the Program
+is covered only if its contents constitute a work based on the
+Program (independent of having been made by running the Program).
+Whether that is true depends on what the Program does.
+
+  1. You may copy and distribute verbatim copies of the Program's
+source code as you receive it, in any medium, provided that you
+conspicuously and appropriately publish on each copy an appropriate
+copyright notice and disclaimer of warranty; keep intact all the
+notices that refer to this License and to the absence of any warranty;
+and give any other recipients of the Program a copy of this License
+along with the Program.
+
+You may charge a fee for the physical act of transferring a copy, and
+you may at your option offer warranty protection in exchange for a fee.
+
+  2. You may modify your copy or copies of the Program or any portion
+of it, thus forming a work based on the Program, and copy and
+distribute such modifications or work under the terms of Section 1
+above, provided that you also meet all of these conditions:
+
+    a) You must cause the modified files to carry prominent notices
+    stating that you changed the files and the date of any change.
+
+    b) You must cause any work that you distribute or publish, that in
+    whole or in part contains or is derived from the Program or any
+    part thereof, to be licensed as a whole at no charge to all third
+    parties under the terms of this License.
+
+    c) If the modified program normally reads commands interactively
+    when run, you must cause it, when started running for such
+    interactive use in the most ordinary way, to print or display an
+    announcement including an appropriate copyright notice and a
+    notice that there is no warranty (or else, saying that you provide
+    a warranty) and that users may redistribute the program under
+    these conditions, and telling the user how to view a copy of this
+    License.  (Exception: if the Program itself is interactive but
+    does not normally print such an announcement, your work based on
+    the Program is not required to print an announcement.)
+
+These requirements apply to the modified work as a whole.  If
+identifiable sections of that work are not derived from the Program,
+and can be reasonably considered independent and separate works in
+themselves, then this License, and its terms, do not apply to those
+sections when you distribute them as separate works.  But when you
+distribute the same sections as part of a whole which is a work based
+on the Program, the distribution of the whole must be on the terms of
+this License, whose permissions for other licensees extend to the
+entire whole, and thus to each and every part regardless of who wrote it.
+
+Thus, it is not the intent of this section to claim rights or contest
+your rights to work written entirely by you; rather, the intent is to
+exercise the right to control the distribution of derivative or
+collective works based on the Program.
+
+In addition, mere aggregation of another work not based on the Program
+with the Program (or with a work based on the Program) on a volume of
+a storage or distribution medium does not bring the other work under
+the scope of this License.
+
+  3. You may copy and distribute the Program (or a work based on it,
+under Section 2) in object code or executable form under the terms of
+Sections 1 and 2 above provided that you also do one of the following:
+
+    a) Accompany it with the complete corresponding machine-readable
+    source code, which must be distributed under the terms of Sections
+    1 and 2 above on a medium customarily used for software interchange; or,
+
+    b) Accompany it with a written offer, valid for at least three
+    years, to give any third party, for a charge no more than your
+    cost of physically performing source distribution, a complete
+    machine-readable copy of the corresponding source code, to be
+    distributed under the terms of Sections 1 and 2 above on a medium
+    customarily used for software interchange; or,
+
+    c) Accompany it with the information you received as to the offer
+    to distribute corresponding source code.  (This alternative is
+    allowed only for noncommercial distribution and only if you
+    received the program in object code or executable form with such
+    an offer, in accord with Subsection b above.)
+
+The source code for a work means the preferred form of the work for
+making modifications to it.  For an executable work, complete source
+code means all the source code for all modules it contains, plus any
+associated interface definition files, plus the scripts used to
+control compilation and installation of the executable.  However, as a
+special exception, the source code distributed need not include
+anything that is normally distributed (in either source or binary
+form) with the major components (compiler, kernel, and so on) of the
+operating system on which the executable runs, unless that component
+itself accompanies the executable.
+
+If distribution of executable or object code is made by offering
+access to copy from a designated place, then offering equivalent
+access to copy the source code from the same place counts as
+distribution of the source code, even though third parties are not
+compelled to copy the source along with the object code.
+
+  4. You may not copy, modify, sublicense, or distribute the Program
+except as expressly provided under this License.  Any attempt
+otherwise to copy, modify, sublicense or distribute the Program is
+void, and will automatically terminate your rights under this License.
+However, parties who have received copies, or rights, from you under
+this License will not have their licenses terminated so long as such
+parties remain in full compliance.
+
+  5. You are not required to accept this License, since you have not
+signed it.  However, nothing else grants you permission to modify or
+distribute the Program or its derivative works.  These actions are
+prohibited by law if you do not accept this License.  Therefore, by
+modifying or distributing the Program (or any work based on the
+Program), you indicate your acceptance of this License to do so, and
+all its terms and conditions for copying, distributing or modifying
+the Program or works based on it.
+
+  6. Each time you redistribute the Program (or any work based on the
+Program), the recipient automatically receives a license from the
+original licensor to copy, distribute or modify the Program subject to
+these terms and conditions.  You may not impose any further
+restrictions on the recipients' exercise of the rights granted herein.
+You are not responsible for enforcing compliance by third parties to
+this License.
+
+  7. If, as a consequence of a court judgment or allegation of patent
+infringement or for any other reason (not limited to patent issues),
+conditions are imposed on you (whether by court order, agreement or
+otherwise) that contradict the conditions of this License, they do not
+excuse you from the conditions of this License.  If you cannot
+distribute so as to satisfy simultaneously your obligations under this
+License and any other pertinent obligations, then as a consequence you
+may not distribute the Program at all.  For example, if a patent
+license would not permit royalty-free redistribution of the Program by
+all those who receive copies directly or indirectly through you, then
+the only way you could satisfy both it and this License would be to
+refrain entirely from distribution of the Program.
+
+If any portion of this section is held invalid or unenforceable under
+any particular circumstance, the balance of the section is intended to
+apply and the section as a whole is intended to apply in other
+circumstances.
+
+It is not the purpose of this section to induce you to infringe any
+patents or other property right claims or to contest validity of any
+such claims; this section has the sole purpose of protecting the
+integrity of the free software distribution system, which is
+implemented by public license practices.  Many people have made
+generous contributions to the wide range of software distributed
+through that system in reliance on consistent application of that
+system; it is up to the author/donor to decide if he or she is willing
+to distribute software through any other system and a licensee cannot
+impose that choice.
+
+This section is intended to make thoroughly clear what is believed to
+be a consequence of the rest of this License.
+
+  8. If the distribution and/or use of the Program is restricted in
+certain countries either by patents or by copyrighted interfaces, the
+original copyright holder who places the Program under this License
+may add an explicit geographical distribution limitation excluding
+those countries, so that distribution is permitted only in or among
+countries not thus excluded.  In such case, this License incorporates
+the limitation as if written in the body of this License.
+
+  9. The Free Software Foundation may publish revised and/or new versions
+of the General Public License from time to time.  Such new versions will
+be similar in spirit to the present version, but may differ in detail to
+address new problems or concerns.
+
+Each version is given a distinguishing version number.  If the Program
+specifies a version number of this License which applies to it and "any
+later version", you have the option of following the terms and conditions
+either of that version or of any later version published by the Free
+Software Foundation.  If the Program does not specify a version number of
+this License, you may choose any version ever published by the Free Software
+Foundation.
+
+  10. If you wish to incorporate parts of the Program into other free
+programs whose distribution conditions are different, write to the author
+to ask for permission.  For software which is copyrighted by the Free
+Software Foundation, write to the Free Software Foundation; we sometimes
+make exceptions for this.  Our decision will be guided by the two goals
+of preserving the free status of all derivatives of our free software and
+of promoting the sharing and reuse of software generally.
+
+                            NO WARRANTY
+
+  11. BECAUSE THE PROGRAM IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY
+FOR THE PROGRAM, TO THE EXTENT PERMITTED BY APPLICABLE LAW.  EXCEPT WHEN
+OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
+PROVIDE THE PROGRAM "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED
+OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.  THE ENTIRE RISK AS
+TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH YOU.  SHOULD THE
+PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING,
+REPAIR OR CORRECTION.
+
+  12. IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING
+WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR
+REDISTRIBUTE THE PROGRAM AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES,
+INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING
+OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED
+TO LOSS OF DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY
+YOU OR THIRD PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER
+PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGES.
+
+                     END OF TERMS AND CONDITIONS
+
+            How to Apply These Terms to Your New Programs
+
+  If you develop a new program, and you want it to be of the greatest
+possible use to the public, the best way to achieve this is to make it
+free software which everyone can redistribute and change under these terms.
+
+  To do so, attach the following notices to the program.  It is safest
+to attach them to the start of each source file to most effectively
+convey the exclusion of warranty; and each file should have at least
+the "copyright" line and a pointer to where the full notice is found.
+
+    <one line to give the program's name and a brief idea of what it does.>
+    Copyright (C) <year>  <name of author>
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, see <https://www.gnu.org/licenses/>.
+
+Also add information on how to contact you by electronic and paper mail.
+
+If the program is interactive, make it output a short notice like this
+when it starts in an interactive mode:
+
+    Gnomovision version 69, Copyright (C) year name of author
+    Gnomovision comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
+    This is free software, and you are welcome to redistribute it
+    under certain conditions; type `show c' for details.
+
+The hypothetical commands `show w' and `show c' should show the appropriate
+parts of the General Public License.  Of course, the commands you use may
+be called something other than `show w' and `show c'; they could even be
+mouse-clicks or menu items--whatever suits your program.
+
+You should also get your employer (if you work as a programmer) or your
+school, if any, to sign a "copyright disclaimer" for the program, if
+necessary.  Here is a sample; alter the names:
+
+  Yoyodyne, Inc., hereby disclaims all copyright interest in the program
+  `Gnomovision' (which makes passes at compilers) written by James Hacker.
+
+  <signature of Moe Ghoul>, 1 April 1989
+  Moe Ghoul, President of Vice
+
+This General Public License does not permit incorporating your program into
+proprietary programs.  If your program is a subroutine library, you may
+consider it more useful to permit linking proprietary applications with the
+library.  If this is what you want to do, use the GNU Lesser General
+Public License instead of this License.
+
+"""
+
+
+let licenseGPL3Contents = """
                     GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 

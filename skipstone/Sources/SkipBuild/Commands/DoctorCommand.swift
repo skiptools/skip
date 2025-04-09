@@ -20,6 +20,9 @@ struct DoctorCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Check for native SDK", valueName: "native"))
+    var native: Bool = false
+
     // we do not fail fast by default for doctor since it is useful to see all the parts that failed
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Fail immediately when an error occurs"))
     var failFast: Bool = false
@@ -28,7 +31,7 @@ struct DoctorCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
         await withLogStream(with: out) {
             await out.yield(MessageBlock(status: nil, "Skip Doctor"))
 
-            try await runDoctor(with: out)
+            try await runDoctor(checkNative: self.native, with: out)
             let latestVersion = await checkSkipUpdates(with: out)
             if let latestVersion = latestVersion, latestVersion != skipVersion {
                 await out.yield(MessageBlock(status: .warn, "A new version is Skip (\(latestVersion)) is available to update with: skip upgrade"))
@@ -39,7 +42,7 @@ struct DoctorCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
 
 extension ToolOptionsCommand where Self : StreamingCommand {
     /// Runs the `skip doctor` command and stream the results to the messenger
-    func runDoctor(with out: MessageQueue) async throws {
+    func runDoctor(checkNative: Bool, with out: MessageQueue) async throws {
 
         /// Invokes the given command and attempts to parse the output against the given regular expression pattern to validate that it is a semantic version string
         func checkVersion(title: String, cmd: [String], min: Version? = nil, pattern: String, watch: Bool = false, hint: String? = nil) async throws {
@@ -115,6 +118,9 @@ extension ToolOptionsCommand where Self : StreamingCommand {
             try await checkRosetta()
         }
         try await checkVersion(title: "Swift version", cmd: ["swift", "-version"], min: Version("5.9.0"), pattern: "Swift version ([0-9.]+)")
+        if checkNative {
+            try await checkVersion(title: "Swift Android SDK version", cmd: ["skip", "android", "build", "--version"], min: Version("6.1.0"), pattern: "Swift Package Manager - Swift ([0-9.]+)", hint: " (install with: skip android sdk install)")
+        }
         // TODO: add advice to run `xcode-select -s /Applications/Xcode.app/Contents/Developer` to work around https://github.com/skiptools/skip/issues/18
         try await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)", hint: " (install from: https://developer.apple.com/xcode/)")
         await checkXcodeCommandLineTools(with: out)

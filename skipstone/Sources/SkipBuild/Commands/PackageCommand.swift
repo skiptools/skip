@@ -37,6 +37,17 @@ protocol CreateOptionsCommand : ParsableArguments {
     var createOptions: CreateOptions { get }
 }
 
+struct NativeMode : OptionSet {
+    static let nativeModel = NativeMode(rawValue: 1 << 0)
+    static let nativeApp = NativeMode(rawValue: 1 << 1)
+
+    let rawValue: Int
+
+    init(rawValue: Int) {
+        self.rawValue = rawValue
+    }
+}
+
 struct CreateOptions : ParsableArguments {
     @Option(help: ArgumentHelp("Application identifier"))
     var id: String = "net.example.MyApp"
@@ -64,6 +75,9 @@ struct CreateOptions : ParsableArguments {
     @Option(help: ArgumentHelp("Resource folder name"))
     var resourcePath: String = "Resources"
 
+    @Option(help: ArgumentHelp("Swift version for project"))
+    var swiftVersion: String? = nil
+
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Create library dependencies between modules", valueName: "show"))
     var chain: Bool = true
 
@@ -82,8 +96,11 @@ struct CreateOptions : ParsableArguments {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary of the new files", valueName: "show"))
     var showTree: Bool = false
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create a fully native app", valueName: "native"))
+    var nativeApp: Bool = false
+
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create a native model layer", valueName: "native"))
-    var native: Bool = false
+    var nativeModel: Bool = false
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether native model should use kotlincompat", valueName: "kotlincompat"))
     var kotlincompat: Bool = false
@@ -99,6 +116,25 @@ struct CreateOptions : ParsableArguments {
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Validate generated Package.swift files", valueName: "validate"))
     var validatePackage: Bool = true
+
+    var nativeMode: NativeMode {
+        var mode: NativeMode = []
+        if self.nativeApp == true {
+            mode.insert(.nativeApp)
+        }
+        if self.nativeModel == true {
+            mode.insert(.nativeModel)
+        }
+        return mode
+    }
+
+    var isNative: Bool {
+        !nativeMode.isEmpty
+    }
+
+    var moduleMode: ModuleMode {
+        isNative && kotlincompat ? ModuleMode.kotlincompat : isNative ? .native : .transpiled
+    }
 
     var projectTemplateURL: URL {
         get throws {

@@ -19,9 +19,9 @@ jobs:
 
   ci-linux:
     #runs-on: ubuntu-18.4
-    runs-on: ubuntu-20.04
+    #runs-on: ubuntu-20.04
     #runs-on: ubuntu-22.04
-    #runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
@@ -42,11 +42,13 @@ jobs:
         run: swift --version
 
       - name: Install dependencies
+        # this is only needed for ubuntu-20.04
+        if: false
         # need to update first or libcurl4-nss-dev isn't found
         # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/customizing-github-hosted-runners#installing-software-on-ubuntu-runners
         run: |
           sudo apt-get update
-          sudo apt-get install -y binutils git gnupg2 libc6-dev libcurl4 libcurl4-nss-dev libedit2 libgcc-9-dev libpython2.7 libsqlite3-0 libstdc++-9-dev libxml2 libz3-dev pkg-config tzdata uuid-dev zlib1g-dev
+          sudo apt-get install -y binutils git gnupg2 libc6-dev libcurl4 libedit2 libgcc-9-dev libpython2.7 libsqlite3-0 libstdc++-9-dev libxml2 libz3-dev pkg-config tzdata uuid-dev zlib1g-dev
 
       # checkout both skipstone.git and skip.git for the linked SkipDrive
       - name: Checkout skipstone.git
@@ -68,7 +70,8 @@ jobs:
         run: KOTLINC=kotlinc swift test -v -c debug --parallel
 
       - name: Build SkipRunner (Release)
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        if: false
+        #if: ${{ startsWith(github.ref, 'refs/tags/') }}
         working-directory: skipstone
         run: |
           # needs a clean build or else we get linker errors

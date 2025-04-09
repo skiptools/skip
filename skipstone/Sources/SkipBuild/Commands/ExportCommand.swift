@@ -64,6 +64,9 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
     @Option(help: ArgumentHelp("SDK path for export build", valueName: "sdk dir"))
     var sdkPath: String? = nil
 
+    @Option(help: ArgumentHelp("Project scheme name to export", valueName: "scheme"))
+    var schemeName: String? = nil
+
     func performCommand(with out: MessageQueue) async {
         await withLogStream(with: out) {
             try await runExport(with: out)
@@ -153,7 +156,7 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
                     let ipaOutputPath = outputFolder.appending(component: outputName + ".ipa")
                     let xcarchiveOutputPath = outputFolder.appending(component: outputName + ".xcarchive.zip")
 
-                    _ = try await createIPA(configuration: variant, primaryModuleName: appModuleName, cfgSuffix: "-" + variant.rawValue, projectURL: projectURL, out: out, prefix: "", xcodeProjectURL: projectLayout.darwinProjectFolder, ipaURL: ipaOutputPath.asURL, xcarchiveURL: xcarchiveOutputPath.asURL, verifyFile: false, returnHashes: false)
+                    _ = try await createIPA(configuration: variant, schemeName: self.schemeName, primaryModuleName: appModuleName, cfgSuffix: "-" + variant.rawValue, projectURL: projectURL, out: out, prefix: "", xcodeProjectURL: projectLayout.darwinProjectFolder, ipaURL: ipaOutputPath.asURL, xcarchiveURL: xcarchiveOutputPath.asURL, verifyFile: false, returnHashes: false)
 
                     createdURLs.append(ipaOutputPath.asURL)
                     createdURLs.append(xcarchiveOutputPath.asURL)

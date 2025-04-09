@@ -97,8 +97,9 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, Too
         let modules = try self.modules
         let icon: IconParameters? = noIcon == true ? nil : IconParameters(iconBackgroundColor: iconBackground, iconForegroundColor: iconForeground, iconSources: icon, iconShadow: iconShadow, iconInset: iconInset)
 
-        let mode = self.createOptions.native && self.createOptions.kotlincompat ? ModuleMode.kotlincompat : self.createOptions.native ? .native : .transpiled
-        let (createdURL, project, _) = try await initSkipProject(baseName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, verify: buildOptions.verify, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, returnHashes: false, showTree: self.createOptions.showTree, chain: createOptions.chain, gitRepo: createOptions.gitRepo, free: createOptions.free, appfair: createOptions.appfair, zero: createOptions.zero, appid: self.appid, icon: icon, version: self.version, mode: mode, moduleTests: self.createOptions.moduleTests, github: self.createOptions.github, fastlane: self.createOptions.fastlane, validatePackage: self.createOptions.validatePackage, apk: apk, ipa: ipa, with: out)
+        let moduleMode = self.createOptions.moduleMode
+        let nativeMode = self.createOptions.nativeMode
+        let (createdURL, project, _) = try await initSkipProject(baseName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, verify: buildOptions.verify, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, returnHashes: false, showTree: self.createOptions.showTree, chain: createOptions.chain, gitRepo: createOptions.gitRepo, free: createOptions.free, appfair: createOptions.appfair, zero: createOptions.zero, appid: self.appid, icon: icon, version: self.version, swiftVersion: self.createOptions.swiftVersion ?? "5.9", nativeMode: nativeMode, moduleMode: moduleMode, moduleTests: self.createOptions.moduleTests, github: self.createOptions.github, fastlane: self.createOptions.fastlane, validatePackage: self.createOptions.validatePackage, apk: apk, ipa: ipa, with: out)
 
         await out.yield(MessageBlock(status: .pass, "Created module \(modules.map(\.moduleName).joined(separator: ", ")) in \(createdURL.path)"))
 
@@ -162,7 +163,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         }
         return hashes
     }
-    
+
     /// Zip up the given folder.
     @discardableResult func zipFolder(with out: MessageQueue, message msg: String, compressionLevel: Int = 9, zipFile: URL, folder: URL) async throws -> Result<ProcessOutput, Error> {
         func returnFileSize(_ result: Result<ProcessOutput, Error>?) -> (result: Result<ProcessOutput, Error>?, message: MessageBlock?) {
@@ -175,12 +176,20 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         return try await run(with: out, msg, ["zip", "-\(compressionLevel)", "--symlinks", "-r", zipFile.path, folder.lastPathComponent], in: folder.deletingLastPathComponent(), resultHandler: returnFileSize)
     }
 
-    func createIPA(configuration: BuildConfiguration, primaryModuleName: String, sdk: String = "iphoneos", cfgSuffix: String, projectURL: URL, out: MessageQueue, prefix re: String, xcodeProjectURL: URL, ipaURL ipaOutputURL: URL? = nil, xcarchiveURL: URL? = nil, teamID: String? = nil, verifyFile: Bool = true, returnHashes: Bool) async throws -> [URL : String?] {
+    func createIPA(configuration: BuildConfiguration, schemeName: String?, primaryModuleName: String, sdk: String = "iphoneos", cfgSuffix: String, projectURL: URL, out: MessageQueue, prefix re: String, xcodeProjectURL: URL, ipaURL ipaOutputURL: URL? = nil, xcarchiveURL: URL? = nil, teamID: String? = nil, verifyFile: Bool = true, returnHashes: Bool) async throws -> [URL : String?] {
         // xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -skipMacroValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
         let cfg = configuration.rawValue.capitalized
         let archiveBasePath = darwinBuildFolder + "/Archives/" + cfg
 
         let archivePath = archiveBasePath + "/" + primaryModuleName + ".xcarchive"
+
+        // Get the scheme list from the Xcode project
+        let projectSchemes = try await run(with: out, "Check project schemes", ["xcodebuild", "-list", "-json", "-project", xcodeProjectURL.path]).get()
+        let schemeList = try JSONDecoder().decode(XcodeProjectSchemes.self, from: projectSchemes.stdout.data(using: .utf8) ?? Data())
+
+        guard let appSchemeName = schemeName ?? schemeList.project.targets?.first else {
+            throw MissingProjectFileError(errorDescription: "No schemes found in project: \(xcodeProjectURL.path): \(projectSchemes.stdout)")
+        }
 
         // note that derivedDataPath and archivePath are relative to CWD rather than
         let fullArchivePath = projectURL.path + "/" + archivePath
@@ -194,7 +203,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
             "-skipMacroValidation",
             "-archivePath", fullArchivePath,
             "-configuration", cfg,
-            "-scheme", primaryModuleName,
+            "-scheme", appSchemeName,
             "-sdk", sdk,
             "-destination", "generic/platform=iOS",
             "archive",
@@ -268,7 +277,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         return hashes
     }
 
-    func initSkipProject(baseName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: BuildConfiguration, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, appfair: Bool? = nil, zero skipZeroSupport: Bool, appid: String?, appModuleName: String = "app", icon: IconParameters?, version: String?, mode: ModuleMode, moduleTests: Bool, github: Bool, fastlane: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
+    func initSkipProject(baseName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: BuildConfiguration, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, appfair: Bool? = nil, zero skipZeroSupport: Bool, appid: String?, appModuleName: String = "app", icon: IconParameters?, version: String?, swiftVersion: String, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests: Bool, github: Bool, fastlane: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
 
         // the initial build/test is done with debug configuration regardless of the configuration setting; this is because unit tests don't always run correctly in release mode
         let debugConfiguration = "debug"
@@ -284,9 +293,9 @@ extension ToolOptionsCommand where Self : StreamingCommand {
 
         let primaryModuleName = modules.first?.moduleName ?? "Module"
         // the embedded framework must have a different name from the app name, or else it will try to archive a framework instead of an app
-        let primaryModuleFrameworkName = primaryModuleName + "App"
+        let primaryModuleFrameworkName = primaryModuleName + AppProjectLayout.appProductSuffix
 
-        let (projectURL, project) = try await AppProjectLayout.createSkipAppProject(projectName: projectName, productName: primaryModuleFrameworkName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, chain: chain, gitRepo: gitRepo, appfair: appfair == true, free: free, zero: skipZeroSupport, appid: appid, icon: icon, version: version, mode: mode, moduleTests: moduleTests, github: github, fastlane: fastlane, packageResolved: packageResolvedURL)
+        let (projectURL, project) = try await AppProjectLayout.createSkipAppProject(projectName: projectName, productName: primaryModuleFrameworkName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, chain: chain, gitRepo: gitRepo, appfair: appfair == true, free: free, zero: skipZeroSupport, appid: appid, icon: icon, version: version, swiftVersion: swiftVersion, nativeMode: nativeMode, moduleMode: moduleMode, moduleTests: moduleTests, github: github, fastlane: fastlane, packageResolved: packageResolvedURL)
         let projectPath = try projectURL.absolutePath
 
         if build == true || apk == true {
@@ -310,7 +319,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
 
         let xcodeProjectURL = project.darwinProjectFolder
         if ipa == true  {
-            let ipaFiles = try await createIPA(configuration: configuration, primaryModuleName: primaryModuleName, cfgSuffix: cfgSuffix, projectURL: projectURL, out: out, prefix: re, xcodeProjectURL: xcodeProjectURL, returnHashes: returnHashes)
+            let ipaFiles = try await createIPA(configuration: configuration, schemeName: nil, primaryModuleName: primaryModuleName, cfgSuffix: cfgSuffix, projectURL: projectURL, out: out, prefix: re, xcodeProjectURL: xcodeProjectURL, returnHashes: returnHashes)
             artifactHashes.merge(ipaFiles, uniquingKeysWith: { $1 })
         }
 

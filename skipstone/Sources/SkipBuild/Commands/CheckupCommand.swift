@@ -1,6 +1,11 @@
 import Foundation
 import ArgumentParser
 import SkipSyntax
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 struct CheckupCommand: MessageCommand, ToolOptionsCommand {
@@ -21,11 +26,42 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
     @Flag(help: ArgumentHelp("Check twice that sample build outputs produce identical artifacts", valueName: "verify"))
     var doubleCheck: Bool = false
 
-    @Flag(help: ArgumentHelp("Generate native module when running checkup", valueName: "native"))
+    @Flag(help: ArgumentHelp("Generate native app when running checkup", valueName: "native"))
     var native: Bool = false
+
+    @Flag(help: ArgumentHelp("Generate native app when running checkup", valueName: "native"))
+    var nativeApp: Bool = false
+
+    @Flag(help: ArgumentHelp("Generate native module when running checkup", valueName: "native"))
+    var nativeModel: Bool = false
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Fail immediately when an error occurs"))
     var failFast: Bool = true
+
+    @Option(name: [.long], help: ArgumentHelp("Swift version for project", valueName: "swift-version"))
+    var swiftVersion: String = "5.9"
+
+    @Option(name: [.long], help: ArgumentHelp("Name of checkup project", valueName: "name"))
+    var projectName: String = "hello-skip"
+
+    @Option(name: [.long], help: ArgumentHelp("Name of checkup project module", valueName: "module-name"))
+    var moduleName: String = "HelloSkip"
+
+    /// The native mode to use for checkup, which can be a combination of native app and native model.
+    var nativeMode: NativeMode {
+        var mode: NativeMode = []
+        if self.native || self.nativeApp {
+            mode.insert(.nativeApp)
+        }
+        if self.native || self.nativeModel {
+            mode.insert(.nativeModel)
+        }
+        return mode
+    }
+
+    var isNative: Bool {
+        !nativeMode.isEmpty
+    }
 
     func performCommand(with out: MessageQueue) async {
         await withLogStream(with: out) {
@@ -34,7 +70,7 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
     }
 
     func runCheckup(with out: MessageQueue) async throws {
-        try await runDoctor(with: out)
+        try await runDoctor(checkNative: isNative, with: out)
 
         @Sendable func buildSampleProject(packageResolvedURL: URL? = nil) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
             let primary = packageResolvedURL == nil
@@ -42,14 +78,16 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
             let tmpdir = NSTemporaryDirectory() + "/" + UUID().uuidString
             try FileManager.default.createDirectory(atPath: tmpdir, withIntermediateDirectories: true)
 
-            //let checkupModules = try [PackageModule(parse: "HelloSkip"), PackageModule(parse: "HelloModel"), PackageModule(parse: "HelloCore")]
-            var checkupModules = [PackageModule(moduleName: "HelloSkip")]
+            //let checkupModules = try [PackageModule(parse: moduleName), PackageModule(parse: "HelloModel"), PackageModule(parse: "HelloCore")]
+            var checkupModules = [PackageModule(moduleName: moduleName)]
             // when checking a native package, create a second module that will have the bridge dependency
-            if native == true {
+            if nativeMode.contains(.nativeModel) {
                 checkupModules += [PackageModule(moduleName: "HelloModel")]
             }
+            let runTests = primary && nativeMode != .nativeApp
+
             // create a project differently based on the index, but the ultimate binary output should be identical
-            return try await initSkipProject(baseName: "hello-skip", modules: checkupModules, resourceFolder: "Resources", dir: URL(fileURLWithPath: tmpdir, isDirectory: true), verify: false, configuration: self.configuration, build: primary, test: primary, returnHashes: doubleCheck, messagePrefix: !primary ? "Re-" : "", showTree: false, chain: true, gitRepo: false, free: true, zero: !native, appid: "skip.hello.App", icon: nil, version: "1.0.0", mode: native == true ? .native : .transpiled, moduleTests: primary, github: true, fastlane: true, validatePackage: true, packageResolved: packageResolvedURL, apk: true, ipa: true, with: out)
+            return try await initSkipProject(baseName: projectName, modules: checkupModules, resourceFolder: "Resources", dir: URL(fileURLWithPath: tmpdir, isDirectory: true), verify: false, configuration: self.configuration, build: primary, test: runTests, returnHashes: doubleCheck, messagePrefix: !primary ? "Re-" : "", showTree: false, chain: true, gitRepo: false, free: true, zero: !isNative, appid: "skip.hello.App", icon: nil, version: "1.0.0", swiftVersion: self.swiftVersion, nativeMode: nativeMode, moduleMode: isNative ? .native : .transpiled, moduleTests: primary && nativeMode != [.nativeApp], github: true, fastlane: true, validatePackage: true, packageResolved: packageResolvedURL, apk: true, ipa: true, with: out)
         }
 
         // build a sample project (twice when performing a double-check)

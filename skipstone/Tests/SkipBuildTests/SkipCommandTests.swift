@@ -49,11 +49,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 5.9
-        // This is a Skip (https://skip.tools) package,
-        // containing a Swift Package Manager project
-        // that will use the Skip build plugin to transpile the
-        // Swift Package, Sources, and Tests into an
-        // Android Gradle Project with Kotlin sources and JUnit tests.
+        // This is a Skip (https://skip.tools) package.
         import PackageDescription
         import Foundation
 
@@ -105,11 +101,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 5.9
-        // This is a Skip (https://skip.tools) package,
-        // containing a Swift Package Manager project
-        // that will use the Skip build plugin to transpile the
-        // Swift Package, Sources, and Tests into an
-        // Android Gradle Project with Kotlin sources and JUnit tests.
+        // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
         let package = Package(
@@ -206,11 +198,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 5.9
-        // This is a Skip (https://skip.tools) package,
-        // containing a Swift Package Manager project
-        // that will use the Skip build plugin to transpile the
-        // Swift Package, Sources, and Tests into an
-        // Android Gradle Project with Kotlin sources and JUnit tests.
+        // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
         let package = Package(
@@ -278,11 +266,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 5.9
-        // This is a Skip (https://skip.tools) package,
-        // containing a Swift Package Manager project
-        // that will use the Skip build plugin to transpile the
-        // Swift Package, Sources, and Tests into an
-        // Android Gradle Project with Kotlin sources and JUnit tests.
+        // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
         let package = Package(
@@ -588,8 +572,8 @@ final class SkipCommandTests: XCTestCase {
         #endif
     }
 
-    func testLibInitNativeCommand() async throws {
-        let (projectURL, projectTree) = try await libInitComand(projectName: "basic-project", native: true, moduleNames: "SomeModule")
+    func testLibInitNativeModelCommand() async throws {
+        let (projectURL, projectTree) = try await libInitComand(projectName: "basic-project", native: .nativeModel, moduleNames: "SomeModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Package.swift
@@ -683,17 +667,13 @@ final class SkipCommandTests: XCTestCase {
         skip:
           mode: 'native'
           bridging: true
-        
+
         """)
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 5.9
-        // This is a Skip (https://skip.tools) package,
-        // containing a Swift Package Manager project
-        // that will use the Skip build plugin to transpile the
-        // Swift Package, Sources, and Tests into an
-        // Android Gradle Project with Kotlin sources and JUnit tests.
+        // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
         let package = Package(
@@ -722,7 +702,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitKotlincompatCommand() async throws {
-        let (projectURL, projectTree) = try await libInitComand(projectName: "basic-project", native: true, kotlincompat: true, moduleNames: "SomeModule")
+        let (projectURL, projectTree) = try await libInitComand(projectName: "basic-project", native: .nativeModel, kotlincompat: true, moduleNames: "SomeModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Package.swift
@@ -829,11 +809,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 5.9
-        // This is a Skip (https://skip.tools) package,
-        // containing a Swift Package Manager project
-        // that will use the Skip build plugin to transpile the
-        // Swift Package, Sources, and Tests into an
-        // Android Gradle Project with Kotlin sources and JUnit tests.
+        // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
         let package = Package(
@@ -861,9 +837,9 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
-
-    func testLibInitAppNativeCommand() async throws {
-        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: false, native: true, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "APP_MODULE", "MODEL_MODULE")
+    /// A multi-module native app with transpiled app and compiled model
+    func testLibInitAppNativeModelCommand() async throws {
+        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: false, native: .nativeModel, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "APP_MODULE", "MODEL_MODULE")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -946,7 +922,7 @@ final class SkipCommandTests: XCTestCase {
         skip:
           mode: 'native'
           bridging: true
-        
+
         """)
 
         let testCaseCode = try load("Tests/MODEL_MODULETests/MODEL_MODULETests.swift")
@@ -990,11 +966,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 5.9
-        // This is a Skip (https://skip.tools) package,
-        // containing a Swift Package Manager project
-        // that will use the Skip build plugin to transpile the
-        // Swift Package, Sources, and Tests into an
-        // Android Gradle Project with Kotlin sources and JUnit tests.
+        // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
         let package = Package(
@@ -1002,7 +974,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
             products: [
-                .library(name: "APP_MODULEApp", type: .dynamic, targets: ["APP_MODULE"]),
+                .library(name: "APP_MODULE\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["APP_MODULE"]),
                 .library(name: "MODEL_MODULE", type: .dynamic, targets: ["MODEL_MODULE"]),
             ],
             dependencies: [
@@ -1030,7 +1002,282 @@ final class SkipCommandTests: XCTestCase {
                 ], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
-        
+
+        """)
+    }
+
+    /// A multi-module native app
+    func testLibInitAppNativeAppModelCommand() async throws {
+        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: false, native: .nativeApp, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "APP_MODULE", "MODEL_MODULE")
+        XCTAssertEqual(projectTree ?? "", """
+        .
+        ├─ Android
+        │  ├─ app
+        │  │  ├─ build.gradle.kts
+        │  │  ├─ proguard-rules.pro
+        │  │  └─ src
+        │  │     └─ main
+        │  │        ├─ AndroidManifest.xml
+        │  │        └─ kotlin
+        │  │           └─ Main.kt
+        │  ├─ gradle
+        │  │  └─ wrapper
+        │  │     └─ gradle-wrapper.properties
+        │  ├─ gradle.properties
+        │  └─ settings.gradle.kts
+        ├─ Darwin
+        │  ├─ APP_MODULE.xcconfig
+        │  ├─ APP_MODULE.xcodeproj
+        │  │  └─ project.pbxproj
+        │  ├─ Assets.xcassets
+        │  │  ├─ AccentColor.colorset
+        │  │  │  └─ Contents.json
+        │  │  ├─ AppIcon.appiconset
+        │  │  │  └─ Contents.json
+        │  │  └─ Contents.json
+        │  ├─ Entitlements.plist
+        │  ├─ Info.plist
+        │  └─ Sources
+        │     └─ Main.swift
+        ├─ Package.swift
+        ├─ README.md
+        ├─ Skip.env
+        ├─ Sources
+        │  ├─ APP_MODULE
+        │  │  ├─ APP_MODULEApp.swift
+        │  │  ├─ ContentView.swift
+        │  │  ├─ Resources
+        │  │  │  ├─ Localizable.xcstrings
+        │  │  │  └─ Module.xcassets
+        │  │  │     └─ Contents.json
+        │  │  └─ Skip
+        │  │     └─ skip.yml
+        │  └─ MODEL_MODULE
+        │     ├─ Skip
+        │     │  └─ skip.yml
+        │     └─ ViewModel.swift
+        └─ Tests
+           └─ MODEL_MODULETests
+              ├─ MODEL_MODULETests.swift
+              ├─ Skip
+              │  └─ skip.yml
+              └─ XCSkipTests.swift
+
+        """)
+
+        let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
+        let AndroidManifest = try load("Android/app/src/main/AndroidManifest.xml")
+        XCTAssertTrue(AndroidManifest.contains("android.intent.category.LAUNCHER"))
+
+        let AppSkipYML = try load("Sources/APP_MODULE/Skip/skip.yml")
+        XCTAssertEqual(AppSkipYML, """
+        # Configuration file for https://skip.tools project
+        #
+        # Kotlin dependencies and Gradle build options for this module can be configured here
+        #build:
+        #  contents:
+        #    - block: 'dependencies'
+        #      contents:
+        #        - 'implementation("androidx.compose.runtime:runtime")'
+
+        # this is a natively-compiled module
+        skip:
+          mode: 'native'
+          bridging: true
+
+        """)
+
+        let SkipYML = try load("Sources/MODEL_MODULE/Skip/skip.yml")
+        XCTAssertEqual(SkipYML, """
+        # Configuration file for https://skip.tools project
+        #
+        # Kotlin dependencies and Gradle build options for this module can be configured here
+        #build:
+        #  contents:
+        #    - block: 'dependencies'
+        #      contents:
+        #        - 'implementation("androidx.compose.runtime:runtime")'
+
+        # this is a natively-compiled module
+        skip:
+          mode: 'native'
+          bridging: true
+
+        """)
+
+        let testCaseCode = try load("Tests/MODEL_MODULETests/MODEL_MODULETests.swift")
+        XCTAssertEqual(testCaseCode, """
+        import XCTest
+        import OSLog
+        import Foundation
+        import SkipBridge
+        @testable import MODEL_MODULE
+
+        let logger: Logger = Logger(subsystem: "MODEL_MODULE", category: "Tests")
+
+        @available(macOS 13, *)
+        final class MODEL_MODULETests: XCTestCase {
+            override func setUp() {
+                #if os(Android)
+                // needed to load the compiled bridge from the transpiled tests
+                loadPeerLibrary(packageName: "cool-app", moduleName: "MODEL_MODULE")
+                #endif
+            }
+
+            func testMODEL_MODULE() throws {
+                logger.log("running testMODEL_MODULE")
+                XCTAssertEqual(1 + 2, 3, "basic test")
+            }
+
+            func testViewModel() async throws {
+                let vm = ViewModel()
+                vm.items.append(Item(title: "ABC"))
+                XCTAssertFalse(vm.items.isEmpty)
+                XCTAssertEqual("ABC", vm.items.last?.title)
+
+                vm.clear()
+                XCTAssertTrue(vm.items.isEmpty)
+            }
+
+        }
+
+        """)
+
+        let PackageSwift = try load("Package.swift")
+        XCTAssertEqual(PackageSwift, """
+        // swift-tools-version: 5.9
+        // This is a Skip (https://skip.tools) package.
+        import PackageDescription
+
+        let package = Package(
+            name: "cool-app",
+            defaultLocalization: "en",
+            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            products: [
+                .library(name: "APP_MODULE\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["APP_MODULE"]),
+                .library(name: "MODEL_MODULE", type: .dynamic, targets: ["MODEL_MODULE"]),
+            ],
+            dependencies: [
+                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-fuse-ui.git", "0.0.0"..<"2.0.0"),
+                .package(url: "https://source.skip.tools/skip-fuse.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-model.git", from: "1.0.0")
+            ],
+            targets: [
+                .target(name: "APP_MODULE", dependencies: [
+                    "MODEL_MODULE",
+                    .product(name: "SkipFuseUI", package: "skip-fuse-ui")
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "MODEL_MODULE", dependencies: [
+                    .product(name: "SkipFuse", package: "skip-fuse"),
+                    .product(name: "SkipModel", package: "skip-model")
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .testTarget(name: "MODEL_MODULETests", dependencies: [
+                    "MODEL_MODULE",
+                    .product(name: "SkipTest", package: "skip")
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+            ]
+        )
+
+        """)
+    }
+
+    /// A single-module native app
+    func testLibInitAppNativeAppCommand() async throws {
+        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: false, native: .nativeApp, tests: nil, fastlane: false, appid: "some.cool.app", swiftVersion: "6.0", moduleNames: "APP_MODULE")
+        XCTAssertEqual(projectTree ?? "", """
+        .
+        ├─ Android
+        │  ├─ app
+        │  │  ├─ build.gradle.kts
+        │  │  ├─ proguard-rules.pro
+        │  │  └─ src
+        │  │     └─ main
+        │  │        ├─ AndroidManifest.xml
+        │  │        └─ kotlin
+        │  │           └─ Main.kt
+        │  ├─ gradle
+        │  │  └─ wrapper
+        │  │     └─ gradle-wrapper.properties
+        │  ├─ gradle.properties
+        │  └─ settings.gradle.kts
+        ├─ Darwin
+        │  ├─ APP_MODULE.xcconfig
+        │  ├─ APP_MODULE.xcodeproj
+        │  │  └─ project.pbxproj
+        │  ├─ Assets.xcassets
+        │  │  ├─ AccentColor.colorset
+        │  │  │  └─ Contents.json
+        │  │  ├─ AppIcon.appiconset
+        │  │  │  └─ Contents.json
+        │  │  └─ Contents.json
+        │  ├─ Entitlements.plist
+        │  ├─ Info.plist
+        │  └─ Sources
+        │     └─ Main.swift
+        ├─ Package.swift
+        ├─ README.md
+        ├─ Skip.env
+        └─ Sources
+           └─ APP_MODULE
+              ├─ APP_MODULEApp.swift
+              ├─ ContentView.swift
+              ├─ Resources
+              │  ├─ Localizable.xcstrings
+              │  └─ Module.xcassets
+              │     └─ Contents.json
+              ├─ Skip
+              │  └─ skip.yml
+              └─ ViewModel.swift
+
+        """)
+
+        let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
+        let AndroidManifest = try load("Android/app/src/main/AndroidManifest.xml")
+        XCTAssertTrue(AndroidManifest.contains("android.intent.category.LAUNCHER"))
+
+        let SkipYML = try load("Sources/APP_MODULE/Skip/skip.yml")
+        XCTAssertEqual(SkipYML, """
+        # Configuration file for https://skip.tools project
+        #
+        # Kotlin dependencies and Gradle build options for this module can be configured here
+        #build:
+        #  contents:
+        #    - block: 'dependencies'
+        #      contents:
+        #        - 'implementation("androidx.compose.runtime:runtime")'
+
+        # this is a natively-compiled module
+        skip:
+          mode: 'native'
+          bridging: true
+
+        """)
+
+        let PackageSwift = try load("Package.swift")
+        XCTAssertEqual(PackageSwift, """
+        // swift-tools-version: 6.0
+        // This is a Skip (https://skip.tools) package.
+        import PackageDescription
+
+        let package = Package(
+            name: "cool-app",
+            defaultLocalization: "en",
+            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            products: [
+                .library(name: "APP_MODULE\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["APP_MODULE"]),
+            ],
+            dependencies: [
+                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-fuse-ui.git", "0.0.0"..<"2.0.0")
+            ],
+            targets: [
+                .target(name: "APP_MODULE", dependencies: [
+                    .product(name: "SkipFuseUI", package: "skip-fuse-ui")
+                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+            ]
+        )
+
         """)
     }
 
@@ -1139,11 +1386,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 5.9
-        // This is a Skip (https://skip.tools) package,
-        // containing a Swift Package Manager project
-        // that will use the Skip build plugin to transpile the
-        // Swift Package, Sources, and Tests into an
-        // Android Gradle Project with Kotlin sources and JUnit tests.
+        // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
         let package = Package(
@@ -1151,7 +1394,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
             products: [
-                .library(name: "FreeAppApp", type: .dynamic, targets: ["FreeApp"]),
+                .library(name: "FreeApp\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["FreeApp"]),
                 .library(name: "FreeAppModel", type: .dynamic, targets: ["FreeAppModel"]),
             ],
             dependencies: [
@@ -1277,11 +1520,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 5.9
-        // This is a Skip (https://skip.tools) package,
-        // containing a Swift Package Manager project
-        // that will use the Skip build plugin to transpile the
-        // Swift Package, Sources, and Tests into an
-        // Android Gradle Project with Kotlin sources and JUnit tests.
+        // This is a Skip (https://skip.tools) package.
         import PackageDescription
         import Foundation
 
@@ -1294,7 +1533,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
             products: [
-                .library(name: "TOP_MODULEApp", type: .dynamic, targets: ["TOP_MODULE"]),
+                .library(name: "TOP_MODULE\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["TOP_MODULE"]),
                 .library(name: "MIDDLE_MODULE", type: .dynamic, targets: ["MIDDLE_MODULE"]),
                 .library(name: "BOTTOM_MODULE", type: .dynamic, targets: ["BOTTOM_MODULE"]),
             ],
@@ -1408,11 +1647,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 5.9
-        // This is a Skip (https://skip.tools) package,
-        // containing a Swift Package Manager project
-        // that will use the Skip build plugin to transpile the
-        // Swift Package, Sources, and Tests into an
-        // Android Gradle Project with Kotlin sources and JUnit tests.
+        // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
         let package = Package(
@@ -1420,7 +1655,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
             products: [
-                .library(name: "M1App", type: .dynamic, targets: ["M1"]),
+                .library(name: "M1\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["M1"]),
                 .library(name: "M2", type: .dynamic, targets: ["M2"]),
                 .library(name: "M3", type: .dynamic, targets: ["M3"]),
                 .library(name: "M4", type: .dynamic, targets: ["M4"]),
@@ -1457,7 +1692,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitApp5NativeModuleCommand() async throws {
-        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: false, native: true, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "M1", "M2", "M3", "M4", "M5")
+        let (projectURL, projectTree) = try await libInitComand(projectName: "cool-app", zero: false, native: .nativeModel, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "M1", "M2", "M3", "M4", "M5")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -1533,11 +1768,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 5.9
-        // This is a Skip (https://skip.tools) package,
-        // containing a Swift Package Manager project
-        // that will use the Skip build plugin to transpile the
-        // Swift Package, Sources, and Tests into an
-        // Android Gradle Project with Kotlin sources and JUnit tests.
+        // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
         let package = Package(
@@ -1545,7 +1776,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
             products: [
-                .library(name: "M1App", type: .dynamic, targets: ["M1"]),
+                .library(name: "M1\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["M1"]),
                 .library(name: "M2", type: .dynamic, targets: ["M2"]),
                 .library(name: "M3", type: .dynamic, targets: ["M3"]),
                 .library(name: "M4", type: .dynamic, targets: ["M4"]),
@@ -1588,7 +1819,7 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
-    func libInitComand(projectName: String, free: Bool? = nil, zero: Bool? = nil, appfair: Bool? = nil, native: Bool? = nil, kotlincompat: Bool = false, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, resourcePath: String? = "Resources", backgroundColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
+    func libInitComand(projectName: String, free: Bool? = nil, zero: Bool? = nil, appfair: Bool? = nil, native: NativeMode = [], kotlincompat: Bool = false, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, swiftVersion: String? = nil, resourcePath: String? = "Resources", backgroundColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["lib", "init", "-jA", "--no-build", "--no-test", "--show-tree"]
@@ -1615,19 +1846,25 @@ final class SkipCommandTests: XCTestCase {
             cmd += ["--no-appfair"]
         }
 
-        if native == true {
-            cmd += ["--native"]
+        if native.contains(.nativeApp) {
+            cmd += ["--native-app"]
+        }
+
+        if native.contains(.nativeModel) {
+            cmd += ["--native-model"]
             if kotlincompat == true {
                 cmd += ["--kotlincompat"]
             }
-        } else if native == false {
-            cmd += ["--no-native"]
         }
 
         if moduleTests == true {
             cmd += ["--module-tests"]
         } else if moduleTests == false {
             cmd += ["--no-module-tests"]
+        }
+
+        if let swiftVersion {
+            cmd += ["--swift-version", swiftVersion]
         }
 
         if fastlane == true {
