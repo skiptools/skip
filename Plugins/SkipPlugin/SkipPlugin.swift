@@ -275,6 +275,17 @@ import PackagePlugin
             "--module-root", outputBase.path,
             ]
 
+        func appendArguments(_ args: [String], unlessAlreadySet: Bool = true) {
+            // scan the existing arguments to see if the same arg already exists
+            if unlessAlreadySet == true && buildArguments.indices.first(where: {
+                buildArguments.dropFirst($0).prefix(args.count) == .init(args)
+            }) != nil {
+                return
+            }
+
+            buildArguments += args
+        }
+
         let packageDeps = recursivePackageDependencies(for: context.package)
 
         // create a map from [target ID: package] for all known targets
@@ -295,7 +306,7 @@ import PackagePlugin
             let dependencyParameter = [targetDep.name, package.displayName, package.directory.string].joined(separator: ":")
             // only add the dependency parameter if we have not already specified it (duplicates are possible because we may visit the same target multiple times)
             if dependencyParameters.insert(dependencyParameter).inserted {
-                buildArguments += ["--dependency", dependencyParameter]
+                appendArguments(["--dependency", dependencyParameter])
             }
         }
 
@@ -303,7 +314,7 @@ import PackagePlugin
             for executableProduct in pack.package.products(ofType: ExecutableProduct.self) {
                 // also add the Skip plugin dependency itself, so we use the local version of the plugin
                 if executableProduct.name == "skip" {
-                    buildArguments += ["--dependency", [executableProduct.name, pack.package.id, pack.package.directory.string].joined(separator: ":")]
+                    appendArguments(["--dependency", [executableProduct.name, pack.package.id, pack.package.directory.string].joined(separator: ":")])
                 }
             }
         }
@@ -329,10 +340,10 @@ import PackagePlugin
                 outputFiles.append(skipBridgeOutputDir.appending(subpath: fileName))
             }
             
-            buildArguments += ["--skip-bridge-output", skipBridgeOutputDir.string]
+            appendArguments(["--skip-bridge-output", skipBridgeOutputDir.string])
         }
 
-        buildArguments += buildModuleArgs
+        appendArguments(buildModuleArgs)
 
         //Diagnostics.remark("invoke skip \(buildArguments.joined(separator: " "))")
         return [
