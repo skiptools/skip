@@ -22,13 +22,23 @@ jobs:
       - run: brew install skiptools/skip/skip
       - run: skip checkup
       #- run: skip checkup --verbose --double-check
+
       - run: skip init demo-module DemoModule
       - run: skip init --appid=xyz.skip.Demo demo-app DemoApp DemoModule
       - run: skip init --appfair DemoFairApp
 
+      # native model and app init
       - run: skip android sdk install --verbose
+
       - run: skip checkup --verbose --native
-      - run: skip init --native demo-module-native DemoModule
-      - run: skip init --native --kotlincompat demo-module-kotlincompat DemoModule
-      - run: skip init --native --appid=xyz.skip.Demo demo-app-native DemoApp DemoModule
+
+      - run: skip checkup --verbose --native-model
+      - run: skip init --native-model demo-module-native DemoModule
+      - run: skip init --native-model --kotlincompat demo-module-kotlincompat DemoModule
+      - run: skip init --native-model --appid=xyz.skip.Demo demo-native-model-app DemoApp DemoModule
+
+      - run: skip checkup --verbose --native-app
+      - run: skip init --native-app --appid=xyz.skip.Demo demo-app-native DemoApp
+      - run: skip init --native-app --native-model --appid=xyz.skip.Demo demo-app-native-model DemoApp DemoModel
+      - run: skip export --package demo-app-native-model
 

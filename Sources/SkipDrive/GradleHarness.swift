@@ -295,7 +295,28 @@ extension GradleHarness {
         }
     }
 
+    func preprocessGradleArguments(in projectFolder: URL?, arguments: [String]) {
+        // warn when we detect that the Gradle project needs to be upgraded
+        var project = projectFolder ?? URL.currentDirectory()
+        if let projectFlagIndex = arguments.firstIndex(where: { $0 == "-p" }),
+           let projectArg = arguments.dropFirst(projectFlagIndex + 1).first {
+            project.appendPathComponent(projectArg, isDirectory: true)
+        }
+        project.appendPathComponent("settings.gradle.kts", isDirectory: false)
+
+        if FileManager.default.fileExists(atPath: project.path) {
+            if let settingsContents = try? String(String(contentsOf: project, encoding: .utf8)) {
+                if !settingsContents.contains(#""skip", "plugin""#) { // check for the new "skip plugin --prebuild" command we should be running
+                    let issue = GradleIssue(kind: .warning, message: "Android project upgrade required. Please open a Terminal and cd to the project folder, then run `skip upgrade` and `skip verify --fix` to update the project.", location: SourceLocation(path: project.path, position: SourceLocation.Position(line: 0, column: 0)))
+                    print(issue.xcodeMessageString)
+                }
+            }
+        }
+    }
+
     public func gradleExec(in projectFolder: URL?, moduleName: String?, packageName: String?, arguments: [String]) async throws {
+        preprocessGradleArguments(in: projectFolder, arguments: arguments)
+
         let driver = try await GradleDriver()
         let acts: [String] = [] // releaseBuild ? ["assembleRelease"] : ["assembleDebug"] // expected in the arguments to the command
 
