@@ -941,6 +941,15 @@ final class SwiftUITests: XCTestCase {
         """)
     }
 
+    func testGestureStateVariable() async throws {
+        try await checkProducesMessage(swift: """
+        import SwiftUI
+        struct V: View {
+            @GestureState var i = 0
+        }
+        """)
+    }
+
     func testKeyedEnvironmentVariable() async throws {
         try await check(supportingSwift: baseSupportingSwift + """
         extension Int {

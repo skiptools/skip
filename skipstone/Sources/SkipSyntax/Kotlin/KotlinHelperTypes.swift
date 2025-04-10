@@ -160,7 +160,8 @@ extension KotlinStatement {
             return attributes
         }
         let withoutMarkers = attributes.attributes.filter { $0 != .bridgeToKotlin && $0 != .bridgeToSwift }
-        let supported = withoutMarkers.filter { $0.kind != .unknown }
+        // We don't support @GestureState in transpilation yet
+        let supported = withoutMarkers.filter { $0.kind != .unknown && $0.kind != .gestureState }
         if supported.count < withoutMarkers.count {
             messages.append(.kotlinAttributeUnsupported(self, source: translator.syntaxTree.source))
         }
