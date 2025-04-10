@@ -32,6 +32,12 @@
       location = "group:../skip-firebase">
    </FileRef>
    <FileRef
+      location = "group:../swift-android-native">
+   </FileRef>
+   <FileRef
+      location = "group:../swift-jni">
+   </FileRef>
+   <FileRef
       location = "group:../skip-bridge">
    </FileRef>
    <FileRef
@@ -41,7 +47,16 @@
       location = "group:../skip-fuse">
    </FileRef>
    <FileRef
+      location = "group:../skip-fuse-ui">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-integ-demo">
+   </FileRef>
+   <FileRef
       location = "group:../skip-kit">
+   </FileRef>
+   <FileRef
+      location = "group:../skip-device">
    </FileRef>
    <FileRef
       location = "group:../skip-keychain">
@@ -53,10 +68,19 @@
       location = "group:../skipapp-hello/Darwin/HelloSkip.xcodeproj">
    </FileRef>
    <FileRef
+      location = "group:../skipapp-hello-fuse/Darwin/HelloSkipFuse.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:../skipapp-notes/Darwin/SkipNotes.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "group:../skipapp-hiya/Darwin/HiyaSkip.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:../skipapp-showcase/Darwin/Showcase.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:../skipapp-showcase-fuse/Darwin/ShowcaseFuse.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:../skipapp-bookings/Darwin/TravelBookings.xcodeproj">
