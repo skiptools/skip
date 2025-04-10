@@ -426,13 +426,13 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1i")
         func BridgeKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> Int32 {
-            return MainActor.assumeIsolated {
+            return SkipBridge.assumeMainActorUnchecked {
                 return Int32(i)
             }
         }
         @_cdecl("Java_BridgeKt_Swift_1i_1set")
         func BridgeKt_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: Int32) {
-            MainActor.assumeIsolated {
+            SkipBridge.assumeMainActorUnchecked {
                 i = Int(value)
             }
         }
@@ -455,7 +455,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_BridgeKt_Swift_1i")
         func BridgeKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer? {
             do {
-                return try MainActor.assumeIsolated {
+                return try SkipBridge.assumeMainActorUnchecked {
                     let f_return_swift = try Int32(i)
                     return f_return_swift.toJavaObject(options: [])
                 }
@@ -1246,7 +1246,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_BridgeKt_Swift_1f_10")
         func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: Int32) -> Int32 {
             let p_0_swift = Int(p_0)
-            return MainActor.assumeIsolated {
+            return SkipBridge.assumeMainActorUnchecked {
                 let f_return_swift = f(i: p_0_swift)
                 return Int32(f_return_swift)
             }
@@ -5658,14 +5658,14 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_C_Swift_1mainActorValue")
         func C_Swift_mainActorValue(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer {
             let peer_swift: C_TypeErased = Swift_peer.pointee()!
-            return MainActor.assumeIsolated {
+            return SkipBridge.assumeMainActorUnchecked {
                 return AnyBridging.toJavaObject(peer_swift.get_mainActorValue(), options: [])!
             }
         }
         @_cdecl("Java_C_Swift_1mainActorValue_1set")
         func C_Swift_mainActorValue_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: JavaObjectPointer) {
             let peer_swift: C_TypeErased = Swift_peer.pointee()!
-            MainActor.assumeIsolated {
+            SkipBridge.assumeMainActorUnchecked {
                 peer_swift.set_mainActorValue(AnyBridging.fromJavaObject(value, options: [])!)
             }
         }
@@ -5682,7 +5682,7 @@ final class BridgeToKotlinTests: XCTestCase {
         func C_Swift_mainActorIdentity_1(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ p_0: JavaObjectPointer) -> JavaObjectPointer {
             let p_0_swift = AnyBridging.fromJavaObject(p_0, options: [])!
             let peer_swift: C_TypeErased = Swift_peer.pointee()!
-            return MainActor.assumeIsolated {
+            return SkipBridge.assumeMainActorUnchecked {
                 let f_return_swift = peer_swift.mainActorIdentity_1(p_0_swift)
                 return AnyBridging.toJavaObject(f_return_swift, options: [])!
             }
@@ -6365,7 +6365,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_V_Swift_1composableBody")
         func V_Swift_composableBody(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer? {
             let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
-            return MainActor.assumeIsolated {
+            return SkipBridge.assumeMainActorUnchecked {
                 let body = peer_swift.value.body
                 return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])
             }
@@ -6478,7 +6478,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_V_Swift_1composableBody")
         func V_Swift_composableBody(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer? {
             let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
-            return MainActor.assumeIsolated {
+            return SkipBridge.assumeMainActorUnchecked {
                 let body = peer_swift.value.body
                 return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])
             }
@@ -6551,7 +6551,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_E_Swift_1composableBody")
         func E_Swift_composableBody(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer? {
             let peer_swift = E.fromJavaObject(Java_target, options: [])
-            return MainActor.assumeIsolated {
+            return SkipBridge.assumeMainActorUnchecked {
                 let body = peer_swift.body
                 return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])
             }
@@ -6658,7 +6658,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_V_Swift_1composableBody")
         func V_Swift_composableBody(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer? {
             let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
-            return MainActor.assumeIsolated {
+            return SkipBridge.assumeMainActorUnchecked {
                 let body = peer_swift.value.body
                 return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])
             }
@@ -6765,7 +6765,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_V_Swift_1composableBody")
         func V_Swift_composableBody(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer? {
             let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
-            return MainActor.assumeIsolated {
+            return SkipBridge.assumeMainActorUnchecked {
                 let body = peer_swift.value.body
                 return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])
             }
@@ -6969,7 +6969,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_V_Swift_1composableBody")
         func V_Swift_composableBody(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer? {
             let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
-            return MainActor.assumeIsolated {
+            return SkipBridge.assumeMainActorUnchecked {
                 let body = peer_swift.value.body
                 return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])
             }

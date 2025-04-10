@@ -672,7 +672,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 5.9
+        // swift-tools-version: 6.0
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -808,7 +808,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 5.9
+        // swift-tools-version: 6.0
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -965,7 +965,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 5.9
+        // swift-tools-version: 6.0
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -1145,7 +1145,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 5.9
+        // swift-tools-version: 6.0
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -1767,7 +1767,7 @@ final class SkipCommandTests: XCTestCase {
         XCTAssertTrue(AndroidManifest.contains("android.intent.category.LAUNCHER"))
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 5.9
+        // swift-tools-version: 6.0
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 

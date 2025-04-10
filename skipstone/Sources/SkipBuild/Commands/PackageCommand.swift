@@ -46,6 +46,10 @@ struct NativeMode : OptionSet {
     init(rawValue: Int) {
         self.rawValue = rawValue
     }
+
+    var swiftVersion: String {
+        isEmpty ? "5.9" : "6.0"
+    }
 }
 
 struct CreateOptions : ParsableArguments {

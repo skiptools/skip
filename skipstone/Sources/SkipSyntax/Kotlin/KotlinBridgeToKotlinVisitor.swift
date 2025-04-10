@@ -756,7 +756,7 @@ final class KotlinBridgeToKotlinVisitor {
             retString = "return lhs_swift == rhs_swift"
         }
         if functionDeclaration.apiFlags.options.contains(.mainActor) {
-            cdeclBody.append("return MainActor.assumeIsolated {")
+            cdeclBody.append("return SkipBridge.assumeMainActorUnchecked {")
             cdeclBody.append(1, retString)
             cdeclBody.append("}")
         } else {
@@ -900,7 +900,7 @@ final class KotlinBridgeToKotlinVisitor {
             retString = "return lhs_swift < rhs_swift"
         }
         if functionDeclaration.apiFlags.options.contains(.mainActor) {
-            cdeclBody.append("return MainActor.assumeIsolated {")
+            cdeclBody.append("return SkipBridge.assumeMainActorUnchecked {")
             cdeclBody.append(1, retString)
             cdeclBody.append("}")
         } else {
@@ -1758,14 +1758,14 @@ final class KotlinBridgeToKotlinVisitor {
         if classDeclaration.declarationType == .enumDeclaration {
             cdeclSignature = .function([], .optional(.javaObjectPointer), APIFlags(), nil)
             cdeclSource.append("let peer_swift = \(classDeclaration.signature).fromJavaObject(Java_target, options: [])")
-            cdeclSource.append("return MainActor.assumeIsolated {")
+            cdeclSource.append("return SkipBridge.assumeMainActorUnchecked {")
             cdeclSource.append(1, "let body = peer_swift.body")
             cdeclSource.append(1, "return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])")
             cdeclSource.append("}")
         } else {
             cdeclSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))], .optional(.javaObjectPointer), APIFlags(), nil)
             cdeclSource.append("let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!")
-            cdeclSource.append("return MainActor.assumeIsolated {")
+            cdeclSource.append("return SkipBridge.assumeMainActorUnchecked {")
             cdeclSource.append(1, "let body = peer_swift.value.body")
             cdeclSource.append(1, "return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])")
             cdeclSource.append("}")
@@ -1794,7 +1794,7 @@ final class KotlinBridgeToKotlinVisitor {
         }
         let tryString = isThrows ? "try " : ""
         let returnString = isReturn ? "return " : ""
-        swift.append(indentation, "\(returnString)\(tryString)MainActor.assumeIsolated {")
+        swift.append(indentation, "\(returnString)\(tryString)SkipBridge.assumeMainActorUnchecked {")
         block(&swift, indentation.inc())
         swift.append(indentation, "}")
     }
