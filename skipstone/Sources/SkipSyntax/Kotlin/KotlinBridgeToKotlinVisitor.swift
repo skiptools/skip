@@ -1521,7 +1521,7 @@ final class KotlinBridgeToKotlinVisitor {
                 var syncSwift: [String] = []
                 var initCdeclFunctions: [CDeclFunction] = []
                 var syncCdeclFunctions: [CDeclFunction] = []
-                if attributes.stateAttribute != nil || attributes.contains(.focusState) || attributes.contains(.appStorage) {
+                if attributes.stateAttribute != nil || attributes.contains(.focusState) || attributes.contains(.gestureState) || attributes.contains(.appStorage) {
                     let supportTypeName: String
                     let boxName: String
                     if attributes.contains(.appStorage) {
@@ -1559,7 +1559,7 @@ final class KotlinBridgeToKotlinVisitor {
         functionDeclaration.extras = .singleNewline
         var bodyKotlin: [String] = []
         for (name, attributes) in stateVariables {
-            if attributes.stateAttribute != nil || attributes.contains(.focusState) || attributes.contains(.appStorage) {
+            if attributes.stateAttribute != nil || attributes.contains(.focusState) || attributes.contains(.gestureState) || attributes.contains(.appStorage) {
                 let supportTypeName = attributes.contains(.appStorage) ? "AppStorageSupport" : "StateSupport"
                 bodyKotlin.append("val remembered\(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.\(supportTypeName), Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_\(name)(Swift_peer)) }")
                 bodyKotlin.append("Swift_syncState_\(name)(Swift_peer, remembered\(name).value)")

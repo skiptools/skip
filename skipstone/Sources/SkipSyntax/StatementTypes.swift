@@ -1801,7 +1801,7 @@ final class     VariableDeclaration: Statement {
     var apiFlags: APIFlags {
         // Default to assuming that get-only protocol properties are computed
         let isComputed = getter?.body != nil || (getter != nil && setter == nil)
-        return APIFlags(isAsync: asyncBehavior != .sync, isMainActor: attributes.contains(.mainActor), isSwiftUIBindable: attributes.contains(.bindable) || attributes.contains(.observedObject) || attributes.contains(.state) || attributes.contains(.stateObject) || attributes.contains(.binding) || attributes.contains(.environmentObject) || attributes.environmentAttribute?.tokenTypeSignature != nil || attributes.contains(.focusState), isViewBuilder: attributes.contains(.viewBuilder), isComputed: isComputed, isWriteable: !isLet && (getter == nil || setter != nil), throwsType: throwsType)
+        return APIFlags(isAsync: asyncBehavior != .sync, isMainActor: attributes.contains(.mainActor), isSwiftUIBindable: attributes.contains(.bindable) || attributes.contains(.observedObject) || attributes.contains(.state) || attributes.contains(.stateObject) || attributes.contains(.binding) || attributes.contains(.environmentObject) || attributes.environmentAttribute?.tokenTypeSignature != nil || attributes.contains(.focusState) || attributes.contains(.gestureState), isViewBuilder: attributes.contains(.viewBuilder), isComputed: isComputed, isWriteable: !isLet && (getter == nil || setter != nil), throwsType: throwsType)
     }
     var isMutating: Bool {
         return !isLet && (getter == nil || setter != nil) && !attributes.isNonMutating
@@ -1833,7 +1833,7 @@ final class     VariableDeclaration: Statement {
         let modifiers = Modifiers.for(syntax: variableDecl.modifiers)
         let decodeLevel = decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
         guard decodeLevel != .none else {
-            if syntaxTree.isBridgeFile, context.memberOf?.type == .structDeclaration, attributes.stateAttribute != nil || attributes.environmentAttribute != nil || attributes.contains(.focusState) || attributes.contains(.appStorage), let syntax = variableDecl.bindings.first {
+            if syntaxTree.isBridgeFile, context.memberOf?.type == .structDeclaration, attributes.stateAttribute != nil || attributes.environmentAttribute != nil || attributes.contains(.focusState) || attributes.contains(.gestureState) || attributes.contains(.appStorage), let syntax = variableDecl.bindings.first {
                 // We need to track state in SwiftUI views regardless of visibility
                 guard let optionalName = syntax.pattern.identifierPatterns(in: syntaxTree)?.map(\.name?.removingBacktickEscaping).first, let name = optionalName else {
                     throw Message.unsupportedSyntax(syntax.pattern, source: syntaxTree.source)
