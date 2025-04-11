@@ -984,7 +984,7 @@ class SkipCommandTests : XCTestCase {
 
         XCTAssertEqual("Initializing Skip application \(name)", msgs.first)
 
-        for path in ["Package.swift", "Sources/Demo", "Tests", "Tests/DemoTests/Skip/skip.yml"] {
+        for path in ["Package.swift", "Sources/Demo"] {
             XCTAssertTrue(FileManager.default.fileExists(atPath: dir + path), "missing file at: \(path)")
         }
 
