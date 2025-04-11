@@ -137,7 +137,7 @@ struct CreateOptions : ParsableArguments {
     }
 
     var moduleMode: ModuleMode {
-        isNative && kotlincompat ? ModuleMode.kotlincompat : isNative ? .native : .transpiled
+        isNative && kotlincompat ? ModuleMode.kotlincompat : isNative ? (nativeApp ? .native : .nativeBridged) : .transpiled
     }
 
     var projectTemplateURL: URL {

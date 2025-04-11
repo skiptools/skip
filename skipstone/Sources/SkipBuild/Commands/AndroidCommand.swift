@@ -3,6 +3,7 @@ import Foundation
 import FoundationNetworking
 #endif
 import ArgumentParser
+import TSCBasic
 import ELFKit
 #if canImport(SkipDriveExternal)
 import SkipDriveExternal
@@ -137,8 +138,8 @@ fileprivate extension AndroidOperationCommand {
                 ) {
                     continue
                 }
-                print(outputLine.line, to: &stderrStream)
-                stderrStream.flush()
+                print(outputLine.line, to: &TSCBasic.stderrStream)
+                TSCBasic.stderrStream.flush()
             } else {
                 if !outputOptions.verbose && (
                     outputLine.line.hasPrefix("warning: Could not read SDKSettings.json for SDK")
@@ -147,8 +148,8 @@ fileprivate extension AndroidOperationCommand {
                 ) {
                     continue
                 }
-                print(outputLine.line, to: &stdoutStream)
-                stdoutStream.flush()
+                print(outputLine.line, to: &TSCBasic.stdoutStream)
+                TSCBasic.stdoutStream.flush()
             }
         }
         #endif
@@ -185,6 +186,8 @@ fileprivate extension AndroidOperationCommand {
             }
             var cmd: [String] = []
             var xswiftc = toolchainOptions.xswiftc
+            var xcc = toolchainOptions.xcc
+            var xlinker = toolchainOptions.xlinker
 
             cmd += [swiftCmd]
             cmd += ["build"]
@@ -229,9 +232,39 @@ fileprivate extension AndroidOperationCommand {
                 xswiftc += ["-L" + tc.libPathStatic.path]
                 xswiftc += ["-lc++_shared"]
                 xswiftc += ["-llog"]
-                // -Xfrontend -function-sections: enables dead stripping of unused runtime functions.
-                xswiftc += ["-Xfrontend", "-function-sections"]
                 xswiftc += ["-Osize"]
+
+                // enables dead stripping of unused runtime functions: swiftc -Xcc -ffunction-sections -Xcc -fdata-sections -Xcc -mthumb -Xlinker --gc-sections -Xfrontend -metadata-sections -Xfrontend -function-sections -Xfrontend -data-sections -static-stdlib -target -lswiftCore -lswiftStdlibStubsBaremetal -lstdc++_nano -lc -lg -lm -lgcc -Xlinker -T -Xlinker ./linker.ld imp.o unicode.o test.swift
+                xswiftc += ["-Xfrontend", "-function-sections"]
+                //xswiftc += ["-Xfrontend", "-data-sections"]
+                //xswiftc += ["-Xfrontend", "-metadata-sections"]
+                xcc += ["-ffunction-sections"]
+                xcc += ["-fdata-sections"]
+                xcc += ["-fvisibility=hidden"]
+                xcc += ["-fmerge-all-constants"]
+
+                // garbage collect unused sections
+                xlinker += ["--gc-sections"]
+                //xlinker += ["--print-gc-sections"] // debug removed sections
+                //xlinker += ["--strip-debug"]
+
+                // create a linker version script that excludes all global symbols other than the JNI-exported functions
+                let versionScript = """
+                    {
+                      global:
+                        Java_*;
+                        JNI_*;
+                      local:
+                        *;
+                    };
+
+                    """
+
+                let scratch = try toolchainOptions.scratchPath ?? createTempDir().path
+                let versionScriptPath = try AbsolutePath(validating: "jni_export.map", relativeTo: AbsolutePath(validating: scratch))
+                try localFileSystem.writeChanges(path: versionScriptPath, bytes: ByteString(encodingAsUTF8: versionScript))
+                xlinker += ["--version-script=\(versionScriptPath.pathString)"]
+                //xlinker += ["-T"]
             }
 
             // always set the TARGET_OS_ANDROID environment and build constant, regardless of bridging
@@ -241,10 +274,10 @@ fileprivate extension AndroidOperationCommand {
             for xswiftc in xswiftc {
                 cmd += ["-Xswiftc", xswiftc]
             }
-            for xcc in toolchainOptions.xcc {
+            for xcc in xcc {
                 cmd += ["-Xcc", xcc]
             }
-            for xlinker in toolchainOptions.xlinker {
+            for xlinker in xlinker {
                 cmd += ["-Xlinker", xlinker]
             }
             for xcxx in toolchainOptions.xcxx {
@@ -780,8 +813,8 @@ struct ToolchainOptions: ParsableArguments {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Enable SKIP_BRIDGE bridging to Kotlin"))
     var bridge: Bool = true
 
-    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Enable bundling Swift static libary into shared object"))
-    var aggregate: Bool = false
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Enable bundling all libraries into a single shared object"))
+    var aggregate: Bool = (ProcessInfo.processInfo.environment["SKIP_AGGREGATE"] ?? "0") != "0"
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Prune non-dependent libraries from build output"))
     var prune: Bool = true

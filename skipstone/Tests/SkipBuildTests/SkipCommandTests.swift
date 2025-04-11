@@ -318,7 +318,10 @@ final class SkipCommandTests: XCTestCase {
         ├─ Darwin
         │  ├─ APPNAME.xcconfig
         │  ├─ APPNAME.xcodeproj
-        │  │  └─ project.pbxproj
+        │  │  ├─ project.pbxproj
+        │  │  └─ xcshareddata
+        │  │     └─ xcschemes
+        │  │        └─ APPNAME App.xcscheme
         │  ├─ Assets.xcassets
         │  │  ├─ AccentColor.colorset
         │  │  │  └─ Contents.json
@@ -391,7 +394,10 @@ final class SkipCommandTests: XCTestCase {
         ├─ Darwin
         │  ├─ APPNAME.xcconfig
         │  ├─ APPNAME.xcodeproj
-        │  │  └─ project.pbxproj
+        │  │  ├─ project.pbxproj
+        │  │  └─ xcshareddata
+        │  │     └─ xcschemes
+        │  │        └─ APPNAME App.xcscheme
         │  ├─ Assets.xcassets
         │  │  ├─ AccentColor.colorset
         │  │  │  └─ Contents.json
@@ -501,7 +507,10 @@ final class SkipCommandTests: XCTestCase {
         ├─ Darwin
         │  ├─ APPNAME.xcconfig
         │  ├─ APPNAME.xcodeproj
-        │  │  └─ project.pbxproj
+        │  │  ├─ project.pbxproj
+        │  │  └─ xcshareddata
+        │  │     └─ xcschemes
+        │  │        └─ APPNAME App.xcscheme
         │  ├─ Assets.xcassets
         │  │  ├─ AccentColor.colorset
         │  │  │  └─ Contents.json
@@ -643,7 +652,6 @@ final class SkipCommandTests: XCTestCase {
             }
 
             func testAsyncThrowsFunction() async throws {
-                let id = UUID()
                 let type: SomeModuleModule.SomeModuleType = try await SomeModuleModule.createSomeModuleType(id: id, delay: 0.001)
                 XCTAssertEqual(id, type.id)
             }
@@ -859,7 +867,10 @@ final class SkipCommandTests: XCTestCase {
         ├─ Darwin
         │  ├─ APP_MODULE.xcconfig
         │  ├─ APP_MODULE.xcodeproj
-        │  │  └─ project.pbxproj
+        │  │  ├─ project.pbxproj
+        │  │  └─ xcshareddata
+        │  │     └─ xcschemes
+        │  │        └─ APP_MODULE App.xcscheme
         │  ├─ Assets.xcassets
         │  │  ├─ AccentColor.colorset
         │  │  │  └─ Contents.json
@@ -1028,7 +1039,10 @@ final class SkipCommandTests: XCTestCase {
         ├─ Darwin
         │  ├─ APP_MODULE.xcconfig
         │  ├─ APP_MODULE.xcodeproj
-        │  │  └─ project.pbxproj
+        │  │  ├─ project.pbxproj
+        │  │  └─ xcshareddata
+        │  │     └─ xcschemes
+        │  │        └─ APP_MODULE App.xcscheme
         │  ├─ Assets.xcassets
         │  │  ├─ AccentColor.colorset
         │  │  │  └─ Contents.json
@@ -1083,7 +1097,6 @@ final class SkipCommandTests: XCTestCase {
         # this is a natively-compiled module
         skip:
           mode: 'native'
-          bridging: true
 
         """)
 
@@ -1101,7 +1114,6 @@ final class SkipCommandTests: XCTestCase {
         # this is a natively-compiled module
         skip:
           mode: 'native'
-          bridging: true
 
         """)
 
@@ -1204,7 +1216,10 @@ final class SkipCommandTests: XCTestCase {
         ├─ Darwin
         │  ├─ APP_MODULE.xcconfig
         │  ├─ APP_MODULE.xcodeproj
-        │  │  └─ project.pbxproj
+        │  │  ├─ project.pbxproj
+        │  │  └─ xcshareddata
+        │  │     └─ xcschemes
+        │  │        └─ APP_MODULE App.xcscheme
         │  ├─ Assets.xcassets
         │  │  ├─ AccentColor.colorset
         │  │  │  └─ Contents.json
@@ -1250,7 +1265,6 @@ final class SkipCommandTests: XCTestCase {
         # this is a natively-compiled module
         skip:
           mode: 'native'
-          bridging: true
 
         """)
 
@@ -1321,7 +1335,10 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ Entitlements.plist
         │  ├─ FreeApp.xcconfig
         │  ├─ FreeApp.xcodeproj
-        │  │  └─ project.pbxproj
+        │  │  ├─ project.pbxproj
+        │  │  └─ xcshareddata
+        │  │     └─ xcschemes
+        │  │        └─ FreeApp App.xcscheme
         │  ├─ Info.plist
         │  ├─ Sources
         │  │  └─ Main.swift
@@ -1463,7 +1480,10 @@ final class SkipCommandTests: XCTestCase {
         │  │  └─ Main.swift
         │  ├─ TOP_MODULE.xcconfig
         │  └─ TOP_MODULE.xcodeproj
-        │     └─ project.pbxproj
+        │     ├─ project.pbxproj
+        │     └─ xcshareddata
+        │        └─ xcschemes
+        │           └─ TOP_MODULE App.xcscheme
         ├─ Package.swift
         ├─ README.md
         ├─ Skip.env
@@ -1598,7 +1618,10 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ Info.plist
         │  ├─ M1.xcconfig
         │  ├─ M1.xcodeproj
-        │  │  └─ project.pbxproj
+        │  │  ├─ project.pbxproj
+        │  │  └─ xcshareddata
+        │  │     └─ xcschemes
+        │  │        └─ M1 App.xcscheme
         │  └─ Sources
         │     └─ Main.swift
         ├─ Package.swift
@@ -1720,7 +1743,10 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ Info.plist
         │  ├─ M1.xcconfig
         │  ├─ M1.xcodeproj
-        │  │  └─ project.pbxproj
+        │  │  ├─ project.pbxproj
+        │  │  └─ xcshareddata
+        │  │     └─ xcschemes
+        │  │        └─ M1 App.xcscheme
         │  └─ Sources
         │     └─ Main.swift
         ├─ Package.swift

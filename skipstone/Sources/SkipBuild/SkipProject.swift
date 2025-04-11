@@ -12,6 +12,7 @@ struct AppVerifyError : LocalizedError {
 enum ModuleMode {
     case transpiled
     case native
+    case nativeBridged
     case kotlincompat
 }
 
@@ -164,7 +165,7 @@ class FrameworkProjectLayout {
                             options: 'kotlincompat'
 
                         """
-                    } else {
+                    } else if moduleMode == .nativeBridged {
                         skipYamlModule += """
                           bridging: true
 
@@ -1411,6 +1412,7 @@ class AppProjectLayout : FrameworkProjectLayout {
     let darwinProjectConfig: URL
     let darwinProjectFolder: URL
     let darwinProjectContents: URL
+    let darwinSchemesFolder: URL
     let darwinSourcesFolder: URL
     let darwinMainAppSwift: URL
     let darwinFastlaneFolder: URL
@@ -1459,6 +1461,7 @@ class AppProjectLayout : FrameworkProjectLayout {
         self.darwinProjectConfig = try darwinFolder.resolve(moduleName + ".xcconfig", check: check)
         self.darwinProjectFolder = try darwinFolder.resolve(moduleName + ".xcodeproj/", check: check)
         self.darwinProjectContents = try darwinProjectFolder.resolve("project.pbxproj", check: check)
+        self.darwinSchemesFolder = darwinProjectFolder.resolve("xcshareddata/xcschemes/", check: optional)
         self.darwinEntitlementsPlist = try darwinFolder.resolve("Entitlements.plist", check: check)
         self.darwinInfoPlist = darwinFolder.resolve("Info.plist", check: optional)
 
@@ -2046,6 +2049,8 @@ New features and better performance.
         let isNativeAppModule = nativeMode.contains(.nativeApp)
         let swiftUIImport = isNativeAppModule ? "import SkipFuseUI" : "import SwiftUI"
         let osLogImport = isNativeAppModule ? "import SkipFuse" : "import OSLog"
+        // explicitly bridge the public app functions that need to be accessed from Main.kt
+        let skipBridge = isNativeAppModule ? "/* SKIP @bridge */" : ""
 
         // Darwin/Sources/Main.swift
         let appMainContents = """
@@ -2130,8 +2135,8 @@ let logger: Logger = Logger(subsystem: "\(appid)", category: "\(primaryModuleNam
 /// The shared top-level view for the app, loaded from the platform-specific App delegates below.
 ///
 /// The default implementation merely loads the `ContentView` for the app and logs a message.
-public struct \(primaryModuleName)RootView : View {
-    public init() {
+\(skipBridge)public struct \(primaryModuleName)RootView : View {
+    \(skipBridge)public init() {
     }
 
     public var body: some View {
@@ -2145,34 +2150,33 @@ public struct \(primaryModuleName)RootView : View {
 /// Global application delegate functions.
 ///
 /// These functions can update a shared observable object to communicate app state changes to interested views.
-/// The sender for each of these functions will be either a `UIApplication` (iOS) or `AppCompatActivity` (Android)
-public final class \(primaryModuleName)AppDelegate : Sendable {
-    public static let shared = \(primaryModuleName)AppDelegate()
+\(skipBridge)public final class \(primaryModuleName)AppDelegate : Sendable {
+    \(skipBridge)public static let shared = \(primaryModuleName)AppDelegate()
 
     private init() {
     }
 
-    public func onStart() {
+    \(skipBridge)public func onStart() {
         logger.debug("onStart")
     }
 
-    public func onResume() {
+    \(skipBridge)public func onResume() {
         logger.debug("onResume")
     }
 
-    public func onPause() {
+    \(skipBridge)public func onPause() {
         logger.debug("onPause")
     }
 
-    public func onStop() {
+    \(skipBridge)public func onStop() {
         logger.debug("onStop")
     }
 
-    public func onDestroy() {
+    \(skipBridge)public func onDestroy() {
         logger.debug("onDestroy")
     }
 
-    public func onLowMemory() {
+    \(skipBridge)public func onLowMemory() {
         logger.debug("onLowMemory")
     }
 }
@@ -2203,7 +2207,7 @@ public final class \(primaryModuleName)AppDelegate : Sendable {
             }
 """
 
-        let platformHeartView = appfair == true ? "" : isNativeAppModule ? """
+        let nativeAppModulePlatformView = """
 /// A view that shows a blue heart on iOS and a green heart on Android.
 struct PlatformHeartView : View {
     var body: some View {
@@ -2218,7 +2222,7 @@ struct PlatformHeartView : View {
 }
 
 #if SKIP
-/// A bridged Android view that can use transpiled Kotlin and access Compose views directly
+/// Use a ContentComposer to integrate Compose content. This code will be transpiled to Kotlin.
 struct HeartComposer : ContentComposer {
     @Composable func Compose(context: ComposeContext) {
         androidx.compose.material3.Text("💚", modifier: context.modifier)
@@ -2226,7 +2230,9 @@ struct HeartComposer : ContentComposer {
 }
 #endif
 
-""" : """
+"""
+
+        let transpiledAppModulePlatformView = """
 /// A view that shows a blue heart on iOS and a green heart on Android.
 struct PlatformHeartView : View {
     var body: some View {
@@ -2240,8 +2246,10 @@ struct PlatformHeartView : View {
     }
 }
 
- 
 """
+
+        // the platform-specific view is different between a native app module and a transpiled module
+        let platformHeartView = appfair == true ? "" : isNativeAppModule ? nativeAppModulePlatformView : transpiledAppModulePlatformView
 
         // Sources/Playground/PlaygroundApp.swift
         let contentViewContents = """
@@ -2287,10 +2295,8 @@ struct ContentView: View {
 struct WelcomeView : View {
     @State var heartBeating = false
     @Binding var welcomeName: String
-    @Environment(ViewModel.self) var viewModel: ViewModel
 
     var body: some View {
-        @Bindable var viewModel = viewModel
         VStack(spacing: 0) {
             Text("Hello [\\(welcomeName)](\(appLink))!")
                 .padding()
@@ -2308,7 +2314,6 @@ struct ItemListView : View {
     @Environment(ViewModel.self) var viewModel: ViewModel
 
     var body: some View {
-        @Bindable var viewModel = viewModel
         List {
             ForEach(viewModel.items) { item in
                 NavigationLink(value: item) {
@@ -2381,12 +2386,10 @@ struct ItemView : View {
 }
 
 struct SettingsView : View {
-    @Environment(ViewModel.self) var viewModel: ViewModel
     @Binding var appearance: String
     @Binding var welcomeName: String
 
     var body: some View {
-        @Bindable var viewModel = viewModel
         \(settingsFormView) {
             TextField("Name", text: $welcomeName)
             Picker("Appearance", selection: $appearance) {
@@ -2933,6 +2936,92 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
         let xcodeProjectPbxprojURL = appProject.darwinProjectContents
         // change spaces to tabs in the pbxproj, since that is what Xcode will do when it saves it
         try xcodeProjectContents.replacingOccurrences(of: "    ", with: "\t").write(to: xcodeProjectPbxprojURL, atomically: false, encoding: .utf8)
+
+
+        let xcschemeContents = """
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "1630"
+   version = "1.7">
+   <BuildAction
+      parallelizeBuildables = "YES"
+      buildImplicitDependencies = "YES"
+      buildArchitectures = "Automatic">
+      <BuildActionEntries>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "499CD4382AC5B799001AE8D8"
+               BuildableName = "\(APP_NAME).app"
+               BlueprintName = "\(APP_TARGET)"
+               ReferencedContainer = "container:\(APP_NAME).xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+      </BuildActionEntries>
+   </BuildAction>
+   <TestAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      shouldAutocreateTestPlan = "YES">
+   </TestAction>
+   <LaunchAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      launchStyle = "0"
+      useCustomWorkingDirectory = "NO"
+      ignoresPersistentStateOnLaunch = "NO"
+      debugDocumentVersioning = "YES"
+      debugServiceExtension = "internal"
+      allowLocationSimulation = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "499CD4382AC5B799001AE8D8"
+            BuildableName = "\(APP_NAME).app"
+            BlueprintName = "\(APP_TARGET)"
+            ReferencedContainer = "container:\(APP_NAME).xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+   </LaunchAction>
+   <ProfileAction
+      buildConfiguration = "Release"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      savedToolIdentifier = ""
+      useCustomWorkingDirectory = "NO"
+      debugDocumentVersioning = "YES">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "499CD4382AC5B799001AE8D8"
+            BuildableName = "\(APP_NAME).app"
+            BlueprintName = "\(APP_TARGET)"
+            ReferencedContainer = "container:\(APP_NAME).xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+   </ProfileAction>
+   <AnalyzeAction
+      buildConfiguration = "Debug">
+   </AnalyzeAction>
+   <ArchiveAction
+      buildConfiguration = "Release"
+      revealArchiveInOrganizer = "YES">
+   </ArchiveAction>
+</Scheme>
+
+"""
+
+        let xcodeProjectSchemeURL = appProject.darwinSchemesFolder.appending(path: "\(APP_TARGET).xcscheme")
+        try xcschemeContents.write(to: xcodeProjectSchemeURL.createParentDirectory(), atomically: false, encoding: .utf8)
 
         let androidIconName: String? = hasIcon ? "mipmap/ic_launcher" : nil
         try createAndroidManifest(androidIconName: androidIconName).write(to: appProject.androidManifest.createParentDirectory(), atomically: false, encoding: .utf8)
