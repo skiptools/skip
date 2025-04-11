@@ -81,10 +81,10 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
             if nativeMode.contains(.nativeModel) {
                 checkupModules += [PackageModule(moduleName: "HelloModel")]
             }
-            let runTests = primary && nativeMode != .nativeApp
+            let runTests = primary && nativeMode.isEmpty
 
             // create a project differently based on the index, but the ultimate binary output should be identical
-            return try await initSkipProject(baseName: projectName, modules: checkupModules, resourceFolder: "Resources", dir: URL(fileURLWithPath: tmpdir, isDirectory: true), verify: false, configuration: self.configuration, build: primary, test: runTests, returnHashes: doubleCheck, messagePrefix: !primary ? "Re-" : "", showTree: false, chain: true, gitRepo: false, free: true, zero: !isNative, appid: "skip.hello.App", icon: nil, version: "1.0.0", swiftVersion: nativeMode.swiftVersion, nativeMode: nativeMode, moduleMode: isNative ? .native : .transpiled, moduleTests: primary && nativeMode != [.nativeApp], github: true, fastlane: true, validatePackage: true, packageResolved: packageResolvedURL, apk: true, ipa: true, with: out)
+            return try await initSkipProject(baseName: projectName, modules: checkupModules, resourceFolder: "Resources", dir: URL(fileURLWithPath: tmpdir, isDirectory: true), verify: false, configuration: self.configuration, build: primary, test: runTests, returnHashes: doubleCheck, messagePrefix: !primary ? "Re-" : "", showTree: false, chain: true, gitRepo: false, free: true, zero: !isNative, appid: "skip.hello.App", icon: nil, version: "1.0.0", swiftVersion: nativeMode.swiftVersion, nativeMode: nativeMode, moduleMode: isNative ? .native : .transpiled, moduleTests: runTests, github: true, fastlane: true, validatePackage: true, packageResolved: packageResolvedURL, apk: true, ipa: true, with: out)
         }
 
         // build a sample project (twice when performing a double-check)

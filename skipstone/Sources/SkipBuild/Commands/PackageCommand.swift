@@ -110,7 +110,7 @@ struct CreateOptions : ParsableArguments {
     var kotlincompat: Bool = false
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create test modules", valueName: "tests"))
-    var moduleTests: Bool = true
+    var moduleTests: Bool? = nil
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create fastlane metadata", valueName: "enable"))
     var fastlane: Bool = true

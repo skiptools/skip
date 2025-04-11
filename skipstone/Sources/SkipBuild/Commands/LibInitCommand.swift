@@ -99,7 +99,10 @@ struct LibInitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, Too
 
         let moduleMode = self.createOptions.moduleMode
         let nativeMode = self.createOptions.nativeMode
-        let (createdURL, project, _) = try await initSkipProject(baseName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, verify: buildOptions.verify, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, returnHashes: false, showTree: self.createOptions.showTree, chain: createOptions.chain, gitRepo: createOptions.gitRepo, free: createOptions.free, appfair: createOptions.appfair, zero: createOptions.zero, appid: self.appid, icon: icon, version: self.version, swiftVersion: self.createOptions.swiftVersion ?? nativeMode.swiftVersion, nativeMode: nativeMode, moduleMode: moduleMode, moduleTests: self.createOptions.moduleTests, github: self.createOptions.github, fastlane: self.createOptions.fastlane, validatePackage: self.createOptions.validatePackage, apk: apk, ipa: ipa, with: out)
+        // for now we default to creating tests only when non-native
+        let createTests = self.createOptions.moduleTests ?? nativeMode.isEmpty
+
+        let (createdURL, project, _) = try await initSkipProject(baseName: self.projectName, modules: modules, resourceFolder: createOptions.resourcePath, dir: dir, verify: buildOptions.verify, configuration: createOptions.configuration, build: buildOptions.build, test: buildOptions.test, returnHashes: false, showTree: self.createOptions.showTree, chain: createOptions.chain, gitRepo: createOptions.gitRepo, free: createOptions.free, appfair: createOptions.appfair, zero: createOptions.zero, appid: self.appid, icon: icon, version: self.version, swiftVersion: self.createOptions.swiftVersion ?? nativeMode.swiftVersion, nativeMode: nativeMode, moduleMode: moduleMode, moduleTests: createTests, github: self.createOptions.github, fastlane: self.createOptions.fastlane, validatePackage: self.createOptions.validatePackage, apk: apk, ipa: ipa, with: out)
 
         await out.yield(MessageBlock(status: .pass, "Created module \(modules.map(\.moduleName).joined(separator: ", ")) in \(createdURL.path)"))
 

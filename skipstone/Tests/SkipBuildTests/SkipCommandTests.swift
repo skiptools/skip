@@ -582,7 +582,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitNativeModelCommand() async throws {
-        let (projectURL, projectTree) = try await libInitComand(projectName: "basic-project", native: .nativeModel, moduleNames: "SomeModule")
+        let (projectURL, projectTree) = try await libInitComand(projectName: "basic-project", native: .nativeModel, tests: true, moduleNames: "SomeModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Package.swift
@@ -715,24 +715,15 @@ final class SkipCommandTests: XCTestCase {
         .
         ├─ Package.swift
         ├─ README.md
-        ├─ Sources
-        │  └─ SomeModule
-        │     ├─ Skip
-        │     │  └─ skip.yml
-        │     └─ SomeModule.swift
-        └─ Tests
-           └─ SomeModuleTests
+        └─ Sources
+           └─ SomeModule
               ├─ Skip
               │  └─ skip.yml
-              ├─ SomeModuleTests.swift
-              └─ XCSkipTests.swift
+              └─ SomeModule.swift
 
         """)
 
         let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
-
-        let XCSkipTests = try load("Tests/SomeModuleTests/XCSkipTests.swift")
-        XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
 
         let moduleCode = try load("Sources/SomeModule/SomeModule.swift")
         XCTAssertEqual(moduleCode, """
@@ -751,45 +742,6 @@ final class SkipCommandTests: XCTestCase {
             public struct SomeModuleType: Identifiable, Hashable, Codable {
                 public var id: UUID
             }
-        }
-
-        """)
-
-        let testCaseCode = try load("Tests/SomeModuleTests/SomeModuleTests.swift")
-        XCTAssertEqual(testCaseCode, """
-        import XCTest
-        import OSLog
-        import Foundation
-        import SkipBridge
-        @testable import SomeModule
-
-        let logger: Logger = Logger(subsystem: "SomeModule", category: "Tests")
-
-        @available(macOS 13, *)
-        final class SomeModuleTests: XCTestCase {
-            override func setUp() {
-                #if os(Android)
-                // needed to load the compiled bridge from the transpiled tests
-                loadPeerLibrary(packageName: "basic-project", moduleName: "SomeModule")
-                #endif
-            }
-
-            func testSomeModule() throws {
-                logger.log("running testSomeModule")
-                XCTAssertEqual(1 + 2, 3, "basic test")
-            }
-
-            func testAsyncThrowsFunction() async throws {
-                #if SKIP
-                // when the native module is in kotlincompat, types are unwrapped Java classes
-                let id = java.util.UUID.randomUUID()
-                #else
-                let id = UUID()
-                #endif
-                let type: SomeModuleModule.SomeModuleType = try await SomeModuleModule.createSomeModuleType(id: id, delay: 0.001)
-                XCTAssertEqual(id, type.id)
-            }
-
         }
 
         """)
@@ -834,10 +786,6 @@ final class SkipCommandTests: XCTestCase {
             targets: [
                 .target(name: "SomeModule", dependencies: [
                     .product(name: "SkipFuse", package: "skip-fuse")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .testTarget(name: "SomeModuleTests", dependencies: [
-                    "SomeModule",
-                    .product(name: "SkipTest", package: "skip")
                 ], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
