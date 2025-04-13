@@ -151,7 +151,10 @@ class SkipCommandTests : XCTestCase {
         │  ├─ Entitlements.plist
         │  ├─ HelloSkip.xcconfig
         │  ├─ HelloSkip.xcodeproj
-        │  │  └─ project.pbxproj
+        │  │  ├─ project.pbxproj
+        │  │  └─ xcshareddata
+        │  │     └─ xcschemes
+        │  │        └─ HelloSkip App.xcscheme
         │  ├─ Info.plist
         │  ├─ Sources
         │  │  └─ Main.swift
@@ -254,7 +257,10 @@ class SkipCommandTests : XCTestCase {
         │  │  └─ Contents.json
         │  ├─ Demo.xcconfig
         │  ├─ Demo.xcodeproj
-        │  │  └─ project.pbxproj
+        │  │  ├─ project.pbxproj
+        │  │  └─ xcshareddata
+        │  │     └─ xcschemes
+        │  │        └─ Demo App.xcscheme
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
         │  ├─ Sources
@@ -370,7 +376,10 @@ class SkipCommandTests : XCTestCase {
         │  │  └─ Contents.json
         │  ├─ Demo.xcconfig
         │  ├─ Demo.xcodeproj
-        │  │  └─ project.pbxproj
+        │  │  ├─ project.pbxproj
+        │  │  └─ xcshareddata
+        │  │     └─ xcschemes
+        │  │        └─ Demo App.xcscheme
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
         │  ├─ Sources
@@ -492,7 +501,10 @@ class SkipCommandTests : XCTestCase {
         │  │  └─ Contents.json
         │  ├─ Demo.xcconfig
         │  ├─ Demo.xcodeproj
-        │  │  └─ project.pbxproj
+        │  │  ├─ project.pbxproj
+        │  │  └─ xcshareddata
+        │  │     └─ xcschemes
+        │  │        └─ Demo App.xcscheme
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
         │  ├─ Sources
@@ -631,7 +643,10 @@ class SkipCommandTests : XCTestCase {
         │  │  └─ Contents.json
         │  ├─ Demo.xcconfig
         │  ├─ Demo.xcodeproj
-        │  │  └─ project.pbxproj
+        │  │  ├─ project.pbxproj
+        │  │  └─ xcshareddata
+        │  │     └─ xcschemes
+        │  │        └─ Demo App.xcscheme
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
         │  ├─ Sources
