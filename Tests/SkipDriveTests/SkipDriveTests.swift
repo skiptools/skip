@@ -797,7 +797,10 @@ class SkipCommandTests : XCTestCase {
         │  ├─ Entitlements.plist
         │  ├─ HelloSkip.xcconfig
         │  ├─ HelloSkip.xcodeproj
-        │  │  └─ project.pbxproj
+        │  │  ├─ project.pbxproj
+        │  │  └─ xcshareddata
+        │  │     └─ xcschemes
+        │  │        └─ HelloSkip App.xcscheme
         │  ├─ Info.plist
         │  ├─ Sources
         │  │  └─ Main.swift
