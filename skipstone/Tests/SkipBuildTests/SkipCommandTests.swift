@@ -866,8 +866,16 @@ final class SkipCommandTests: XCTestCase {
         let AndroidManifest = try load("Android/app/src/main/AndroidManifest.xml")
         XCTAssertTrue(AndroidManifest.contains("android.intent.category.LAUNCHER"))
 
-        let SkipYML = try load("Sources/MODEL_MODULE/Skip/skip.yml")
-        XCTAssertEqual(SkipYML, """
+        let AppSkipYML = try load("Sources/APP_MODULE/Skip/skip.yml")
+        XCTAssertEqual(AppSkipYML, """
+        # Configuration file for https://skip.tools project
+        build:
+          contents:
+
+        """)
+
+        let ModelSkipYML = try load("Sources/MODEL_MODULE/Skip/skip.yml")
+        XCTAssertEqual(ModelSkipYML, """
         # Configuration file for https://skip.tools project
         #
         # Kotlin dependencies and Gradle build options for this module can be configured here
