@@ -1712,7 +1712,7 @@ class TypeDeclaration: Statement {
 enum UnbridgedMember: Hashable {
     case constructor
     case uninitializedStructProperty
-    case swiftUIStateProperty(String, Attributes) // Name, attributes
+    case swiftUIStateProperty(String, Attributes, Modifiers) // Name, attributes, modifiers
     case observableType(String)
 
     var isSwiftUIStateProperty: Bool {
@@ -1838,7 +1838,7 @@ final class     VariableDeclaration: Statement {
                 guard let optionalName = syntax.pattern.identifierPatterns(in: syntaxTree)?.map(\.name?.removingBacktickEscaping).first, let name = optionalName else {
                     throw Message.unsupportedSyntax(syntax.pattern, source: syntaxTree.source)
                 }
-                return [UnbridgedMemberDeclaration(member: .swiftUIStateProperty(name, attributes), syntax: syntax, extras: extras, in: syntaxTree)]
+                return [UnbridgedMemberDeclaration(member: .swiftUIStateProperty(name, attributes, modifiers), syntax: syntax, extras: extras, in: syntaxTree)]
             } else if syntaxTree.isBridgeFile, context.memberOf?.type == .structDeclaration, !modifiers.isStatic, variableDecl.bindings.first?.initializer?.value == nil {
                 // We must note unbridged, unintialized struct properties because they affect default constructor
                 // generation and bridging

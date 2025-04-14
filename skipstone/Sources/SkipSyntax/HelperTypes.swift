@@ -787,11 +787,11 @@ extension LabeledValue: Equatable, Hashable where V: Equatable, V: Hashable {
 /// Member and type modifiers.
 ///
 /// - Note: `Codable` for use in `CodebaseInfo`.
-struct Modifiers: PrettyPrintable, Codable {
+struct Modifiers: PrettyPrintable, Hashable, Codable {
     /// Visibility modifier.
     ///
     /// - Note: `Codable` for use in `CodebaseInfo`.
-    enum Visibility: Equatable, Comparable, Codable {
+    enum Visibility: Hashable, Comparable, Codable {
         case `private`
         case `fileprivate`
         case `default`

@@ -1506,8 +1506,12 @@ final class KotlinBridgeToKotlinVisitor {
         var swift: [String] = []
         var cdeclFunctions: [CDeclFunction] = []
 
-        let stateVariables: [(String, Attributes)] = classDeclaration.unbridgedMembers.compactMap {
-            guard case .swiftUIStateProperty(let name, let attributes) = $0 else {
+        let stateVariables: [(String, Attributes)] = classDeclaration.unbridgedMembers.compactMap { (unbridged: UnbridgedMember) -> (String, Attributes)? in
+            guard case .swiftUIStateProperty(let name, let attributes, let modifiers) = unbridged else {
+                return nil
+            }
+            guard modifiers.visibility >= .default else {
+                classDeclaration.messages.append(.kotlinBridgeStatePrivate(classDeclaration, property: name, source: syntaxTree.source))
                 return nil
             }
             return (name, attributes)
