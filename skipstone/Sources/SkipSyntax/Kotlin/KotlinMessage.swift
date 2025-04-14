@@ -74,6 +74,10 @@ extension Message {
         return Message(kind: .warning, message: "This file contains @Observables, but they will not be able to power your Android UI unless you 'import SkipFuse' or 'import SkipFuseUI'", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinBridgeStatePrivate(_ sourceDerived: SourceDerived, property: String, source: Source) -> Message {
+        return Message(kind: .error, message: "Private state property '\(property)' cannot be bridged to Android. Consider making this property internal", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinBridgeSuperclassBridging(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .error, message: "This release does not support bridging a compiled subclass of a transpiled type or vice versa", sourceDerived: sourceDerived, source: source)
     }
