@@ -3006,7 +3006,7 @@ final class KotlinTypeLiteral: KotlinExpression, KotlinCastTarget {
         var literal = self.literal
         if !literal.generics.isEmpty {
             if castTargetType == .typeErasedTarget {
-                literal = literal.withGenerics(literal.generics.map { _ in TypeSignature.none })
+                literal = literal.withGenerics(of: .none)
             }
         } else if castTargetType != .none, let signature = signature, !signature.generics.isEmpty {
             literal = literal.withGenerics(Array(repeating: TypeSignature.none, count: signature.generics.count))

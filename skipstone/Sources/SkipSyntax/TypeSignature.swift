@@ -773,6 +773,15 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         return self
     }
 
+    /// Convert all generic types to the given type.
+    func withGenerics(of type: TypeSignature) -> TypeSignature {
+        let generics = self.generics
+        guard !generics.isEmpty else {
+            return self
+        }
+        return withGenerics(generics.map { _ in type })
+    }
+
     private static func typealiasedWithGenerics(alias: Typealias, type: TypeSignature, generics: [TypeSignature]) -> TypeSignature {
         guard generics.count == alias.from.generics.count else {
             return .typealiased(alias, type.withGenerics(generics))

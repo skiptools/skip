@@ -2254,8 +2254,7 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
     private func appendEqualsBody(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
         output.append(" {\n")
         let bodyIndentation = indentation.inc()
-        let anyGenerics = parameters[1].declaredType.generics.map { _ in TypeSignature.none }
-        output.append(bodyIndentation).append("if (other !is \(parameters[1].declaredType.withGenerics(anyGenerics).kotlin)) {\n")
+        output.append(bodyIndentation).append("if (other !is \(parameters[1].declaredType.withGenerics(of: .any).kotlin)) {\n")
         output.append(bodyIndentation.inc()).append("return false\n")
         output.append(bodyIndentation).append("}\n")
         output.append(bodyIndentation).append("val \(parameters[0].internalLabel) = this\n")

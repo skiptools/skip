@@ -229,6 +229,7 @@ extension KotlinBridgeOptions {
 extension TypeSignature {
     static let anyDynamicObject: TypeSignature = .named("AnyDynamicObject", [])
     static let skipUIView: TypeSignature = .module("SkipUI", .named("View", []))
+    static let skipUIViewModifier: TypeSignature = .module("SkipUI", .named("ViewModifier", []))
     static let javaObjectPointer: TypeSignature = .named("JavaObjectPointer", [])
     static let javaString: TypeSignature = .named("JavaString", [])
     static func swiftObjectPointer(kotlin: Bool) -> TypeSignature {

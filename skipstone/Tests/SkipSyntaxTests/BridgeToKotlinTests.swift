@@ -5615,7 +5615,7 @@ final class BridgeToKotlinTests: XCTestCase {
                 return typeErased
             }
         }
-        private final class C_TypeErased {
+        private final class C_TypeErased : @unchecked Sendable {
             let genericvalue: Any
             let genericptr: SwiftObjectPointer
             init(_ value: AnyObject) {
@@ -5837,7 +5837,7 @@ final class BridgeToKotlinTests: XCTestCase {
                 return typeErased
             }
         }
-        private final class S_TypeErased {
+        private final class S_TypeErased : @unchecked Sendable {
             var genericvalue: Any
             init(_ value: Any) {
                 self.genericvalue = value
@@ -5986,7 +5986,7 @@ final class BridgeToKotlinTests: XCTestCase {
                 return typeErased
             }
         }
-        private final class E_TypeErased {
+        private final class E_TypeErased : @unchecked Sendable {
             let genericvalue: Any
             init(_ value: Any) {
                 self.genericvalue = value
@@ -6266,7 +6266,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
     func testBridgedView() async throws {
         try await check(swiftBridge: """
-        #if canImport(SkipSwiftUI)
+        #if canImport(SkipFuseUI)
         import SkipFuseUI
         #endif
         public struct V: View {
@@ -6483,6 +6483,20 @@ final class BridgeToKotlinTests: XCTestCase {
                 return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])
             }
         }
+        """, transformers: transformers)
+    }
+
+    func testGenericView() async throws {
+        try await check(swiftBridge: """
+        import SkipFuseUI
+        struct V<T>: View {
+            @State var t: T
+            var body: some View {
+                Text("Hello")
+            }
+        }
+        """, kotlin: """
+        """, swiftBridgeSupport: """
         """, transformers: transformers)
     }
 
@@ -6877,6 +6891,32 @@ final class BridgeToKotlinTests: XCTestCase {
                 return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])
             }
         }
+        """, transformers: transformers)
+    }
+
+    func testCustomModifier() async throws {
+        try await check(swiftBridge: """
+        import SkipFuseUI
+        struct VM : ViewModifier {
+            @State var count = 1
+            func body(content: Content) -> some View {
+                content.bold()
+            }
+        }
+        struct V: View {
+            var body: some View {
+                Text("Hello")
+                    .modifier(VM())
+                    .myModifier()
+            }
+        }
+        extension View {
+            public func myModifier() -> some View {
+                reutrn modifier(VM())
+            }
+        }
+        """, kotlin: """
+        """, swiftBridgeSupport: """
         """, transformers: transformers)
     }
 
