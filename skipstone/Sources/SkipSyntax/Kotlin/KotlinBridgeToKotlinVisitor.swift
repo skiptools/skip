@@ -187,16 +187,15 @@ final class KotlinBridgeToKotlinVisitor {
         // Getter
         let isInstance = classDeclaration != nil && !variableDeclaration.isStatic
         let isProtocolInstance = interfaceDeclaration != nil && !variableDeclaration.isStatic
-        let isBasicEnum = classDeclaration?.declarationType == .enumDeclaration && classDeclaration?.isSealedClassesEnum == false
-        let isNonGenericSealedClassesEnum = classDeclaration?.isSealedClassesEnum == true && classDeclaration?.generics.isEmpty != false
+        let classType = ClassType(classDeclaration)
         let getterArguments: String
         let getterParameters: String
-        if isInstance {
-            getterArguments = isNonGenericSealedClassesEnum ? "(javaClass.name)" : isBasicEnum ? "(name)" : "(Swift_peer)"
-            getterParameters = isNonGenericSealedClassesEnum ? "(className: String)" : isBasicEnum ? "(name: String)" : "(Swift_peer: skip.bridge.SwiftObjectPointer)"
-        } else if isProtocolInstance {
+        if isInstance, let classType {
+            getterArguments = "(\(classType.peerExternalArgument))"
+            getterParameters = "(\(classType.peerExternalParameter))"
+        } else if isProtocolInstance, let interfaceDeclaration {
             getterArguments = "(this)"
-            getterParameters = "(Java_iface: \(interfaceDeclaration!.name))"
+            getterParameters = "(Java_iface: \(interfaceDeclaration.name))"
         } else {
             getterArguments = "()"
             getterParameters = "()"
@@ -232,42 +231,31 @@ final class KotlinBridgeToKotlinVisitor {
         let valueString: String
         let optionsString = options.jconvertibleOptions
         if let classDeclaration {
-            if isInstance {
-                if !classDeclaration.generics.isEmpty {
-                    cdeclGetterBody.append("let peer_swift: \(classDeclaration.signature.typeErasedClass) = Swift_peer.pointee()!")
+            if isInstance, let classType {
+                cdeclInstanceParameters = [classType.peerSwiftParameter]
+                cdeclGetterBody.append(0, classType.peerSwiftAssignment(to: classDeclaration, optionsString: optionsString))
+                switch classType {
+                case .generic:
                     valueString = bridgable.type.convertToCDecl(value: "peer_swift.get_\(propertyName)()", strategy: bridgable.strategy, options: options)
-                } else if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
-                    cdeclGetterBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
-                    valueString = bridgable.type.convertToCDecl(value: "peer_swift.\(propertyName)", strategy: bridgable.strategy, options: options)
-                } else if isNonGenericSealedClassesEnum {
-                    cdeclGetterBody.append("let className_swift = String.fromJavaObject(className, options: \(optionsString))")
-                    cdeclGetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaClassName(className_swift, Java_target, options: \(optionsString))")
-                    valueString = bridgable.type.convertToCDecl(value: "peer_swift.\(propertyName)", strategy: bridgable.strategy, options: options)
-                } else if isBasicEnum {
-                    cdeclGetterBody.append("let name_swift = String.fromJavaObject(name, options: \(optionsString))")
-                    cdeclGetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaName(name_swift)")
-                    valueString = bridgable.type.convertToCDecl(value: "peer_swift.\(propertyName)", strategy: bridgable.strategy, options: options)
-                } else {
-                    cdeclGetterBody.append("let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!")
-                    valueString = bridgable.type.convertToCDecl(value: "peer_swift.value.\(propertyName)", strategy: bridgable.strategy, options: options)
+                default:
+                    valueString = bridgable.type.convertToCDecl(value: "\(classType.peerSwiftTarget).\(propertyName)", strategy: bridgable.strategy, options: options)
                 }
-                cdeclInstanceParameters = [cdeclInstanceParameter(for: classDeclaration)]
             } else {
-                valueString = bridgable.type.convertToCDecl(value: "\(classDeclaration.signature).\(propertyName)", strategy: bridgable.strategy, options: options)
                 cdeclInstanceParameters = []
+                valueString = bridgable.type.convertToCDecl(value: "\(classDeclaration.signature).\(propertyName)", strategy: bridgable.strategy, options: options)
             }
         } else if let interfaceDeclaration {
             if isProtocolInstance {
+                cdeclInstanceParameters = [TypeSignature.Parameter(label: "Java_iface", type: .javaObjectPointer)]
                 cdeclGetterBody.append("let peer_swift = AnyBridging.fromJavaObject(Java_iface, options: \(optionsString)) as! any \(interfaceDeclaration.name)")
                 valueString = bridgable.type.convertToCDecl(value: "peer_swift.\(propertyName)", strategy: bridgable.strategy, options: options)
-                cdeclInstanceParameters = [TypeSignature.Parameter(label: "Java_iface", type: .javaObjectPointer)]
             } else {
-                valueString = bridgable.type.convertToCDecl(value: "\(interfaceDeclaration.name).\(propertyName)", strategy: bridgable.strategy, options: options)
                 cdeclInstanceParameters = []
+                valueString = bridgable.type.convertToCDecl(value: "\(interfaceDeclaration.name).\(propertyName)", strategy: bridgable.strategy, options: options)
             }
         } else {
-            valueString = bridgable.type.convertToCDecl(value: propertyName, strategy: bridgable.strategy, options: options)
             cdeclInstanceParameters = []
+            valueString = bridgable.type.convertToCDecl(value: propertyName, strategy: bridgable.strategy, options: options)
         }
         if variableDeclaration.apiFlags.throwsType == .none {
             appendMainActorIsolated(&cdeclGetterBody, isolated: variableDeclaration.apiFlags.options.contains(.mainActor), isReturn: true) { body, indentation in
@@ -293,8 +281,8 @@ final class KotlinBridgeToKotlinVisitor {
             let setterArguments: String
             let setterInstanceParameter: String
             if isInstance {
-                setterArguments = isNonGenericSealedClassesEnum ? "javaClass.name, newValue\(castString)" : isBasicEnum ? "name, newValue\(castString)" : "Swift_peer, newValue\(castString)"
-                setterInstanceParameter = isNonGenericSealedClassesEnum ? "className: String, " : isBasicEnum ? "name: String, " : "Swift_peer: skip.bridge.SwiftObjectPointer, "
+                setterArguments = "\(classType?.peerExternalArgument ?? ""), newValue\(castString)"
+                setterInstanceParameter = "\(classType?.peerExternalParameter ?? ""), "
             } else if isProtocolInstance {
                 setterArguments = "this, newValue\(castString)"
                 setterInstanceParameter = "Java_iface: \(interfaceDeclaration!.name), "
@@ -310,25 +298,14 @@ final class KotlinBridgeToKotlinVisitor {
 
             var cdeclSetterBody: [String] = []
             let setValueString: String
-            if let classDeclaration {
+            if let classDeclaration, let classType {
                 if isInstance {
-                    if !classDeclaration.generics.isEmpty {
-                        cdeclSetterBody.append("let peer_swift: \(classDeclaration.signature.typeErasedClass) = Swift_peer.pointee()!")
+                    cdeclSetterBody.append(0, classType.peerSwiftAssignment(to: classDeclaration, optionsString: optionsString))
+                    switch classType {
+                    case .generic:
                         setValueString = "peer_swift.set_\(propertyName)(" + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options) + ")"
-                    } else if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
-                        cdeclSetterBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
-                        setValueString = "peer_swift.\(propertyName) = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options)
-                    } else if isNonGenericSealedClassesEnum {
-                        cdeclSetterBody.append("let className_swift = String.fromJavaObject(className, options: \(optionsString))")
-                        cdeclSetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaClassName(className_swift, Java_target, options: \(optionsString))")
-                        setValueString = "peer_swift.\(propertyName) = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options)
-                    } else if isBasicEnum {
-                        cdeclSetterBody.append("let name_swift = String.fromJavaObject(name, options: \(optionsString))")
-                        cdeclSetterBody.append("let peer_swift = \(classDeclaration.signature).fromJavaName(name_swift)")
-                        setValueString = "peer_swift.\(propertyName) = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options)
-                    } else {
-                        cdeclSetterBody.append("let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!")
-                        setValueString = "peer_swift.value.\(propertyName) = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options)
+                    default:
+                        setValueString = "\(classType.peerSwiftTarget).\(propertyName) = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options)
                     }
                 } else {
                     setValueString = "\(classDeclaration.signature).\(propertyName) = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options)
@@ -435,38 +412,21 @@ final class KotlinBridgeToKotlinVisitor {
             cdeclBody.append("let f_callback_swift = " + callbackType.convertFromCDecl(value: "f_callback", strategy: .direct, options: options))
         }
 
+        let classType = ClassType(classDeclaration)
         let swiftCallTarget: String
         var externalArgumentsString: String
         var swiftFunctionName = functionName
         let optionsString = options.jconvertibleOptions
-        if let classDeclaration, functionDeclaration.type != .constructorDeclaration {
+        if let classDeclaration, let classType, functionDeclaration.type != .constructorDeclaration {
             if functionDeclaration.isStatic {
                 swiftCallTarget = classDeclaration.name + "."
                 externalArgumentsString = ""
             } else {
-                if !classDeclaration.generics.isEmpty {
-                    cdeclBody.append("let peer_swift: \(classDeclaration.signature.typeErasedClass) = Swift_peer.pointee()!")
-                    swiftCallTarget = "peer_swift."
+                cdeclBody.append(0, classType.peerSwiftAssignment(to: classDeclaration, optionsString: optionsString))
+                swiftCallTarget = classType.peerSwiftTarget + "."
+                externalArgumentsString = classType.peerExternalArgument
+                if classType == .generic {
                     swiftFunctionName += uniquifier == nil ? "" : "_\(uniquifier!)"
-                    externalArgumentsString = "Swift_peer"
-                } else if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
-                    cdeclBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
-                    swiftCallTarget = "peer_swift."
-                    externalArgumentsString = "Swift_peer"
-                } else if classDeclaration.isSealedClassesEnum {
-                    cdeclBody.append("let className_swift = String.fromJavaObject(className, options: \(optionsString))")
-                    cdeclBody.append("let peer_swift = \(classDeclaration.signature).fromJavaClassName(className_swift, Java_target, options: \(optionsString))")
-                    swiftCallTarget = "peer_swift."
-                    externalArgumentsString = "javaClass.name"
-                } else if classDeclaration.declarationType == .enumDeclaration {
-                    cdeclBody.append("let name_swift = String.fromJavaObject(name, options: \(optionsString))")
-                    cdeclBody.append("let peer_swift = \(classDeclaration.signature).fromJavaName(name_swift)")
-                    swiftCallTarget = "peer_swift."
-                    externalArgumentsString = "name"
-                } else {
-                    cdeclBody.append("let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!")
-                    swiftCallTarget = "peer_swift.value."
-                    externalArgumentsString = "Swift_peer"
                 }
             }
         } else if let interfaceDeclaration {
@@ -517,7 +477,7 @@ final class KotlinBridgeToKotlinVisitor {
             }
             if isThrows {
                 cdeclBody.append("do {")
-                if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
+                if classType == .reference {
                     cdeclBody.append(1, "let f_return_swift = try \(classDeclaration.signature)\(swiftArgumentsString)")
                 } else {
                     cdeclBody.append(1, "let f_return_swift = try SwiftValueTypeBox(\(classDeclaration.signature)\(swiftArgumentsString))")
@@ -528,9 +488,9 @@ final class KotlinBridgeToKotlinVisitor {
                 cdeclBody.append(1, "return SwiftObjectNil")
                 cdeclBody.append("}")
             } else {
-                if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
+                if classType == .reference {
                     cdeclBody.append("let f_return_swift = \(classDeclaration.signature)\(swiftArgumentsString)")
-                } else if isMutableStructCopyConstructor && !classDeclaration.generics.isEmpty {
+                } else if isMutableStructCopyConstructor && classType == .generic {
                     // Create a new type-erased wrapper using the original instance
                     cdeclBody.append("let ptr = SwiftObjectPointer.peer(of: p_0, options: \(optionsString))")
                     cdeclBody.append("let peer_swift: \(classDeclaration.signature.typeErasedClass) = ptr.pointee()!")
@@ -644,16 +604,8 @@ final class KotlinBridgeToKotlinVisitor {
 
         var externalFunctionDeclaration = "private external fun \(externalName)("
         var externalParametersString: String
-        if classDeclaration != nil, functionDeclaration.type != .constructorDeclaration && !functionDeclaration.isStatic {
-            if classDeclaration?.generics.isEmpty == false {
-                externalParametersString = "Swift_peer: skip.bridge.SwiftObjectPointer"
-            } else if classDeclaration?.isSealedClassesEnum == true {
-                externalParametersString = "className: String"
-            } else if classDeclaration?.declarationType == .enumDeclaration {
-                externalParametersString = "name: String"
-            } else {
-                externalParametersString = "Swift_peer: skip.bridge.SwiftObjectPointer"
-            }
+        if let classType, functionDeclaration.type != .constructorDeclaration && !functionDeclaration.isStatic {
+            externalParametersString = classType.peerExternalParameter
         } else if let interfaceDeclaration, !functionDeclaration.isStatic {
             externalParametersString = "Java_iface: \(interfaceDeclaration.name)"
         } else {
@@ -688,7 +640,7 @@ final class KotlinBridgeToKotlinVisitor {
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: isCompanionCall, name: externalName, translator: translator)
         let instanceParameter: [TypeSignature.Parameter]
-        if classDeclaration != nil && functionDeclaration.type != .constructorDeclaration && !functionDeclaration.isStatic { instanceParameter = [cdeclInstanceParameter(for: classDeclaration!)]
+        if let classType, functionDeclaration.type != .constructorDeclaration && !functionDeclaration.isStatic { instanceParameter = [classType.peerSwiftParameter]
         } else if interfaceDeclaration != nil, !functionDeclaration.isStatic {
             instanceParameter = [TypeSignature.Parameter(label: "Java_iface", type: .javaObjectPointer)]
         } else {
@@ -719,8 +671,7 @@ final class KotlinBridgeToKotlinVisitor {
 
     private func updateEqualsDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration) {
         functionDeclaration.extras = nil
-        let anyGenerics = classDeclaration.signature.generics.map { _ in TypeSignature.any }
-        let classWithAnyGenerics = classDeclaration.signature.withGenerics(anyGenerics)
+        let classWithAnyGenerics = classDeclaration.signature.withGenerics(of: .any)
         let bodySourceCode: [String]
         if functionDeclaration.isKotlinEqualImplementation {
             // equals(other:)
@@ -821,16 +772,18 @@ final class KotlinBridgeToKotlinVisitor {
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_hashvalue(Swift_peer: skip.bridge.SwiftObjectPointer): Long")
         classDeclaration.insert(statements: [externalFunctionDeclaration], after: functionDeclaration)
 
+        let classType = ClassType(classDeclaration)
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: false, name: "Swift_hashvalue", translator: translator)
-        let cdeclType: TypeSignature = .function([cdeclInstanceParameter(for: classDeclaration)], .int64, APIFlags(), nil)
+        let cdeclType: TypeSignature = .function([classType.peerSwiftParameter], .int64, APIFlags(), nil)
         var cdeclBody: [String] = []
-        if !classDeclaration.generics.isEmpty {
+        switch ClassType(classDeclaration) {
+        case .generic:
             cdeclBody.append("let peer_swift: \(classDeclaration.signature.typeErasedClass) = Swift_peer.pointee()!")
             cdeclBody.append("return Int64((peer_swift.genericvalue as! (any Hashable)).hashValue)")
-        } else if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
+        case .reference:
             cdeclBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
             cdeclBody.append("return Int64(peer_swift.hashValue)")
-        } else {
+        default:
             cdeclBody.append("let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!")
             cdeclBody.append("return Int64(peer_swift.value.hashValue)")
         }
@@ -848,16 +801,17 @@ final class KotlinBridgeToKotlinVisitor {
         hash.isGenerated = true
         hash.parent = classDeclaration
 
+        let classType = ClassType(classDeclaration)
         let statements: [KotlinStatement]
         let sourceCode: [String]
         let cdeclFunction: CDeclFunction?
-        if !classDeclaration.generics.isEmpty, classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
+        if classType == .generic, classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
             let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_hashvalue(Swift_peer: skip.bridge.SwiftObjectPointer): Long")
             statements = [hash, externalFunctionDeclaration]
             sourceCode = ["return Swift_hashvalue(Swift_peer).hashCode()"]
 
             let (cdecl, cdeclName) = CDeclFunction.declaration(for: hash, isCompanion: false, name: "Swift_hashvalue", translator: translator)
-            let cdeclType: TypeSignature = .function([cdeclInstanceParameter(for: classDeclaration)], .int64, APIFlags(), nil)
+            let cdeclType: TypeSignature = .function([classType.peerSwiftParameter], .int64, APIFlags(), nil)
             cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: [
                 "let peer_swift: \(classDeclaration.signature.typeErasedClass) = Swift_peer.pointee()!",
                 "return Int64(peer_swift.genericptr.hashValue)"
@@ -1007,7 +961,8 @@ final class KotlinBridgeToKotlinVisitor {
         // We'll be adding constructors, so we can't use a superclass call. Transform it into a call to super(...)
         // that we can add as a delegating call to each constructor. If this is a sealed classes enum, though, we
         // keep the superclass call because we won't add constructors. This is most common for Error enums calling Exception()
-        let isNonGenericEnum = classDeclaration.declarationType == .enumDeclaration && classDeclaration.generics.isEmpty
+        let classType = ClassType(classDeclaration)
+        let isNonGenericEnum = classType == .sealedClassesEnum || classType == .enum
         let superclassCall: String?
         var clearSuperclassCall = false
         if isNonGenericEnum {
@@ -1024,11 +979,15 @@ final class KotlinBridgeToKotlinVisitor {
         }
 
         let isError = classDeclaration.inherits.first?.isNamed("Exception") == true && classDeclaration.inherits.contains { $0.isNamed("Error", moduleName: "Swift", generics: []) }
-        var isView = false
+        var swiftUIType: SwiftUIType = .none
         let mappedInherits: [TypeSignature] = classDeclaration.inherits.compactMap {
             guard !includesUI || (!$0.isNamed("View", moduleName: "SwiftUI", generics: []) && !$0.isNamed("View", moduleName: "SkipSwiftUI", generics: [])) else {
-                isView = true
+                swiftUIType = .view
                 return .skipUIView
+            }
+            guard !includesUI || (!$0.isNamed("ViewModifier", moduleName: "SwiftUI", generics: []) && !$0.isNamed("ViewModifier", moduleName: "SkipSwiftUI", generics: [])) else {
+                swiftUIType = .viewModifier
+                return .skipUIViewModifier
             }
             if (classDeclaration.declarationType == .actorDeclaration && $0.isNamed("Actor"))
                 || (isError && $0.isNamed("Exception"))
@@ -1042,7 +1001,7 @@ final class KotlinBridgeToKotlinVisitor {
                 return nil
             }
         }
-        if isView && classDeclaration.modifiers.visibility == .private {
+        if swiftUIType != .none && classDeclaration.modifiers.visibility == .private {
             classDeclaration.messages.append(.kotlinBridgeViewPrivate(classDeclaration, source: syntaxTree.source))
             return false
         }
@@ -1103,7 +1062,7 @@ final class KotlinBridgeToKotlinVisitor {
                 insertStatements.append(release)
             }
 
-            if !isView && !classDeclaration.unbridgedMembers.suppressDefaultConstructorGeneration && classDeclaration.generics.isEmpty && !classDeclaration.members.contains(where: { $0.type == .constructorDeclaration }) {
+            if swiftUIType == .none && !classDeclaration.unbridgedMembers.suppressDefaultConstructorGeneration && classType != .generic && !classDeclaration.members.contains(where: { $0.type == .constructorDeclaration }) {
                 let constructor = KotlinFunctionDeclaration(name: "constructor")
                 constructor.modifiers.visibility = .public
                 if subclassDepth < 1 {
@@ -1127,7 +1086,7 @@ final class KotlinBridgeToKotlinVisitor {
 
                 let constructorCdecl = CDeclFunction.declaration(for: classDeclaration, isCompanion: subclassDepth >= 1, name: externalConstructorName, translator: translator)
                 var constructorBody: [String] = []
-                if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
+                if classType == .reference {
                     constructorBody.append("let f_return_swift = \(classDeclaration.signature)()")
                 } else {
                     constructorBody.append("let f_return_swift = SwiftValueTypeBox(\(classDeclaration.signature)())")
@@ -1151,14 +1110,15 @@ final class KotlinBridgeToKotlinVisitor {
 
                 let releaseCdecl = CDeclFunction.declaration(for: classDeclaration, isCompanion: false, name: "Swift_release", translator: translator)
                 var releaseBody: [String] = []
-                if !classDeclaration.generics.isEmpty {
+                switch classType {
+                case .generic:
                     releaseBody.append("Swift_peer.release(as: \(classDeclaration.signature.typeErasedClass).self)")
-                } else if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
+                case .reference:
                     releaseBody.append("Swift_peer.release(as: \(classDeclaration.signature).self)")
-                } else {
+                default:
                     releaseBody.append("Swift_peer.release(as: SwiftValueTypeBox<\(classDeclaration.signature)>.self)")
                 }
-                cdeclFunctions.append(CDeclFunction(name: releaseCdecl.cdeclFunctionName, cdecl: releaseCdecl.cdecl, signature: .function([cdeclInstanceParameter(for: classDeclaration)], .void, APIFlags(), nil), body: releaseBody))
+                cdeclFunctions.append(CDeclFunction(name: releaseCdecl.cdeclFunctionName, cdecl: releaseCdecl.cdecl, signature: .function([classType.peerSwiftParameter], .void, APIFlags(), nil), body: releaseBody))
             }
         }
 
@@ -1172,14 +1132,17 @@ final class KotlinBridgeToKotlinVisitor {
             if let enumCaseDeclaration = member as? KotlinEnumCaseDeclaration {
                 enumCases.append(enumCaseDeclaration)
             } else if let variableDeclaration = member as? KotlinVariableDeclaration {
-                if isView && variableDeclaration.propertyName == "body" {
+                if swiftUIType == .view && variableDeclaration.propertyName == "body" {
                     // We substitute our own body
                     classDeclaration.remove(statement: variableDeclaration)
                 } else if update(variableDeclaration, in: classDeclaration) {
                     bridgedVariableDeclarations.append(variableDeclaration)
                 }
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
-                if functionDeclaration.isEqualImplementation || functionDeclaration.isKotlinEqualImplementation {
+                if swiftUIType == .viewModifier && functionDeclaration.name == "body" && functionDeclaration.parameters.count == 1 && functionDeclaration.parameters[0].externalLabel == "content" {
+                    // We substitute our own body
+                    classDeclaration.remove(statement: functionDeclaration)
+                } else if functionDeclaration.isEqualImplementation || functionDeclaration.isKotlinEqualImplementation {
                     updateEqualsDeclaration(functionDeclaration, in: classDeclaration)
                     bridgedFunctionDeclarations.append((functionDeclaration, nil))
                     hasEqualsDeclaration = true
@@ -1217,10 +1180,12 @@ final class KotlinBridgeToKotlinVisitor {
 
         let isEmptyEnum = classDeclaration.declarationType == .enumDeclaration && enumCases.isEmpty
         let finalMemberVisibility = min(classDeclaration.modifiers.visibility, .public)
+        var swiftUIStateVariables: [(String, Attributes)] = []
         var additionalSwiftDeclarations: [String] = []
         var additionalCDeclFunctions: [CDeclFunction] = []
-        if isView {
-            let (statements, swift, cdeclFunctions) = addViewImplementation(to: classDeclaration, visibility: finalMemberVisibility)
+        if swiftUIType != .none {
+            let (stateVariables, statements, swift, cdeclFunctions) = addSwiftUIImplementation(swiftUIType, to: classDeclaration, visibility: finalMemberVisibility)
+            swiftUIStateVariables = stateVariables
             insertStatements += statements
             additionalSwiftDeclarations += swift
             additionalCDeclFunctions += cdeclFunctions
@@ -1248,8 +1213,10 @@ final class KotlinBridgeToKotlinVisitor {
             if classDeclaration.declarationType == .classDeclaration, classDeclaration.modifiers.isFinal || !classDeclaration.generics.isEmpty {
                 conformances += ", BridgedFinalClass"
             }
-            if isView {
+            if swiftUIType == .view {
                 conformances += ", SkipUIBridging, SkipUI.View"
+            } else if swiftUIType == .viewModifier {
+                conformances += ", SkipUI.ViewModifier"
             }
         }
         var swift: [String] = []
@@ -1270,12 +1237,13 @@ final class KotlinBridgeToKotlinVisitor {
                 if subclassDepth < 1 {
                     swift.append(1, "\(finalMemberVisibilityString)static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {")
                     swift.append(2, "let ptr = SwiftObjectPointer.peer(of: obj!, options: options)")
-                    if !classDeclaration.generics.isEmpty {
+                    switch classType {
+                    case .generic:
                         swift.append(2, "let typeErased: \(classDeclaration.signature.typeErasedClass) = ptr.pointee()!")
                         swift.append(2, "return typeErased.genericvalue as! Self")
-                    } else if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
+                    case .reference:
                         swift.append(2, "return ptr.pointee()!")
-                    } else {
+                    default:
                         swift.append(2, "let box: SwiftValueTypeBox<Self> = ptr.pointee()!")
                         swift.append(2, "return box.value")
                     }
@@ -1283,12 +1251,13 @@ final class KotlinBridgeToKotlinVisitor {
 
                     let isolation = classDeclaration.declarationType == .actorDeclaration ? "nonisolated " : ""
                     swift.append(1, "\(finalMemberVisibilityString)\(isolation)func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {")
-                    if !classDeclaration.generics.isEmpty {
+                    switch classType {
+                    case .generic:
                         swift.append(2, "let typeErased = toTypeErased()")
                         swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: typeErased, retain: true)")
-                    } else if classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
+                    case .reference:
                         swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)")
-                    } else {
+                    default:
                         swift.append(2, "let box = SwiftValueTypeBox(self)")
                         swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: box, retain: true)")
                     }
@@ -1319,7 +1288,7 @@ final class KotlinBridgeToKotlinVisitor {
         swiftDefinitions.append(swiftDefinition)
 
         if !classDeclaration.generics.isEmpty {
-            swiftDefinitions.append(typeErasedPeerSwift(for: classDeclaration, variableDeclarations: bridgedVariableDeclarations, functionDeclarations: bridgedFunctionDeclarations, visibility: finalMemberVisibility))
+            swiftDefinitions.append(typeErasedPeerSwift(for: classDeclaration, variableDeclarations: bridgedVariableDeclarations, functionDeclarations: bridgedFunctionDeclarations, swiftUIType: swiftUIType, stateVariables: swiftUIStateVariables, visibility: finalMemberVisibility))
         }
 
         let customProjection: [String]? = classDeclaration.generics.isEmpty ? nil : [
@@ -1335,18 +1304,18 @@ final class KotlinBridgeToKotlinVisitor {
         return true
     }
 
-    private func typeErasedPeerSwift(for classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], functionDeclarations: [(KotlinFunctionDeclaration, uniquifier: Int?)], visibility: Modifiers.Visibility) -> SwiftDefinition {
+    private func typeErasedPeerSwift(for classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], functionDeclarations: [(KotlinFunctionDeclaration, uniquifier: Int?)], swiftUIType: SwiftUIType, stateVariables: [(String, Attributes)], visibility: Modifiers.Visibility) -> SwiftDefinition {
         let visibilityString = visibility.swift(suffix: " ")
         var swift: [String] = []
         swift.append("extension \(classDeclaration.signature.withGenerics([])): TypeErasedConvertible {")
         swift.append(1, "\(visibilityString)func toTypeErased() -> AnyObject {")
         swift.append(2, "let typeErased = \(classDeclaration.signature.typeErasedClass)(self)")
-        swift.append(2, typeErasedClosureSwift(for: classDeclaration, to: "typeErased", variableDeclarations: variableDeclarations, functionDeclarations: functionDeclarations))
+        swift.append(2, typeErasedClosureSwift(for: classDeclaration, to: "typeErased", variableDeclarations: variableDeclarations, functionDeclarations: functionDeclarations, swiftUIType: swiftUIType, stateVariables: stateVariables))
         swift.append(2, "return typeErased")
         swift.append(1, "}")
         swift.append("}")
 
-        swift.append("private final class \(classDeclaration.signature.typeErasedClass) {")
+        swift.append("private final class \(classDeclaration.signature.typeErasedClass) : @unchecked Sendable {")
         if classDeclaration.inherits.contains(.named("MutableStruct", [])) {
             swift.append(1, "var genericvalue: Any")
         } else {
@@ -1421,11 +1390,26 @@ final class KotlinBridgeToKotlinVisitor {
             let mainActorString = isLessThanDeclaration.apiFlags.options.contains(.mainActor) ? "@MainActor " : ""
             swift.append(1, "var islessthan: (\(mainActorString)(Any) -> Bool)!")
         }
+
+        if swiftUIType == .view {
+            swift.append(1, "var body: (@MainActor () -> Any)!")
+        } else if swiftUIType != .none {
+            swift.append(1, "var body: (@MainActor (JavaBackedView) -> Any)!")
+        }
+        for (name, attributes) in stateVariables {
+            if attributes.stateAttribute != nil || attributes.contains(.focusState) || attributes.contains(.gestureState) || attributes.contains(.appStorage) {
+                swift.append(1, "var Java_initState_\(name): (() -> SkipUI.StateSupport)!")
+                swift.append(1, "var Java_syncState_\(name): ((SkipUI.StateSupport) -> Void)!")
+            } else if attributes.environmentAttribute != nil {
+                swift.append(1, "var Java_initEnvironment_\(name): (() -> String)!")
+                swift.append(1, "var Java_syncEnvironment_\(name): ((SkipUI.EnvironmentSupport?) -> Void)!")
+            }
+        }
         swift.append("}")
         return SwiftDefinition(swift: swift)
     }
 
-    private func typeErasedClosureSwift(for classDeclaration: KotlinClassDeclaration, to target: String, variableDeclarations: [KotlinVariableDeclaration], functionDeclarations: [(KotlinFunctionDeclaration, uniquifier: Int?)]) -> [String] {
+    private func typeErasedClosureSwift(for classDeclaration: KotlinClassDeclaration, to target: String, variableDeclarations: [KotlinVariableDeclaration], functionDeclarations: [(KotlinFunctionDeclaration, uniquifier: Int?)], swiftUIType: SwiftUIType, stateVariables: [(String, Attributes)]) -> [String] {
         var swift: [String] = []
         for variableDeclaration in variableDeclarations {
             let tryString = variableDeclaration.apiFlags.throwsType != .none ? "try " : ""
@@ -1498,10 +1482,25 @@ final class KotlinBridgeToKotlinVisitor {
         if hasIsLessThan {
             swift.append(1, "\(target).islessthan = { [unowned \(target)] in (\(target).genericvalue as! Self) < $0 as! Self }")
         }
+
+        if swiftUIType == .view {
+            swift.append("\(target).body = { [unowned \(target)] in (\(target).genericvalue as! Self).body }")
+        } else if swiftUIType != .none {
+            swift.append("\(target).body = { [unowned \(target)] in (\(target).genericvalue as! Self).body($0) }")
+        }
+        for (name, attributes) in stateVariables {
+            if attributes.stateAttribute != nil || attributes.contains(.focusState) || attributes.contains(.gestureState) || attributes.contains(.appStorage) {
+                swift.append("\(target).Java_initState_\(name) = { [unowned \(target)] in (\(target).genericvalue as! Self).Java_initState_\(name)() }")
+                swift.append("\(target).Java_syncState_\(name) = { [unowned \(target)] in (\(target).genericvalue as! Self).Java_syncState_\(name)(support: $0) }")
+            } else if attributes.environmentAttribute != nil {
+                swift.append("\(target).Java_initEnvironment_\(name) = { [unowned \(target)] in (\(target).genericvalue as! Self).Java_initEnvironment_\(name)() }")
+                swift.append("\(target).Java_syncEnvironment_\(name) = { [unowned \(target)] in (\(target).genericvalue as! Self).Java_syncEnvironment_\(name)(support: $0) }")
+            }
+        }
         return swift
     }
 
-    private func addViewImplementation(to classDeclaration: KotlinClassDeclaration, visibility: Modifiers.Visibility) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func addSwiftUIImplementation(_ swiftUIType: SwiftUIType, to classDeclaration: KotlinClassDeclaration, visibility: Modifiers.Visibility) -> (stateVariables: [(String, Attributes)], statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         var statements: [KotlinStatement] = []
         var swift: [String] = []
         var cdeclFunctions: [CDeclFunction] = []
@@ -1517,7 +1516,7 @@ final class KotlinBridgeToKotlinVisitor {
             return (name, attributes)
         }
         if !stateVariables.isEmpty {
-            statements += viewComposeContent(for: classDeclaration, stateVariables: stateVariables)
+            statements += swiftUIComposeContent(swiftUIType, for: classDeclaration, stateVariables: stateVariables)
             for (name, attributes) in stateVariables {
                 var initStatements: [KotlinStatement] = []
                 var syncStatements: [KotlinStatement] = []
@@ -1535,11 +1534,11 @@ final class KotlinBridgeToKotlinVisitor {
                         supportTypeName = "StateSupport"
                         boxName = "valueBox"
                     }
-                    (initStatements, initSwift, initCdeclFunctions) = viewInitState(for: name, in: classDeclaration, supportTypeName: supportTypeName, boxName: boxName)
-                    (syncStatements, syncSwift, syncCdeclFunctions) = viewSyncState(for: name, in: classDeclaration, supportTypeName: supportTypeName, boxName: boxName)
+                    (initStatements, initSwift, initCdeclFunctions) = swiftUIInitState(for: name, in: classDeclaration, supportTypeName: supportTypeName, boxName: boxName)
+                    (syncStatements, syncSwift, syncCdeclFunctions) = swiftUISyncState(for: name, in: classDeclaration, supportTypeName: supportTypeName, boxName: boxName)
                 } else if attributes.environmentAttribute != nil {
-                    (initStatements, initSwift, initCdeclFunctions) = viewInitEnvironment(for: name, in: classDeclaration)
-                    (syncStatements, syncSwift, syncCdeclFunctions) = viewSyncEnvironment(for: name, in: classDeclaration)
+                    (initStatements, initSwift, initCdeclFunctions) = swiftUIInitEnvironment(for: name, in: classDeclaration)
+                    (syncStatements, syncSwift, syncCdeclFunctions) = swiftUISyncEnvironment(for: name, in: classDeclaration)
                 }
                 statements += initStatements + syncStatements
                 swift += initSwift + syncSwift
@@ -1547,48 +1546,52 @@ final class KotlinBridgeToKotlinVisitor {
             }
         }
 
-        let (bodyStatements, bodySwift, bodyCdeclFunctions) = viewBodyImplementation(for: classDeclaration, visibility: visibility)
+        let (bodyStatements, bodySwift, bodyCdeclFunctions) = swiftUIBodyImplementation(swiftUIType, for: classDeclaration, visibility: visibility)
         statements += bodyStatements
         swift += bodySwift
         cdeclFunctions += bodyCdeclFunctions
 
-        return (statements, swift, cdeclFunctions)
+        return (stateVariables, statements, swift, cdeclFunctions)
     }
 
-    private func viewComposeContent(for classDeclaration: KotlinClassDeclaration, stateVariables: [(name: String, attributes: Attributes)]) -> [KotlinStatement] {
-        let functionDeclaration = KotlinFunctionDeclaration(name: "ComposeContent")
-        functionDeclaration.parameters = [Parameter<KotlinExpression>(externalLabel: "composectx", declaredType: .named("skip.ui.ComposeContext", []))]
+    private func swiftUIComposeContent(_ swiftUIType: SwiftUIType, for classDeclaration: KotlinClassDeclaration, stateVariables: [(name: String, attributes: Attributes)]) -> [KotlinStatement] {
+        let functionName = swiftUIType == .view ? "ComposeContent" : "Compose"
+        let functionDeclaration = KotlinFunctionDeclaration(name: functionName)
+        if swiftUIType == .view {
+            functionDeclaration.parameters = [Parameter<KotlinExpression>(externalLabel: "composectx", declaredType: .named("skip.ui.ComposeContext", []))]
+        } else {
+            functionDeclaration.parameters = [Parameter<KotlinExpression>(externalLabel: "content", declaredType: .named("skip.ui.View", [])), Parameter<KotlinExpression>(externalLabel: "composectx", declaredType: .named("skip.ui.ComposeContext", []))]
+        }
         functionDeclaration.modifiers = Modifiers(visibility: .public, isOverride: true)
         functionDeclaration.attributes.attributes.append(Attribute(signature: .named("androidx.compose.runtime.Composable", [])))
         functionDeclaration.extras = .singleNewline
+
+        let classType = ClassType(classDeclaration)
         var bodyKotlin: [String] = []
         for (name, attributes) in stateVariables {
             if attributes.stateAttribute != nil || attributes.contains(.focusState) || attributes.contains(.gestureState) || attributes.contains(.appStorage) {
                 let supportTypeName = attributes.contains(.appStorage) ? "AppStorageSupport" : "StateSupport"
-                bodyKotlin.append("val remembered\(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.\(supportTypeName), Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_\(name)(Swift_peer)) }")
-                bodyKotlin.append("Swift_syncState_\(name)(Swift_peer, remembered\(name).value)")
-            } else if attributes.contains(.appStorage) {
-                bodyKotlin.append("val remembered\(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.AppStorageSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_\(name)(Swift_peer)) }")
-                bodyKotlin.append("Swift_syncState_\(name)(Swift_peer, remembered\(name).value)")
+                bodyKotlin.append("val remembered\(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.\(supportTypeName), Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_\(name)(\(classType.peerExternalArgument))) }")
+                bodyKotlin.append("Swift_syncState_\(name)(\(classType.peerExternalArgument), remembered\(name).value)")
             } else if attributes.environmentAttribute != nil {
-                bodyKotlin.append("val envkey\(name) = Swift_initEnvironment_\(name)(Swift_peer)")
+                bodyKotlin.append("val envkey\(name) = Swift_initEnvironment_\(name)(\(classType.peerExternalArgument))")
                 bodyKotlin.append("val envvalue\(name) = skip.ui.EnvironmentValues.shared.bridged(envkey\(name))")
-                bodyKotlin.append("Swift_syncEnvironment_\(name)(Swift_peer, envvalue\(name))")
+                bodyKotlin.append("Swift_syncEnvironment_\(name)(\(classType.peerExternalArgument), envvalue\(name))")
             }
         }
-        bodyKotlin.append("super.ComposeContent(composectx)")
+        if swiftUIType == .view {
+            bodyKotlin.append("super.ComposeContent(composectx)")
+        } else {
+            bodyKotlin.append("super.Compose(content, composectx)")
+        }
         functionDeclaration.body = KotlinCodeBlock(statements: bodyKotlin.map { KotlinRawStatement(sourceCode: $0) })
         return [functionDeclaration]
     }
 
-    private func viewInitState(for name: String, in classDeclaration: KotlinClassDeclaration, supportTypeName: String, boxName: String) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func swiftUIInitState(for name: String, in classDeclaration: KotlinClassDeclaration, supportTypeName: String, boxName: String) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+        let classType = ClassType(classDeclaration)
         let externalName = "Swift_initState_\(name)"
-        let externalSourceCode: String
-        if classDeclaration.declarationType == .enumDeclaration {
-            externalSourceCode = "private external fun \(externalName)(): skip.ui.\(supportTypeName)"
-        } else {
-            externalSourceCode = "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.\(supportTypeName)"
-        }
+        let externalSourceCode = "private external fun \(externalName)(\(classType.peerExternalParameter)): skip.ui.\(supportTypeName)"
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: externalSourceCode)
         externalFunctionDeclaration.parent = classDeclaration
 
@@ -1598,33 +1601,18 @@ final class KotlinBridgeToKotlinVisitor {
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
-        let cdeclSignature: TypeSignature
-        let cdeclSource: [String]
-        if classDeclaration.declarationType == .enumDeclaration {
-            cdeclSignature = .function([], .javaObjectPointer, APIFlags(), nil)
-            cdeclSource = [
-                "let peer_swift = \(classDeclaration.signature).fromJavaObject(Java_target, options: [])",
-                "return peer_swift.Java_initState_\(name)().toJavaObject(options: [])!"
-            ]
-        } else {
-            cdeclSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))], .javaObjectPointer, APIFlags(), nil)
-            cdeclSource = [
-                "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
-                "return peer_swift.value.Java_initState_\(name)().toJavaObject(options: [])!"
-            ]
-        }
+        let cdeclSignature: TypeSignature = .function([classType.peerSwiftParameter], .javaObjectPointer, APIFlags(), nil)
+        let cdeclSource = classType.peerSwiftAssignment(to: classDeclaration, optionsString: "[]") + [
+            "return \(classType.peerSwiftTarget).Java_initState_\(name)().toJavaObject(options: [])!"
+        ]
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
-    private func viewSyncState(for name: String, in classDeclaration: KotlinClassDeclaration, supportTypeName: String, boxName: String) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func swiftUISyncState(for name: String, in classDeclaration: KotlinClassDeclaration, supportTypeName: String, boxName: String) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+        let classType = ClassType(classDeclaration)
         let externalName = "Swift_syncState_\(name)"
-        let externalSourceCode: String
-        if classDeclaration.declarationType == .enumDeclaration {
-            externalSourceCode = "private external fun \(externalName)(support: skip.ui.\(supportTypeName))"
-        } else {
-            externalSourceCode = "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.\(supportTypeName))"
-        }
+        let externalSourceCode = "private external fun \(externalName)(\(classType.peerExternalParameter), support: skip.ui.\(supportTypeName))"
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: externalSourceCode)
         externalFunctionDeclaration.parent = classDeclaration
 
@@ -1634,35 +1622,20 @@ final class KotlinBridgeToKotlinVisitor {
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
-        let cdeclSignature: TypeSignature
-        let cdeclSource: [String]
-        if classDeclaration.declarationType == .enumDeclaration {
-            cdeclSignature = .function([TypeSignature.Parameter(label: "support", type: .javaObjectPointer)], .void, APIFlags(), nil)
-            cdeclSource = [
-                "let peer_swift = \(classDeclaration.signature).fromJavaObject(Java_target, options: [])",
-                "let support_swift = SkipUI.\(supportTypeName).fromJavaObject(support, options: [])",
-                "peer_swift.Java_syncState_\(name)(support: support_swift)"
-            ]
-        } else {
-            cdeclSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false)), TypeSignature.Parameter(label: "support", type: .javaObjectPointer)], .void, APIFlags(), nil)
-            cdeclSource = [
-                "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
-                "let support_swift = SkipUI.\(supportTypeName).fromJavaObject(support, options: [])",
-                "peer_swift.value.Java_syncState_\(name)(support: support_swift)"
-            ]
-        }
+        let cdeclSignature: TypeSignature = .function([classType.peerSwiftParameter, TypeSignature.Parameter(label: "support", type: .javaObjectPointer)], .void, APIFlags(), nil)
+        let argumentString = classType == .generic ? "support_swift" : "support: support_swift"
+        let cdeclSource = classType.peerSwiftAssignment(to: classDeclaration, optionsString: "[]") + [
+            "let support_swift = SkipUI.\(supportTypeName).fromJavaObject(support, options: [])",
+            "\(classType.peerSwiftTarget).Java_syncState_\(name)(\(argumentString))"
+        ]
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
-    private func viewInitEnvironment(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func swiftUIInitEnvironment(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+        let classType = ClassType(classDeclaration)
         let externalName = "Swift_initEnvironment_\(name)"
-        let externalSourceCode: String
-        if classDeclaration.declarationType == .enumDeclaration {
-            externalSourceCode = "private external fun \(externalName)(): String"
-        } else {
-            externalSourceCode = "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer): String"
-        }
+        let externalSourceCode = "private external fun \(externalName)(\(classType.peerExternalParameter)): String"
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: externalSourceCode)
         externalFunctionDeclaration.parent = classDeclaration
 
@@ -1672,33 +1645,18 @@ final class KotlinBridgeToKotlinVisitor {
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
-        let cdeclSignature: TypeSignature
-        let cdeclSource: [String]
-        if classDeclaration.declarationType == .enumDeclaration {
-            cdeclSignature = .function([], .javaString, APIFlags(), nil)
-            cdeclSource = [
-                "let peer_swift = \(classDeclaration.signature).fromJavaObject(Java_target, options: [])",
-                "return peer_swift.Java_initEnvironment_\(name)().toJavaObject(options: [])!"
-            ]
-        } else {
-            cdeclSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))], .javaString, APIFlags(), nil)
-            cdeclSource = [
-                "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
-                "return peer_swift.value.Java_initEnvironment_\(name)().toJavaObject(options: [])!"
-            ]
-        }
+        let cdeclSignature: TypeSignature = .function([classType.peerSwiftParameter], .javaString, APIFlags(), nil)
+        let cdeclSource = classType.peerSwiftAssignment(to: classDeclaration, optionsString: "[]") + [
+            "return \(classType.peerSwiftTarget).Java_initEnvironment_\(name)().toJavaObject(options: [])!"
+        ]
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
-    private func viewSyncEnvironment(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func swiftUISyncEnvironment(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+        let classType = ClassType(classDeclaration)
         let externalName = "Swift_syncEnvironment_\(name)"
-        let externalSourceCode: String
-        if classDeclaration.declarationType == .enumDeclaration {
-            externalSourceCode = "private external fun \(externalName)(support: skip.ui.EnvironmentSupport?)"
-        } else {
-            externalSourceCode = "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.EnvironmentSupport?)"
-        }
+        let externalSourceCode = "private external fun \(externalName)(\(classType.peerExternalParameter), support: skip.ui.EnvironmentSupport?)"
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: externalSourceCode)
         externalFunctionDeclaration.parent = classDeclaration
 
@@ -1708,41 +1666,29 @@ final class KotlinBridgeToKotlinVisitor {
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
-        let cdeclSignature: TypeSignature
-        let cdeclSource: [String]
-        if classDeclaration.declarationType == .enumDeclaration {
-            cdeclSignature = .function([TypeSignature.Parameter(label: "support", type: .optional(.javaObjectPointer))], .void, APIFlags(), nil)
-            cdeclSource = [
-                "let peer_swift = \(classDeclaration.signature).fromJavaObject(Java_target, options: [])",
-                "let support_swift = SkipUI.EnvironmentSupport.fromJavaObject(support, options: [])",
-                "peer_swift.Java_syncEnvironment_\(name)(support: support_swift)"
-            ]
-        } else {
-            cdeclSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false)), TypeSignature.Parameter(label: "support", type: .optional(.javaObjectPointer))], .void, APIFlags(), nil)
-            cdeclSource = [
-                "let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!",
-                "let support_swift = SkipUI.EnvironmentSupport.fromJavaObject(support, options: [])",
-                "peer_swift.value.Java_syncEnvironment_\(name)(support: support_swift)"
-            ]
-        }
+        let cdeclSignature: TypeSignature = .function([classType.peerSwiftParameter, TypeSignature.Parameter(label: "support", type: .optional(.javaObjectPointer))], .void, APIFlags(), nil)
+        let argumentString = classType == .generic ? "support_swift" : "support: support_swift"
+        let cdeclSource = classType.peerSwiftAssignment(to: classDeclaration, optionsString: "[]") + [
+            "let support_swift = SkipUI.EnvironmentSupport.fromJavaObject(support, options: [])",
+            "\(classType.peerSwiftTarget).Java_syncEnvironment_\(name)(\(argumentString))"
+        ]
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
-    private func viewBodyImplementation(for classDeclaration: KotlinClassDeclaration, visibility: Modifiers.Visibility) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func swiftUIBodyImplementation(_ swiftUIType: SwiftUIType, for classDeclaration: KotlinClassDeclaration, visibility: Modifiers.Visibility) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+        let classType = ClassType(classDeclaration)
         let externalName = "Swift_composableBody"
-        let externalSourceCode: String
-        let functionSourceCode: String
-        if classDeclaration.declarationType == .enumDeclaration {
-            externalSourceCode = "private external fun \(externalName)(): skip.ui.View?"
-            functionSourceCode = "return skip.ui.ComposeBuilder { composectx: skip.ui.ComposeContext -> \(externalName)()?.Compose(composectx) ?: skip.ui.ComposeResult.ok }"
-        } else {
-            externalSourceCode = "private external fun \(externalName)(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.View?"
-            functionSourceCode = "return skip.ui.ComposeBuilder { composectx: skip.ui.ComposeContext -> \(externalName)(Swift_peer)?.Compose(composectx) ?: skip.ui.ComposeResult.ok }"
-        }
+        let externalParameters = swiftUIType == .view ? classType.peerExternalParameter : "\(classType.peerExternalParameter), content: skip.ui.View"
+        let externalArguments = swiftUIType == .view ? classType.peerExternalArgument : "\(classType.peerExternalArgument), content"
+        let externalSourceCode = "private external fun \(externalName)(\(externalParameters)): skip.ui.View?"
+        let functionSourceCode = "return skip.ui.ComposeBuilder { composectx: skip.ui.ComposeContext -> \(externalName)(\(externalArguments))?.Compose(composectx) ?: skip.ui.ComposeResult.ok }"
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: externalSourceCode)
 
         let functionDeclaration = KotlinFunctionDeclaration(name: "body")
+        if swiftUIType != .view {
+            functionDeclaration.parameters = [Parameter<KotlinExpression>(externalLabel: "content", declaredType: .named("skip.ui.View", []))]
+        }
         functionDeclaration.returnType = .skipUIView
         functionDeclaration.modifiers = Modifiers(visibility: .public, isOverride: true)
         functionDeclaration.extras = .singleNewline
@@ -1752,43 +1698,43 @@ final class KotlinBridgeToKotlinVisitor {
 
         var swift: [String] = []
         let visibilityString = visibility.swift(suffix: " ")
-        swift.append("\(visibilityString)var Java_view: any SkipUI.View {")
+        if swiftUIType == .view {
+            swift.append("\(visibilityString)var Java_view: any SkipUI.View {")
+        } else {
+            swift.append("\(visibilityString)var Java_modifier: any SkipUI.ViewModifier {")
+        }
         swift.append(1, "return self")
         swift.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: false, name: externalName, translator: translator)
-        let cdeclSignature: TypeSignature
-        var cdeclSource: [String] = []
-        if classDeclaration.declarationType == .enumDeclaration {
-            cdeclSignature = .function([], .optional(.javaObjectPointer), APIFlags(), nil)
-            cdeclSource.append("let peer_swift = \(classDeclaration.signature).fromJavaObject(Java_target, options: [])")
-            cdeclSource.append("return SkipBridge.assumeMainActorUnchecked {")
-            cdeclSource.append(1, "let body = peer_swift.body")
-            cdeclSource.append(1, "return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])")
-            cdeclSource.append("}")
-        } else {
-            cdeclSignature = .function([TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))], .optional(.javaObjectPointer), APIFlags(), nil)
-            cdeclSource.append("let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!")
-            cdeclSource.append("return SkipBridge.assumeMainActorUnchecked {")
-            cdeclSource.append(1, "let body = peer_swift.value.body")
-            cdeclSource.append(1, "return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])")
-            cdeclSource.append("}")
+        var cdeclParameters = [classType.peerSwiftParameter]
+        if swiftUIType != .view {
+            cdeclParameters.append(TypeSignature.Parameter(label: "content", type: .javaObjectPointer))
         }
+        let cdeclSignature: TypeSignature = .function(cdeclParameters, .optional(.javaObjectPointer), APIFlags(), nil)
+        var cdeclSource = classType.peerSwiftAssignment(to: classDeclaration, optionsString: "[]")
+        let bodyInvocation: String
+        if swiftUIType == .view {
+            if classType == .generic {
+                bodyInvocation = "let body = \(classType.peerSwiftTarget).body()"
+            } else {
+                bodyInvocation = "let body = \(classType.peerSwiftTarget).body"
+            }
+        } else {
+            cdeclSource.append("let content_swift = JavaBackedView(content)")
+            if classType == .generic {
+                bodyInvocation = "let body = \(classType.peerSwiftTarget).body(content_swift)"
+            } else {
+                bodyInvocation = "let body = \(classType.peerSwiftTarget).body(content: content_swift)"
+            }
+        }
+        cdeclSource.append("return SkipBridge.assumeMainActorUnchecked {")
+        cdeclSource.append(1, bodyInvocation)
+        cdeclSource.append(1, "return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])")
+        cdeclSource.append("}")
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
 
         return ([functionDeclaration, externalFunctionDeclaration], swift, [cdeclFunction])
-    }
-
-    private func cdeclInstanceParameter(for classDeclaration: KotlinClassDeclaration) -> TypeSignature.Parameter {
-        if !classDeclaration.generics.isEmpty {
-            return TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))
-        } else if classDeclaration.isSealedClassesEnum {
-            return TypeSignature.Parameter(label: "className", type: .javaString)
-        } else if classDeclaration.declarationType == .enumDeclaration {
-            return TypeSignature.Parameter(label: "name", type: .javaString)
-        } else {
-            return TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))
-        }
     }
 
     private func appendMainActorIsolated(_ swift: inout [String], _ indentation: Indentation = 0, isolated: Bool, isThrows: Bool = false, isReturn: Bool = false, block: (inout [String], Indentation) -> Void) {
@@ -1802,4 +1748,105 @@ final class KotlinBridgeToKotlinVisitor {
         block(&swift, indentation.inc())
         swift.append(indentation, "}")
     }
+}
+
+private enum ClassType : Equatable {
+    case reference
+    case value
+    case generic
+    case sealedClassesEnum
+    case `enum`
+
+    init(_ declaration: KotlinClassDeclaration) {
+        if !declaration.generics.isEmpty {
+            self = .generic
+        } else if declaration.isSealedClassesEnum {
+            self = .sealedClassesEnum
+        } else if declaration.declarationType == .enumDeclaration {
+            self = .enum
+        } else if declaration.declarationType == .classDeclaration || declaration.declarationType == .actorDeclaration {
+            self = .reference
+        } else {
+            self = .value
+        }
+    }
+
+    init?(_ declaration: KotlinClassDeclaration?) {
+        guard let declaration else {
+            return nil
+        }
+        self.init(declaration)
+    }
+
+    var peerExternalArgument: String {
+        switch self {
+        case .sealedClassesEnum:
+            return "javaClass.name"
+        case .enum:
+            return "name"
+        default:
+            return "Swift_peer"
+        }
+    }
+
+    var peerExternalParameter: String {
+        switch self {
+        case .sealedClassesEnum:
+            return "className: String"
+        case .enum:
+            return "name: String"
+        default:
+            return "Swift_peer: skip.bridge.SwiftObjectPointer"
+        }
+    }
+
+    var peerSwiftParameter: TypeSignature.Parameter {
+        switch self {
+        case .sealedClassesEnum:
+            return TypeSignature.Parameter(label: "className", type: .javaString)
+        case .enum:
+            return TypeSignature.Parameter(label: "name", type: .javaString)
+        default:
+            return TypeSignature.Parameter(label: "Swift_peer", type: .swiftObjectPointer(kotlin: false))
+        }
+    }
+
+    var peerSwiftTarget: String {
+        switch self {
+        case .value:
+            return "peer_swift.value"
+        default:
+            return "peer_swift"
+        }
+    }
+
+    func peerSwiftAssignment(to classDeclaration: KotlinClassDeclaration?, optionsString: String) -> [String] {
+        guard let classDeclaration else {
+            return []
+        }
+        switch self {
+        case .generic:
+            return ["let peer_swift: \(classDeclaration.signature.typeErasedClass) = Swift_peer.pointee()!"]
+        case .reference:
+            return ["let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!"]
+        case .sealedClassesEnum:
+            return [
+                "let className_swift = String.fromJavaObject(className, options: \(optionsString))",
+                "let peer_swift = \(classDeclaration.signature).fromJavaClassName(className_swift, Java_target, options: \(optionsString))"
+            ]
+        case .enum:
+            return [
+                "let name_swift = String.fromJavaObject(name, options: \(optionsString))",
+                "let peer_swift = \(classDeclaration.signature).fromJavaName(name_swift)"
+            ]
+        default:
+            return ["let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!"]
+        }
+    }
+}
+
+private enum SwiftUIType : Equatable {
+    case none
+    case view
+    case viewModifier
 }

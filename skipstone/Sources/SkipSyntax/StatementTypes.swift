@@ -1552,7 +1552,7 @@ class TypeDeclaration: Statement {
         var decodeFlags: DecodeFlags = []
         if decodeLevel == .none {
             // We need to decode native views for adapting to SkipSwiftUI
-            if syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, let inheritsView = inherits.first(where: { $0.isNamed("View", moduleName: "SwiftUI", generics: []) || $0.isNamed("View", moduleName: "SkipSwiftUI", generics: []) }) {
+            if syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, let inheritsView = inherits.first(where: { isSwiftUIType($0) }) {
                 decodeLevel = .api
                 decodeFlags.insert(.swiftUIState)
                 // We don't care about other protocols
@@ -1602,7 +1602,7 @@ class TypeDeclaration: Statement {
         var decodeFlags: DecodeFlags = []
         if decodeLevel == .none {
             // We need to decode native views for adapting to SkipSwiftUI
-            if syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, let inheritsView = inherits.first(where: { $0.isNamed("View", moduleName: "SwiftUI", generics: []) || $0.isNamed("View", moduleName: "SkipSwiftUI", generics: []) }) {
+            if syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, let inheritsView = inherits.first(where: { isSwiftUIType($0) }) {
                 decodeLevel = .api
                 decodeFlags.insert(.swiftUIState)
                 // We don't care about other protocols
@@ -1652,6 +1652,15 @@ class TypeDeclaration: Statement {
             return false
         }
         return (keptMembers, unbridgedMembers)
+    }
+
+    private static func isSwiftUIType(_ signature: TypeSignature) -> Bool {
+        return signature.isNamed("View", moduleName: "SwiftUI", generics: [])
+            || signature.isNamed("View", moduleName: "SkipSwiftUI", generics: [])
+            || signature.isNamed("ViewModifier", moduleName: "SwiftUI", generics: [])
+            || signature.isNamed("ViewModifier", moduleName: "SkipSwiftUI", generics: [])
+            || signature.isNamed("ToolbarContent", moduleName: "SwiftUI", generics: [])
+            || signature.isNamed("ToolbarContent", moduleName: "SkipSwiftUI", generics: [])
     }
 
     var nonExtensionDeclarationType: StatementType? {
