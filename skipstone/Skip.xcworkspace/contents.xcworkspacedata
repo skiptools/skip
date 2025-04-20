@@ -86,6 +86,9 @@
       location = "group:../skipapp-bookings/Darwin/TravelBookings.xcodeproj">
    </FileRef>
    <FileRef
+      location = "group:../skipapp-bookings-fuse/Darwin/TravelBookingsFuse.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "group:../skipapp-fireside/Darwin/FireSide.xcodeproj">
    </FileRef>
    <FileRef
