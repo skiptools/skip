@@ -520,16 +520,18 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             // We pass dependencies is inout to bypass Swift 6+ requiring that it be @MainActor.
             var packageAddendum = """
 
-            func useLocalPackage(named packageName: String, dependencies: inout [Package.Dependency]) {
+            func useLocalPackage(named packageName: String, id packageID: String, dependencies: inout [Package.Dependency]) {
                 dependencies = dependencies.filter {
                     switch $0.kind {
                     case let .sourceControl(name: name, location: location, requirement: _):
-                        return name != packageName && !location.hasSuffix(packageName) && !location.hasSuffix(packageName + ".git")
+                        return name != packageName && !location.hasSuffix("/" + packageID) && !location.hasSuffix("/" + packageID + ".git")
+                    case let .fileSystem(name: name, path: location):
+                        return name != packageName && !location.hasSuffix("/" + packageID) && !location.hasSuffix("/" + packageID + ".git")
                     default:
                         return true
                     }
                 }
-                dependencies += [.package(name: packageName, path: "Packages/" + packageName)]
+                dependencies += [.package(name: packageName, path: "Packages/" + packageID)]
             }
             
             """
@@ -538,7 +540,10 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
             let moduleLinkPaths = Dictionary(self.linkNamePaths, uniquingKeysWith: { $1 })
 
-            for (targetName, packageID, var packagePath) in self.dependencyIdPaths {
+            for (targetName, packageName, var packagePath) in self.dependencyIdPaths {
+                // the package name in the Package.swift typically the last part of the repository name (e.g., "swift-algorithms" in https://github.com/apple/swift-algorithms.git ), but for other packages it isn't (e.g., "Lottie" for https://github.com/airbnb/lottie-ios.git ); we need to use the repository name
+                let packageID = packagePath.split(separator: "/").last?.description ?? packagePath
+
                 if !createdIds.insert(packageID).inserted {
                     // only create the link once, even if specified multiple times
                     continue
@@ -561,7 +566,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 try addLink(dependencyPackageLink, pointingAt: destinationPath, relative: false)
 
                 packageAddendum += """
-                useLocalPackage(named: "\(packageID)", dependencies: &package.dependencies)
+                useLocalPackage(named: "\(packageName)", id: "\(packageID)", dependencies: &package.dependencies)
                 
                 """
             }
