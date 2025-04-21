@@ -33,8 +33,8 @@ class Statement: SyntaxNode {
         guard syntaxTree.decodeLevel != .full && syntaxTree.decodeLevel != .none else {
             return syntaxTree.decodeLevel
         }
-        // We need to fully decode anything in SKIP blocks for transpilation
-        guard !context.isInIfSkipBlock else {
+        // Fully decode #if SKIP content and any expressions we're already decoding (e.g. local var decl inside code block)
+        guard !context.isInIfSkipBlock && !context.isInExpression else {
             return .full
         }
         let effectiveVisibility: Modifiers.Visibility
