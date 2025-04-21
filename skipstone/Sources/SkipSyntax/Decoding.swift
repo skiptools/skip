@@ -48,6 +48,7 @@ struct  StatementDecoder {
 /// Decoding context.
 struct DecodeContext {
     var isInIfSkipBlock = false
+    var isInExpression = false
     var memberOf: (type: StatementType, modifiers: Modifiers, flags: DecodeFlags)?
 }
 
