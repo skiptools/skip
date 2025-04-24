@@ -882,7 +882,7 @@ final class KotlinBridgeToSwiftVisitor {
                 swift.append(1, "}")
             } else {
                 if !isBridgedSubclass {
-                    swift.append(1, "\(finalMemberVisibilityString)\(isStruct ? "var" : isActor ? "nonisolated let" : "let") Java_peer: JObject")
+                    swift.append(1, "\(isActor ? "nonisolated " : "")\(finalMemberVisibilityString)\(isStruct ? "var" : "let") Java_peer: JObject")
                 }
                 swift.append(1, "\(finalMemberVisibilityString)\(isStruct || isActor ? "" : "required ")init(Java_ptr: JavaObjectPointer) {")
                 if isBridgedSubclass {
@@ -1045,12 +1045,11 @@ final class KotlinBridgeToSwiftVisitor {
 
     private static func swiftForJConvertibleContract(in statementType: StatementType, visibility: Modifiers.Visibility) -> [String] {
         let visibilityString = visibility.swift(suffix: " ")
-        let isolation = statementType == .actorDeclaration ? "nonisolated " : ""
         var swift: [String] = []
-        swift.append(visibilityString + "static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {")
+        swift.append("nonisolated \(visibilityString)static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {")
         swift.append(1, "return .init(Java_ptr: obj!)")
         swift.append("}")
-        swift.append("\(visibilityString)\(isolation)func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {")
+        swift.append("nonisolated \(visibilityString)func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {")
         swift.append(1, "return Java_peer.safePointer()")
         swift.append("}")
         return swift
@@ -1069,7 +1068,7 @@ final class KotlinBridgeToSwiftVisitor {
         var swift: [String] = []
         var declarations: [String] = []
 
-        swift.append(visibilityString + "static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {")
+        swift.append("nonisolated \(visibilityString)static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {")
         if isSealedClassesEnum {
             swift.append(1, "let className = Java_className(of: obj!, options: options)")
             swift.append(1, "return fromJavaClassName(className, obj!, options: options)")
@@ -1081,7 +1080,7 @@ final class KotlinBridgeToSwiftVisitor {
         swift.append("}")
 
         if isSealedClassesEnum {
-            swift.append("fileprivate static func fromJavaClassName(_ className: String, _ obj: JavaObjectPointer, options: JConvertibleOptions) -> Self {")
+            swift.append("nonisolated fileprivate static func fromJavaClassName(_ className: String, _ obj: JavaObjectPointer, options: JConvertibleOptions) -> Self {")
             swift.append(1, "switch className {")
             for (enumCaseDeclaration, enumCaseBridgables) in zip(caseDeclarations, caseBridgables) {
                 let (enumCaseCode, enumCaseDeclarations) = sealedClassesEnumCaseFromJavaClassName(enumCaseDeclaration, bridgables: enumCaseBridgables, inClassName: className, generics: generics, options: options)
@@ -1092,7 +1091,7 @@ final class KotlinBridgeToSwiftVisitor {
             swift.append(1, "}")
             swift.append("}")
         } else {
-            swift.append("fileprivate static func fromJavaName(_ name: String) -> Self {")
+            swift.append("nonisolated fileprivate static func fromJavaName(_ name: String) -> Self {")
             if caseDeclarations.isEmpty {
                 swift.append(1, "fatalError()")
             } else {
@@ -1106,7 +1105,7 @@ final class KotlinBridgeToSwiftVisitor {
             swift.append("}")
         }
 
-        swift.append(visibilityString + "func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {")
+        swift.append("nonisolated \(visibilityString)func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {")
         if isSealedClassesEnum {
             swift.append(1, "switch self {")
             for (enumCaseDeclaration, enumCaseBridgables) in zip(caseDeclarations, caseBridgables) {

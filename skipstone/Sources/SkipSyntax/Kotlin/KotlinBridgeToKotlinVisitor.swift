@@ -258,12 +258,12 @@ final class KotlinBridgeToKotlinVisitor {
             valueString = bridgable.type.convertToCDecl(value: propertyName, strategy: bridgable.strategy, options: options)
         }
         if variableDeclaration.apiFlags.throwsType == .none {
-            appendMainActorIsolated(&cdeclGetterBody, isolated: variableDeclaration.apiFlags.options.contains(.mainActor), isReturn: true) { body, indentation in
+            variableDeclaration.appendMainActorIsolated(&cdeclGetterBody, in: classDeclaration, isReturn: true) { body, indentation in
                 body.append(indentation, "return " + valueString)
             }
         } else {
             cdeclGetterBody.append("do {")
-            appendMainActorIsolated(&cdeclGetterBody, 1, isolated: variableDeclaration.apiFlags.options.contains(.mainActor), isThrows: true, isReturn: true) { body, indentation in
+            variableDeclaration.appendMainActorIsolated(&cdeclGetterBody, 1, in: classDeclaration, isReturn: true) { body, indentation in
                 body.append(indentation, "let f_return_swift = try " + valueString)
                 body.append(indentation, "return f_return_swift.toJavaObject(options: \(optionsString))")
             }
@@ -320,10 +320,11 @@ final class KotlinBridgeToKotlinVisitor {
             } else {
                 setValueString = propertyName + " = " + bridgable.constrainedType.convertFromCDecl(value: "value", strategy: bridgable.strategy, options: options)
             }
-            appendMainActorIsolated(&cdeclSetterBody, isolated: variableDeclaration.apiFlags.options.contains(.mainActor)) { body, indentation in
+            let cdeclParameter = TypeSignature.Parameter(label: "value", type: bridgable.type.cdecl(strategy: bridgable.strategy, options: options))
+            variableDeclaration.appendMainActorIsolated(&cdeclSetterBody, in: classDeclaration, parameter: cdeclParameter) { body, indentation in
                 body.append(indentation, setValueString)
             }
-            let cdeclSetter = CDeclFunction(name: cdeclName + "_set", cdecl: cdecl + "_1set", signature: .function(cdeclInstanceParameters + [TypeSignature.Parameter(label: "value", type: bridgable.type.cdecl(strategy: bridgable.strategy, options: options))], .void, APIFlags(), nil), body: cdeclSetterBody)
+            let cdeclSetter = CDeclFunction(name: cdeclName + "_set", cdecl: cdecl + "_1set", signature: .function(cdeclInstanceParameters + [cdeclParameter], .void, APIFlags(), nil), body: cdeclSetterBody)
             cdeclFunctions.append(cdeclSetter)
         }
         variableDeclaration.willSet = nil
@@ -398,15 +399,16 @@ final class KotlinBridgeToKotlinVisitor {
         let isCompanionCall = functionDeclaration.isStatic || (functionDeclaration.type == .constructorDeclaration && isBridgedSubclass)
         let externalName = (isAsync ? "Swift_callback_" : "Swift_") + (interfaceDeclaration == nil ? "" : interfaceDeclaration!.name + "_") + (isCompanionCall ? "Companion_" : "") + functionName + (uniquifier == nil ? "" : "_\(uniquifier!)")
 
-        var cdeclBody: [String] = []
+        var cdeclBodyParameters: [String] = []
         if !isMutableStructCopyConstructor || classDeclaration?.generics.isEmpty != false {
             for index in 0..<bridgable.parameters.count {
                 let strategy = bridgable.parameters[index].strategy
                 let parameterType = isMutableStructCopyConstructor ? classDeclaration!.signature : bridgable.parameters[index].constrainedType
-                cdeclBody.append("let p_\(index)_swift = " + parameterType.convertFromCDecl(value: "p_\(index)", strategy: strategy, options: options))
+                cdeclBodyParameters.append("let p_\(index)_swift = " + parameterType.convertFromCDecl(value: "p_\(index)", strategy: strategy, options: options))
             }
         }
 
+        var cdeclBody: [String] = []
         if isAsync {
             let callbackType = bridgable.return.constrainedType.callbackClosureType(apiFlags: functionDeclaration.apiFlags, kotlin: false)
             cdeclBody.append("let f_callback_swift = " + callbackType.convertFromCDecl(value: "f_callback", strategy: .direct, options: options))
@@ -469,6 +471,10 @@ final class KotlinBridgeToKotlinVisitor {
 
         var body: [String] = []
         let cdeclReturnType: TypeSignature
+        let cdeclParameters = bridgable.parameters.enumerated().map { (index, bridgable) in
+            let strategy = bridgable.strategy
+            return TypeSignature.Parameter(label: "p_\(index)", type: bridgable.type.cdecl(strategy: strategy, options: options))
+        }
         if let classDeclaration, functionDeclaration.type == .constructorDeclaration {
             if isBridgedSubclass {
                 functionDeclaration.delegatingConstructorCall = KotlinRawExpression(sourceCode: "super(Swift_peer = \(externalName)(\(externalArgumentsString)), marker = null)")
@@ -477,30 +483,36 @@ final class KotlinBridgeToKotlinVisitor {
             }
             if isThrows {
                 cdeclBody.append("do {")
-                if classType == .reference {
-                    cdeclBody.append(1, "let f_return_swift = try \(classDeclaration.signature)\(swiftArgumentsString)")
-                } else {
-                    cdeclBody.append(1, "let f_return_swift = try SwiftValueTypeBox(\(classDeclaration.signature)\(swiftArgumentsString))")
+                functionDeclaration.appendMainActorIsolated(&cdeclBody, 1, in: classDeclaration, parameters: cdeclParameters, isReturn: true) { body, indentation in
+                    body.append(indentation, cdeclBodyParameters)
+                    if classType == .reference {
+                        body.append(indentation, "let f_return_swift = try \(classDeclaration.signature)\(swiftArgumentsString)")
+                    } else {
+                        body.append(indentation, "let f_return_swift = try SwiftValueTypeBox(\(classDeclaration.signature)\(swiftArgumentsString))")
+                    }
+                    body.append(indentation, "return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)")
                 }
-                cdeclBody.append(1, "return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)")
                 cdeclBody.append("} catch {")
                 cdeclBody.append(1, "JThrowable.throw(error, options: \(optionsString), env: Java_env)")
                 cdeclBody.append(1, "return SwiftObjectNil")
                 cdeclBody.append("}")
             } else {
-                if classType == .reference {
-                    cdeclBody.append("let f_return_swift = \(classDeclaration.signature)\(swiftArgumentsString)")
-                } else if isMutableStructCopyConstructor && classType == .generic {
-                    // Create a new type-erased wrapper using the original instance
-                    cdeclBody.append("let ptr = SwiftObjectPointer.peer(of: p_0, options: \(optionsString))")
-                    cdeclBody.append("let peer_swift: \(classDeclaration.signature.typeErasedClass) = ptr.pointee()!")
-                    cdeclBody.append("let f_return_swift = (peer_swift.genericvalue as! TypeErasedConvertible).toTypeErased()")
-                } else if isMutableStructCopyConstructor {
-                    cdeclBody.append("let f_return_swift = SwiftValueTypeBox\(swiftArgumentsString)")
-                } else {
-                    cdeclBody.append("let f_return_swift = SwiftValueTypeBox(\(classDeclaration.signature)\(swiftArgumentsString))")
+                functionDeclaration.appendMainActorIsolated(&cdeclBody, in: classDeclaration, parameters: cdeclParameters, isReturn: true) { body, indentation in
+                    body.append(indentation, cdeclBodyParameters)
+                    if classType == .reference {
+                        body.append(indentation, "let f_return_swift = \(classDeclaration.signature)\(swiftArgumentsString)")
+                    } else if isMutableStructCopyConstructor && classType == .generic {
+                        // Create a new type-erased wrapper using the original instance
+                        body.append(indentation, "let ptr = SwiftObjectPointer.peer(of: p_0, options: \(optionsString))")
+                        body.append(indentation, "let peer_swift: \(classDeclaration.signature.typeErasedClass) = ptr.pointee()!")
+                        body.append(indentation, "let f_return_swift = (peer_swift.genericvalue as! TypeErasedConvertible).toTypeErased()")
+                    } else if isMutableStructCopyConstructor {
+                        body.append(indentation, "let f_return_swift = SwiftValueTypeBox\(swiftArgumentsString)")
+                    } else {
+                        body.append(indentation, "let f_return_swift = SwiftValueTypeBox(\(classDeclaration.signature)\(swiftArgumentsString))")
+                    }
+                    body.append(indentation, "return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)")
                 }
-                cdeclBody.append("return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)")
             }
             cdeclReturnType = .swiftObjectPointer(kotlin: false)
         } else if isAsync {
@@ -534,6 +546,7 @@ final class KotlinBridgeToKotlinVisitor {
             body.append(1, "}")
             body.append("}")
 
+            cdeclBody += cdeclBodyParameters
             cdeclBody.append("Task {")
             if isThrows {
                 cdeclBody.append(1, "do {")
@@ -566,14 +579,18 @@ final class KotlinBridgeToKotlinVisitor {
             body.append(externalName + "(\(externalArgumentsString))")
             if isThrows {
                 cdeclBody.append("do {")
-                appendMainActorIsolated(&cdeclBody, 1, isolated: functionDeclaration.apiFlags.options.contains(.mainActor), isThrows: true) { body, indentation in
+                functionDeclaration.appendMainActorIsolated(&cdeclBody, 1, in: classDeclaration, parameters: cdeclParameters) { body, indentation in
+                    body.append(indentation, cdeclBodyParameters)
                     body.append(indentation, "try \(swiftCallTarget)\(swiftFunctionName)\(swiftArgumentsString)")
                 }
                 cdeclBody.append("} catch {")
                 cdeclBody.append(1, "JThrowable.throw(error, options: \(optionsString), env: Java_env)")
                 cdeclBody.append("}")
             } else {
-                cdeclBody.append("\(swiftCallTarget)\(swiftFunctionName)\(swiftArgumentsString)")
+                functionDeclaration.appendMainActorIsolated(&cdeclBody, in: classDeclaration, parameters: cdeclParameters) { body, indentation in
+                    body.append(indentation, cdeclBodyParameters)
+                    body.append(indentation, "\(swiftCallTarget)\(swiftFunctionName)\(swiftArgumentsString)")
+                }
             }
             cdeclReturnType = .void
         } else {
@@ -581,7 +598,8 @@ final class KotlinBridgeToKotlinVisitor {
             if isThrows {
                 forceUnwrapString = bridgable.return.type.isOptional ? "" : "!!"
                 cdeclBody.append("do {")
-                appendMainActorIsolated(&cdeclBody, 1, isolated: functionDeclaration.apiFlags.options.contains(.mainActor), isThrows: true, isReturn: true) { body, indentation in
+                functionDeclaration.appendMainActorIsolated(&cdeclBody, 1, in: classDeclaration, parameters: cdeclParameters, isReturn: true) { body, indentation in
+                    body.append(indentation, cdeclBodyParameters)
                     body.append(indentation, "let f_return_swift = try \(swiftCallTarget)\(swiftFunctionName)\(swiftArgumentsString)")
                     body.append(indentation, "return " + bridgable.return.type.asOptional(true).convertToCDecl(value: "f_return_swift", strategy: bridgable.return.strategy, options: options))
                 }
@@ -592,7 +610,8 @@ final class KotlinBridgeToKotlinVisitor {
                 cdeclReturnType = bridgable.return.type.asOptional(true).cdecl(strategy: bridgable.return.strategy, options: options)
             } else {
                 forceUnwrapString = ""
-                appendMainActorIsolated(&cdeclBody, isolated: functionDeclaration.apiFlags.options.contains(.mainActor), isReturn: true) { body, indentation in
+                functionDeclaration.appendMainActorIsolated(&cdeclBody, in: classDeclaration, parameters: cdeclParameters, isReturn: true) { body, indentation in
+                    body.append(indentation, cdeclBodyParameters)
                     body.append(indentation, "let f_return_swift = \(swiftCallTarget)\(swiftFunctionName)\(swiftArgumentsString)")
                     body.append(indentation, "return " + functionDeclaration.returnType.convertToCDecl(value: "f_return_swift", strategy: bridgable.return.strategy, options: options))
                 }
@@ -647,10 +666,7 @@ final class KotlinBridgeToKotlinVisitor {
             instanceParameter = []
         }
         let callbackParameter = isAsync ? [TypeSignature.Parameter(label: "f_callback", type: .javaObjectPointer)] : []
-        let cdeclType: TypeSignature = .function(instanceParameter + bridgable.parameters.enumerated().map { (index, bridgable) in
-            let strategy = bridgable.strategy
-            return TypeSignature.Parameter(label: "p_\(index)", type: bridgable.type.cdecl(strategy: strategy, options: options))
-        } + callbackParameter, cdeclReturnType, APIFlags(), nil)
+        let cdeclType: TypeSignature = .function(instanceParameter + cdeclParameters + callbackParameter, cdeclReturnType, APIFlags(), nil)
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
         cdeclFunctions.append(cdeclFunction)
 
@@ -706,12 +722,8 @@ final class KotlinBridgeToKotlinVisitor {
             ]
             retString = "return lhs_swift == rhs_swift"
         }
-        if functionDeclaration.apiFlags.options.contains(.mainActor) {
-            cdeclBody.append("return SkipBridge.assumeMainActorUnchecked {")
-            cdeclBody.append(1, retString)
-            cdeclBody.append("}")
-        } else {
-            cdeclBody.append(retString)
+        functionDeclaration.appendMainActorIsolated(&cdeclBody, in: classDeclaration, isReturn: true) { body, indentation in
+            body.append(indentation, retString)
         }
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
         cdeclFunctions.append(cdeclFunction)
@@ -775,17 +787,14 @@ final class KotlinBridgeToKotlinVisitor {
         let classType = ClassType(classDeclaration)
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: false, name: "Swift_hashvalue", translator: translator)
         let cdeclType: TypeSignature = .function([classType.peerSwiftParameter], .int64, APIFlags(), nil)
-        var cdeclBody: [String] = []
-        switch ClassType(classDeclaration) {
-        case .generic:
-            cdeclBody.append("let peer_swift: \(classDeclaration.signature.typeErasedClass) = Swift_peer.pointee()!")
-            cdeclBody.append("return Int64((peer_swift.genericvalue as! (any Hashable)).hashValue)")
-        case .reference:
-            cdeclBody.append("let peer_swift: \(classDeclaration.signature) = Swift_peer.pointee()!")
-            cdeclBody.append("return Int64(peer_swift.hashValue)")
-        default:
-            cdeclBody.append("let peer_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = Swift_peer.pointee()!")
-            cdeclBody.append("return Int64(peer_swift.value.hashValue)")
+        var cdeclBody = classType.peerSwiftAssignment(to: classDeclaration, optionsString: "[]")
+        functionDeclaration.appendMainActorIsolated(&cdeclBody, in: classDeclaration, isReturn: true) { body, indentation in
+            switch classType {
+            case .generic:
+                body.append(indentation, "return Int64((\(classType.peerSwiftTarget).genericvalue as! (any Hashable)).hashValue)")
+            default:
+                body.append(indentation, "return Int64(\(classType.peerSwiftTarget).hashValue)")
+            }
         }
 
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
@@ -853,12 +862,8 @@ final class KotlinBridgeToKotlinVisitor {
             ]
             retString = "return lhs_swift < rhs_swift"
         }
-        if functionDeclaration.apiFlags.options.contains(.mainActor) {
-            cdeclBody.append("return SkipBridge.assumeMainActorUnchecked {")
-            cdeclBody.append(1, retString)
-            cdeclBody.append("}")
-        } else {
-            cdeclBody.append(retString)
+        functionDeclaration.appendMainActorIsolated(&cdeclBody, in: classDeclaration, isReturn: true) { body, indentation in
+            body.append(indentation, retString)
         }
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclType, body: cdeclBody)
         cdeclFunctions.append(cdeclFunction)
@@ -1086,13 +1091,14 @@ final class KotlinBridgeToKotlinVisitor {
 
                 let constructorCdecl = CDeclFunction.declaration(for: classDeclaration, isCompanion: subclassDepth >= 1, name: externalConstructorName, translator: translator)
                 var constructorBody: [String] = []
-                if classType == .reference {
-                    constructorBody.append("let f_return_swift = \(classDeclaration.signature)()")
-                } else {
-                    constructorBody.append("let f_return_swift = SwiftValueTypeBox(\(classDeclaration.signature)())")
+                appendMainActorIsolated(&constructorBody, in: classDeclaration, attributes: Attributes(), modifiers: Modifiers(), isReturn: true) { body, indentation in
+                    if classType == .reference {
+                        body.append("let f_return_swift = \(classDeclaration.signature)()")
+                    } else {
+                        body.append("let f_return_swift = SwiftValueTypeBox(\(classDeclaration.signature)())")
+                    }
+                    body.append("return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)")
                 }
-                constructorBody.append("return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)")
-
                 cdeclFunctions.append(CDeclFunction(name: constructorCdecl.cdeclFunctionName, cdecl: constructorCdecl.cdecl, signature: .function([], .swiftObjectPointer(kotlin: false), APIFlags(), nil), body: constructorBody))
             }
 
@@ -1180,7 +1186,7 @@ final class KotlinBridgeToKotlinVisitor {
 
         let isEmptyEnum = classDeclaration.declarationType == .enumDeclaration && enumCases.isEmpty
         let finalMemberVisibility = min(classDeclaration.modifiers.visibility, .public)
-        var swiftUIStateVariables: [(String, Attributes)] = []
+        var swiftUIStateVariables: [(String, Attributes, Modifiers)] = []
         var additionalSwiftDeclarations: [String] = []
         var additionalCDeclFunctions: [CDeclFunction] = []
         if swiftUIType != .none {
@@ -1235,7 +1241,7 @@ final class KotlinBridgeToKotlinVisitor {
             } else {
                 let finalMemberVisibilityString = finalMemberVisibility.swift(suffix: " ")
                 if subclassDepth < 1 {
-                    swift.append(1, "\(finalMemberVisibilityString)static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {")
+                    swift.append(1, "nonisolated \(finalMemberVisibilityString)static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {")
                     swift.append(2, "let ptr = SwiftObjectPointer.peer(of: obj!, options: options)")
                     switch classType {
                     case .generic:
@@ -1249,8 +1255,7 @@ final class KotlinBridgeToKotlinVisitor {
                     }
                     swift.append(1, "}")
 
-                    let isolation = classDeclaration.declarationType == .actorDeclaration ? "nonisolated " : ""
-                    swift.append(1, "\(finalMemberVisibilityString)\(isolation)func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {")
+                    swift.append(1, "nonisolated \(finalMemberVisibilityString)func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {")
                     switch classType {
                     case .generic:
                         swift.append(2, "let typeErased = toTypeErased()")
@@ -1304,11 +1309,11 @@ final class KotlinBridgeToKotlinVisitor {
         return true
     }
 
-    private func typeErasedPeerSwift(for classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], functionDeclarations: [(KotlinFunctionDeclaration, uniquifier: Int?)], swiftUIType: SwiftUIType, stateVariables: [(String, Attributes)], visibility: Modifiers.Visibility) -> SwiftDefinition {
+    private func typeErasedPeerSwift(for classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], functionDeclarations: [(KotlinFunctionDeclaration, uniquifier: Int?)], swiftUIType: SwiftUIType, stateVariables: [(String, Attributes, Modifiers)], visibility: Modifiers.Visibility) -> SwiftDefinition {
         let visibilityString = visibility.swift(suffix: " ")
         var swift: [String] = []
         swift.append("extension \(classDeclaration.signature.withGenerics([])): TypeErasedConvertible {")
-        swift.append(1, "\(visibilityString)func toTypeErased() -> AnyObject {")
+        swift.append(1, "nonisolated \(visibilityString)func toTypeErased() -> AnyObject {")
         swift.append(2, "let typeErased = \(classDeclaration.signature.typeErasedClass)(self)")
         swift.append(2, typeErasedClosureSwift(for: classDeclaration, to: "typeErased", variableDeclarations: variableDeclarations, functionDeclarations: functionDeclarations, swiftUIType: swiftUIType, stateVariables: stateVariables))
         swift.append(2, "return typeErased")
@@ -1336,7 +1341,7 @@ final class KotlinBridgeToKotlinVisitor {
         for variableDeclaration in variableDeclarations {
             let getter = variableDeclaration.isAppendAsFunction ? variableDeclaration.propertyName.addingBacktickEscapingIfNeeded : "get_\(variableDeclaration.propertyName)"
             let type: TypeSignature = .any.asOptional(variableDeclaration.propertyType.isOptional)
-            let mainActorString = variableDeclaration.apiFlags.options.contains(.mainActor) ? "@MainActor " : ""
+            let mainActorString = variableDeclaration.isMainActorIsolated(in: classDeclaration) ? "@MainActor " : ""
             let asyncString = variableDeclaration.apiFlags.options.contains(.async) ? " async" : ""
             let throwsString = variableDeclaration.apiFlags.throwsType != .none ? " throws" : ""
             swift.append(1, "var \(getter): (\(mainActorString)()\(asyncString)\(throwsString) -> \(type))!")
@@ -1377,17 +1382,17 @@ final class KotlinBridgeToKotlinVisitor {
                 let type: TypeSignature = parameter.declaredType.isNamedType ? .any.asOptional(parameter.declaredType.isOptional) : parameter.declaredType
                 return type.description
             }.joined(separator: ", ")
-            let mainActorString = functionDeclaration.apiFlags.options.contains(.mainActor) ? "@MainActor " : ""
+            let mainActorString = functionDeclaration.isMainActorIsolated(in: classDeclaration) ? "@MainActor " : ""
             let asyncString = functionDeclaration.apiFlags.options.contains(.async) ? " async" : ""
             let throwsString = functionDeclaration.apiFlags.throwsType != .none ? " throws" : ""
             swift.append(1, "var \(functionName)\(uniquifierString): (\(mainActorString)(\(parametersString))\(asyncString)\(throwsString) -> \(returnType))!")
         }
         if let isEqualDeclaration {
-            let mainActorString = isEqualDeclaration.apiFlags.options.contains(.mainActor) ? "@MainActor " : ""
+            let mainActorString = isEqualDeclaration.isMainActorIsolated(in: classDeclaration) ? "@MainActor " : ""
             swift.append(1, "var isequal: (\(mainActorString)(Any) -> Bool)!")
         }
         if let isLessThanDeclaration {
-            let mainActorString = isLessThanDeclaration.apiFlags.options.contains(.mainActor) ? "@MainActor " : ""
+            let mainActorString = isLessThanDeclaration.isMainActorIsolated(in: classDeclaration) ? "@MainActor " : ""
             swift.append(1, "var islessthan: (\(mainActorString)(Any) -> Bool)!")
         }
 
@@ -1396,20 +1401,21 @@ final class KotlinBridgeToKotlinVisitor {
         } else if swiftUIType != .none {
             swift.append(1, "var body: (@MainActor (JavaBackedView) -> Any)!")
         }
-        for (name, attributes) in stateVariables {
+        for (name, attributes, modifiers) in stateVariables {
+            let mainActorString = isMainActorIsolated(in: classDeclaration, attributes: attributes, modifiers: modifiers) ? "@MainActor " : ""
             if attributes.stateAttribute != nil || attributes.contains(.focusState) || attributes.contains(.gestureState) || attributes.contains(.appStorage) {
-                swift.append(1, "var Java_initState_\(name): (() -> SkipUI.StateSupport)!")
-                swift.append(1, "var Java_syncState_\(name): ((SkipUI.StateSupport) -> Void)!")
+                swift.append(1, "var Java_initState_\(name): (\(mainActorString)() -> SkipUI.StateSupport)!")
+                swift.append(1, "var Java_syncState_\(name): (\(mainActorString)(SkipUI.StateSupport) -> Void)!")
             } else if attributes.environmentAttribute != nil {
-                swift.append(1, "var Java_initEnvironment_\(name): (() -> String)!")
-                swift.append(1, "var Java_syncEnvironment_\(name): ((SkipUI.EnvironmentSupport?) -> Void)!")
+                swift.append(1, "var Java_initEnvironment_\(name): (\(mainActorString)() -> String)!")
+                swift.append(1, "var Java_syncEnvironment_\(name): (\(mainActorString)(SkipUI.EnvironmentSupport?) -> Void)!")
             }
         }
         swift.append("}")
         return SwiftDefinition(swift: swift)
     }
 
-    private func typeErasedClosureSwift(for classDeclaration: KotlinClassDeclaration, to target: String, variableDeclarations: [KotlinVariableDeclaration], functionDeclarations: [(KotlinFunctionDeclaration, uniquifier: Int?)], swiftUIType: SwiftUIType, stateVariables: [(String, Attributes)]) -> [String] {
+    private func typeErasedClosureSwift(for classDeclaration: KotlinClassDeclaration, to target: String, variableDeclarations: [KotlinVariableDeclaration], functionDeclarations: [(KotlinFunctionDeclaration, uniquifier: Int?)], swiftUIType: SwiftUIType, stateVariables: [(String, Attributes, Modifiers)]) -> [String] {
         var swift: [String] = []
         for variableDeclaration in variableDeclarations {
             let tryString = variableDeclaration.apiFlags.throwsType != .none ? "try " : ""
@@ -1488,7 +1494,7 @@ final class KotlinBridgeToKotlinVisitor {
         } else if swiftUIType != .none {
             swift.append("\(target).body = { [unowned \(target)] in (\(target).genericvalue as! Self).body($0) }")
         }
-        for (name, attributes) in stateVariables {
+        for (name, attributes, _) in stateVariables {
             if attributes.stateAttribute != nil || attributes.contains(.focusState) || attributes.contains(.gestureState) || attributes.contains(.appStorage) {
                 swift.append("\(target).Java_initState_\(name) = { [unowned \(target)] in (\(target).genericvalue as! Self).Java_initState_\(name)() }")
                 swift.append("\(target).Java_syncState_\(name) = { [unowned \(target)] in (\(target).genericvalue as! Self).Java_syncState_\(name)(support: $0) }")
@@ -1500,12 +1506,12 @@ final class KotlinBridgeToKotlinVisitor {
         return swift
     }
 
-    private func addSwiftUIImplementation(_ swiftUIType: SwiftUIType, to classDeclaration: KotlinClassDeclaration, visibility: Modifiers.Visibility) -> (stateVariables: [(String, Attributes)], statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func addSwiftUIImplementation(_ swiftUIType: SwiftUIType, to classDeclaration: KotlinClassDeclaration, visibility: Modifiers.Visibility) -> (stateVariables: [(String, Attributes, Modifiers)], statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         var statements: [KotlinStatement] = []
         var swift: [String] = []
         var cdeclFunctions: [CDeclFunction] = []
 
-        let stateVariables: [(String, Attributes)] = classDeclaration.unbridgedMembers.compactMap { (unbridged: UnbridgedMember) -> (String, Attributes)? in
+        let stateVariables: [(String, Attributes, Modifiers)] = classDeclaration.unbridgedMembers.compactMap { (unbridged: UnbridgedMember) -> (String, Attributes, Modifiers)? in
             guard case .swiftUIStateProperty(let name, let attributes, let modifiers) = unbridged else {
                 return nil
             }
@@ -1513,11 +1519,11 @@ final class KotlinBridgeToKotlinVisitor {
                 classDeclaration.messages.append(.kotlinBridgeStatePrivate(classDeclaration, property: name, source: syntaxTree.source))
                 return nil
             }
-            return (name, attributes)
+            return (name, attributes, modifiers)
         }
         if !stateVariables.isEmpty {
             statements += swiftUIComposeContent(swiftUIType, for: classDeclaration, stateVariables: stateVariables)
-            for (name, attributes) in stateVariables {
+            for (name, attributes, modifiers) in stateVariables {
                 var initStatements: [KotlinStatement] = []
                 var syncStatements: [KotlinStatement] = []
                 var initSwift: [String] = []
@@ -1534,11 +1540,11 @@ final class KotlinBridgeToKotlinVisitor {
                         supportTypeName = "StateSupport"
                         boxName = "valueBox"
                     }
-                    (initStatements, initSwift, initCdeclFunctions) = swiftUIInitState(for: name, in: classDeclaration, supportTypeName: supportTypeName, boxName: boxName)
-                    (syncStatements, syncSwift, syncCdeclFunctions) = swiftUISyncState(for: name, in: classDeclaration, supportTypeName: supportTypeName, boxName: boxName)
+                    (initStatements, initSwift, initCdeclFunctions) = swiftUIInitState(for: name, in: classDeclaration, supportTypeName: supportTypeName, boxName: boxName, attributes: attributes, modifiers: modifiers)
+                    (syncStatements, syncSwift, syncCdeclFunctions) = swiftUISyncState(for: name, in: classDeclaration, supportTypeName: supportTypeName, boxName: boxName, attributes: attributes, modifiers: modifiers)
                 } else if attributes.environmentAttribute != nil {
-                    (initStatements, initSwift, initCdeclFunctions) = swiftUIInitEnvironment(for: name, in: classDeclaration)
-                    (syncStatements, syncSwift, syncCdeclFunctions) = swiftUISyncEnvironment(for: name, in: classDeclaration)
+                    (initStatements, initSwift, initCdeclFunctions) = swiftUIInitEnvironment(for: name, in: classDeclaration, attributes: attributes, modifiers: modifiers)
+                    (syncStatements, syncSwift, syncCdeclFunctions) = swiftUISyncEnvironment(for: name, in: classDeclaration, attributes: attributes, modifiers: modifiers)
                 }
                 statements += initStatements + syncStatements
                 swift += initSwift + syncSwift
@@ -1554,7 +1560,7 @@ final class KotlinBridgeToKotlinVisitor {
         return (stateVariables, statements, swift, cdeclFunctions)
     }
 
-    private func swiftUIComposeContent(_ swiftUIType: SwiftUIType, for classDeclaration: KotlinClassDeclaration, stateVariables: [(name: String, attributes: Attributes)]) -> [KotlinStatement] {
+    private func swiftUIComposeContent(_ swiftUIType: SwiftUIType, for classDeclaration: KotlinClassDeclaration, stateVariables: [(name: String, attributes: Attributes, modifiers: Modifiers)]) -> [KotlinStatement] {
         let functionName = swiftUIType == .view ? "ComposeContent" : "Compose"
         let functionDeclaration = KotlinFunctionDeclaration(name: functionName)
         if swiftUIType == .view {
@@ -1568,7 +1574,7 @@ final class KotlinBridgeToKotlinVisitor {
 
         let classType = ClassType(classDeclaration)
         var bodyKotlin: [String] = []
-        for (name, attributes) in stateVariables {
+        for (name, attributes, _) in stateVariables {
             if attributes.stateAttribute != nil || attributes.contains(.focusState) || attributes.contains(.gestureState) || attributes.contains(.appStorage) {
                 let supportTypeName = attributes.contains(.appStorage) ? "AppStorageSupport" : "StateSupport"
                 bodyKotlin.append("val remembered\(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.\(supportTypeName), Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_\(name)(\(classType.peerExternalArgument))) }")
@@ -1588,7 +1594,7 @@ final class KotlinBridgeToKotlinVisitor {
         return [functionDeclaration]
     }
 
-    private func swiftUIInitState(for name: String, in classDeclaration: KotlinClassDeclaration, supportTypeName: String, boxName: String) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func swiftUIInitState(for name: String, in classDeclaration: KotlinClassDeclaration, supportTypeName: String, boxName: String, attributes: Attributes, modifiers: Modifiers) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let classType = ClassType(classDeclaration)
         let externalName = "Swift_initState_\(name)"
         let externalSourceCode = "private external fun \(externalName)(\(classType.peerExternalParameter)): skip.ui.\(supportTypeName)"
@@ -1596,20 +1602,22 @@ final class KotlinBridgeToKotlinVisitor {
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
-        source.append("func Java_initState_\(name)() -> SkipUI.\(supportTypeName) {")
+        let mainActorString = attributes.contains(.mainActor) ? "@MainActor " : ""
+        source.append("\(mainActorString)func Java_initState_\(name)() -> SkipUI.\(supportTypeName) {")
         source.append(1, "return $\(name).\(boxName)!.Java_initStateSupport()")
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
         let cdeclSignature: TypeSignature = .function([classType.peerSwiftParameter], .javaObjectPointer, APIFlags(), nil)
-        let cdeclSource = classType.peerSwiftAssignment(to: classDeclaration, optionsString: "[]") + [
-            "return \(classType.peerSwiftTarget).Java_initState_\(name)().toJavaObject(options: [])!"
-        ]
+        var cdeclSource = classType.peerSwiftAssignment(to: classDeclaration, optionsString: "[]")
+        appendMainActorIsolated(&cdeclSource, in: classDeclaration, attributes: attributes, modifiers: modifiers, isReturn: true) { body, indentation in
+            body.append(indentation, "return \(classType.peerSwiftTarget).Java_initState_\(name)().toJavaObject(options: [])!")
+        }
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
-    private func swiftUISyncState(for name: String, in classDeclaration: KotlinClassDeclaration, supportTypeName: String, boxName: String) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func swiftUISyncState(for name: String, in classDeclaration: KotlinClassDeclaration, supportTypeName: String, boxName: String, attributes: Attributes, modifiers: Modifiers) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let classType = ClassType(classDeclaration)
         let externalName = "Swift_syncState_\(name)"
         let externalSourceCode = "private external fun \(externalName)(\(classType.peerExternalParameter), support: skip.ui.\(supportTypeName))"
@@ -1617,22 +1625,24 @@ final class KotlinBridgeToKotlinVisitor {
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
-        source.append("func Java_syncState_\(name)(support: SkipUI.\(supportTypeName)) {")
+        let mainActorString = attributes.contains(.mainActor) ? "@MainActor " : ""
+        source.append("\(mainActorString)func Java_syncState_\(name)(support: SkipUI.\(supportTypeName)) {")
         source.append(1, "$\(name).\(boxName)!.Java_syncStateSupport(support)")
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
         let cdeclSignature: TypeSignature = .function([classType.peerSwiftParameter, TypeSignature.Parameter(label: "support", type: .javaObjectPointer)], .void, APIFlags(), nil)
         let argumentString = classType == .generic ? "support_swift" : "support: support_swift"
-        let cdeclSource = classType.peerSwiftAssignment(to: classDeclaration, optionsString: "[]") + [
-            "let support_swift = SkipUI.\(supportTypeName).fromJavaObject(support, options: [])",
-            "\(classType.peerSwiftTarget).Java_syncState_\(name)(\(argumentString))"
-        ]
+        var cdeclSource = classType.peerSwiftAssignment(to: classDeclaration, optionsString: "[]")
+        appendMainActorIsolated(&cdeclSource, in: classDeclaration, locals: ["support"], attributes: attributes, modifiers: modifiers) { body, indentation in
+            body.append(indentation, "let support_swift = SkipUI.\(supportTypeName).fromJavaObject(support, options: [])")
+            body.append(indentation, "\(classType.peerSwiftTarget).Java_syncState_\(name)(\(argumentString))")
+        }
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
-    private func swiftUIInitEnvironment(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func swiftUIInitEnvironment(for name: String, in classDeclaration: KotlinClassDeclaration, attributes: Attributes, modifiers: Modifiers) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let classType = ClassType(classDeclaration)
         let externalName = "Swift_initEnvironment_\(name)"
         let externalSourceCode = "private external fun \(externalName)(\(classType.peerExternalParameter)): String"
@@ -1640,20 +1650,22 @@ final class KotlinBridgeToKotlinVisitor {
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
-        source.append("func Java_initEnvironment_\(name)() -> String {")
+        let mainActorString = attributes.contains(.mainActor) ? "@MainActor " : ""
+        source.append("\(mainActorString)func Java_initEnvironment_\(name)() -> String {")
         source.append(1, "return $\(name).key")
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
         let cdeclSignature: TypeSignature = .function([classType.peerSwiftParameter], .javaString, APIFlags(), nil)
-        let cdeclSource = classType.peerSwiftAssignment(to: classDeclaration, optionsString: "[]") + [
-            "return \(classType.peerSwiftTarget).Java_initEnvironment_\(name)().toJavaObject(options: [])!"
-        ]
+        var cdeclSource = classType.peerSwiftAssignment(to: classDeclaration, optionsString: "[]")
+        appendMainActorIsolated(&cdeclSource, in: classDeclaration, attributes: attributes, modifiers: modifiers, isReturn: true) { body, indentation in
+            body.append(indentation, "return \(classType.peerSwiftTarget).Java_initEnvironment_\(name)().toJavaObject(options: [])!")
+        }
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
-    private func swiftUISyncEnvironment(for name: String, in classDeclaration: KotlinClassDeclaration) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func swiftUISyncEnvironment(for name: String, in classDeclaration: KotlinClassDeclaration, attributes: Attributes, modifiers: Modifiers) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let classType = ClassType(classDeclaration)
         let externalName = "Swift_syncEnvironment_\(name)"
         let externalSourceCode = "private external fun \(externalName)(\(classType.peerExternalParameter), support: skip.ui.EnvironmentSupport?)"
@@ -1661,17 +1673,19 @@ final class KotlinBridgeToKotlinVisitor {
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
-        source.append("func Java_syncEnvironment_\(name)(support: SkipUI.EnvironmentSupport?) {")
+        let mainActorString = attributes.contains(.mainActor) ? "@MainActor " : ""
+        source.append("\(mainActorString)func Java_syncEnvironment_\(name)(support: SkipUI.EnvironmentSupport?) {")
         source.append(1, "$\(name).Java_syncEnvironmentSupport(support)")
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
         let cdeclSignature: TypeSignature = .function([classType.peerSwiftParameter, TypeSignature.Parameter(label: "support", type: .optional(.javaObjectPointer))], .void, APIFlags(), nil)
         let argumentString = classType == .generic ? "support_swift" : "support: support_swift"
-        let cdeclSource = classType.peerSwiftAssignment(to: classDeclaration, optionsString: "[]") + [
-            "let support_swift = SkipUI.EnvironmentSupport.fromJavaObject(support, options: [])",
-            "\(classType.peerSwiftTarget).Java_syncEnvironment_\(name)(\(argumentString))"
-        ]
+        var cdeclSource = classType.peerSwiftAssignment(to: classDeclaration, optionsString: "[]")
+        appendMainActorIsolated(&cdeclSource, in: classDeclaration, locals: ["support"], attributes: attributes, modifiers: modifiers) { body, indentation in
+            body.append(indentation, "let support_swift = SkipUI.EnvironmentSupport.fromJavaObject(support, options: [])")
+            body.append(indentation, "\(classType.peerSwiftTarget).Java_syncEnvironment_\(name)(\(argumentString))")
+        }
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
@@ -1699,9 +1713,9 @@ final class KotlinBridgeToKotlinVisitor {
         var swift: [String] = []
         let visibilityString = visibility.swift(suffix: " ")
         if swiftUIType == .view {
-            swift.append("\(visibilityString)var Java_view: any SkipUI.View {")
+            swift.append("nonisolated \(visibilityString)var Java_view: any SkipUI.View {")
         } else {
-            swift.append("\(visibilityString)var Java_modifier: any SkipUI.ViewModifier {")
+            swift.append("nonisolated \(visibilityString)var Java_modifier: any SkipUI.ViewModifier {")
         }
         swift.append(1, "return self")
         swift.append("}")
@@ -1735,18 +1749,6 @@ final class KotlinBridgeToKotlinVisitor {
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
 
         return ([functionDeclaration, externalFunctionDeclaration], swift, [cdeclFunction])
-    }
-
-    private func appendMainActorIsolated(_ swift: inout [String], _ indentation: Indentation = 0, isolated: Bool, isThrows: Bool = false, isReturn: Bool = false, block: (inout [String], Indentation) -> Void) {
-        guard isolated else {
-            block(&swift, indentation)
-            return
-        }
-        let tryString = isThrows ? "try " : ""
-        let returnString = isReturn ? "return " : ""
-        swift.append(indentation, "\(returnString)\(tryString)SkipBridge.assumeMainActorUnchecked {")
-        block(&swift, indentation.inc())
-        swift.append(indentation, "}")
     }
 }
 
@@ -1849,4 +1851,56 @@ private enum SwiftUIType : Equatable {
     case none
     case view
     case viewModifier
+}
+
+private extension KotlinVariableDeclaration {
+    func isMainActorIsolated(in classDeclaration: KotlinClassDeclaration?) -> Bool {
+        return SkipSyntax.isMainActorIsolated(in: classDeclaration, attributes: attributes, modifiers: modifiers, isAsync: apiFlags.options.contains(.async))
+    }
+
+    func appendMainActorIsolated(_ swift: inout [String], _ indentation: Indentation = 0, in classDeclaration: KotlinClassDeclaration?, parameter: TypeSignature.Parameter? = nil, isReturn: Bool = false, block: (inout [String], Indentation) -> Void) {
+        let locals: [String]
+        if let parameter, let label = parameter.label, parameter.type == .javaObjectPointer || parameter.type == .javaString {
+            locals = [label]
+        } else {
+            locals = []
+        }
+        SkipSyntax.appendMainActorIsolated(&swift, indentation, in: classDeclaration, locals: locals, attributes: attributes, modifiers: modifiers, isThrows: apiFlags.throwsType != .none, isAsync: apiFlags.options.contains(.async), isReturn: isReturn, block: block)
+    }
+}
+
+private extension KotlinFunctionDeclaration {
+    func isMainActorIsolated(in classDeclaration: KotlinClassDeclaration?) -> Bool {
+        return SkipSyntax.isMainActorIsolated(in: classDeclaration, attributes: attributes, modifiers: modifiers, isAsync: apiFlags.options.contains(.async))
+    }
+
+    func appendMainActorIsolated(_ swift: inout [String], _ indentation: Indentation = 0, in classDeclaration: KotlinClassDeclaration?, parameters: [TypeSignature.Parameter] = [], isReturn: Bool = false, block: (inout [String], Indentation) -> Void) {
+        let locals = parameters.filter { $0.label != nil && ($0.type == .javaObjectPointer || $0.type == .javaString) }.map { $0.label! }
+        SkipSyntax.appendMainActorIsolated(&swift, indentation, in: classDeclaration, locals: locals, attributes: attributes, modifiers: modifiers, isThrows: apiFlags.throwsType != .none, isAsync: apiFlags.options.contains(.async), isReturn: isReturn, block: block)
+    }
+}
+
+private func appendMainActorIsolated(_ swift: inout [String], _ indentation: Indentation = 0, in classDeclaration: KotlinClassDeclaration?, locals: [String] = [], attributes: Attributes, modifiers: Modifiers, isThrows: Bool = false, isAsync: Bool = false, isReturn: Bool = false, block: (inout [String], Indentation) -> Void) {
+    guard isMainActorIsolated(in: classDeclaration, attributes: attributes, modifiers: modifiers, isAsync: isAsync) else {
+        block(&swift, indentation)
+        return
+    }
+    locals.forEach { swift.append(indentation, "let \($0)_sendable = UncheckedSendableBox(\($0))") }
+    let tryString = isThrows ? "try " : ""
+    let returnString = isReturn ? "return " : ""
+    swift.append(indentation, "\(returnString)\(tryString)SkipBridge.assumeMainActorUnchecked {")
+    let bodyIndentation = indentation.inc()
+    locals.forEach { swift.append(bodyIndentation, "let \($0) = \($0)_sendable.wrappedValue") }
+    block(&swift, bodyIndentation)
+    swift.append(indentation, "}")
+}
+
+private func isMainActorIsolated(in classDeclaration: KotlinClassDeclaration?, attributes: Attributes, modifiers: Modifiers, isAsync: Bool = false) -> Bool {
+    guard !modifiers.isNonisolated else {
+        return false
+    }
+    guard !attributes.contains(.mainActor) else {
+        return true
+    }
+    return classDeclaration?.attributes.contains(.mainActor) == true && !isAsync
 }
