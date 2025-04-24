@@ -172,7 +172,13 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
         typealias Output = KeyOutput
 
         func executeCommand() async throws -> Output {
-            guard let exp = ISO8601DateFormatter().date(from: expiration) else {
+            func parseDate() -> Date? {
+                // permit dates without the time specifier (e.g., 2026-04-24)
+                ISO8601DateFormatter().date(from: expiration)
+                ?? ISO8601DateFormatter().date(from: expiration + "T00:00:00Z")
+            }
+
+            guard let exp = parseDate() else {
                 throw LicenseError.licenseExpirationDateInvalid
             }
             let key = LicenseKey(id: id, expiration: exp, hostid: hostid)
