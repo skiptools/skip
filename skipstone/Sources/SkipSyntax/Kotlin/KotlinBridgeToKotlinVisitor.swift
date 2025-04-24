@@ -176,9 +176,7 @@ final class KotlinBridgeToKotlinVisitor {
             return true
         }
 
-        // Remove initial value and make sure type is declared
-        variableDeclaration.value = nil
-        variableDeclaration.declaredType = bridgable.kotlinType
+        updateDeclaration(variableDeclaration, with: bridgable)
 
         let externalName = "Swift_" + (interfaceDeclaration == nil ? "" : interfaceDeclaration!.name + "_") + (variableDeclaration.isStatic ? "Companion_" : "") + propertyName
         var externalFunctionDeclarations: [String] = []
@@ -336,6 +334,12 @@ final class KotlinBridgeToKotlinVisitor {
         return true
     }
 
+    private func updateDeclaration(_ variableDeclaration: KotlinVariableDeclaration, with bridgable: Bridgable) {
+        // Remove initial value and make sure type is declared
+        variableDeclaration.value = nil
+        variableDeclaration.declaredType = bridgable.kotlinType
+    }
+
     private func isSupportedConstant(_ variableDeclaration: KotlinVariableDeclaration, type: TypeSignature) -> Bool {
         guard variableDeclaration.isLet, let value = variableDeclaration.value else {
             return false
@@ -375,14 +379,8 @@ final class KotlinBridgeToKotlinVisitor {
             }
             bridgable = functionBridgable
         }
-        functionDeclaration.returnType = bridgable.return.kotlinType
-        functionDeclaration.parameters = functionDeclaration.parameters.enumerated().map { index, parameter in
-            var parameter = parameter
-            parameter.declaredType = bridgable.parameters[index].kotlinType
-            return parameter
-        }
+        updateDeclaration(functionDeclaration, with: bridgable)
         functionDeclaration.extras = nil
-        functionDeclaration.generics = functionDeclaration.generics.compactMapBridgable(direction: .toKotlin, options: options, codebaseInfo: codebaseInfo)
 
         let (bodyCodeBlock, externalStatements) = addDefinitions(for: functionDeclaration, bridgable: bridgable, in: classDeclaration, isBridgedSubclass: isBridgedSubclass, inExtensionOf: interfaceDeclaration, isMutableStructCopyConstructor: isMutableStructCopyConstructor, uniquifier: uniquifier)
         functionDeclaration.body = bodyCodeBlock
@@ -390,6 +388,16 @@ final class KotlinBridgeToKotlinVisitor {
         let parent = interfaceDeclaration?.parent ?? functionDeclaration.parent
         (parent as? KotlinStatement)?.insert(statements: externalStatements, after: interfaceDeclaration ?? functionDeclaration)
         return true
+    }
+
+    private func updateDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, with bridgable: FunctionBridgable) {
+        functionDeclaration.returnType = bridgable.return.kotlinType
+        functionDeclaration.parameters = functionDeclaration.parameters.enumerated().map { index, parameter in
+            var parameter = parameter
+            parameter.declaredType = bridgable.parameters[index].kotlinType
+            return parameter
+        }
+        functionDeclaration.generics = functionDeclaration.generics.compactMapBridgable(direction: .toKotlin, options: options, codebaseInfo: codebaseInfo)
     }
 
     private func addDefinitions(for functionDeclaration: KotlinFunctionDeclaration, bridgable: FunctionBridgable, in classDeclaration: KotlinClassDeclaration? = nil, isBridgedSubclass: Bool = false, inExtensionOf interfaceDeclaration: KotlinInterfaceDeclaration? = nil, isMutableStructCopyConstructor: Bool = false, isDeclaredByVariable: Bool = false, uniquifier: Int? = nil) -> (KotlinCodeBlock, [KotlinStatement]) {
@@ -897,7 +905,9 @@ final class KotlinBridgeToKotlinVisitor {
                 if isExtension {
                     update(variableDeclaration, inExtensionOf: interfaceDeclaration)
                 } else {
-                    let _ = variableDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator)
+                    if let bridgable = variableDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator) {
+                        updateDeclaration(variableDeclaration, with: bridgable)
+                    }
                 }
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
                 let isExtension = extensions.contains { info in
@@ -908,7 +918,9 @@ final class KotlinBridgeToKotlinVisitor {
                         extensionFunctionCount += 1
                     }
                 } else {
-                    let _ = functionDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator)
+                    if let bridgable = functionDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator) {
+                        updateDeclaration(functionDeclaration, with: bridgable)
+                    }
                 }
             }
         }

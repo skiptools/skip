@@ -5220,6 +5220,59 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testProtocolKotlinCompatibilityOption() async throws {
+        let transformers = builtinKotlinTransformers() + [KotlinBridgeTransformer(options: .kotlincompat)]
+        try await check(supportingSwift: """
+        class URL: SwiftCustomBridged, KotlinConverting<java.net.URI> {
+        }
+        """, swiftBridge: """
+        public protocol FooAPIClientNetworkFetcher {
+            func fetchData(with url: URL, method: String, httpHeaders: [String: String], body: String?) async throws -> String
+        }
+        """, kotlins: ["""
+        interface FooAPIClientNetworkFetcher {
+            suspend fun fetchData(with: java.net.URI, method: String, httpHeaders: kotlin.collections.Map<String, String>, body: String?): String
+        }
+        """, """
+        internal open class URL: SwiftCustomBridged, KotlinConverting<java.net.URI> {
+        }
+        """], swiftBridgeSupport: """
+        public final class FooAPIClientNetworkFetcher_BridgeImpl: FooAPIClientNetworkFetcher, BridgedFromKotlin {
+            nonisolated private static let Java_class = try! JClass(name: "FooAPIClientNetworkFetcher")
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            public func fetchData(with p_0: URL, method p_1: String, httpHeaders p_2: [String: String], body p_3: String?) async throws -> String {
+                return try await withCheckedThrowingContinuation { f_continuation in
+                    let f_return_callback: (String?, JavaObjectPointer?) -> Void = { f_return, f_error in
+                        if let f_error {
+                            f_continuation.resume(throwing: JThrowable.toError(f_error, options: [.kotlincompat])!)
+                        } else {
+                            f_continuation.resume(returning: f_return!)
+                        }
+                    }
+                    jniContext {
+                        let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback, options: [.kotlincompat]).toJavaParameter(options: [.kotlincompat])
+                        let p_0_java = p_0.toJavaObject(options: [.kotlincompat])!.toJavaParameter(options: [.kotlincompat])
+                        let p_1_java = p_1.toJavaParameter(options: [.kotlincompat])
+                        let p_2_java = p_2.toJavaObject(options: [.kotlincompat])!.toJavaParameter(options: [.kotlincompat])
+                        let p_3_java = p_3.toJavaParameter(options: [.kotlincompat])
+                        try! Java_peer.call(method: Self.Java_fetchData_0_methodID, options: [.kotlincompat], args: [p_0_java, p_1_java, p_2_java, p_3_java, f_return_callback_java])
+                    }
+                }
+            }
+            nonisolated private static let Java_fetchData_0_methodID = Java_class.getMethodID(name: "callback_fetchData", sig: "(Ljava/net/URI;Ljava/lang/String;Lkotlin/collections/Map;Ljava/lang/String;Lkotlin/jvm/functions/Function2;)V")!
+            nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            nonisolated public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+        }
+        """, transformers: transformers)
+    }
+
     func testTupleKotlinCompatibilityOption() async throws {
         let transformers = builtinKotlinTransformers() + [KotlinBridgeTransformer(options: .kotlincompat)]
         try await check(supportingSwift: """
