@@ -91,9 +91,9 @@ struct JavaClassRef {
 func declareStaticLet(_ identifier: String, ofType: String, visibility: Modifiers.Visibility? = nil, in signature: TypeSignature? = nil, declarationType: StatementType? = nil, value: String) -> String {
     let visibilityString = (visibility ?? .private).swift(suffix: " ")
     if declarationType == .protocolDeclaration || declarationType == .extensionDeclaration || signature?.generics.isEmpty == false {
-        return "\(visibilityString)static var \(identifier): \(ofType) { \(value) }"
+        return "nonisolated \(visibilityString)static var \(identifier): \(ofType) { \(value) }"
     } else {
-        return "\(signature == nil ? "\(visibilityString)let " : "\(visibilityString)static let ")\(identifier) = \(value)"
+        return "\(signature == nil ? "\(visibilityString)let " : "nonisolated \(visibilityString)static let ")\(identifier) = \(value)"
     }
 }
 
@@ -619,12 +619,13 @@ extension TypeSignature {
 
 extension Modifiers {
     func swift(suffix: String = "") -> String {
-        var string = visibility.swift()
-        if isNonisolated {
+        var string = isNonisolated ? "nonisolated" : ""
+        let visibilityString = visibility.swift()
+        if !visibilityString.isEmpty {
             if !string.isEmpty {
                 string += " "
             }
-            string += "nonisolated"
+            string += visibilityString
         }
         if isStatic {
             if !string.isEmpty {
