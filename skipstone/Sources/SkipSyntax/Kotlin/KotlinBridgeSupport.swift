@@ -535,6 +535,14 @@ extension TypeSignature {
             if typeJNI.hasSuffix(";") {
                 typeJNI = String(typeJNI.dropFirst())
             }
+            // Package-qualified Java types might end up modeled as members rather than modules
+            // Detect compound members with lowercase paths and uppercase names
+            if !parentJNI.contains("/") && parentJNI.contains("$") && typeJNI.first?.isLowercase == false {
+                if parentJNI.split(separator: "$").last?.first?.isLowercase == true {
+                    parentJNI.replace("$", with: "/")
+                    return parentJNI + "/" + typeJNI
+                }
+            }
             return parentJNI + "$" + typeJNI
         case .metaType:
             return "Ljava/lang/Class;"
