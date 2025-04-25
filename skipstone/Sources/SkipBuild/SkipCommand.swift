@@ -56,6 +56,9 @@ public func skipstone(_ args: [String]) async throws -> (out: String, err: Strin
 
 /// The command that is run by "SkipRunner" (aka "skip")
 public struct SkipRunnerExecutor: SkipCommandExecutor {
+    @OptionGroup()
+    var versionOptions: VersionOptions
+
     public static var configuration = CommandConfiguration(
         commandName: "skip",
         abstract: "skip \(skipVersion)",
@@ -101,6 +104,18 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
     }
 }
 
+/// Encapsulates `--version` flag behavior.
+struct VersionOptions: ParsableArguments {
+    @Flag(name: .long, help: "Print the version and exit")
+    var version: Bool = false
+
+    func validate() throws {
+        if version {
+            print(VersionCommand.Output().message(term: .plain) ?? "")
+            throw ExitCode.success
+        }
+    }
+}
 
 /// The command that is run by "SkipKey", which can be used to create and verify Skip license keys
 public struct SkipKeyExecutor: SkipCommandExecutor {
