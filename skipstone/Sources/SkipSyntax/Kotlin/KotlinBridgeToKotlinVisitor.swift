@@ -1006,6 +1006,10 @@ final class KotlinBridgeToKotlinVisitor {
                 swiftUIType = .viewModifier
                 return .skipUIViewModifier
             }
+            guard !includesUI || (!$0.isNamed("ToolbarContent", moduleName: "SwiftUI", generics: []) && !$0.isNamed("ToolbarContent", moduleName: "SkipSwiftUI", generics: [])) else {
+                swiftUIType = .toolbarContent
+                return .skipUIToolbarContent
+            }
             if (classDeclaration.declarationType == .actorDeclaration && $0.isNamed("Actor"))
                 || (isError && $0.isNamed("Exception"))
                 || (isError && $0.isNamed("Error"))
@@ -1150,7 +1154,7 @@ final class KotlinBridgeToKotlinVisitor {
             if let enumCaseDeclaration = member as? KotlinEnumCaseDeclaration {
                 enumCases.append(enumCaseDeclaration)
             } else if let variableDeclaration = member as? KotlinVariableDeclaration {
-                if swiftUIType == .view && variableDeclaration.propertyName == "body" {
+                if (swiftUIType == .view || swiftUIType == .toolbarContent), variableDeclaration.propertyName == "body" {
                     // We substitute our own body
                     classDeclaration.remove(statement: variableDeclaration)
                 } else if update(variableDeclaration, in: classDeclaration) {
@@ -1231,10 +1235,15 @@ final class KotlinBridgeToKotlinVisitor {
             if classDeclaration.declarationType == .classDeclaration, classDeclaration.modifiers.isFinal || !classDeclaration.generics.isEmpty {
                 conformances += ", BridgedFinalClass"
             }
-            if swiftUIType == .view {
+            switch swiftUIType {
+            case .none:
+                break
+            case .view:
                 conformances += ", SkipUIBridging, SkipUI.View"
-            } else if swiftUIType == .viewModifier {
+            case .viewModifier:
                 conformances += ", SkipUI.ViewModifier"
+            case .toolbarContent:
+                conformances += ", SkipUIBridging, SkipUI.ToolbarContent"
             }
         }
         var swift: [String] = []
@@ -1408,7 +1417,7 @@ final class KotlinBridgeToKotlinVisitor {
             swift.append(1, "var islessthan: (\(mainActorString)(Any) -> Bool)!")
         }
 
-        if swiftUIType == .view {
+        if swiftUIType == .view || swiftUIType == .toolbarContent {
             swift.append(1, "var body: (@MainActor () -> Any)!")
         } else if swiftUIType != .none {
             swift.append(1, "var body: (@MainActor (JavaBackedView) -> Any)!")
@@ -1501,7 +1510,7 @@ final class KotlinBridgeToKotlinVisitor {
             swift.append(1, "\(target).islessthan = { [unowned \(target)] in (\(target).genericvalue as! Self) < $0 as! Self }")
         }
 
-        if swiftUIType == .view {
+        if swiftUIType == .view || swiftUIType == .toolbarContent {
             swift.append("\(target).body = { [unowned \(target)] in (\(target).genericvalue as! Self).body }")
         } else if swiftUIType != .none {
             swift.append("\(target).body = { [unowned \(target)] in (\(target).genericvalue as! Self).body($0) }")
@@ -1573,9 +1582,9 @@ final class KotlinBridgeToKotlinVisitor {
     }
 
     private func swiftUIComposeContent(_ swiftUIType: SwiftUIType, for classDeclaration: KotlinClassDeclaration, stateVariables: [(name: String, attributes: Attributes, modifiers: Modifiers)]) -> [KotlinStatement] {
-        let functionName = swiftUIType == .view ? "ComposeContent" : "Compose"
+        let functionName = swiftUIType == .view || swiftUIType == .toolbarContent ? "ComposeContent" : "Compose"
         let functionDeclaration = KotlinFunctionDeclaration(name: functionName)
-        if swiftUIType == .view {
+        if swiftUIType == .view || swiftUIType == .toolbarContent {
             functionDeclaration.parameters = [Parameter<KotlinExpression>(externalLabel: "composectx", declaredType: .named("skip.ui.ComposeContext", []))]
         } else {
             functionDeclaration.parameters = [Parameter<KotlinExpression>(externalLabel: "content", declaredType: .named("skip.ui.View", [])), Parameter<KotlinExpression>(externalLabel: "composectx", declaredType: .named("skip.ui.ComposeContext", []))]
@@ -1597,7 +1606,7 @@ final class KotlinBridgeToKotlinVisitor {
                 bodyKotlin.append("Swift_syncEnvironment_\(name)(\(classType.peerExternalArgument), envvalue\(name))")
             }
         }
-        if swiftUIType == .view {
+        if swiftUIType == .view || swiftUIType == .toolbarContent {
             bodyKotlin.append("super.ComposeContent(composectx)")
         } else {
             bodyKotlin.append("super.Compose(content, composectx)")
@@ -1705,14 +1714,14 @@ final class KotlinBridgeToKotlinVisitor {
     private func swiftUIBodyImplementation(_ swiftUIType: SwiftUIType, for classDeclaration: KotlinClassDeclaration, visibility: Modifiers.Visibility) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let classType = ClassType(classDeclaration)
         let externalName = "Swift_composableBody"
-        let externalParameters = swiftUIType == .view ? classType.peerExternalParameter : "\(classType.peerExternalParameter), content: skip.ui.View"
-        let externalArguments = swiftUIType == .view ? classType.peerExternalArgument : "\(classType.peerExternalArgument), content"
+        let externalParameters = swiftUIType == .view || swiftUIType == .toolbarContent ? classType.peerExternalParameter : "\(classType.peerExternalParameter), content: skip.ui.View"
+        let externalArguments = swiftUIType == .view || swiftUIType == .toolbarContent ? classType.peerExternalArgument : "\(classType.peerExternalArgument), content"
         let externalSourceCode = "private external fun \(externalName)(\(externalParameters)): skip.ui.View?"
         let functionSourceCode = "return skip.ui.ComposeBuilder { composectx: skip.ui.ComposeContext -> \(externalName)(\(externalArguments))?.Compose(composectx) ?: skip.ui.ComposeResult.ok }"
         let externalFunctionDeclaration = KotlinRawStatement(sourceCode: externalSourceCode)
 
         let functionDeclaration = KotlinFunctionDeclaration(name: "body")
-        if swiftUIType != .view {
+        if swiftUIType != .view && swiftUIType != .toolbarContent {
             functionDeclaration.parameters = [Parameter<KotlinExpression>(externalLabel: "content", declaredType: .named("skip.ui.View", []))]
         }
         functionDeclaration.returnType = .skipUIView
@@ -1724,7 +1733,7 @@ final class KotlinBridgeToKotlinVisitor {
 
         var swift: [String] = []
         let visibilityString = visibility.swift(suffix: " ")
-        if swiftUIType == .view {
+        if swiftUIType == .view || swiftUIType == .toolbarContent {
             swift.append("nonisolated \(visibilityString)var Java_view: any SkipUI.View {")
         } else {
             swift.append("nonisolated \(visibilityString)var Java_modifier: any SkipUI.ViewModifier {")
@@ -1734,13 +1743,13 @@ final class KotlinBridgeToKotlinVisitor {
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: false, name: externalName, translator: translator)
         var cdeclParameters = [classType.peerSwiftParameter]
-        if swiftUIType != .view {
+        if swiftUIType != .view && swiftUIType != .toolbarContent {
             cdeclParameters.append(TypeSignature.Parameter(label: "content", type: .javaObjectPointer))
         }
         let cdeclSignature: TypeSignature = .function(cdeclParameters, .optional(.javaObjectPointer), APIFlags(), nil)
         var cdeclSource = classType.peerSwiftAssignment(to: classDeclaration, optionsString: "[]")
         let bodyInvocation: String
-        if swiftUIType == .view {
+        if swiftUIType == .view || swiftUIType == .toolbarContent {
             if classType == .generic {
                 bodyInvocation = "let body = \(classType.peerSwiftTarget).body()"
             } else {
@@ -1863,6 +1872,7 @@ private enum SwiftUIType : Equatable {
     case none
     case view
     case viewModifier
+    case toolbarContent
 }
 
 private extension KotlinVariableDeclaration {
