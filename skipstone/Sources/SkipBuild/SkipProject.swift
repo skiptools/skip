@@ -1622,8 +1622,10 @@ ANDROID_PACKAGE_NAME = \(appModulePackage)
 // Set the action that will be executed as part of the Xcode Run Script phase
 // Setting to "launch" will build and run the app in the first open Android emulator or device
 // Setting to "build" will just run gradle build, but will not launch the app
+// Setting to "none" will completely disable the build and launch of the Android app
 SKIP_ACTION = launch
 //SKIP_ACTION = build
+//SKIP_ACTION = none
 
 ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor
@@ -2621,11 +2623,14 @@ struct SettingsView : View {
 if [ "${SKIP_ZERO}" != "" ]; then
   echo "note: skipping skip due to SKIP_ZERO"
   exit 0
-elif [ "${ENABLE_PREVIEWS}" == "YES" ]; then
+elif [ "${ENABLE_PREVIEWS}" = "YES" ]; then
   echo "note: skipping skip due to ENABLE_PREVIEWS"
   exit 0
-elif [ "${ACTION}" == "install" ]; then
+elif [ "${ACTION}" = "install" ]; then
   echo "note: skipping skip due to archive install"
+  exit 0
+elif [ "${SKIP_ACTION}" = "none" ]; then
+  echo "note: skipping skip due to SKIP_ACTION none"
   exit 0
 else
   SKIP_ACTION="${SKIP_ACTION:-launch}"
@@ -3181,7 +3186,7 @@ extension FrameworkProjectLayout {
             //System.setProperty("BUILT_PRODUCTS_DIR", "${System.getProperty("user.home")}/Library/Developer/Xcode/DerivedData/MySkipProject-HASH/Build/Products/Debug-iphonesimulator")
             @Suppress("DEPRECATION")
             exec {
-                commandLine("skip", "plugin", "--prebuild", "--package-path", settings.rootDir.parent, "--plugin-ref", pluginPath.absolutePath)
+                commandLine("sh", "-c", "skip plugin --prebuild --package-path '${settings.rootDir.parent}' --plugin-ref '${pluginPath.absolutePath}'")
                 environment("PATH", "${System.getenv("PATH")}:/opt/homebrew/bin")
             }
             includeBuild(pluginPath.readText()) {

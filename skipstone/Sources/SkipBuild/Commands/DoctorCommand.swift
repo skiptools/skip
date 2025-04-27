@@ -119,7 +119,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         }
         try await checkVersion(title: "Swift version", cmd: ["swift", "-version"], min: Version("5.9.0"), pattern: "Swift version ([0-9.]+)")
         if checkNative {
-            try await checkVersion(title: "Swift Android SDK version", cmd: ["skip", "android", "build", "--version"], min: Version("6.1.0"), pattern: "Swift Package Manager - Swift ([0-9.]+)", hint: " (install with: skip android sdk install)")
+            try await checkVersion(title: "Swift Android SDK version", cmd: ["skip", "android", "toolchain", "version"], min: Version("6.1.0"), pattern: "Swift Package Manager - Swift ([0-9.]+)", hint: " (install with: skip android sdk install)")
         }
         // TODO: add advice to run `xcode-select -s /Applications/Xcode.app/Contents/Developer` to work around https://github.com/skiptools/skip/issues/18
         try await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)", hint: " (install from: https://developer.apple.com/xcode/)")

@@ -575,8 +575,8 @@ extension StreamingCommand {
         // in the end, throw an error if there are any failures; otherwise pass
         // TODO: a --warnings-as-errors flag could be useful for running in strict mode
         if let failCount = messageTypes[.fail]?.count, failCount > 0 {
-            //throw StreamCommandError(errorDescription: "\(failCount) \(failCount == 1 ? "error" : "errors")")
-            throw StreamCommandError(errorDescription: "\(failCount) \(failCount == 1 ? "error" : "errors"): \(messages.compactMap({ $0.message(term: .plain) }))")
+            throw StreamCommandError(errorDescription: "\(failCount) \(failCount == 1 ? "error" : "errors")")
+            //throw StreamCommandError(errorDescription: "\(failCount) \(failCount == 1 ? "error" : "errors"): \(messages.compactMap({ $0.message(term: .plain) }))")
         }
     }
 }

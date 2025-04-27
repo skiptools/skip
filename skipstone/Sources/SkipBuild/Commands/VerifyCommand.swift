@@ -182,7 +182,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
                         try expectedContents.write(to: url, atomically: false, encoding: .utf8)
                         return CheckStatus(status: .warn, message: "\(title): updated contents")
                     } else {
-                        return CheckStatus(status: .fail, message: "\(title): contents out of date")
+                        return CheckStatus(status: .warn, message: "\(title): out of date: run skip verify --fix")
                     }
                 } else {
                     return CheckStatus(status: .pass)

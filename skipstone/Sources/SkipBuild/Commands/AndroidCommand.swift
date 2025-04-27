@@ -23,6 +23,7 @@ struct AndroidCommand: AsyncParsableCommand {
             AndroidRunCommand.self,
             AndroidTestCommand.self,
             AndroidSDKCommand.self,
+            AndroidToolchainCommand.self,
         ])
 }
 
@@ -98,6 +99,40 @@ struct AndroidSDKListCommand: SkipCommand, StreamingCommand, OutputOptionsComman
         func message(term: Term) -> String? {
             name
         }
+    }
+}
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct AndroidToolchainCommand: AsyncParsableCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "toolchain",
+        abstract: "Manage installation of Swift Android Host Toolchain",
+        shouldDisplay: androidCommandEnabled,
+        subcommands: [
+            AndroidToolchainVersionCommand.self,
+        ])
+}
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct AndroidToolchainVersionCommand: AndroidOperationCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "version",
+        abstract: "Show the version of the Swift Android Host Toolchain",
+        shouldDisplay: true)
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    @OptionGroup(title: "Tool Options")
+    var toolOptions: ToolOptions
+
+    @OptionGroup(title: "Toolchain Options")
+    var toolchainOptions: ToolchainOptions
+
+    var args: [String] { ["--version"] }
+
+    func performCommand(with out: MessageQueue) async throws {
+        try await runSwiftPM(defaultArch: .current, testingLibrary: nil, with: out)
     }
 }
 
