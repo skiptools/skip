@@ -331,6 +331,12 @@ extension ToolOptionsCommand where Self : StreamingCommand {
             artifactHashes.merge(apkFiles, uniquingKeysWith: { $1 })
         }
 
+        if gitRepo == true {
+            // https://github.com/skiptools/skip/issues/407
+            try await run(with: out, "Initializing git repository", ["git", "-C", projectURL.path, "init"])
+            try await run(with: out, "Adding files to git repository", ["git", "-C", projectURL.path, "add", "."])
+        }
+
         if verify {
             try await performVerifyCommand(project: projectPath.pathString, autofix: false, free: free, with: out.subqueue("Verify Project"))
         }
