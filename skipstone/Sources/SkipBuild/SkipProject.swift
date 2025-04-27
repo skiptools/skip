@@ -3186,7 +3186,7 @@ extension FrameworkProjectLayout {
             //System.setProperty("BUILT_PRODUCTS_DIR", "${System.getProperty("user.home")}/Library/Developer/Xcode/DerivedData/MySkipProject-HASH/Build/Products/Debug-iphonesimulator")
             @Suppress("DEPRECATION")
             exec {
-                commandLine("sh", "-c", "skip plugin --prebuild --package-path '${settings.rootDir.parent}' --plugin-ref '${pluginPath.absolutePath}'")
+                commandLine("/bin/sh", "-c", "skip plugin --prebuild --package-path '${settings.rootDir.parent}' --plugin-ref '${pluginPath.absolutePath}'")
                 environment("PATH", "${System.getenv("PATH")}:/opt/homebrew/bin")
             }
             includeBuild(pluginPath.readText()) {
