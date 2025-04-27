@@ -56,8 +56,9 @@ public func skipstone(_ args: [String]) async throws -> (out: String, err: Strin
 
 /// The command that is run by "SkipRunner" (aka "skip")
 public struct SkipRunnerExecutor: SkipCommandExecutor {
-    @OptionGroup()
-    var versionOptions: VersionOptions
+    // cannot use because it conflicts with various "--version" options in `skip init` and `skip android`
+    //@OptionGroup()
+    //var versionOptions: VersionOptions
 
     public static var configuration = CommandConfiguration(
         commandName: "skip",
