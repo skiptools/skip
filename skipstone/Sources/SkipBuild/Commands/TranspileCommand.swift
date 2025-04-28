@@ -65,12 +65,12 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         #endif
 
         if Self.enablePreviews == true {
-            info("Skip \(v): transpile plugin not running for ENABLE_PREVIEWS=YES")
+            info("Skip \(v): skipstone plugin not running for ENABLE_PREVIEWS=YES")
             return
         }
 
         if SkippyCommand.skippyOnly == true {
-            info("Skip \(v): transpile plugin not running for CONFIGURATION=Skippy")
+            info("Skip \(v): skipstone plugin not running for CONFIGURATION=Skippy")
             return
         }
 
@@ -102,7 +102,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let outputFolderPath = try AbsolutePath(validating: outputFolder, relativeTo: baseOutputPath)
 
 
-        info("Skip \(v): transpile plugin to: \(transpileOptions.outputFolder ?? "nowhere") at \(dateFormatter.string(from: .now))")
+        info("Skip \(v): skipstone plugin to: \(transpileOptions.outputFolder ?? "nowhere") at \(dateFormatter.string(from: .now))")
         try await self.transpile(root: baseOutputPath, project: projectFolderPath, module: moduleRootPath, skip: skipFolderPath, output: outputFolderPath, fs: fs, with: out)
     }
 
@@ -111,7 +111,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             try await transpileThrows(root: rootPath, project: projectFolderPath, module: moduleRootPath, skip: skipFolderPath, output: outputFolderPath, fs: fs, with: out)
         } catch {
             // ensure that the error is logged in some way before failing
-            self.error("An error occurred while performing transpilation: \(error.localizedDescription)")
+            self.error("Skip \(skipVersion) error: \(error.localizedDescription)")
             throw error
         }
     }
@@ -282,12 +282,18 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         // We no longer remove the path because the plugin doesn't seem to require it to know to run in dependency order
         //removePath(sourcehashOutputPath) // delete the build completion marker to force its re-creation (removeFileTree doesn't throw when the file doesn't exist)
 
+        // load and merge each of the skip.yml files for the dependent modules
+        let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
+
+        let isNativeModule = baseSkipConfig.skip?.mode?.lowercased() == "native"
+
         // also add any files in the skipFolderFile to the list of sources (including the skip.yml and other metadata files)
         let skipFolderPathContents = try FileManager.default.enumeratedURLs(of: skipFolderPath.asURL)
             .filter({ (try? $0.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true })
 
         // validate licenses in all the Skip source files, as well as any custom Kotlin files in the Skip folder
-        let sourcehashes = try await createSourceHashes(validateLicense: ["swift", "kt", "java"], sourceURLs: sourceURLs + skipFolderPathContents)
+        let sourcehashes = try await createSourceHashes(validateLicense: ["swift", "kt", "java"], isNativeModule: isNativeModule, sourceURLs: sourceURLs + skipFolderPathContents)
+
         // touch the build marker with the most recent file time from the complete build list
         // if we were to touch it afresh every time, the plugin would be re-executed every time
         defer {
@@ -306,10 +312,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         let codebaseInfo = try await loadCodebaseInfo() // initialize the codebaseinfo and load DependentModuleName.skipcode.json
 
-        // load and merge each of the skip.yml files for the dependent modules
-        let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
-
-        let isNativeModule = baseSkipConfig.skip?.mode?.lowercased() == "native"
         let autoBridge: AutoBridge = primaryModuleName == "SkipSwiftUI" ? .none : baseSkipConfig.skip?.isAutoBridgingEnabled() == true ? .public : .default
         let dynamicRoot = baseSkipConfig.skip?.dynamicroot
 

@@ -138,7 +138,7 @@ cat > ${ARTIFACTBUNDLE}/info.json << EOF
                 {
                     "path": "macos/${SKIPCMD}",
                     "supportedTriples": ["x86_64-apple-macosx", "arm64-apple-macosx"]
-                },
+                }
             ]
         }
     }

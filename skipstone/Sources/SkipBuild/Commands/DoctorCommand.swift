@@ -41,6 +41,8 @@ struct DoctorCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
 }
 
 extension ToolOptionsCommand where Self : StreamingCommand {
+    // TODO: check license validity: https://github.com/skiptools/skip/issues/388
+
     /// Runs the `skip doctor` command and stream the results to the messenger
     func runDoctor(checkNative: Bool, with out: MessageQueue) async throws {
 

@@ -544,13 +544,14 @@ extension OutputOptions {
         let env = cfg + "/skipkey.env"
         if !FileManager.default.fileExists(atPath: env) {
             try? """
-            # Obtain a Skip key from https://skip.tools for the SKIPKEY property
-            # Be sure that the key is on a single line, and that
-            # there is a space between the colon and the key string
-            #SKIPKEY:
+            # Obtain a Skip key from https://skip.tools for the SKIPKEY property.
+            # This file must be valid YAML, so be sure that the key is on a single line,
+            # and that there is a space between the colon and the key string
+            SKIPKEY: 
             """.write(toFile: env, atomically: false, encoding: .utf8)
         }
 
+        #if false // not currently used
         let yml = cfg + "/skip.yml"
         if !FileManager.default.fileExists(atPath: yml) {
             try? """
@@ -567,6 +568,7 @@ environment:
 """
                 .write(toFile: yml, atomically: false, encoding: .utf8)
         }
+        #endif
 
         return firstRun
     }

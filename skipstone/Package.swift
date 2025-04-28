@@ -23,7 +23,9 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.8.1"),
         .package(url: "https://github.com/marcprux/universal.git", from: "5.2.2"),
-        .package(url: "https://github.com/p-x9/ELFKit.git", from: "0.2.0"),
+        // needed until https://github.com/p-x9/ELFKit/pull/6 is released
+        .package(url: "https://github.com/marcprux/ELFKit.git", from: "0.2.1"),
+        //.package(url: "https://github.com/p-x9/ELFKit.git", from: "0.2.0")
     ],
     targets: [
         // SkipDriveExternal is a link to ../../skip/Sources/SkipDrive

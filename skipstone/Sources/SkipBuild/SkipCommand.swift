@@ -123,8 +123,8 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
     public static var configuration = CommandConfiguration(commandName: "skipkey",
                                                            abstract: "Skip Key Tool \(skipVersion)",
                                                            subcommands: [
-                                                            InfoCommand.self,
-                                                            CreateCommand.self,
+                                                            LicenseInfoCommand.self,
+                                                            LicenseCreateCommand.self,
                                                            ])
 
     public init() {
@@ -132,6 +132,7 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
 
     struct KeyOutput : MessageEncodable {
         var id: String
+        var type: LicenseKey.LicenseType?
         var expiration: Date
         var hostid: String?
         var key: String
@@ -140,6 +141,7 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
 
             """
             id: \(id)
+            type: \(type?.rawValue ?? "legacy")
             expiration: \(expiration)
             expiration: \(ISO8601DateFormatter.string(from: expiration, timeZone: TimeZone(secondsFromGMT: 0)!))
             hostid: \(hostid ?? "")
@@ -149,7 +151,7 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
     }
 
 
-    struct InfoCommand: SingleStreamingCommand {
+    struct LicenseInfoCommand: SingleStreamingCommand {
         static var configuration = CommandConfiguration(commandName: "info", abstract: "Show key info")
 
         @Option(name: [.customShort("k"), .long], help: ArgumentHelp("The key to open", valueName: "key"))
@@ -163,18 +165,24 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
         func executeCommand() async throws -> Output {
             //info("create key")
             let licenseKey = try LicenseKey(licenseString: self.key)
-            return KeyOutput(id: licenseKey.id, expiration: licenseKey.expiration, hostid: licenseKey.hostid, key: key)
+            return KeyOutput(id: licenseKey.id, type: licenseKey.licenseType, expiration: licenseKey.expiration, hostid: licenseKey.hostid, key: key)
         }
     }
 
-    struct CreateCommand: SingleStreamingCommand {
+    struct LicenseCreateCommand: SingleStreamingCommand {
         static var configuration = CommandConfiguration(commandName: "create", abstract: "Create a new key")
 
         @Option(name: [.customShort("i"), .long], help: ArgumentHelp("The identifier for the key", valueName: "id"))
         var id: String
 
+        @Option(name: [.customShort("t"), .long], help: ArgumentHelp("The type of the license key", valueName: "type"))
+        var type: LicenseKey.LicenseType
+
         @Option(name: [.customShort("e"), .long], help: ArgumentHelp("The ISO-8601 key expiration date", valueName: "date"))
-        var expiration: String
+        var expiration: String?
+
+        @Option(name: [.customShort("d"), .long], help: ArgumentHelp("The number of days before expiration", valueName: "days"))
+        var expirationDays: Int?
 
         @Option(name: [.customShort("h"), .long], help: ArgumentHelp("The hostid for the key", valueName: "hostid"))
         var hostid: String?
@@ -188,26 +196,34 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
         typealias Output = KeyOutput
 
         func executeCommand() async throws -> Output {
-            func parseDate() -> Date? {
-                // permit dates without the time specifier (e.g., 2026-04-24)
-                ISO8601DateFormatter().date(from: expiration)
-                ?? ISO8601DateFormatter().date(from: expiration + "T00:00:00Z")
+            func parseDate() throws -> Date? {
+                if let expiration {
+                    // permit dates without the time specifier (e.g., 2026-04-24)
+                    return ISO8601DateFormatter().date(from: expiration)
+                    ?? ISO8601DateFormatter().date(from: expiration + "T00:00:00Z")
+                } else if let expirationDays {
+                    return Date.now.addingTimeInterval(60 * 60 * 24 * Double(expirationDays))
+                } else {
+                    throw error("Either --expiration or --expiration-days must be specified")
+                }
             }
 
-            guard let exp = parseDate() else {
+            guard let exp = try parseDate() else {
                 throw LicenseError.licenseExpirationDateInvalid
             }
-            let key = LicenseKey(id: id, expiration: exp, hostid: hostid)
+            let key = LicenseKey(id: id, expiration: exp, hostid: hostid, flags: type.licenseFlags)
             let iv = nonce.flatMap(Data.init(hexString:))
             if nonce != nil && iv?.count != 12 {
                 throw LicenseError.invalidNonceFormat
             }
             let keyString = try key.licenseKeyString(iv: iv)
-            return KeyOutput(id: id, expiration: exp, key: keyString)
+            return KeyOutput(id: id, type: key.licenseType, expiration: exp, key: keyString)
         }
     }
 }
 
+extension LicenseKey.LicenseType : ExpressibleByArgument {
+}
 
 extension SkipCommandExecutor {
     /// Run the given command on the given arguments.
