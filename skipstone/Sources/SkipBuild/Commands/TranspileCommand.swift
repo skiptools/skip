@@ -522,18 +522,27 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             // We pass dependencies is inout to bypass Swift 6+ requiring that it be @MainActor.
             var packageAddendum = """
 
+            /// Convert remote dependencies into their locally-cached versions.
+            /// This allows us to re-use dependencies from the parent
+            /// Xcode/SwiftPM process without redundently cloning them.
             func useLocalPackage(named packageName: String, id packageID: String, dependencies: inout [Package.Dependency]) {
-                dependencies = dependencies.filter {
-                    switch $0.kind {
-                    case let .sourceControl(name: name, location: location, requirement: _):
-                        return name != packageName && !location.hasSuffix("/" + packageID) && !location.hasSuffix("/" + packageID + ".git")
-                    case let .fileSystem(name: name, path: location):
-                        return name != packageName && !location.hasSuffix("/" + packageID) && !location.hasSuffix("/" + packageID + ".git")
-                    default:
-                        return true
+                func localDependency(name: String?, location: String) -> Package.Dependency? {
+                    if name == packageID || location.hasSuffix("/" + packageID) || location.hasSuffix("/" + packageID + ".git") {
+                        return Package.Dependency.package(path: "Packages/" + packageID)
+                    } else {
+                        return nil
                     }
                 }
-                dependencies += [.package(name: packageName, path: "Packages/" + packageID)]
+                dependencies = dependencies.map { dep in
+                    switch dep.kind {
+                    case let .sourceControl(name: name, location: location, requirement: _):
+                        return localDependency(name: name, location: location) ?? dep
+                    case let .fileSystem(name: name, path: location):
+                        return localDependency(name: name, location: location) ?? dep
+                    default:
+                        return dep
+                    }
+                }
             }
             
             """

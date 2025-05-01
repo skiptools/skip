@@ -38,6 +38,20 @@ class FrameworkProjectLayout {
         }
     }
 
+    /// Get the default Java package name for the given module, throwing an error if the Java package name contains a reserved keyword.
+    static func packageName(forModule moduleName: String) throws -> String {
+        // https://docs.oracle.com/javase/tutorial/java/nutsandbolts/_keywords.html
+        let keywords: Set<String> = ["abstract", "continue", "for", "new", "switch", "assert", "default", "goto", "package", "synchronized", "boolean", "do", "if", "private", "this", "break", "double", "implements", "protected", "throw", "byte", "else", "import", "public", "throws", "case", "enum", "instanceof", "return", "transient", "catch", "extends", "int", "short", "try", "char", "final", "interface", "static", "void", "class", "finally", "long", "strictfp", "volatile", "const", "float", "native", "super", "while"]
+
+        let pname = KotlinTranslator.packageName(forModule: moduleName)
+        let packageParts = pname.split(separator: ".")
+        for part in packageParts {
+            if keywords.contains(String(part)) {
+                throw InitError(errorDescription: "The module name \"\(moduleName)\" is invalid because the derived Java package name \"\(pname)\" contains a reserved keyword: \"\(part)\"")
+            }
+        }
+        return pname
+    }
 
     static func createSkipLibrary(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, swiftVersion: String, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests createModuleTests: Bool, packageResolved packageResolvedURL: URL?) throws -> URL {
         if modules.isEmpty {
@@ -108,7 +122,7 @@ class FrameworkProjectLayout {
         for moduleIndex in modules.indices {
             let module = modules[moduleIndex]
             let moduleName = module.moduleName
-            let modulePackage = KotlinTranslator.packageName(forModule: moduleName)
+            let modulePackage = try packageName(forModule: moduleName)
             // the isAppModule is the initial module in the list when we specify we want to create an app module
             let isAppModule = app == true && moduleIndex == modules.startIndex
             // the model module is the second in the chain
@@ -1621,7 +1635,7 @@ class AppProjectLayout : FrameworkProjectLayout {
 
         let sourcesFolderName = "Sources"
         let appModuleName = primaryModuleName
-        let appModulePackage = KotlinTranslator.packageName(forModule: appModuleName)
+        let appModulePackage = try packageName(forModule: appModuleName)
 
         // The Xcode name for the app
         let APP_NAME = appModuleName
