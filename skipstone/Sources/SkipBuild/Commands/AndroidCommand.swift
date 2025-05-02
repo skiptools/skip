@@ -630,7 +630,7 @@ fileprivate extension AndroidOperationCommand {
 
         // folder containing the shared object files
         var libPathDynamic = libBase
-            .appendingPathComponent(arch.libpathDynamic, isDirectory: true)
+            .appendingPathComponent(arch.triple, isDirectory: true)
 
         // pre-6.0.3 SDKs stored their libraries in the API-level-specific folder, and after in the parent folder; check each lib location for the expected "libswiftCore.so" library
         if !FileManager.default.fileExists(atPath: libPathDynamic.appendingPathComponent("libswiftCore.so", isDirectory: false).path) {
@@ -714,7 +714,7 @@ struct AndroidBuildCommand: AndroidOperationCommand {
     var args: [String] = []
 
     func performCommand(with out: MessageQueue) async throws {
-        try await runSwiftPM(defaultArch: .automatic, archiveOutputFolder: dir.flatMap(URL.init(fileURLWithPath:)), testingLibrary: nil, with: out)
+        try await runSwiftPM(defaultArch: .current, archiveOutputFolder: dir.flatMap(URL.init(fileURLWithPath:)), testingLibrary: nil, with: out)
     }
 }
 
@@ -949,6 +949,7 @@ enum AndroidArch: String {
         }
     }
 
+    /// e.g.: `~/Library/org.swift.swiftpm/swift-sdks/swift-6.1-RELEASE-android-24-0.1.artifactbundle/swift-6.1-release-android-24-sdk/android-27c-sysroot/usr/lib/arm-linux-androideabi`
     var triple: String {
         switch self {
         case .aarch64:
@@ -960,7 +961,6 @@ enum AndroidArch: String {
         }
     }
 
-    /// e.g. `~/Library/org.swift.swiftpm/swift-sdks/swift-6.0.3-RELEASE-android-24-0.1.artifactbundle/swift-6.0.3-release-android-24-sdk/android-27c-sysroot/usr/lib/aarch64-linux-android`
     var libpathDynamic: String {
         switch self {
         case .aarch64:
