@@ -907,6 +907,7 @@ final class KotlinBridgeToKotlinVisitor {
                 } else {
                     if let bridgable = variableDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator) {
                         updateDeclaration(variableDeclaration, with: bridgable)
+                        KotlinBridgeToSwiftVisitor.appendCallbackFunction(for: variableDeclaration, bridgable: bridgable, modifiers: variableDeclaration.modifiers)
                     }
                 }
             } else if let functionDeclaration = member as? KotlinFunctionDeclaration {
@@ -920,6 +921,7 @@ final class KotlinBridgeToKotlinVisitor {
                 } else {
                     if let bridgable = functionDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator) {
                         updateDeclaration(functionDeclaration, with: bridgable)
+                        KotlinBridgeToSwiftVisitor.appendCallbackFunction(for: functionDeclaration, bridgable: bridgable, modifiers: functionDeclaration.modifiers)
                     }
                 }
             }

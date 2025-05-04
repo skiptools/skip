@@ -157,7 +157,7 @@ final class KotlinBridgeToSwiftVisitor {
             swift = definitionSwift + javaSwift
         }
         swiftDefinitions.append(SwiftDefinition(statement: variableDeclaration, swift: swift))
-        appendCallbackFunction(for: variableDeclaration, bridgable: bridgable, modifiers: variableDeclaration.modifiers)
+        Self.appendCallbackFunction(for: variableDeclaration, bridgable: bridgable, modifiers: variableDeclaration.modifiers)
         return true
     }
 
@@ -169,7 +169,7 @@ final class KotlinBridgeToSwiftVisitor {
         guard !addConstantDefinition(for: variableDeclaration, type: bridgable.type, modifiers: modifiers, to: &swiftDefinitions) else {
             return false
         }
-        appendCallbackFunction(for: variableDeclaration, bridgable: bridgable, modifiers: modifiers)
+        Self.appendCallbackFunction(for: variableDeclaration, bridgable: bridgable, modifiers: modifiers)
         // Don't add Swift for protocol extension members that were merged into Kotlin interface
         guard info != nil || parentStatement.type != .interfaceDeclaration else {
             return true
@@ -361,7 +361,7 @@ final class KotlinBridgeToSwiftVisitor {
         }
     }
 
-    private func appendCallbackFunction(for variableDeclaration: KotlinVariableDeclaration, bridgable: Bridgable, modifiers: Modifiers) {
+    static func appendCallbackFunction(for variableDeclaration: KotlinVariableDeclaration, bridgable: Bridgable, modifiers: Modifiers) {
         guard variableDeclaration.apiFlags.options.contains(.async) else {
             return
         }
@@ -401,7 +401,7 @@ final class KotlinBridgeToSwiftVisitor {
         let definitionSwift = Self.swift(forFunctionWithName: name, type: type, generics: functionDeclaration.generics, parameterValues: parameterValues, disambiguatingParameterCount: functionDeclaration.disambiguatingParameterCount, bridgable: bridgable, options: options, modifiers: modifiers, apiFlags: functionDeclaration.apiFlags, targetIdentifier: globalsClassRef.identifier, methodIdentifier: methodIdentifier)
         let javaSwift = Self.swiftJavaDeclarations(forFunctionWithName: name, type: type, disambiguatingParameterCount: functionDeclaration.disambiguatingParameterCount, bridgable: bridgable, options: options, apiFlags: functionDeclaration.apiFlags, classIdentifier: globalsClassRef.identifier, methodIdentifier: methodIdentifier)
         swiftDefinitions.append(SwiftDefinition(statement: functionDeclaration, swift: definitionSwift + javaSwift))
-        appendCallbackFunction(for: functionDeclaration, bridgable: bridgable, modifiers: functionDeclaration.modifiers)
+        Self.appendCallbackFunction(for: functionDeclaration, bridgable: bridgable, modifiers: functionDeclaration.modifiers)
         return true
     }
 
@@ -410,7 +410,7 @@ final class KotlinBridgeToSwiftVisitor {
             return false
         }
         let modifiers = info?.modifiers ?? functionDeclaration.modifiers
-        appendCallbackFunction(for: functionDeclaration, bridgable: bridgable, modifiers: modifiers)
+        Self.appendCallbackFunction(for: functionDeclaration, bridgable: bridgable, modifiers: modifiers)
         // Don't add Swift for protocol extension members that were merged into Kotlin interface
         guard info != nil || parentStatement.type != .interfaceDeclaration else {
             return true
@@ -642,7 +642,7 @@ final class KotlinBridgeToSwiftVisitor {
         return [methodID]
     }
 
-    private func appendCallbackFunction(for functionDeclaration: KotlinFunctionDeclaration, bridgable: FunctionBridgable, modifiers: Modifiers) {
+    static func appendCallbackFunction(for functionDeclaration: KotlinFunctionDeclaration, bridgable: FunctionBridgable, modifiers: Modifiers) {
         guard functionDeclaration.apiFlags.options.contains(.async) else {
             return
         }
@@ -688,7 +688,7 @@ final class KotlinBridgeToSwiftVisitor {
         (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [callbackFunction], after: functionDeclaration)
     }
 
-    private func invocationSourceCode(for functionDeclaration: KotlinFunctionDeclaration) -> String {
+    private static func invocationSourceCode(for functionDeclaration: KotlinFunctionDeclaration) -> String {
         let argumentsString = functionDeclaration.parameters.map {
             let label = $0.externalLabel ?? $0.internalLabel
             return label + " = " + label

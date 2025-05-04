@@ -4209,6 +4209,181 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testProtocolAsyncConformance() async throws {
+        try await check(swiftBridge: """
+        public protocol P {
+            func f() async throws -> Int
+        }
+        public final class C : P {
+            public func f() async throws -> Int {
+                return 1
+            }
+            public func g(p: P) async throws -> Int {
+                return try await p.f()
+            }
+        }
+        """, kotlin: """
+        interface P {
+            suspend fun f(): Int
+            fun callback_f(f_return_callback: (Int?, Throwable?) -> Unit) {
+                Task {
+                    try {
+                        f_return_callback(f(), null)
+                    } catch(t: Throwable) {
+                        f_return_callback(null, t)
+                    }
+                }
+            }
+        }
+        class C: P, skip.bridge.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.SwiftObjectPointer = skip.bridge.SwiftObjectNil
+
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
+
+            constructor() {
+                Swift_peer = Swift_constructor()
+            }
+            private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer
+
+            override fun Swift_peer(): skip.bridge.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_peer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            override suspend fun f(): Int = Async.run {
+                kotlin.coroutines.suspendCoroutine { f_continuation ->
+                    Swift_callback_f_0(Swift_peer) { f_return, f_error ->
+                        if (f_error != null) {
+                            f_continuation.resumeWith(kotlin.Result.failure(f_error))
+                        } else {
+                            f_continuation.resumeWith(kotlin.Result.success(f_return!!))
+                        }
+                    }
+                }
+            }
+            private external fun Swift_callback_f_0(Swift_peer: skip.bridge.SwiftObjectPointer, f_callback: (Int?, Throwable?) -> Unit)
+            suspend fun g(p: P): Int = Async.run {
+                kotlin.coroutines.suspendCoroutine { f_continuation ->
+                    Swift_callback_g_1(Swift_peer, p) { f_return, f_error ->
+                        if (f_error != null) {
+                            f_continuation.resumeWith(kotlin.Result.failure(f_error))
+                        } else {
+                            f_continuation.resumeWith(kotlin.Result.success(f_return!!))
+                        }
+                    }
+                }
+            }
+            private external fun Swift_callback_g_1(Swift_peer: skip.bridge.SwiftObjectPointer, p: P, f_callback: (Int?, Throwable?) -> Unit)
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        """, swiftBridgeSupport: """
+        public final class P_BridgeImpl: P, BridgedFromKotlin {
+            nonisolated private static let Java_class = try! JClass(name: "P")
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            public func f() async throws -> Int {
+                return try await withCheckedThrowingContinuation { f_continuation in
+                    let f_return_callback: (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
+                        if let f_error {
+                            f_continuation.resume(throwing: JThrowable.toError(f_error, options: [])!)
+                        } else {
+                            f_continuation.resume(returning: f_return!)
+                        }
+                    }
+                    jniContext {
+                        let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
+                        try! Java_peer.call(method: Self.Java_f_0_methodID, options: [], args: [f_return_callback_java])
+                    }
+                }
+            }
+            nonisolated private static let Java_f_0_methodID = Java_class.getMethodID(name: "callback_f", sig: "(Lkotlin/jvm/functions/Function2;)V")!
+            nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            nonisolated public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+        }
+        extension C: BridgedToKotlin, BridgedFinalClass {
+            nonisolated private static let Java_class = try! JClass(name: "C")
+            nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                return ptr.pointee()!
+            }
+            nonisolated public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            nonisolated private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+        }
+        @_cdecl("Java_C_Swift_1constructor")
+        func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
+            let f_return_swift = C()
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_C_Swift_1release")
+        func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: C.self)
+        }
+        @_cdecl("Java_C_Swift_1callback_1f_10")
+        func C_Swift_callback_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ f_callback: JavaObjectPointer) {
+            let f_callback_swift = SwiftClosure2.closure(forJavaObject: f_callback, options: [])! as (Int?, JavaObjectPointer?) -> Void
+            let peer_swift: C = Swift_peer.pointee()!
+            Task {
+                do {
+                    let f_return_swift = try await peer_swift.f()
+                    f_callback_swift(f_return_swift, nil)
+                } catch {
+                    jniContext {
+                        f_callback_swift(nil, JThrowable.toThrowable(error, options: [])!)
+                    }
+                }
+            }
+        }
+        @_cdecl("Java_C_Swift_1callback_1g_11")
+        func C_Swift_callback_g_1(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ p_0: JavaObjectPointer, _ f_callback: JavaObjectPointer) {
+            let f_callback_swift = SwiftClosure2.closure(forJavaObject: f_callback, options: [])! as (Int?, JavaObjectPointer?) -> Void
+            let peer_swift: C = Swift_peer.pointee()!
+            let p_0_swift = AnyBridging.fromJavaObject(p_0, options: []) { P_BridgeImpl.fromJavaObject(p_0, options: []) as Any } as! P
+            Task {
+                do {
+                    let f_return_swift = try await peer_swift.g(p: p_0_swift)
+                    f_callback_swift(f_return_swift, nil)
+                } catch {
+                    jniContext {
+                        f_callback_swift(nil, JThrowable.toThrowable(error, options: [])!)
+                    }
+                }
+            }
+        }
+        @_cdecl("Java_C_Swift_1projectionImpl")
+        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
     func testProtocolTypeMembers() async throws {
         try await check(swiftBridge: """
         public protocol P {
@@ -5232,6 +5407,16 @@ final class BridgeToKotlinTests: XCTestCase {
         """, kotlins: ["""
         interface FooAPIClientNetworkFetcher {
             suspend fun fetchData(with: java.net.URI, method: String, httpHeaders: kotlin.collections.Map<String, String>, body: String?): String
+            fun callback_fetchData(with: java.net.URI, method: String, httpHeaders: kotlin.collections.Map<String, String>, body: String?, f_return_callback: (String?, Throwable?) -> Unit) {
+                val url = with
+                Task {
+                    try {
+                        f_return_callback(fetchData(with = with, method = method, httpHeaders = httpHeaders, body = body), null)
+                    } catch(t: Throwable) {
+                        f_return_callback(null, t)
+                    }
+                }
+            }
         }
         """, """
         internal open class URL: SwiftCustomBridged, KotlinConverting<java.net.URI> {
