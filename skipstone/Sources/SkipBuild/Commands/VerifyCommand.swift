@@ -10,6 +10,9 @@ struct VerifyCommand: SkipCommand, StreamingCommand, ProjectCommand, ToolOptions
     static var configuration = CommandConfiguration(
         commandName: "verify",
         abstract: "Verify Skip project",
+        discussion: """
+This command is run on a Skip project to ensure that the structure and contents are valid.
+""",
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")

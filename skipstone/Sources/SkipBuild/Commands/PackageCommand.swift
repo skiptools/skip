@@ -6,30 +6,6 @@ import SkipSyntax
 /// Common functions for managing Skip Packages common protocol for `AppCommand` and `LibCommand`.
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 protocol PackageCommand : SkipCommand, ToolOptionsCommand, OutputOptionsCommand {
-
-}
-
-@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct AppCommand: AsyncParsableCommand {
-    static var configuration = CommandConfiguration(
-        commandName: "app",
-        abstract: "Commands to manage application projects",
-        shouldDisplay: false,
-        subcommands: [
-            AppCreateCommand.self
-        ])
-}
-
-
-@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct LibCommand: AsyncParsableCommand {
-    static var configuration = CommandConfiguration(
-        commandName: "lib",
-        abstract: "Commands to manage library projects",
-        shouldDisplay: false,
-        subcommands: [
-            LibInitCommand.self
-        ])
 }
 
 protocol CreateOptionsCommand : ParsableArguments {
@@ -53,9 +29,6 @@ struct NativeMode : OptionSet {
 }
 
 struct CreateOptions : ParsableArguments {
-    @Option(help: ArgumentHelp("Application identifier"))
-    var id: String = "net.example.MyApp"
-
     @Option(name: [.customShort("d"), .long], help: ArgumentHelp("Base folder for project creation", valueName: "directory"))
     var dir: String?
 
@@ -72,9 +45,6 @@ struct CreateOptions : ParsableArguments {
 
     @Option(name: [.long], help: ArgumentHelp("A path to the template zip file to use", valueName: "zip", visibility: .hidden))
     var templateFile: String?
-
-//    @Option(help: ArgumentHelp("The package dependencies for this module"))
-//    var dependency: [String] = ["skip", "skip-foundation"]
 
     @Option(help: ArgumentHelp("Resource folder name"))
     var resourcePath: String = "Resources"

@@ -10,6 +10,9 @@ struct DevicesCommand: SkipCommand, StreamingCommand, OutputOptionsCommand, Tool
     static var configuration = CommandConfiguration(
         commandName: "devices",
         abstract: "List connected devices and emulators/simulators",
+        discussion: """
+This command will list all the connected Android emulators and devices and iOS simulators and devices.
+""",
         shouldDisplay: true)
 
     @OptionGroup(title: "Tool Options")

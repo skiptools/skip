@@ -10,11 +10,7 @@ struct IconCommand: MessageCommand, StreamingCommand {
     static var configuration = CommandConfiguration(
         commandName: "icon",
         abstract: "Create and manage app icons",
-        discussion: """
-This command will create and update icons in the Darwin and Android folders of a Skip project.
-
-Examples:
-
+        usage: """
 # Resize the given PNG icon for each of the required icon sizes
 skip icon app_icon.png
 
@@ -36,7 +32,11 @@ skip icon --open-preview --background #5C6BC0-#3B3F54 symbol.svg
 
 # Create new icons with custom image inset and shadow radius
 skip icon --background #F7DC6F-#F2C464 --inset 0.4 --shadow 0.02 symbol.svg
+""",
+        discussion: """
+This command will create and update icons in the Darwin and Android folders of a Skip project.
 
+skip icon should be run in the root folder of a conventional Skip app project that contains Darwin and Android folders.
 """,
         shouldDisplay: true)
 

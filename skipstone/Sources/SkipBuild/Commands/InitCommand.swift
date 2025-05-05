@@ -7,10 +7,32 @@ import FoundationNetworking
 #endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct LibInitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, ToolOptionsCommand, BuildOptionsCommand, StreamingCommand {
+struct InitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, ToolOptionsCommand, BuildOptionsCommand, StreamingCommand {
     static var configuration = CommandConfiguration(
         commandName: "init",
-        abstract: "Initialize a new Skip project",
+        abstract: "Create a new Skip project",
+        usage: """
+# Create a new transpiled app project
+skip init --appid=some.app.id app-project AppName
+
+# Create a new native app project
+skip init --native-app --appid=some.app.id app-project AppName
+
+# Create a new transpiled library project
+skip init lib-project ModuleName
+
+# Create a new native library project
+skip init --native-model lib-project ModuleName
+
+# Create a new app project with multiple modules
+skip init --native-app --appid=some.app.id app-project AppName ModuleName
+
+### DEPENDENCIES @ syntax https://github.com/orgs/skiptools/discussions/417
+
+""",
+        discussion: """
+This command will create a conventional Skip app or library project.
+""",
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")

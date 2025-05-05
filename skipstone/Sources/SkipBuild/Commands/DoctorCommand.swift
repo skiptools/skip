@@ -12,6 +12,9 @@ struct DoctorCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "doctor",
         abstract: "Evaluate and diagnose Skip development environment",
+        discussion: """
+This command will check for system configuration and prerequisites. It is a subset of the skip checkup command.
+""",
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")

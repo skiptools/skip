@@ -56,13 +56,10 @@ public func skipstone(_ args: [String]) async throws -> (out: String, err: Strin
 
 /// The command that is run by "SkipRunner" (aka "skip")
 public struct SkipRunnerExecutor: SkipCommandExecutor {
-    // cannot use because it conflicts with various "--version" options in `skip init` and `skip android`
-    //@OptionGroup()
-    //var versionOptions: VersionOptions
-
     public static var configuration = CommandConfiguration(
         commandName: "skip",
         abstract: "skip \(skipVersion)",
+        //version: skipVersion,
         shouldDisplay: true,
         subcommands: [
             WelcomeCommand.self,
@@ -72,10 +69,7 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
             CheckupCommand.self,
             UpgradeCommand.self,
 
-            AppCommand.self,
-            LibCommand.self,
-            AppCreateCommand.self, // skip create is shorthand for skip app create
-            LibInitCommand.self, // skip init is shorthand for skip lib init
+            InitCommand.self, // skip init is shorthand for skip lib init
             VerifyCommand.self,
             IconCommand.self,
 
@@ -85,7 +79,6 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
             AndroidCommand.self,
             ExportCommand.self,
             DevicesCommand.self,
-            AssembleCommand.self,
             RunCommand.self,
             TestCommand.self,
 

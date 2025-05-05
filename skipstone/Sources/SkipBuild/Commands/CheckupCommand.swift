@@ -12,6 +12,16 @@ struct CheckupCommand: MessageCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "checkup",
         abstract: "Run tests to ensure Skip is in working order",
+        usage: """
+# Perform a basic system checkup
+skip checkup
+
+# Perform a system checkup for native app support
+skip checkup --native
+""",
+        discussion: """
+This command performs a full system checkup to ensure that Skip can create and build a sample project. It runs all the checks performed by skip doctor, and also creates and builds a conventional Skip app project.
+""",
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")
