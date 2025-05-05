@@ -5284,4 +5284,112 @@ final class BridgeToSwiftTests: XCTestCase {
         public let i: Int = 1
         """, transformers: transformers)
     }
+
+    func testView() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        import SwiftUI
+        public struct V: View {
+            @State public var i = 0
+            public var body: some View {
+            }
+        }
+        #endif
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
+        class V: View, skip.lib.SwiftProjecting {
+            var i: Int
+                get() = _i.wrappedValue
+                set(newValue) {
+                    _i.wrappedValue = newValue
+                }
+            var _i: skip.ui.State<Int>
+            fun body(): View {
+                return ComposeBuilder { composectx: ComposeContext -> ComposeResult.ok }
+            }
+
+            @Composable
+            @Suppress("UNCHECKED_CAST")
+            override fun ComposeContent(composectx: ComposeContext) {
+                val rememberedi by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_i) }
+                _i = rememberedi
+
+                super.ComposeContent(composectx)
+            }
+
+            constructor(i: Int = 0) {
+                this._i = skip.ui.State(i)
+            }
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        """, swiftBridgeSupport: """
+
+        import SkipFuseUI
+        public struct V: SkipUI.View, SkipSwiftUI.View, SkipSwiftUI.SkipUIBridging, BridgedFromKotlin {
+            nonisolated private static let Java_class = try! JClass(name: "V")
+            public var Java_peer: JObject
+            public init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            nonisolated public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+            public typealias Body = Never
+            public var Java_view: any SkipUI.View {
+                return self
+            }
+
+            public var i: Int {
+                get {
+                    return jniContext {
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, options: [], args: [])
+                        return Int(value_java)
+                    }
+                }
+                set {
+                    jniContext {
+                        Java_peer = try! JObject(Java_peer.call(method: Self.Java_scopy_methodID, options: [], args: []))
+                        let value_java = Int32(newValue).toJavaParameter(options: [])
+                        try! Java_peer.call(method: Self.Java_set_i_methodID, options: [], args: [value_java])
+                    }
+                }
+            }
+            nonisolated private static let Java_get_i_methodID = Java_class.getMethodID(name: "getI", sig: "()I")!
+            nonisolated private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
+
+            public init(i p_0: Int) {
+                Java_peer = jniContext {
+                    let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java])
+                    return JObject(ptr)
+                }
+            }
+            nonisolated private static let Java_constructor_0_methodID = Java_class.getMethodID(name: "<init>", sig: "(I)V")!
+        }
+        @_cdecl("Java_V_Swift_1projectionImpl")
+        func V_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = V.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
 }

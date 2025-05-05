@@ -231,6 +231,8 @@ extension TypeSignature {
     static let skipUIView: TypeSignature = .module("SkipUI", .named("View", []))
     static let skipUIViewModifier: TypeSignature = .module("SkipUI", .named("ViewModifier", []))
     static let skipUIToolbarContent: TypeSignature = .module("SkipUI", .named("ToolbarContent", []))
+    static let skipSwiftUIView: TypeSignature = .module("SkipSwiftUI", .named("View", []))
+    static let skipSwiftUIBridging: TypeSignature = .module("SkipSwiftUI", .named("SkipUIBridging", []))
     static let javaObjectPointer: TypeSignature = .named("JavaObjectPointer", [])
     static let javaString: TypeSignature = .named("JavaString", [])
     static func swiftObjectPointer(kotlin: Bool) -> TypeSignature {

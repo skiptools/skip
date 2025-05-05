@@ -18,7 +18,7 @@ final class KotlinImportsTransformer: KotlinTransformer {
                         importDeclaration.modulePath = modulePaths[i]
                         lastImportDeclaration = importDeclaration
                     } else {
-                        additionalImportDeclarations.append(KotlinImportDeclaration(modulePath: modulePaths[i]))
+                        additionalImportDeclarations.append(KotlinImportDeclaration(modulePath: modulePaths[i], unmappedModulePath: importDeclaration.unmappedModulePath))
                     }
                 } else if i == 0 {
                     syntaxTree.root.remove(statement: importDeclaration)
@@ -40,7 +40,7 @@ final class KotlinImportsTransformer: KotlinTransformer {
             let modulePaths = translateImport(modulePath: additionalModulePath)
             for modulePath in modulePaths {
                 if importPaths.insert(modulePath).inserted {
-                    additionalImportDeclarations.append(KotlinImportDeclaration(modulePath: modulePath))
+                    additionalImportDeclarations.append(KotlinImportDeclaration(modulePath: modulePath, unmappedModulePath: additionalModulePath))
                 }
             }
         }
