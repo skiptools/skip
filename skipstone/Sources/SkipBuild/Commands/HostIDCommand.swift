@@ -16,7 +16,7 @@ struct HostIDCommand: MessageCommand {
         guard let hostid = ProcessInfo.processInfo.hostIdentifier else {
             throw HostIDError(errorDescription: "Could not access Host ID")
         }
-        throw HostIDError(errorDescription: "Could not access Host ID")
+        await out.write(status: nil, hostid)
     }
 
     public struct HostIDError : LocalizedError {
