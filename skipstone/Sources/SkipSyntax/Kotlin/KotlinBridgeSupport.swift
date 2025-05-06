@@ -480,7 +480,7 @@ extension TypeSignature {
     }
 
     /// Return the JNI signature of this type.
-    func jni(options: KotlinBridgeOptions, isFunctionDeclaration: Bool = false) -> String {
+    func jni(options: KotlinBridgeOptions, isFunctionDeclaration: Bool = false, isPartialMember: Bool = false) -> String {
         switch self {
         case .any:
             return "Ljava/lang/Object;"
@@ -530,23 +530,33 @@ extension TypeSignature {
         case .int128:
             return "Ljava/math/BigInteger;"
         case .member(let parent, let type):
-            var parentJNI = parent.jni(options: options)
+            var parentJNI = parent.jni(options: options, isPartialMember: true)
             if parentJNI.hasSuffix(";") {
-                parentJNI = String(parentJNI.dropLast())
+                parentJNI = String(parentJNI.dropFirst().dropLast())
             }
-            var typeJNI = type.jni(options: options)
+            var typeJNI = type.jni(options: options, isPartialMember: true)
             if typeJNI.hasSuffix(";") {
-                typeJNI = String(typeJNI.dropFirst())
+                typeJNI = String(typeJNI.dropFirst().dropLast())
             }
+            guard !isPartialMember else {
+                return parentJNI + "$" + typeJNI
+            }
+
             // Package-qualified Java types might end up modeled as members rather than modules
-            // Detect compound members with lowercase paths and uppercase names
-            if !parentJNI.contains("/") && parentJNI.contains("$") && typeJNI.first?.isLowercase == false {
-                if parentJNI.split(separator: "$").last?.first?.isLowercase == true {
-                    parentJNI.replace("$", with: "/")
-                    return parentJNI + "/" + typeJNI
+            // Detect members with lowercase paths and uppercase names
+            let tokens = parentJNI.split(separator: "$") + typeJNI.split(separator: "$")
+            var combined = tokens[0]
+            var hasType = false
+            for i in 1..<tokens.count {
+                if !hasType && tokens[i - 1].first?.isLowercase == true && !tokens[i - 1].contains("/") {
+                    combined.append("/")
+                } else {
+                    hasType = true
+                    combined.append("$")
                 }
+                combined += tokens[i]
             }
-            return parentJNI + "$" + typeJNI
+            return "L\(combined);"
         case .metaType:
             return "Ljava/lang/Class;"
         case .module(let name, let type):
