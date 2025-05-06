@@ -480,7 +480,7 @@ extension TypeSignature {
     }
 
     /// Return the JNI signature of this type.
-    func jni(options: KotlinBridgeOptions, isFunctionDeclaration: Bool = false) -> String {
+    func jni(options: KotlinBridgeOptions, isFunctionDeclaration: Bool = false, isPartialMember: Bool = false) -> String {
         switch self {
         case .any:
             return "Ljava/lang/Object;"
@@ -530,30 +530,40 @@ extension TypeSignature {
         case .int128:
             return "Ljava/math/BigInteger;"
         case .member(let parent, let type):
-            var parentJNI = parent.jni(options: options)
+            var parentJNI = parent.jni(options: options, isPartialMember: true)
             if parentJNI.hasSuffix(";") {
-                parentJNI = String(parentJNI.dropLast())
+                parentJNI = String(parentJNI.dropFirst().dropLast())
             }
-            var typeJNI = type.jni(options: options)
+            var typeJNI = type.jni(options: options, isPartialMember: true)
             if typeJNI.hasSuffix(";") {
-                typeJNI = String(typeJNI.dropFirst())
+                typeJNI = String(typeJNI.dropFirst().dropLast())
             }
+            guard !isPartialMember else {
+                return parentJNI + "$" + typeJNI
+            }
+
             // Package-qualified Java types might end up modeled as members rather than modules
-            // Detect compound members with lowercase paths and uppercase names
-            if !parentJNI.contains("/") && parentJNI.contains("$") && typeJNI.first?.isLowercase == false {
-                if parentJNI.split(separator: "$").last?.first?.isLowercase == true {
-                    parentJNI.replace("$", with: "/")
-                    return parentJNI + "/" + typeJNI
+            // Detect members with lowercase paths and uppercase names
+            let tokens = parentJNI.split(separator: "$") + typeJNI.split(separator: "$")
+            var combined = tokens[0]
+            var hasType = false
+            for i in 1..<tokens.count {
+                if !hasType && tokens[i - 1].first?.isLowercase == true && !tokens[i - 1].contains("/") {
+                    combined.append("/")
+                } else {
+                    hasType = true
+                    combined.append("$")
                 }
+                combined += tokens[i]
             }
-            return parentJNI + "$" + typeJNI
+            return translateSpecialCaseJNITypes("L\(combined);")
         case .metaType:
             return "Ljava/lang/Class;"
         case .module(let name, let type):
             let typeName = type.jni(options: options)
             if typeName.hasPrefix("L") && typeName.hasSuffix(";") {
                 let packageName = KotlinTranslator.packageName(forModule: name).replacing(".", with: "/")
-                return "L" + packageName + "/" + typeName.dropFirst()
+                return translateSpecialCaseJNITypes("L" + packageName + "/" + typeName.dropFirst())
             } else {
                 return typeName
             }
@@ -561,7 +571,7 @@ extension TypeSignature {
             if isNamed("AnyHashable", moduleName: "Swift", generics: []) {
                 return "Ljava/lang/Object;"
             }
-            return "L" + name.replacing(".", with: "/") + ";"
+            return translateSpecialCaseJNITypes("L" + name.replacing(".", with: "/") + ";")
         case .none:
             return "Ljava/lang/Object;"
         case .optional(let type):
@@ -624,6 +634,22 @@ extension TypeSignature {
             return type.jni(options: options)
         case .void:
             return "V"
+        }
+    }
+
+    private func translateSpecialCaseJNITypes(_ jni: String) -> String {
+        // Some common Kotlin types map to different JNI types
+        switch jni {
+        case "Lkotlin/ByteArray;":
+            return "[B"
+        case "Lkotlin/collections/Map;":
+            return "Ljava/util/Map;"
+        case "Lkotlin/collections/List;":
+            return "Ljava/util/List;"
+        case "Lkotlin/collections/Set;":
+            return "Ljava/util/Set;"
+        default:
+            return jni
         }
     }
 }
