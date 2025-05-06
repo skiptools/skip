@@ -130,7 +130,7 @@ struct CDeclFunction {
 
     func append(to output: OutputGenerator, indentation: Indentation) {
         output.append(indentation).append("@_cdecl(\"").append(cdecl).append("\")\n")
-        output.append(indentation).append("func ").append(name).append("(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer")
+        output.append(indentation).append("public func ").append(name).append("(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer")
         for parameter in signature.parameters {
             output.append(", _")
             if let label = parameter.label {

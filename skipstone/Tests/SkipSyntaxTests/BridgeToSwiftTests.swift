@@ -633,7 +633,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -697,7 +697,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -779,16 +779,16 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
         }
         @_cdecl("Java_C_Swift_1constructor")
-        func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
+        public func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
             let f_return_swift = C()
             return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
         }
         @_cdecl("Java_C_Swift_1release")
-        func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+        public func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
             Swift_peer.release(as: C.self)
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -1273,7 +1273,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -1532,7 +1532,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -1592,7 +1592,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_f_0_methodID = Java_class.getMethodID(name: "f", sig: "()V")!
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -1721,7 +1721,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         @_cdecl("Java_A_00024B_Swift_1projectionImpl")
-        func A$B_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func A$B_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = A.B.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -1770,7 +1770,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         @_cdecl("Java_A_00024B_00024C_Swift_1projectionImpl")
-        func A$B$C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func A$B$C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = A.B.C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -1812,7 +1812,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -1863,7 +1863,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_constructor_0_methodID = Java_class.getMethodID(name: "<init>", sig: "(I)V")!
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -1914,7 +1914,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_constructor_0_methodID = Java_class.getMethodID(name: "<init>", sig: "(I)V")!
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -1971,7 +1971,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -2020,7 +2020,7 @@ final class BridgeToSwiftTests: XCTestCase {
             public let i: Int = 0
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -2084,7 +2084,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -2143,7 +2143,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_add_0_methodID = Java_class.getMethodID(name: "add", sig: "(II)I")!
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -2212,7 +2212,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_add_0_methodID = Java_class.getMethodID(name: "callback_add", sig: "(Lkotlin/jvm/functions/Function1;)V")!
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -2261,7 +2261,7 @@ final class BridgeToSwiftTests: XCTestCase {
             public static let i: Int = 0
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -2327,7 +2327,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_Companion_set_i_methodID = Java_Companion_class.getMethodID(name: "setI", sig: "(I)V")!
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -2388,7 +2388,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_Companion_add_0_methodID = Java_Companion_class.getMethodID(name: "add", sig: "(II)I")!
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -2450,7 +2450,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -2574,7 +2574,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_compareTo_methodID = Java_class.getMethodID(name: "compareTo", sig: "(Ljava/lang/Object;)I")!
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -2665,7 +2665,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_constructor_0_methodID = Java_class.getMethodID(name: "<init>", sig: "(I)V")!
         }
         @_cdecl("Java_S_Swift_1projectionImpl")
-        func S_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func S_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = S.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -2759,7 +2759,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -2879,7 +2879,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_constructor_0_methodID = Java_class.getMethodID(name: "<init>", sig: "(I)V")!
         }
         @_cdecl("Java_Base_Swift_1projectionImpl")
-        func Base_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func Base_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = Base.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -2922,7 +2922,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_constructor_0_methodID = Java_class.getMethodID(name: "<init>", sig: "(ILjava/lang/String;)V")!
         }
         @_cdecl("Java_Sub1_Swift_1projectionImpl")
-        func Sub1_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func Sub1_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = Sub1.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -2947,7 +2947,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_constructor_0_methodID = Java_class.getMethodID(name: "<init>", sig: "(I)V")!
         }
         @_cdecl("Java_Sub2_Swift_1projectionImpl")
-        func Sub2_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func Sub2_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = Sub2.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -3025,7 +3025,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         @_cdecl("Java_Base_Swift_1projectionImpl")
-        func Base_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func Base_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = Base.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -3048,7 +3048,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
         }
         @_cdecl("Java_Sub_Swift_1projectionImpl")
-        func Sub_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func Sub_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = Sub.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -3167,7 +3167,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_constructor_0_methodID = Java_class.getMethodID(name: "<init>", sig: "(ILjava/lang/String;)V")!
         }
         @_cdecl("Java_Sub1_Swift_1projectionImpl")
-        func Sub1_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func Sub1_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = Sub1.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -3198,7 +3198,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_constructor_0_methodID = Java_class.getMethodID(name: "<init>", sig: "(I)V")!
         }
         @_cdecl("Java_Sub2_Swift_1projectionImpl")
-        func Sub2_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func Sub2_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = Sub2.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -3321,7 +3321,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_inc_1_methodID = Java_class.getMethodID(name: "inc", sig: "()V")!
         }
         @_cdecl("Java_S_Swift_1projectionImpl")
-        func S_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func S_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = S.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -3397,7 +3397,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_set_i_methodID = Java_class.getMethodID(name: "setI", sig: "(I)V")!
         }
         @_cdecl("Java_S_Swift_1projectionImpl")
-        func S_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func S_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = S.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -3508,7 +3508,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_f_0_methodID = Java_class.getMethodID(name: "f", sig: "()V")!
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -3608,7 +3608,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_f_0_methodID = Java_class.getMethodID(name: "f", sig: "(LP;)LP;")!
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -3840,7 +3840,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_Companion_init_1_methodID = Java_Companion_class.getMethodID(name: "init", sig: "(Ljava/lang/String;)LE;")!
         }
         @_cdecl("Java_E_Swift_1projectionImpl")
-        func E_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func E_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = E.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -3898,7 +3898,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         @_cdecl("Java_E_00024S_Swift_1projectionImpl")
-        func E$S_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func E$S_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = E.S.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -4002,7 +4002,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_get_intValue_methodID = Java_class.getMethodID(name: "getIntValue", sig: "()Ljava/lang/Integer;")!
         }
         @_cdecl("Java_E_Swift_1projectionImpl")
-        func E_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func E_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = E.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -4081,7 +4081,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_f_1_methodID = Java_class.getMethodID(name: "f", sig: "()V")!
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -4139,7 +4139,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_f_0_methodID = Java_class.getMethodID(name: "f", sig: "()V")!
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -4191,7 +4191,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -4360,7 +4360,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_g_1_methodID = Java_class.getMethodID(name: "g", sig: "()I")!
         }
         @_cdecl("Java_A_Swift_1projectionImpl")
-        func A_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func A_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = A.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -4419,7 +4419,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         @_cdecl("Java_CustomError_Swift_1projectionImpl")
-        func CustomError_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func CustomError_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = CustomError.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -4493,7 +4493,7 @@ final class BridgeToSwiftTests: XCTestCase {
             case `case2`
         }
         @_cdecl("Java_E_Swift_1projectionImpl")
-        func E_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func E_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = E.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -4635,7 +4635,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static var Java_identity_2_methodID: JavaMethodID { Java_class.getMethodID(name: "identity", sig: "(Ljava/lang/Object;Ljava/lang/Object;I)Ljava/lang/Object;")! }
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C<Any>.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -4738,7 +4738,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static var Java_constructor_0_methodID: JavaMethodID { Java_class.getMethodID(name: "<init>", sig: "(Ljava/lang/Object;)V")! }
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C<P>.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -4878,7 +4878,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static var Java_mutatingRet_3_methodID: JavaMethodID { Java_class.getMethodID(name: "mutatingRet", sig: "(Ljava/lang/Object;)I")! }
         }
         @_cdecl("Java_S_Swift_1projectionImpl")
-        func S_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func S_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = S<Any>.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -4969,7 +4969,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_f_0_methodID = Java_class.getMethodID(name: "f", sig: "(I)I")!
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -5069,7 +5069,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static var Java_aValue_0_methodID: JavaMethodID { Java_class.getMethodID(name: "aValue", sig: "()Ljava/lang/Object;")! }
         }
         @_cdecl("Java_E_Swift_1projectionImpl")
-        func E_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func E_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = E<Any>.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -5165,7 +5165,7 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         @_cdecl("Java_C_Swift_1projectionImpl")
-        func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
@@ -5385,7 +5385,7 @@ final class BridgeToSwiftTests: XCTestCase {
             nonisolated private static let Java_constructor_0_methodID = Java_class.getMethodID(name: "<init>", sig: "(I)V")!
         }
         @_cdecl("Java_V_Swift_1projectionImpl")
-        func V_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+        public func V_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = V.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
