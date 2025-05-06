@@ -5457,7 +5457,7 @@ final class BridgeToKotlinTests: XCTestCase {
                     }
                 }
             }
-            nonisolated private static let Java_fetchData_0_methodID = Java_class.getMethodID(name: "callback_fetchData", sig: "(Ljava/net/URI;Ljava/lang/String;Lkotlin/collections/Map;Ljava/lang/String;Lkotlin/jvm/functions/Function2;)V")!
+            nonisolated private static let Java_fetchData_0_methodID = Java_class.getMethodID(name: "callback_fetchData", sig: "(Ljava/net/URI;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Lkotlin/jvm/functions/Function2;)V")!
             nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }

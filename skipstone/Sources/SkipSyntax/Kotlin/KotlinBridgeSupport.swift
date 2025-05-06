@@ -556,14 +556,14 @@ extension TypeSignature {
                 }
                 combined += tokens[i]
             }
-            return "L\(combined);"
+            return translateSpecialCaseJNITypes("L\(combined);")
         case .metaType:
             return "Ljava/lang/Class;"
         case .module(let name, let type):
             let typeName = type.jni(options: options)
             if typeName.hasPrefix("L") && typeName.hasSuffix(";") {
                 let packageName = KotlinTranslator.packageName(forModule: name).replacing(".", with: "/")
-                return "L" + packageName + "/" + typeName.dropFirst()
+                return translateSpecialCaseJNITypes("L" + packageName + "/" + typeName.dropFirst())
             } else {
                 return typeName
             }
@@ -571,7 +571,7 @@ extension TypeSignature {
             if isNamed("AnyHashable", moduleName: "Swift", generics: []) {
                 return "Ljava/lang/Object;"
             }
-            return "L" + name.replacing(".", with: "/") + ";"
+            return translateSpecialCaseJNITypes("L" + name.replacing(".", with: "/") + ";")
         case .none:
             return "Ljava/lang/Object;"
         case .optional(let type):
@@ -634,6 +634,22 @@ extension TypeSignature {
             return type.jni(options: options)
         case .void:
             return "V"
+        }
+    }
+
+    private func translateSpecialCaseJNITypes(_ jni: String) -> String {
+        // Some common Kotlin types map to different JNI types
+        switch jni {
+        case "Lkotlin/ByteArray;":
+            return "[B"
+        case "Lkotlin/collections/Map;":
+            return "Ljava/util/Map;"
+        case "Lkotlin/collections/List;":
+            return "Ljava/util/List;"
+        case "Lkotlin/collections/Set;":
+            return "Ljava/util/Set;"
+        default:
+            return jni
         }
     }
 }
