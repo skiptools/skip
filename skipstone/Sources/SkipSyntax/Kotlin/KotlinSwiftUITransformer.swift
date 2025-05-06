@@ -27,6 +27,8 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         if needsTranslation {
             let visitor = TranslateVisitor(translator: translator)
             syntaxTree.root.visit(ifSkipBlockContent: syntaxTree.isBridgeFile, perform: visitor.visit)
+            // Add Compose imports to the generated Kotlin for any transpiled SwiftUI, or for bridged files that define
+            // transpiled views. We don't yet support bridging other transpiled SwiftUI constructs
             if !isInSkipUI && (!syntaxTree.isBridgeFile || visitor.hasSwiftUIViews) {
                 addKotlinComposeDependencies(to: syntaxTree)
             }
