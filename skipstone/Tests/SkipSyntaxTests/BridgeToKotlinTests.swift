@@ -8319,6 +8319,185 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testIfSkipBlockView() async throws {
+        try await check(swiftBridge: """
+        #if os(Android)
+        import SkipFuseUI
+        
+        struct V: View {
+            var body: some View {
+                HelloView(count: 1)
+            }
+        }
+        #endif
+        #if SKIP
+        struct HelloView: View {
+            @State var count: Int
+        
+            var body: some View {
+            }
+        }
+        #endif
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        internal class V: skip.ui.View, skip.bridge.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.SwiftObjectPointer = skip.bridge.SwiftObjectNil
+
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
+
+            override fun Swift_peer(): skip.bridge.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_peer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            override fun body(): skip.ui.View {
+                return skip.ui.ComposeBuilder { composectx: skip.ui.ComposeContext -> Swift_composableBody(Swift_peer)?.Compose(composectx) ?: skip.ui.ComposeResult.ok }
+            }
+            private external fun Swift_composableBody(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.View?
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+        }
+        internal class HelloView: View, skip.lib.SwiftProjecting {
+            internal var count: Int
+                get() = _count.wrappedValue
+                set(newValue) {
+                    _count.wrappedValue = newValue
+                }
+            internal var _count: skip.ui.State<Int>
+
+            internal fun body(): View {
+                return ComposeBuilder { composectx: ComposeContext -> ComposeResult.ok }
+            }
+
+            @Composable
+            @Suppress("UNCHECKED_CAST")
+            override fun ComposeContent(composectx: ComposeContext) {
+                val rememberedcount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_count) }
+                _count = rememberedcount
+
+                super.ComposeContent(composectx)
+            }
+
+            constructor(count: Int) {
+                this._count = skip.ui.State(count)
+            }
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+        }
+        """, swiftBridgeSupport: """
+
+        import SkipFuseUI
+        extension V: BridgedToKotlin, SkipUIBridging, SkipUI.View {
+            nonisolated private static let Java_class = try! JClass(name: "V")
+            nonisolated static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                let box: SwiftValueTypeBox<Self> = ptr.pointee()!
+                return box.value
+            }
+            nonisolated func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let box = SwiftValueTypeBox(self)
+                let Swift_peer = SwiftObjectPointer.pointer(to: box, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            nonisolated private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+            nonisolated var Java_view: any SkipUI.View {
+                return self
+            }
+        }
+        @_cdecl("Java_V_Swift_1release")
+        func V_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: SwiftValueTypeBox<V>.self)
+        }
+        @_cdecl("Java_V_Swift_1projectionImpl")
+        func V_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = V.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        @_cdecl("Java_V_Swift_1composableBody")
+        func V_Swift_composableBody(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer? {
+            let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
+            return SkipBridge.assumeMainActorUnchecked {
+                let body = peer_swift.value.body
+                return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])
+            }
+        }
+        import SkipBridge
+
+        struct HelloView: SkipUI.View, SkipSwiftUI.View, SkipSwiftUI.SkipUIBridging, BridgedFromKotlin {
+            nonisolated private static let Java_class = try! JClass(name: "HelloView")
+            var Java_peer: JObject
+            init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            nonisolated static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            nonisolated func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+            typealias Body = Never
+            var Java_view: any SkipUI.View {
+                return self
+            }
+
+            var count: Int {
+                get {
+                    return jniContext {
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_count_methodID, options: [], args: [])
+                        return Int(value_java)
+                    }
+                }
+                set {
+                    jniContext {
+                        Java_peer = try! JObject(Java_peer.call(method: Self.Java_scopy_methodID, options: [], args: []))
+                        let value_java = Int32(newValue).toJavaParameter(options: [])
+                        try! Java_peer.call(method: Self.Java_set_count_methodID, options: [], args: [value_java])
+                    }
+                }
+            }
+            nonisolated private static let Java_get_count_methodID = Java_class.getMethodID(name: "getCount", sig: "()I")!
+            nonisolated private static let Java_set_count_methodID = Java_class.getMethodID(name: "setCount", sig: "(I)V")!
+
+            public init(count p_0: Int) {
+                Java_peer = jniContext {
+                    let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java])
+                    return JObject(ptr)
+                }
+            }
+            nonisolated private static let Java_constructor_0_methodID = Java_class.getMethodID(name: "<init>", sig: "(I)V")!
+        }
+        @_cdecl("Java_HelloView_Swift_1projectionImpl")
+        func HelloView_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = HelloView.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
     public func testBundleModule() async throws {
         KotlinBundleTransformer.testSkipAndroidBridge = true
         defer { KotlinBundleTransformer.testSkipAndroidBridge = false }

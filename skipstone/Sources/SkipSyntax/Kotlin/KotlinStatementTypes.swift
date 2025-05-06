@@ -2397,8 +2397,8 @@ final class KotlinImportDeclaration: KotlinStatement {
         return kstatement
     }
 
-    init(modulePath: [String], sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
-        self.unmappedModulePath = modulePath
+    init(modulePath: [String], unmappedModulePath: [String]? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
+        self.unmappedModulePath = unmappedModulePath ?? modulePath
         self.modulePath = modulePath
         super.init(type: .importDeclaration, sourceFile: sourceFile, sourceRange: sourceRange)
     }

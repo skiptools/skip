@@ -88,13 +88,27 @@ final class KotlinBridgeToSwiftVisitor {
             .filter { !$0.isKotlinImport }
         let outputNode = SwiftDefinition { output, indentation, _ in
             output.append("import SkipBridge\n\n")
+            var importModulePaths: [String] = []
+            var importModulePathsSet: Set<String> = []
             for importDeclaration in importDeclarations {
                 guard importDeclaration.unmappedModulePath.count != 1 || importDeclaration.unmappedModulePath[0] != "SkipBridge" else {
                     continue
                 }
-                let path = importDeclaration.unmappedModulePath.joined(separator: ".")
-                output.append(indentation).append("import ").append(path).append("\n")
+                var modulePath = importDeclaration.unmappedModulePath
+                // Replace Skip transpiled library imports
+                if modulePath.first == "SwiftUI" {
+                    if modulePath.count == 1 {
+                        modulePath = ["SkipFuseUI"]
+                    } else {
+                        modulePath[0] = "SkipSwiftUI"
+                    }
+                }
+                let path = modulePath.joined(separator: ".")
+                if importModulePathsSet.insert(path).inserted {
+                    importModulePaths.append(path)
+                }
             }
+            importModulePaths.forEach { output.append(indentation).append("import ").append($0).append("\n") }
             if needsGlobalsJavaClass {
                 output.append(indentation).append(globalsClassRef.declaration()).append("\n")
             }
@@ -780,6 +794,19 @@ final class KotlinBridgeToSwiftVisitor {
             }
         }
 
+        var isView = false
+        let inherits = typeInfos.flatMap(\.inherits).flatMap { (inherit: TypeSignature) -> [TypeSignature] in
+            let inherit = inherit.withGenerics([])
+            if inherit.isNamed("View", moduleName: "SwiftUI", generics: []) || inherit.isNamed("View", moduleName: "SkipSwiftUI", generics: []), codebaseInfo.global.moduleName != "SkipUI" {
+                isView = true
+                return [.skipUIView, .skipSwiftUIView, .skipSwiftUIBridging]
+            }
+            guard inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.isSendable || inherit.checkBridgable(direction: .toSwift, options: options, generics: classDeclaration.generics, codebaseInfo: codebaseInfo) != nil else {
+                return []
+            }
+            return [inherit]
+        }
+
         var memberDefinitions: [SwiftDefinition] = []
         var hasBridgedStaticMembers = false
         var hasEqualsDefinition = false
@@ -793,6 +820,10 @@ final class KotlinBridgeToSwiftVisitor {
                 }
             } else if let variableDeclaration = member as? KotlinVariableDeclaration {
                 guard !variableDeclaration.isGenerated else {
+                    continue
+                }
+                guard !isView || variableDeclaration.propertyName != "body" else {
+                    // We add our own View contract implementation
                     continue
                 }
                 guard isBridging(attributes: variableDeclaration.attributes, visibility: variableDeclaration.modifiers.visibility, autoBridge: syntaxTree.isBridgeFile ? .internal : syntaxTree.autoBridge) else {
@@ -846,10 +877,6 @@ final class KotlinBridgeToSwiftVisitor {
         let visibilityString = primaryTypeInfo.modifiers.visibility.swift(suffix: " ")
         let modifiersString = primaryTypeInfo.declarationType == .classDeclaration && primaryTypeInfo.modifiers.isFinal ? "final " : ""
         let optionsString = options.jconvertibleOptions
-        let inherits = typeInfos.flatMap(\.inherits).compactMap {
-            let inherit = $0.withGenerics([])
-            return inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.isSendable || inherit.checkBridgable(direction: .toSwift, options: options, generics: classDeclaration.generics, codebaseInfo: codebaseInfo) != nil ? inherit : nil
-        }
         var inheritsString = inherits.map { $0.description }.joined(separator: ", ")
         if !isEmptyEnum && !isBridgedSubclass {
             if !inheritsString.isEmpty {
@@ -952,6 +979,12 @@ final class KotlinBridgeToSwiftVisitor {
             } else if !isBridgedSubclass {
                 swift.append(1, Self.swiftForJConvertibleContract(in: classDeclaration.declarationType, visibility: finalMemberVisibility))
             }
+        }
+        if isView {
+            swift.append(1, "\(finalMemberVisibilityString)typealias Body = Never")
+            swift.append(1, "\(finalMemberVisibilityString)var Java_view: any SkipUI.View {")
+            swift.append(2, "return self")
+            swift.append(1, "}")
         }
 
         let definition = swiftDefinition(of: classDeclaration.signature, statement: classDeclaration, swift: swift, members: memberDefinitions)

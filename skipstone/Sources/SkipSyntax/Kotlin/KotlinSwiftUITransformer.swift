@@ -10,14 +10,16 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
 
         // Does this file need translation?
         var needsTranslation = false
-        if translator.packageName == "skip.ui" {
+        let isInSkipUI = translator.packageName == "skip.ui"
+        if isInSkipUI {
             // We need to be able to transpile the views within our own SkipUI package
             needsTranslation = true
         } else {
             for importDeclaration in syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }) {
-                if importDeclaration.modulePath.first == "SwiftUI" || importDeclaration.modulePath.first == "SkipUI" {
+                if importDeclaration.modulePath.first == "SwiftUI"
+                    || importDeclaration.modulePath.first == "SkipUI"
+                    || importDeclaration.modulePath.first == "SkipFuseUI" {
                     needsTranslation = true
-                    addKotlinComposeDependencies(to: syntaxTree)
                     break
                 }
             }
@@ -25,6 +27,9 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         if needsTranslation {
             let visitor = TranslateVisitor(translator: translator)
             syntaxTree.root.visit(ifSkipBlockContent: syntaxTree.isBridgeFile, perform: visitor.visit)
+            if !isInSkipUI && (!syntaxTree.isBridgeFile || visitor.hasSwiftUIViews) {
+                addKotlinComposeDependencies(to: syntaxTree)
+            }
         }
         return []
     }
@@ -98,6 +103,8 @@ private final class TranslateVisitor {
     init(translator: KotlinTranslator) {
         self.translator = translator
     }
+
+    private(set) var hasSwiftUIViews = false
 
     func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
         if let classDeclaration = node as? KotlinClassDeclaration {
@@ -293,6 +300,9 @@ private final class TranslateVisitor {
 
     /// Perform `View` and `ViewModifier` transformations.
     private func transform(classDeclaration: KotlinClassDeclaration, isModifier: Bool = false, body: KotlinStatement) {
+        if !isModifier {
+            hasSwiftUIViews = true
+        }
         let variableDeclarations = classDeclaration.members.compactMap { $0 as? KotlinVariableDeclaration }
         let stateVariables = variableDeclarations.filter { $0.attributes.stateAttribute != nil }
         let focusStateVariables = variableDeclarations.filter { $0.attributes.contains(.focusState) }
@@ -340,6 +350,7 @@ private final class TranslateVisitor {
             composeFunction.parameters.append(Parameter(externalLabel: "content", declaredType: .named("View", [])))
         }
         composeFunction.parameters.append(Parameter(externalLabel: "composectx", declaredType: .named("ComposeContext", [])))
+        composeFunction.isGenerated = true
         composeFunction.extras = .singleNewline
 
         var composeBodyStatements: [KotlinStatement] = []
