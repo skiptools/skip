@@ -222,7 +222,7 @@ public struct GradleDriver {
             #if os(macOS)
             try? FileManager.default.trashItem(at: testResultFolder, resultingItemURL: nil) // remove the test folder, since a build failure won't clear it and it will appear as if the tests ran successfully
             #else
-            try? FileManager.default.removeItem(atPath: testResultPath)
+            try? FileManager.default.removeItem(atPath: testResultFolder)
             #endif
         }
 
