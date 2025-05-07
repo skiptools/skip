@@ -3243,7 +3243,7 @@ extension FrameworkProjectLayout {
                     keepDebugSymbols.add("**/*.so")
                     pickFirsts.add("**/*.so")
                     // this option will compress JNI .so files
-                    useLegacyPackaging = true
+                    useLegacyPackaging = false
                 }
             }
 
