@@ -204,6 +204,11 @@ extension GradleHarness {
             return GradleIssue(kind: .error, message: line2.trimmingCharacters(in: .whitespacesAndNewlines))
         }
 
+        if line1.lowercased().hasPrefix("error:") {
+            // match generic "Error:" output prefix, like when `skip android build` fails to find the SDK
+            return GradleIssue(kind: .error, message: line1.trimmingCharacters(in: .whitespacesAndNewlines), location: nil)
+        }
+
         if exceptionPattern.firstMatch(in: line1, range: NSRange(line1.startIndex..., in: line1)) != nil {
             // TODO: do we really want to match all exception messages?
             //return GradleIssue(kind: .warning, message: line2.trimmingCharacters(in: .whitespacesAndNewlines))
