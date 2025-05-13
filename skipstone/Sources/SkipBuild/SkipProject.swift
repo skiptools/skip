@@ -16,6 +16,75 @@ enum ModuleMode {
     case kotlincompat
 }
 
+func isValidProjectName(_ name: String) -> String? {
+    let invalidDesc = "Project name must contain only lower-case letters or a dash"
+
+    // Ensure the name is not empty
+    guard !name.isEmpty else { return invalidDesc }
+
+    if name.count < 2 { return invalidDesc }
+
+    // Ensure the first character is an uppercase letter
+    if name != name.lowercased() { return invalidDesc }
+
+    // Define a character set with valid characters (letters, numbers)
+    let validCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-"))
+
+    // Check if the name contains only valid characters
+    if !name.unicodeScalars.allSatisfy({ validCharacters.contains($0) }) {
+        return invalidDesc
+    }
+
+    return nil
+}
+
+func isValidModuleName(_ name: String) -> String? {
+    let invalidDesc = "ModuleName must be capitalized and contain only letters or numbers"
+
+    // Ensure the name is not empty
+    guard !name.isEmpty else { return invalidDesc }
+
+    if name.count < 2 { return invalidDesc }
+
+    // Ensure the first character is an uppercase letter
+    guard let firstChar = name.first, firstChar.isUppercase else { return invalidDesc }
+
+    // Define a character set with valid characters (letters, numbers)
+    let validCharacters = CharacterSet.alphanumerics
+
+    // Check if the name contains only valid characters
+    if !name.unicodeScalars.allSatisfy({ validCharacters.contains($0) }) {
+        return invalidDesc
+    }
+
+    return nil
+}
+
+func isValidBundleIdentifier(_ identifier: String) -> String? {
+    let invalidDesc = "The bundle identifier must be a dot-separated series of lowercase letters or numbers"
+
+    // Ensure the identifier is not empty
+    guard !identifier.isEmpty else { return invalidDesc }
+
+    // Ensure the identifier does not start or end with a period
+    guard !identifier.hasPrefix(".") && !identifier.hasSuffix(".") else { return invalidDesc }
+
+    // Ensure it does not contain consecutive periods
+    guard !identifier.contains("..") else { return invalidDesc }
+
+    // Define valid characters: letters, numbers, dash, and periods
+    let validCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: ".-"))
+
+    // Check if all characters are valid
+    guard identifier.unicodeScalars.allSatisfy({ validCharacters.contains($0) }) else { return invalidDesc }
+
+    // Ensure it has at least two segments
+    let components = identifier.split(separator: ".")
+    guard components.count > 1 else { return invalidDesc }
+
+    return nil
+}
+
 class FrameworkProjectLayout {
     var packageSwift: URL
 
@@ -1606,13 +1675,27 @@ class AppProjectLayout : FrameworkProjectLayout {
     static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, appfair: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, icon: IconParameters?, version: String?, swiftVersion: String, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests: Bool, github: Bool, fastlane: Bool, packageResolved packageResolvedURL: URL? = nil) async throws -> (baseURL: URL, project: AppProjectLayout) {
         let sourceHeader = free ? (SourceLicense.defaultLicense(app: true).sourceHeader + "\n\n") : ""
 
+        if let invalidProjectName = isValidProjectName(projectName) {
+            throw InitError(errorDescription: "\(invalidProjectName): \(projectName)")
+        }
+
+
         if modules.contains(where: { module in
             module.moduleName.lowercased() == projectName.lowercased()
         }) {
             throw InitError(errorDescription: "ModuleName and project-name must be different: \(projectName)")
         }
 
+        for module in modules {
+            if let invalidModuleName = isValidModuleName(module.moduleName) {
+                throw InitError(errorDescription: "\(invalidModuleName): \(module.moduleName)")
+            }
+        }
+
         if let appid = appid {
+            if let invalidAppID = isValidBundleIdentifier(appid) {
+                throw InitError(errorDescription: "\(invalidAppID): \(appid)")
+            }
             if !appid.contains(".") {
                 throw InitError(errorDescription: "Appid must be a valid bundle identifier containing at least one dot: \(appid)")
             }

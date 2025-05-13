@@ -40,14 +40,23 @@ struct AndroidSDKCommand: AsyncParsableCommand {
 }
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+extension ToolOptionsCommand where Self : StreamingCommand {
+    func installAndroidSDK(version: String, reinstall: Bool, with out: MessageQueue) async throws {
+        try await run(with: out, "Install Swift Android SDK", ["brew", reinstall ? "reinstall" : "install", "skiptools/skip/swift-android-toolchain@\(version)"], additionalEnvironment: ["HOMEBREW_AUTO_UPDATE_SECS": "0"])
+    }
+}
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 struct AndroidSDKInstallCommand: MessageCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "install",
         abstract: "Install the native Swift Android SDK",
         shouldDisplay: true)
 
+    static let defaultAndroidSDKVersion = "6.1"
+
     @Option(help: ArgumentHelp("Version of the Swift Android SDK to install", valueName: "version"))
-    var version: String = "6.1"
+    var version: String = Self.defaultAndroidSDKVersion
 
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
@@ -59,7 +68,7 @@ struct AndroidSDKInstallCommand: MessageCommand, ToolOptionsCommand {
     var reinstall: Bool = false
 
     func performCommand(with out: MessageQueue) async throws {
-        try await run(with: out, "Install Swift Android SDK", ["brew", reinstall ? "reinstall" : "install", "skiptools/skip/swift-android-toolchain@\(version)"], additionalEnvironment: ["HOMEBREW_AUTO_UPDATE_SECS": "0"])
+        try await installAndroidSDK(version: version, reinstall: reinstall, with: out)
     }
 }
 

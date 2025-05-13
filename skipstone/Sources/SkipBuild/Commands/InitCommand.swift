@@ -10,7 +10,7 @@ import FoundationNetworking
 struct InitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, ToolOptionsCommand, BuildOptionsCommand, StreamingCommand {
     static var configuration = CommandConfiguration(
         commandName: "init",
-        abstract: "Create a new Skip project",
+        abstract: "Initialize a new Skip project",
         usage: """
 # Create a new transpiled app project
 skip init --appid=some.app.id app-project AppName
@@ -26,14 +26,13 @@ skip init --native-model lib-project ModuleName
 
 # Create a new app project with multiple modules
 skip init --native-app --appid=some.app.id app-project AppName ModuleName
-
-### DEPENDENCIES @ syntax https://github.com/orgs/skiptools/discussions/417
-
 """,
         discussion: """
 This command will create a conventional Skip app or library project.
 """,
         shouldDisplay: true)
+
+    // TODO: add dependencies @ syntax https://github.com/orgs/skiptools/discussions/417
 
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions

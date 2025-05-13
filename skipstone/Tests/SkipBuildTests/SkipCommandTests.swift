@@ -795,7 +795,7 @@ final class SkipCommandTests: XCTestCase {
 
     /// A multi-module native app with transpiled app and compiled model
     func testLibInitAppNativeModelCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, native: .nativeModel, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "APP_MODULE", "MODEL_MODULE")
+        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, native: .nativeModel, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "AppModule", "ModelModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -813,12 +813,12 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ gradle.properties
         │  └─ settings.gradle.kts
         ├─ Darwin
-        │  ├─ APP_MODULE.xcconfig
-        │  ├─ APP_MODULE.xcodeproj
+        │  ├─ AppModule.xcconfig
+        │  ├─ AppModule.xcodeproj
         │  │  ├─ project.pbxproj
         │  │  └─ xcshareddata
         │  │     └─ xcschemes
-        │  │        └─ APP_MODULE App.xcscheme
+        │  │        └─ AppModule App.xcscheme
         │  ├─ Assets.xcassets
         │  │  ├─ AccentColor.colorset
         │  │  │  └─ Contents.json
@@ -833,8 +833,8 @@ final class SkipCommandTests: XCTestCase {
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
-        │  ├─ APP_MODULE
-        │  │  ├─ APP_MODULEApp.swift
+        │  ├─ AppModule
+        │  │  ├─ AppModuleApp.swift
         │  │  ├─ ContentView.swift
         │  │  ├─ Resources
         │  │  │  ├─ Localizable.xcstrings
@@ -842,20 +842,20 @@ final class SkipCommandTests: XCTestCase {
         │  │  │     └─ Contents.json
         │  │  └─ Skip
         │  │     └─ skip.yml
-        │  └─ MODEL_MODULE
+        │  └─ ModelModule
         │     ├─ Skip
         │     │  └─ skip.yml
         │     └─ ViewModel.swift
         └─ Tests
-           ├─ APP_MODULETests
-           │  ├─ APP_MODULETests.swift
+           ├─ AppModuleTests
+           │  ├─ AppModuleTests.swift
            │  ├─ Resources
            │  │  └─ TestData.json
            │  ├─ Skip
            │  │  └─ skip.yml
            │  └─ XCSkipTests.swift
-           └─ MODEL_MODULETests
-              ├─ MODEL_MODULETests.swift
+           └─ ModelModuleTests
+              ├─ ModelModuleTests.swift
               ├─ Skip
               │  └─ skip.yml
               └─ XCSkipTests.swift
@@ -866,7 +866,7 @@ final class SkipCommandTests: XCTestCase {
         let AndroidManifest = try load("Android/app/src/main/AndroidManifest.xml")
         XCTAssertTrue(AndroidManifest.contains("android.intent.category.LAUNCHER"))
 
-        let AppSkipYML = try load("Sources/APP_MODULE/Skip/skip.yml")
+        let AppSkipYML = try load("Sources/AppModule/Skip/skip.yml")
         XCTAssertEqual(AppSkipYML, """
         # Configuration file for https://skip.tools project
         build:
@@ -874,7 +874,7 @@ final class SkipCommandTests: XCTestCase {
 
         """)
 
-        let ModelSkipYML = try load("Sources/MODEL_MODULE/Skip/skip.yml")
+        let ModelSkipYML = try load("Sources/ModelModule/Skip/skip.yml")
         XCTAssertEqual(ModelSkipYML, """
         # Configuration file for https://skip.tools project
         #
@@ -892,27 +892,27 @@ final class SkipCommandTests: XCTestCase {
 
         """)
 
-        let testCaseCode = try load("Tests/MODEL_MODULETests/MODEL_MODULETests.swift")
+        let testCaseCode = try load("Tests/ModelModuleTests/ModelModuleTests.swift")
         XCTAssertEqual(testCaseCode, """
         import XCTest
         import OSLog
         import Foundation
         import SkipBridge
-        @testable import MODEL_MODULE
+        @testable import ModelModule
 
-        let logger: Logger = Logger(subsystem: "MODEL_MODULE", category: "Tests")
+        let logger: Logger = Logger(subsystem: "ModelModule", category: "Tests")
 
         @available(macOS 13, *)
-        final class MODEL_MODULETests: XCTestCase {
+        final class ModelModuleTests: XCTestCase {
             override func setUp() {
                 #if os(Android)
                 // needed to load the compiled bridge from the transpiled tests
-                loadPeerLibrary(packageName: "cool-app", moduleName: "MODEL_MODULE")
+                loadPeerLibrary(packageName: "cool-app", moduleName: "ModelModule")
                 #endif
             }
 
-            func testMODEL_MODULE() throws {
-                logger.log("running testMODEL_MODULE")
+            func testModelModule() throws {
+                logger.log("running testModelModule")
                 XCTAssertEqual(1 + 2, 3, "basic test")
             }
 
@@ -941,8 +941,8 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
             products: [
-                .library(name: "APP_MODULE\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["APP_MODULE"]),
-                .library(name: "MODEL_MODULE", type: .dynamic, targets: ["MODEL_MODULE"]),
+                .library(name: "AppModule\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["AppModule"]),
+                .library(name: "ModelModule", type: .dynamic, targets: ["ModelModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -951,20 +951,20 @@ final class SkipCommandTests: XCTestCase {
                 .package(url: "https://source.skip.tools/skip-model.git", from: "1.0.0")
             ],
             targets: [
-                .target(name: "APP_MODULE", dependencies: [
-                    "MODEL_MODULE",
+                .target(name: "AppModule", dependencies: [
+                    "ModelModule",
                     .product(name: "SkipUI", package: "skip-ui")
                 ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .testTarget(name: "APP_MODULETests", dependencies: [
-                    "APP_MODULE",
+                .testTarget(name: "AppModuleTests", dependencies: [
+                    "AppModule",
                     .product(name: "SkipTest", package: "skip")
                 ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .target(name: "MODEL_MODULE", dependencies: [
+                .target(name: "ModelModule", dependencies: [
                     .product(name: "SkipFuse", package: "skip-fuse"),
                     .product(name: "SkipModel", package: "skip-model")
                 ], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .testTarget(name: "MODEL_MODULETests", dependencies: [
-                    "MODEL_MODULE",
+                .testTarget(name: "ModelModuleTests", dependencies: [
+                    "ModelModule",
                     .product(name: "SkipTest", package: "skip")
                 ], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
@@ -975,7 +975,7 @@ final class SkipCommandTests: XCTestCase {
 
     /// A multi-module native app
     func testLibInitAppNativeAppModelCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, native: .nativeApp, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "APP_MODULE", "MODEL_MODULE")
+        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, native: .nativeApp, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "AppModule", "ModelModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -993,12 +993,12 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ gradle.properties
         │  └─ settings.gradle.kts
         ├─ Darwin
-        │  ├─ APP_MODULE.xcconfig
-        │  ├─ APP_MODULE.xcodeproj
+        │  ├─ AppModule.xcconfig
+        │  ├─ AppModule.xcodeproj
         │  │  ├─ project.pbxproj
         │  │  └─ xcshareddata
         │  │     └─ xcschemes
-        │  │        └─ APP_MODULE App.xcscheme
+        │  │        └─ AppModule App.xcscheme
         │  ├─ Assets.xcassets
         │  │  ├─ AccentColor.colorset
         │  │  │  └─ Contents.json
@@ -1013,8 +1013,8 @@ final class SkipCommandTests: XCTestCase {
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
-        │  ├─ APP_MODULE
-        │  │  ├─ APP_MODULEApp.swift
+        │  ├─ AppModule
+        │  │  ├─ AppModuleApp.swift
         │  │  ├─ ContentView.swift
         │  │  ├─ Resources
         │  │  │  ├─ Localizable.xcstrings
@@ -1022,13 +1022,13 @@ final class SkipCommandTests: XCTestCase {
         │  │  │     └─ Contents.json
         │  │  └─ Skip
         │  │     └─ skip.yml
-        │  └─ MODEL_MODULE
+        │  └─ ModelModule
         │     ├─ Skip
         │     │  └─ skip.yml
         │     └─ ViewModel.swift
         └─ Tests
-           └─ MODEL_MODULETests
-              ├─ MODEL_MODULETests.swift
+           └─ ModelModuleTests
+              ├─ ModelModuleTests.swift
               ├─ Skip
               │  └─ skip.yml
               └─ XCSkipTests.swift
@@ -1039,7 +1039,7 @@ final class SkipCommandTests: XCTestCase {
         let AndroidManifest = try load("Android/app/src/main/AndroidManifest.xml")
         XCTAssertTrue(AndroidManifest.contains("android.intent.category.LAUNCHER"))
 
-        let AppSkipYML = try load("Sources/APP_MODULE/Skip/skip.yml")
+        let AppSkipYML = try load("Sources/AppModule/Skip/skip.yml")
         XCTAssertEqual(AppSkipYML, """
         # Configuration file for https://skip.tools project
         #
@@ -1056,7 +1056,7 @@ final class SkipCommandTests: XCTestCase {
 
         """)
 
-        let SkipYML = try load("Sources/MODEL_MODULE/Skip/skip.yml")
+        let SkipYML = try load("Sources/ModelModule/Skip/skip.yml")
         XCTAssertEqual(SkipYML, """
         # Configuration file for https://skip.tools project
         #
@@ -1073,27 +1073,27 @@ final class SkipCommandTests: XCTestCase {
 
         """)
 
-        let testCaseCode = try load("Tests/MODEL_MODULETests/MODEL_MODULETests.swift")
+        let testCaseCode = try load("Tests/ModelModuleTests/ModelModuleTests.swift")
         XCTAssertEqual(testCaseCode, """
         import XCTest
         import OSLog
         import Foundation
         import SkipBridge
-        @testable import MODEL_MODULE
+        @testable import ModelModule
 
-        let logger: Logger = Logger(subsystem: "MODEL_MODULE", category: "Tests")
+        let logger: Logger = Logger(subsystem: "ModelModule", category: "Tests")
 
         @available(macOS 13, *)
-        final class MODEL_MODULETests: XCTestCase {
+        final class ModelModuleTests: XCTestCase {
             override func setUp() {
                 #if os(Android)
                 // needed to load the compiled bridge from the transpiled tests
-                loadPeerLibrary(packageName: "cool-app", moduleName: "MODEL_MODULE")
+                loadPeerLibrary(packageName: "cool-app", moduleName: "ModelModule")
                 #endif
             }
 
-            func testMODEL_MODULE() throws {
-                logger.log("running testMODEL_MODULE")
+            func testModelModule() throws {
+                logger.log("running testModelModule")
                 XCTAssertEqual(1 + 2, 3, "basic test")
             }
 
@@ -1122,8 +1122,8 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
             products: [
-                .library(name: "APP_MODULE\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["APP_MODULE"]),
-                .library(name: "MODEL_MODULE", type: .dynamic, targets: ["MODEL_MODULE"]),
+                .library(name: "AppModule\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["AppModule"]),
+                .library(name: "ModelModule", type: .dynamic, targets: ["ModelModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -1132,16 +1132,16 @@ final class SkipCommandTests: XCTestCase {
                 .package(url: "https://source.skip.tools/skip-model.git", from: "1.0.0")
             ],
             targets: [
-                .target(name: "APP_MODULE", dependencies: [
-                    "MODEL_MODULE",
+                .target(name: "AppModule", dependencies: [
+                    "ModelModule",
                     .product(name: "SkipFuseUI", package: "skip-fuse-ui")
                 ], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .target(name: "MODEL_MODULE", dependencies: [
+                .target(name: "ModelModule", dependencies: [
                     .product(name: "SkipFuse", package: "skip-fuse"),
                     .product(name: "SkipModel", package: "skip-model")
                 ], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .testTarget(name: "MODEL_MODULETests", dependencies: [
-                    "MODEL_MODULE",
+                .testTarget(name: "ModelModuleTests", dependencies: [
+                    "ModelModule",
                     .product(name: "SkipTest", package: "skip")
                 ], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
@@ -1152,7 +1152,7 @@ final class SkipCommandTests: XCTestCase {
 
     /// A single-module native app
     func testLibInitAppNativeAppCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, native: .nativeApp, tests: nil, fastlane: false, appid: "some.cool.app", swiftVersion: "6.0", moduleNames: "APP_MODULE")
+        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, native: .nativeApp, tests: nil, fastlane: false, appid: "some.cool.app", swiftVersion: "6.0", moduleNames: "AppModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -1170,12 +1170,12 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ gradle.properties
         │  └─ settings.gradle.kts
         ├─ Darwin
-        │  ├─ APP_MODULE.xcconfig
-        │  ├─ APP_MODULE.xcodeproj
+        │  ├─ AppModule.xcconfig
+        │  ├─ AppModule.xcodeproj
         │  │  ├─ project.pbxproj
         │  │  └─ xcshareddata
         │  │     └─ xcschemes
-        │  │        └─ APP_MODULE App.xcscheme
+        │  │        └─ AppModule App.xcscheme
         │  ├─ Assets.xcassets
         │  │  ├─ AccentColor.colorset
         │  │  │  └─ Contents.json
@@ -1190,8 +1190,8 @@ final class SkipCommandTests: XCTestCase {
         ├─ README.md
         ├─ Skip.env
         └─ Sources
-           └─ APP_MODULE
-              ├─ APP_MODULEApp.swift
+           └─ AppModule
+              ├─ AppModuleApp.swift
               ├─ ContentView.swift
               ├─ Resources
               │  ├─ Localizable.xcstrings
@@ -1207,7 +1207,7 @@ final class SkipCommandTests: XCTestCase {
         let AndroidManifest = try load("Android/app/src/main/AndroidManifest.xml")
         XCTAssertTrue(AndroidManifest.contains("android.intent.category.LAUNCHER"))
 
-        let SkipYML = try load("Sources/APP_MODULE/Skip/skip.yml")
+        let SkipYML = try load("Sources/AppModule/Skip/skip.yml")
         XCTAssertEqual(SkipYML, """
         # Configuration file for https://skip.tools project
         #
@@ -1235,14 +1235,14 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
             products: [
-                .library(name: "APP_MODULE\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["APP_MODULE"]),
+                .library(name: "AppModule\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["AppModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
                 .package(url: "https://source.skip.tools/skip-fuse-ui.git", "0.0.0"..<"2.0.0")
             ],
             targets: [
-                .target(name: "APP_MODULE", dependencies: [
+                .target(name: "AppModule", dependencies: [
                     .product(name: "SkipFuseUI", package: "skip-fuse-ui")
                 ], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
@@ -1252,9 +1252,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitAppFair() async throws {
-        let projectName = "Free-App"
-
-        let (projectURL, projectTree) = try await skipInit(projectName: projectName, free: false, appfair: true) // appfair should override free
+        let (projectURL, projectTree) = try await skipInit(projectName: "Free-App", free: false, appfair: true) // appfair should override free
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -1406,7 +1404,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitApp3ModuleCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: true, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "TOP_MODULE", "MIDDLE_MODULE", "BOTTOM_MODULE")
+        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: true, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "TopModule", "MiddleModule", "BottomModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -1434,29 +1432,29 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ Info.plist
         │  ├─ Sources
         │  │  └─ Main.swift
-        │  ├─ TOP_MODULE.xcconfig
-        │  └─ TOP_MODULE.xcodeproj
+        │  ├─ TopModule.xcconfig
+        │  └─ TopModule.xcodeproj
         │     ├─ project.pbxproj
         │     └─ xcshareddata
         │        └─ xcschemes
-        │           └─ TOP_MODULE App.xcscheme
+        │           └─ TopModule App.xcscheme
         ├─ Package.swift
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
-        │  ├─ BOTTOM_MODULE
-        │  │  ├─ BOTTOM_MODULE.swift
+        │  ├─ BottomModule
+        │  │  ├─ BottomModule.swift
         │  │  ├─ Resources
         │  │  │  └─ Localizable.xcstrings
         │  │  └─ Skip
         │  │     └─ skip.yml
-        │  ├─ MIDDLE_MODULE
+        │  ├─ MiddleModule
         │  │  ├─ Resources
         │  │  │  └─ Localizable.xcstrings
         │  │  ├─ Skip
         │  │  │  └─ skip.yml
         │  │  └─ ViewModel.swift
-        │  └─ TOP_MODULE
+        │  └─ TopModule
         │     ├─ ContentView.swift
         │     ├─ Resources
         │     │  ├─ Localizable.xcstrings
@@ -1464,28 +1462,28 @@ final class SkipCommandTests: XCTestCase {
         │     │     └─ Contents.json
         │     ├─ Skip
         │     │  └─ skip.yml
-        │     └─ TOP_MODULEApp.swift
+        │     └─ TopModuleApp.swift
         └─ Tests
-           ├─ BOTTOM_MODULETests
-           │  ├─ BOTTOM_MODULETests.swift
+           ├─ BottomModuleTests
+           │  ├─ BottomModuleTests.swift
            │  ├─ Resources
            │  │  └─ TestData.json
            │  ├─ Skip
            │  │  └─ skip.yml
            │  └─ XCSkipTests.swift
-           ├─ MIDDLE_MODULETests
-           │  ├─ MIDDLE_MODULETests.swift
+           ├─ MiddleModuleTests
+           │  ├─ MiddleModuleTests.swift
            │  ├─ Resources
            │  │  └─ TestData.json
            │  ├─ Skip
            │  │  └─ skip.yml
            │  └─ XCSkipTests.swift
-           └─ TOP_MODULETests
+           └─ TopModuleTests
               ├─ Resources
               │  └─ TestData.json
               ├─ Skip
               │  └─ skip.yml
-              ├─ TOP_MODULETests.swift
+              ├─ TopModuleTests.swift
               └─ XCSkipTests.swift
 
         """)
@@ -1509,9 +1507,9 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
             products: [
-                .library(name: "TOP_MODULE\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["TOP_MODULE"]),
-                .library(name: "MIDDLE_MODULE", type: .dynamic, targets: ["MIDDLE_MODULE"]),
-                .library(name: "BOTTOM_MODULE", type: .dynamic, targets: ["BOTTOM_MODULE"]),
+                .library(name: "TopModule\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["TopModule"]),
+                .library(name: "MiddleModule", type: .dynamic, targets: ["MiddleModule"]),
+                .library(name: "BottomModule", type: .dynamic, targets: ["BottomModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -1520,25 +1518,25 @@ final class SkipCommandTests: XCTestCase {
                 .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
-                .target(name: "TOP_MODULE", dependencies: [
-                    "MIDDLE_MODULE"
+                .target(name: "TopModule", dependencies: [
+                    "MiddleModule"
                 ] + (zero ? [] : [
                     .product(name: "SkipUI", package: "skip-ui")
                 ]), resources: [.process("Resources")], plugins: skipstone),
-                .testTarget(name: "TOP_MODULETests", dependencies: [
-                    "TOP_MODULE"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
-                .target(name: "MIDDLE_MODULE", dependencies: [
-                    "BOTTOM_MODULE"
+                .testTarget(name: "TopModuleTests", dependencies: [
+                    "TopModule"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
+                .target(name: "MiddleModule", dependencies: [
+                    "BottomModule"
                 ] + (zero ? [] : [
                     .product(name: "SkipModel", package: "skip-model")
                 ]), resources: [.process("Resources")], plugins: skipstone),
-                .testTarget(name: "MIDDLE_MODULETests", dependencies: [
-                    "MIDDLE_MODULE"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
-                .target(name: "BOTTOM_MODULE", dependencies: (zero ? [] : [
+                .testTarget(name: "MiddleModuleTests", dependencies: [
+                    "MiddleModule"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
+                .target(name: "BottomModule", dependencies: (zero ? [] : [
                     .product(name: "SkipFoundation", package: "skip-foundation")
                 ]), resources: [.process("Resources")], plugins: skipstone),
-                .testTarget(name: "BOTTOM_MODULETests", dependencies: [
-                    "BOTTOM_MODULE"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
+                .testTarget(name: "BottomModuleTests", dependencies: [
+                    "BottomModule"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
             ]
         )
 
