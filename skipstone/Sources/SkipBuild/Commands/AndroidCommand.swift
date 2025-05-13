@@ -351,6 +351,7 @@ fileprivate extension AndroidOperationCommand {
 
                 // filter out some of the native Android libraries that are located in the same folder as the Swift libraries
                 // including these are unnecessary and also results in a hang when running test cases
+                // This is only for pre-6.1 SDKs that mingle the NDK and the Swift Android SDK into a single root folder
                 let builtinLibraries: Set<String> = [
                     "libandroid.so",
                     "libc.so",
@@ -377,13 +378,16 @@ fileprivate extension AndroidOperationCommand {
                     .filter({ $0.lastPathComponent.contains(".so") })
                     .filter({ !builtinLibraries.contains($0.lastPathComponent) })
 
+                let sysrootLibraries = try files(at: tc.libSysrootArch, allowLinks: true)
+                    .filter({ $0.lastPathComponent.contains(".so") })
+
+                // we always need libc++_shared.so from the NDK sysroot even if it is not an explicit dependency
+                let cppShared = sysrootLibraries.filter({ $0.lastPathComponent == "libc++_shared.so" })
+
                 if !prune {
                     // just return the unfiltered list if we are not pruning the libraries
-                    return buildOutputLibraries + libraries
+                    return buildOutputLibraries + libraries + cppShared
                 }
-
-                // we always need libc++_shared.so even if it is not an explicit dependency
-                let cppShared = libraries.filter({ $0.lastPathComponent == "libc++_shared.so" })
 
                 // analyze the build output .so files for all their dependencies
                 let dependentLibraries = try buildOutputLibraries.flatMap { try sharedObjectDependencies(for: $0, in: libraries) }
@@ -551,7 +555,7 @@ fileprivate extension AndroidOperationCommand {
 
     /// Returns the sorted list of regular files at the given locations
     func files(at url: URL, allowLinks: Bool = false) throws -> [URL] {
-        try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        try FileManager.default.contentsOfDirectory(at: url.resolvingSymlinksInPath(), includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey])
             .filter({
                 if try $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true {
                     return true
@@ -584,11 +588,14 @@ fileprivate extension AndroidOperationCommand {
 
         let sdks = try dirs(at: localSDKsPath)
             .filter({ $0.pathExtension == "artifactbundle" })
-            .filter({ $0.lastPathComponent.hasPrefix("swift-\(toolchainOptions.swiftVersion ?? "")") })
-            .filter({ $0.lastPathComponent.contains("RELEASE-android-\(apiLevel)") })
+            .filter({ $0.lastPathComponent.hasPrefix("swift-\(toolchainOptions.swiftVersion ?? "")") && $0.lastPathComponent.contains("-android-") })
+            // permit non-RELEASE tags if it is specified explicitly, like:
+            // skip android test --swift-version 6.2-DEVELOPMENT-SNAPSHOT-2025-05-07-a
+            //.filter({ toolchainOptions.swiftVersion != nil || $0.lastPathComponent.contains("RELEASE-android") })
             .sorted { u1, u2 in
                 // localizedStandardCompare will handle sorting semantic versions like:
-                // swift-1.10.0-RELEASE > swift-1.2.0-RELEASE
+                // swift-6.1-RELEASE-android-24-0.1.artifactbundle > swift-6.0-RELEASE-android-24-0.1.artifactbundle
+                // swift-6.2-DEVELOPMENT-SNAPSHOT-2025-05-07-a-android-0.1.artifactbundle > swift-6.1-RELEASE-android-24-0.1.artifactbundle
                 u1.lastPathComponent.localizedStandardCompare(u2.lastPathComponent) == .orderedAscending
             }
 
@@ -600,7 +607,19 @@ fileprivate extension AndroidOperationCommand {
         let sdkName = arch.target(api: apiLevel)
         let swiftSDKVersion = sdkPath.lastPathComponent.split(separator: "-").dropFirst().first?.description ?? "latest" // e.g.: 6.0.2
         let toolchainPath = try swiftToolchainFolder(sdkVersion: swiftSDKVersion.description)
-        let sdkRoot = sdkPath.appendingPathComponent("swift-\(swiftSDKVersion)-release-android-\(apiLevel)-sdk", isDirectory: true)
+        let infoPath = sdkPath.appendingPathComponent("info.json", isDirectory: false)
+        let sdkInfo = try JSONDecoder().decode(SDKInfo.self, from: Data(contentsOf: infoPath))
+
+        var sdkRootPath = "swift-\(swiftSDKVersion)-release-android-\(apiLevel)-sdk" // default
+
+        let artifacts = sdkInfo.artifacts.keys.sorted(by: { $0.localizedStandardCompare($1) == .orderedDescending })
+        if let defaultArtifact = artifacts.first {
+            if let sdkArtifact = sdkInfo.artifacts[defaultArtifact]?.variants.first {
+                sdkRootPath = sdkArtifact.path
+            }
+        }
+
+        let sdkRoot = sdkPath.appendingPathComponent(sdkRootPath, isDirectory: true)
         if !isDir(sdkRoot) {
             throw CrossCompilerError(errorDescription: "The Swift Android SDK did not exist at \(sdkRoot.path)")
         }
@@ -609,42 +628,68 @@ fileprivate extension AndroidOperationCommand {
         let schemaSDK = try JSONDecoder().decode(SchemaSDK.self, from: Data(contentsOf: sdkJSONURL))
 
         //let sysroot = try dirs(in: [sdkRoot]).first(where: { $0.lastPathComponent.hasSuffix("-sysroot") }) // e.g.: "android-27c-sysroot"
-        let sysrootPath = schemaSDK.targetTriples?[arch.tripleKey(api: apiLevel)]?.sdkRootPath
+        let tripleKey = arch.tripleKey(api: apiLevel)
+        guard let targetTriple = schemaSDK.targetTriples?[tripleKey] else {
+            throw CrossCompilerError(errorDescription: "The Swift Android SDK did not contain the specified target triple: \(tripleKey)")
+        }
+        let sysrootPath = targetTriple.sdkRootPath
+        let swiftResourcesPath = targetTriple.swiftResourcesPath
+        let swiftStaticResourcesPath = targetTriple.swiftStaticResourcesPath
 
         guard let sysrootPath else {
             throw CrossCompilerError(errorDescription: "The Swift Android SDK did not contain an NDK sysroot at \(sdkRoot.path)")
         }
 
-        let libBase = sdkRoot
+        let libSysrootBase = sdkRoot
             .appendingPathComponent(sysrootPath, isDirectory: true)
             .appendingPathComponent("usr/lib", isDirectory: true)
 
+        let libSysrootArch = libSysrootBase
+            .appendingPathComponent(arch.libpathDynamic, isDirectory: true)
+
+        if !isDir(libSysrootArch) {
+            throw CrossCompilerError(errorDescription: "The Swift Android NDK library path was not found at: \(libSysrootArch.path)")
+        }
+
+        guard let swiftResourcesPath else {
+            throw CrossCompilerError(errorDescription: "The Swift Android SDK did not contain a swiftResourcesPath at \(sdkRoot.path)")
+        }
+
+        guard let swiftStaticResourcesPath else {
+            throw CrossCompilerError(errorDescription: "The Swift Android SDK did not contain a swiftStaticResourcesPath at \(sdkRoot.path)")
+        }
+
         // folder containing the static .a files
-        let libPathStatic = libBase
-            .appendingPathComponent(arch.libpathStatic, isDirectory: true)
-            .appendingPathComponent("android", isDirectory: true)
+        let libPathStatic = sdkRoot
+            .appendingPathComponent(swiftStaticResourcesPath, isDirectory: true)
 
         if !isDir(libPathStatic) {
             throw CrossCompilerError(errorDescription: "The Swift Android SDK static library path for \(arch.tripleKey(api: apiLevel)) did not exist at: \(libPathStatic.path)")
         }
 
         // folder containing the shared object files
-        var libPathDynamic = libBase
-            .appendingPathComponent(arch.triple, isDirectory: true)
+        var libPathDynamic = sdkRoot
+            .appendingPathComponent(swiftResourcesPath, isDirectory: true)
+            .appendingPathComponent("android", isDirectory: true)
 
-        // pre-6.0.3 SDKs stored their libraries in the API-level-specific folder, and after in the parent folder; check each lib location for the expected "libswiftCore.so" library
+        // pre-6.2 SDKs stored their libraries in the API-level-specific folder
         if !FileManager.default.fileExists(atPath: libPathDynamic.appendingPathComponent("libswiftCore.so", isDirectory: false).path) {
-            libPathDynamic = libPathDynamic.appendingPathComponent(apiLevel.description, isDirectory: true)
+            libPathDynamic = libSysrootBase.appendingPathComponent(arch.triple, isDirectory: true)
+
+            // pre-6.0.3 SDKs stored their libraries in the API-level-specific folder, and after in the parent folder; check each lib location for the expected "libswiftCore.so" library
             if !FileManager.default.fileExists(atPath: libPathDynamic.appendingPathComponent("libswiftCore.so", isDirectory: false).path) {
-                throw CrossCompilerError(errorDescription: "Could not locate library path for SDK: \(libPathDynamic.path)")
+                libPathDynamic = libPathDynamic.appendingPathComponent(apiLevel.description, isDirectory: true)
+                if !FileManager.default.fileExists(atPath: libPathDynamic.appendingPathComponent("libswiftCore.so", isDirectory: false).path) {
+                    throw CrossCompilerError(errorDescription: "Could not locate library path for SDK: \(libPathDynamic.path)")
+                }
             }
         }
 
         if !isDir(libPathDynamic) {
-            throw CrossCompilerError(errorDescription: "The Swift Android SDK dybamic library path for \(arch.tripleKey(api: apiLevel)) did not exist at: \(libPathDynamic.path)")
+            throw CrossCompilerError(errorDescription: "The Swift Android SDK dynamic library path for \(arch.tripleKey(api: apiLevel)) did not exist at: \(libPathDynamic.path)")
         }
 
-        return ToolchainPaths(toolchainPath: toolchainPath, swiftSDKVersion: swiftSDKVersion, destinationURL: nil, sdkName: sdkName, libPathDynamic: libPathDynamic, libPathStatic: libPathStatic)
+        return ToolchainPaths(toolchainPath: toolchainPath, swiftSDKVersion: swiftSDKVersion, destinationURL: nil, sdkName: sdkName, libPathDynamic: libPathDynamic, libPathStatic: libPathStatic, libSysrootArch: libSysrootArch)
     }
 
     func swiftToolchainFolder(sdkVersion: String) throws -> URL {
@@ -840,7 +885,7 @@ struct ToolchainOptions: ParsableArguments {
     var arch: [AndroidArchArgument] = []
 
     @Option(help: ArgumentHelp("Android API level", valueName: "level"))
-    var androidAPILevel: Int = 24
+    var androidAPILevel: Int = 28
 
     @Option(help: ArgumentHelp("Root path for Swift SDK", valueName: "path"))
     var swiftSDKHome: String? = nil
@@ -870,6 +915,7 @@ struct ToolchainPaths {
     let sdkName: String?
     let libPathDynamic: URL
     let libPathStatic: URL
+    let libSysrootArch: URL
 }
 
 /// The library for `swift test`
@@ -996,6 +1042,54 @@ enum AndroidArch: String {
         }
     }
 
+}
+
+/**
+ ```
+ {
+     "schemaVersion": "1.0",
+     "artifacts": {
+         "swift-6.0.3-RELEASE-android-24-0.1": {
+             "variants": [ { "path": "swift-6.0.3-release-android-24-sdk" } ],
+             "version": "0.1",
+             "type": "swiftSDK"
+         }
+     }
+ }
+ ```
+
+ or:
+
+ ```
+ {
+   "schemaVersion": "1.0",
+   "artifacts": {
+     "swift-6.2-DEVELOPMENT-SNAPSHOT-2025-04-24-a-android-0.1": {
+       "variants": [
+         {
+           "path": "swift-android"
+         }
+       ],
+       "version": "0.1",
+       "type": "swiftSDK"
+     }
+   }
+ }
+ ```
+ */
+struct SDKInfo: Decodable {
+    let schemaVersion: String
+    var artifacts: [String: SDKInfoArtifact]
+
+    struct SDKInfoArtifact: Decodable {
+        let variants: [SDKVariant]
+        let version: String // "0.1"
+        let type: String // "swiftSDK"
+
+        struct SDKVariant: Decodable {
+            let path: String
+        }
+    }
 }
 
 /**

@@ -113,10 +113,12 @@ extension ToolOptionsCommand where Self : StreamingCommand {
             try await run(with: out, "macOS architecture", ["sysctl", "-n", "sysctl.proc_translated"], watch: false, resultHandler: checkResult)
         }
 
+        // enable overriding skip command with skip.local
+        let skipcmd = ProcessInfo.processInfo.environment["SKIP_COMMAND_OVERRIDE"] ?? "skip"
 
         //await checkVersion(title: "ECHO2 VERSION", cmd: ["sh", "-c", "echo ONE ; sleep 1; echo TWO ; sleep 1; echo THREE ; sleep 1; echo 3.2.1"], min: Version("1.2.3"), pattern: "([0-9.]+)", watch: true)
 
-        try await checkVersion(title: "Skip version", cmd: ["skip", "version"], min: Version(skipVersion), pattern: "Skip version ([0-9.]+)")
+        try await checkVersion(title: "Skip version", cmd: [skipcmd, "version"], min: Version(skipVersion), pattern: "Skip version ([0-9.]+)")
         try await checkVersion(title: "macOS version", cmd: ["sw_vers", "--productVersion"], min: Version("13.5.0"), pattern: "([0-9.]+)")
         if ProcessInfo.isARM {
             // only check for Rosetta when we are on an ARM machine
@@ -124,7 +126,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         }
         try await checkVersion(title: "Swift version", cmd: ["swift", "-version"], min: Version("5.9.0"), pattern: "Swift version ([0-9.]+)")
         if checkNative {
-            try await checkVersion(title: "Swift Android SDK version", cmd: ["skip", "android", "toolchain", "version"], min: Version("6.1.0"), pattern: "Swift Package Manager - Swift ([0-9.]+)", hint: " (install with: skip android sdk install)")
+            try await checkVersion(title: "Swift Android SDK version", cmd: [skipcmd, "android", "toolchain", "version"], min: Version("6.1.0"), pattern: "Swift Package Manager - Swift ([0-9.]+)", hint: " (install with: skip android sdk install)")
         }
         // TODO: add advice to run `xcode-select -s /Applications/Xcode.app/Contents/Developer` to work around https://github.com/skiptools/skip/issues/18
         try await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)", hint: " (install from: https://developer.apple.com/xcode/)")

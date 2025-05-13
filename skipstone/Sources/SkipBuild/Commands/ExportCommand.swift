@@ -16,6 +16,16 @@ struct ExportCommand: MessageCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "export",
         abstract: "Export the Gradle project and built artifacts",
+        usage: """
+# export just the debug version of the archives
+skip export --debug
+
+# export just the "ModuleName" module
+skip export --module ModuleName
+""",
+        discussion: """
+Build and export the Skip modules defined in the Package.swift, with libraries exported as .aar files and the app exported as an .apk and .adb file suitable for distribution.
+""",
         shouldDisplay: exportCommandEnabled)
 
     @Option(name: [.customShort("d"), .long], help: ArgumentHelp("Export output folder", valueName: "directory"))
