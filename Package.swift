@@ -29,8 +29,7 @@ let package = Package(
     ]
 )
 
-import Foundation
-let env = ProcessInfo.processInfo.environment
+let env = Context.environment
 if (env["SKIPLOCAL"] != nil || env["PWD"]?.hasSuffix("skipstone") == true) {
     package.dependencies = package.dependencies.dropLast() + [.package(path: env["SKIPLOCAL"] ?? "../skipstone")]
     package.targets = package.targets.dropLast() + [.executableTarget(name: "skip", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
