@@ -131,7 +131,6 @@ public struct OutputOptions: ParsableArguments {
             }
         }
 
-
         /// The closure that will output a message to standard out
         func writeStream(error: Bool, output: String?, _ message: String, terminator: String = "\n") {
             let stream = (error ? err : fileStream(for: output) ?? out)
@@ -195,7 +194,7 @@ public struct OutputOptions: ParsableArguments {
         if emitJSON {
             try streams.writeStream(error: false, output: output, item.toJSON(outputFormatting: [.sortedKeys, .withoutEscapingSlashes, (jsonCompact ? .sortedKeys : .prettyPrinted)], dateEncodingStrategy: .iso8601).utf8String ?? "")
         } else {
-            if let messageString = item.message(term: self.term) {
+            if !item.squelch, let messageString = item.message(term: self.term) {
                 streams.writeStream(error: messageErrout == true ? false : error, output: output, messageString)
             }
         }
@@ -426,9 +425,13 @@ extension OutputOptions {
 
         let startTime = Date.now
 
+        func clearLine() {
+            writeString(clearLineString + "\r", terminator: "", flush: true)
+        }
+
         var progressMonitor: Task<(), Error>? = nil
         if let progressSprites = self.progressSprites(for: message) {
-            progressMonitor = Task.detached {
+            progressMonitor = Task {
                 var lastMessage: String? = nil
 
                 /// The default implementation of the message handler cycles through the default progress animation and then outputs the result
@@ -443,7 +446,7 @@ extension OutputOptions {
                     }
                 }
 
-                func printMessage() -> String? {
+                @discardableResult func printMessage() -> String? {
                     let newMessage = animatingMessageHandler(nil)
                     if newMessage == lastMessage {
                         // the messages are exactly the same, so don't clear the console and print the message again
@@ -475,19 +478,21 @@ extension OutputOptions {
                     }
                 }
 
-                while true {
-                    let printed = printMessage()?.count ?? 0
+                while !Task.isCancelled {
+                    printMessage()
                     defer {
                         // clear the current line, as well as the line ahead
                         // this will happen one last time when we are cancelled with a CancellationError
-                        writeString(String(repeating: "\u{8}", count: printed) + "\u{001B}[2K", terminator: "", flush: false)
+                        //writeString(String(repeating: "\u{8}", count: printed) + "\u{001B}[2K", terminator: "", flush: false)
+                        clearLine()
                     }
+                    try Task.checkCancellation()
                     try await Task.sleep(for: .milliseconds(50))
                 }
             }
         }
 
-        let resultTask = Task.detached {
+        let resultTask = Task {
             // Capture the async monitorAction as a Result
             await {
                 do {
@@ -513,16 +518,28 @@ extension OutputOptions {
 
         streams.outputBuffer(reset: true) // clear the current output buffer
 
+        func postMessage(_ message: MessageBlock) async {
+            var msg = message
+            if progressMonitor != nil {
+                // when we are using a terminal progress monitor, we do not post to the messenger but instead write it immediately
+                // this is because the message queue is async and might print the result after the next check has started,
+                // which can garble the output
+                writeString(message.message(term: term) ?? "", flush: true)
+                msg.squelch = true
+            }
+            await messenger.yield(msg)
+        }
+
         // send the final message to the block
         let resultHandled = resultHandler(result)
-        if let msgmsg = resultHandled.message { // the result handler spcifies a message to issue
-            await messenger.yield(msgmsg)
+        if let msgmsg = resultHandled.message { // the result handler specifies a message to issue
+            await postMessage(msgmsg)
         } else { // otherwise translate the result
             var messageWithError = message
             if case .failure(let error) = resultHandled.result {
                 messageWithError += ": " + error.localizedDescription
             }
-            await messenger.yield(MessageBlock(status: resultHandled.result?.messageStatusAny ?? result.messageStatusAny, messageWithError))
+            await postMessage(MessageBlock(status: resultHandled.result?.messageStatusAny ?? result.messageStatusAny, messageWithError))
         }
 
         return result
@@ -573,6 +590,15 @@ environment:
         return firstRun
     }
 }
+
+/// Code to clear the line on a tty.
+private let clearLineString = "\u{001B}[2K"
+
+/// Code to end any currently active wrapping.
+private let resetString = "\u{001B}[0m"
+
+/// Code to make string bold.
+private let boldString = "\u{001B}[1m"
 
 extension Result where Success == MessageEncodable {
     /// The `MessageBlock.Status` of a `Result` is underlying status, or `.fail` for an error

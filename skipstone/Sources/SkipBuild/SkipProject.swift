@@ -175,10 +175,9 @@ class FrameworkProjectLayout {
         packageHeader += """
         import PackageDescription
         \(skipZeroSupport ? """
-        import Foundation
 
         // Set SKIP_ZERO=1 to build without Skip libraries
-        let zero = ProcessInfo.processInfo.environment["SKIP_ZERO"] != nil
+        let zero = Context.environment["SKIP_ZERO"] != nil
         let skipstone = !zero ? [Target.PluginUsage.plugin(name: "skipstone", package: "skip")] : []
 
         """ : "")
@@ -1083,7 +1082,7 @@ final class \(moduleName)Tests: XCTestCase {
     func testAsyncThrowsFunction() async throws {
 
 """
-                    if moduleMode == .native {
+                    if moduleMode == .native || moduleMode == .nativeBridged {
                         testCaseCode += """
         let id = UUID()
 

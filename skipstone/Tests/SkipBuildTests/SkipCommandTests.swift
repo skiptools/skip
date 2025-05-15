@@ -51,10 +51,9 @@ final class SkipCommandTests: XCTestCase {
         // swift-tools-version: 5.9
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
-        import Foundation
 
         // Set SKIP_ZERO=1 to build without Skip libraries
-        let zero = ProcessInfo.processInfo.environment["SKIP_ZERO"] != nil
+        let zero = Context.environment["SKIP_ZERO"] != nil
         let skipstone = !zero ? [Target.PluginUsage.plugin(name: "skipstone", package: "skip")] : []
 
         let package = Package(
@@ -652,6 +651,7 @@ final class SkipCommandTests: XCTestCase {
             }
 
             func testAsyncThrowsFunction() async throws {
+                let id = UUID()
                 let type: SomeModuleModule.SomeModuleType = try await SomeModuleModule.createSomeModuleType(id: id, delay: 0.001)
                 XCTAssertEqual(id, type.id)
             }
@@ -1496,10 +1496,9 @@ final class SkipCommandTests: XCTestCase {
         // swift-tools-version: 5.9
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
-        import Foundation
 
         // Set SKIP_ZERO=1 to build without Skip libraries
-        let zero = ProcessInfo.processInfo.environment["SKIP_ZERO"] != nil
+        let zero = Context.environment["SKIP_ZERO"] != nil
         let skipstone = !zero ? [Target.PluginUsage.plugin(name: "skipstone", package: "skip")] : []
 
         let package = Package(

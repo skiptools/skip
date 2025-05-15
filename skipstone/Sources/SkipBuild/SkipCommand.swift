@@ -646,6 +646,11 @@ public protocol MessageConvertible {
     func message(term: Term) -> String?
 
     var status: MessageBlock.Status? { get }
+    var squelch: Bool { get }
+}
+
+extension MessageConvertible {
+    public var squelch: Bool { false }
 }
 
 /// Any message that can be output either as a terminal message or a JSON encoded string
@@ -719,6 +724,10 @@ public struct MessageBlock : StringMessageEncodable {
     }
 
     public let status: Status?
+
+    /// Whether to silence this message from being printed to the terminal
+    public var squelch: Bool = false
+
     let _message: (_ term: Term?) -> String?
 
     public init(status: Status?, _ message: String) {

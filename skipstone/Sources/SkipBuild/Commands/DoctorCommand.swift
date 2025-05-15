@@ -48,7 +48,6 @@ extension ToolOptionsCommand where Self : StreamingCommand {
 
     /// Runs the `skip doctor` command and stream the results to the messenger
     func runDoctor(checkNative: Bool, with out: MessageQueue) async throws {
-
         /// Invokes the given command and attempts to parse the output against the given regular expression pattern to validate that it is a semantic version string
         func checkVersion(title: String, cmd: [String], min: Version? = nil, pattern: String, watch: Bool = false, hint: String? = nil) async throws {
 
@@ -136,7 +135,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         try await checkVersion(title: "Java version", cmd: ["java", "-version"], min: Version("21.0.0"), pattern: "version \"([0-9._]+)\"", hint: ProcessInfo.processInfo.environment["JAVA_HOME"] == nil ? nil : " (check JAVA_HOME environment: \(ProcessInfo.processInfo.environment["JAVA_HOME"] ?? "unset"))") // we don't necessarily need java in the path (which it doesn't seem to be by default with Homebrew)
         try await checkVersion(title: "Android Debug Bridge version", cmd: ["adb", "version"], min: Version("1.0.40"), pattern: "version ([0-9.]+)")
         await checkAndroidStudioVersion(with: out)
-
+        await checkSkipLicense(with: out)
     }
 
     func checkXcodeCommandLineTools(with out: MessageQueue) async {
@@ -154,6 +153,29 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         })
 
         #endif
+    }
+
+    func checkSkipLicense(with out: MessageQueue) async {
+        // Manually try to parse the Android Studio version; tolerate failures
+        await outputOptions.monitor(with: out, "Skip license", resultHandler: { result in
+            do {
+                guard let (license, trialExpiraton, _, _) = try result?.get() else {
+                    return (result, MessageBlock(status: .fail, "Skip license: none found"))
+                }
+
+                let exp = license?.expiration ?? trialExpiraton
+                let daysLeft = Int(ceil(exp.timeIntervalSince(Date.now) / (24 * 60 * 60)))
+                let expires = daysLeft > licenseWarnDays ? "good through" : daysLeft > 0 ? "expires" : "expired"
+                let status: MessageBlock.Status = daysLeft < 0 ? .fail : daysLeft < licenseWarnDays ? .warn : .pass
+                let fmt = { DateFormatter.localizedString(from: $0, dateStyle: .medium, timeStyle: .none) }
+                let ltype = license == nil ? "trial" : license?.licenseType?.rawValue ?? "legacy"
+                return (result, MessageBlock(status: status, "Skip license: \(ltype) \(expires) \(fmt(exp))"))
+            } catch {
+                return (result, MessageBlock(status: .fail, "Skip license error: \(error.localizedDescription)"))
+            }
+        }, monitorAction: { _ in
+            try loadSkipLicense()
+        })
     }
 
     func checkAndroidStudioVersion(with out: MessageQueue) async {

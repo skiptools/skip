@@ -140,14 +140,6 @@ Create a new project by following a series of interactive prompts.
                 case .lite: return "transpiled project"
                 }
             }
-
-
-            var moduleMode: ModuleMode {
-                switch self {
-                case .fuse: return .native
-                case .lite: return .transpiled
-                }
-            }
         }
 
         let projectType = prompt("Select type of project to create", prompt: ProjectTypeOption.self)
@@ -180,26 +172,41 @@ Create a new project by following a series of interactive prompts.
         }
 
         var appid: String? = nil
-        if projectType == .app {
+        if isApp {
             appid = prompt("Enter the app bundle identifier", validate: isValidBundleIdentifier)
+        }
+
+        var moduleMode: ModuleMode = skipMode == .fuse ? .native : .transpiled
+
+        var createTests = createOptions.moduleTests
+        if !isApp {
+            createTests = prompt("Create test cases", defaultValue: createTests ?? true)
+            if skipMode == .fuse {
+                moduleMode = prompt("Enable Kotlin compatibility for native module", defaultValue: createOptions.kotlincompat) ? .kotlincompat : .native
+            }
         }
 
         let freeProject = prompt("Create a free open-source project?", defaultValue: createOptions.free)
         let gitRepo = prompt("Initialize git repository for the project?", defaultValue: createOptions.gitRepo)
 
         var fastlane = false
-        if projectType == .app {
+        if isApp {
             fastlane = prompt("Initialize a Fastlane configuration for the project?", defaultValue: createOptions.fastlane)
         }
 
         let buildProject = prompt("Pre-build the project?", defaultValue: true)
+
+        var runTests = false
+        if !isApp && createTests == true {
+            runTests = prompt("Run project test cases?", defaultValue: true)
+        }
 
         var installNativeSDK = false
         if skipMode == .fuse {
             installNativeSDK = prompt("Install the Swift Android SDK?", defaultValue: true)
         }
 
-        let openXcode = prompt("Open the Xcode project after initialization?", defaultValue: true)
+        let openXcode = prompt("Open the \(isApp ? "Xcode" : "Swift") project after initialization?", defaultValue: true)
 
 
         let modules = try moduleNames.map {
@@ -213,12 +220,44 @@ Create a new project by following a series of interactive prompts.
 
         let dir = URL(fileURLWithPath: self.createOptions.dir ?? projectName, isDirectory: true)
 
-        let (createdURL, project, _) = try await initSkipProject(baseName: projectName, modules: modules, resourceFolder: "Resources", dir: dir, verify: false, configuration: .debug, build: buildProject, test: false, returnHashes: false, messagePrefix: nil, showTree: createOptions.showTree, chain: createOptions.chain, gitRepo: gitRepo, free: freeProject, appfair: nil, zero: createOptions.zero, appid: appid, icon: nil, version: createOptions.swiftVersion, swiftVersion: nativeMode.swiftVersion, nativeMode: nativeMode, moduleMode: skipMode.moduleMode, moduleTests: createOptions.moduleTests ?? true, github: gitRepo, fastlane: fastlane, validatePackage: createOptions.validatePackage, packageResolved: nil, apk: isApp, ipa: isApp, with: out)
+        let (createdURL, project, _) = try await initSkipProject(
+            baseName: projectName,
+            modules: modules,
+            resourceFolder: "Resources",
+            dir: dir,
+            verify: false,
+            configuration: .debug,
+            build: buildProject,
+            test: runTests,
+            returnHashes: false,
+            messagePrefix: nil,
+            showTree: createOptions.showTree,
+            chain: createOptions.chain,
+            gitRepo: gitRepo,
+            free: freeProject,
+            appfair: nil,
+            zero: createOptions.zero,
+            appid: appid,
+            icon: nil,
+            version: createOptions.swiftVersion,
+            swiftVersion: nativeMode.swiftVersion,
+            nativeMode: nativeMode,
+            moduleMode: moduleMode,
+            moduleTests: createTests ?? true,
+            github: gitRepo,
+            fastlane: fastlane,
+            validatePackage: createOptions.validatePackage,
+            packageResolved: nil,
+            apk: isApp,
+            ipa: isApp,
+            with: out
+        )
 
         let _ = createdURL
 
         if openXcode {
-            try await run(with: out, "Opening Xcode project", ["open", project.darwinProjectFolder.path])
+            let projectPath = isApp ? project.darwinProjectFolder : project.packageSwift
+            try await run(with: out, "Opening Xcode project", ["open", projectPath.path])
         }
 
         cout("Project successfully created at \(createdURL.path)")
