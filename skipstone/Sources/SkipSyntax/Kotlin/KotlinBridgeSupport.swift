@@ -238,6 +238,10 @@ extension TypeSignature {
     static func swiftObjectPointer(kotlin: Bool) -> TypeSignature {
         return kotlin ? .named("skip.bridge.SwiftObjectPointer", []) : .named("SwiftObjectPointer", [])
     }
+    static let nothing: TypeSignature = .named("Nothing", [])
+    static func javaVoid(kotlin: Bool) -> TypeSignature {
+        return kotlin ? .module("java.lang", .named("Void", [])) : .void
+    }
 
     /// The generated native type used when bridging a protocol with unknown implementation.
     var protocolBridgeImpl: TypeSignature {
@@ -655,7 +659,7 @@ extension TypeSignature {
 }
 
 extension Modifiers {
-    func swift(suffix: String = "") -> String {
+    func swift(isNoOverride: Bool = false, suffix: String = "") -> String {
         var string = isNonisolated ? "nonisolated" : ""
         let visibilityString = visibility.swift()
         if !visibilityString.isEmpty {
@@ -674,6 +678,12 @@ extension Modifiers {
                 string += " "
             }
             string += "mutating"
+        }
+        if !isNoOverride && isOverride {
+            if !string.isEmpty {
+                string += " "
+            }
+            string += "override"
         }
         return string.isEmpty ? "" : string + suffix
     }
@@ -1095,8 +1105,11 @@ extension TypeSignature {
         case .member, .module, .named:
             if isNamed("AnyHashable", moduleName: "Swift", generics: []) {
                 return Bridgable(type: self, kotlinType: self, strategy: .unknown)
+            } else if isNamed("Nothing", moduleName: "Swift", generics: []) {
+                return Bridgable(type: .none, kotlinType: .javaVoid(kotlin: true), strategy: .unknown)
+            } else {
+                return checkNamedBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source)
             }
-            return checkNamedBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source)
         case .metaType:
             if let sourceDerived, let source {
                 sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))

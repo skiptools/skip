@@ -2889,7 +2889,7 @@ final class BridgeToSwiftTests: XCTestCase {
             public required init(Java_ptr: JavaObjectPointer) {
                 super.init(Java_ptr: Java_ptr)
             }
-            public init(Java_peer: JObject) {
+            public override init(Java_peer: JObject) {
                 super.init(Java_peer: Java_peer)
             }
         
@@ -2932,7 +2932,7 @@ final class BridgeToSwiftTests: XCTestCase {
             public required init(Java_ptr: JavaObjectPointer) {
                 super.init(Java_ptr: Java_ptr)
             }
-            public init(Java_peer: JObject) {
+            public override init(Java_peer: JObject) {
                 super.init(Java_peer: Java_peer)
             }
         
@@ -3035,7 +3035,7 @@ final class BridgeToSwiftTests: XCTestCase {
             public required init(Java_ptr: JavaObjectPointer) {
                 super.init(Java_ptr: Java_ptr)
             }
-            public init(Java_peer: JObject) {
+            public override init(Java_peer: JObject) {
                 super.init(Java_peer: Java_peer)
             }
             public init() {

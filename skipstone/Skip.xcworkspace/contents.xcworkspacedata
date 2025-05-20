@@ -35,6 +35,9 @@
       location = "group:../skip-firebase">
    </FileRef>
    <FileRef
+      location = "group:../skip-motion">
+   </FileRef>
+   <FileRef
       location = "group:../swift-android-native">
    </FileRef>
    <FileRef
@@ -95,6 +98,9 @@
       location = "group:../skipapp-fireside/Darwin/FireSide.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-appdroid/Darwin/AppDroid.xcodeproj">
+      location = "group:../skipapp-fireside-fuse/Darwin/FireSideFuse.xcodeproj">
+   </FileRef>
+   <FileRef
+      location = "group:../skipapp-lottiedemo/Darwin/LottieDemo.xcodeproj">
    </FileRef>
 </Workspace>
