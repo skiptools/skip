@@ -54,13 +54,7 @@ let package = Package(
             .product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.linux])),
         ]),
         .testTarget(name: "SkipBuildTests", dependencies: ["SkipBuild"]),
-        .executableTarget(name: "SkipRunner", dependencies: ["SkipBuild"], linkerSettings: [
-            .linkedLibrary("z", .when(platforms: [.linux])),
-            .linkedLibrary("icuuc", .when(platforms: [.linux])),
-            .linkedLibrary("icudata", .when(platforms: [.linux])),
-            .linkedLibrary("ssl", .when(platforms: [.linux])),
-            .linkedLibrary("crypto", .when(platforms: [.linux])),
-        ]),
+        .executableTarget(name: "SkipRunner", dependencies: ["SkipBuild"]),
         .testTarget(name: "SkipRunnerTests", dependencies: ["SkipBuild"]),
 
         .executableTarget(name: "SkipKey", dependencies: ["SkipBuild"]),
