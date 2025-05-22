@@ -8183,6 +8183,92 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testIfSkipBlockClass() async throws {
+        try await check(swiftBridge: """
+        #if SKIP
+        class C {
+            let i: Int
+        
+            init(i: Int) {
+                self.i = i
+            }
+        
+            deinit {
+                doSomething()
+            }
+        
+            func f() {
+                doSomething()
+            }
+        }
+        #endif
+        """, kotlin: """
+        internal open class C: skip.lib.SwiftProjecting {
+            internal val i: Int
+
+            internal constructor(i: Int) {
+                this.i = i
+            }
+
+            open fun finalize(): Unit = doSomething()
+
+            internal open fun f(): Unit = doSomething()
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+        }
+        """, swiftBridgeSupport: """
+        class C: BridgedFromKotlin {
+            nonisolated private static let Java_class = try! JClass(name: "C")
+            let Java_peer: JObject
+            required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            init(Java_peer: JObject) {
+                self.Java_peer = Java_peer
+            }
+            nonisolated static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            nonisolated func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+
+            var i: Int {
+                get {
+                    return jniContext {
+                        let value_java: Int32 = try! Java_peer.call(method: Self.Java_get_i_methodID, options: [], args: [])
+                        return Int(value_java)
+                    }
+                }
+            }
+            nonisolated private static let Java_get_i_methodID = Java_class.getMethodID(name: "getI", sig: "()I")!
+
+            init(i p_0: Int) {
+                Java_peer = jniContext {
+                    let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_0_methodID, options: [], args: [p_0_java])
+                    return JObject(ptr)
+                }
+            }
+            nonisolated private static let Java_constructor_0_methodID = Java_class.getMethodID(name: "<init>", sig: "(I)V")!
+
+            func f() {
+                jniContext {
+                    try! Java_peer.call(method: Self.Java_f_1_methodID, options: [], args: [])
+                }
+            }
+            nonisolated private static let Java_f_1_methodID = Java_class.getMethodID(name: "f", sig: "()V")!
+        }
+        @_cdecl("Java_C_Swift_1projectionImpl")
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
     func testIfSkipBlockContentComposer() async throws {
         try await check(swiftBridge: """
         #if os(Android)
