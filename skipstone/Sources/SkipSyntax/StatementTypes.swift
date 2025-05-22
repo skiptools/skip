@@ -1138,8 +1138,8 @@ final class FunctionDeclaration: Statement {
     }
 
     private static func decodeDeinitializerDeclaration(_ deinitializerDecl: DeinitializerDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> FunctionDeclaration? {
-        // Deinit is never bridged
-        guard !syntaxTree.isBridgeFile else {
+        // Deinit is never bridged, so only use it for transpilation
+        guard !syntaxTree.isBridgeFile || context.isInIfSkipBlock else {
             return nil
         }
         var attributes = Attributes.for(syntax: deinitializerDecl.attributes, in: syntaxTree)
