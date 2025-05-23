@@ -1706,7 +1706,7 @@ final class KotlinBridgeToKotlinVisitor {
         let argumentString = classType == .generic ? "support_swift" : "support: support_swift"
         var cdeclSource = classType.peerSwiftAssignment(to: classDeclaration, optionsString: "[]")
         appendMainActorIsolated(&cdeclSource, in: classDeclaration, locals: ["support"], attributes: attributes, modifiers: modifiers) { body, indentation in
-            body.append(indentation, "let support_swift = SkipUI.EnvironmentSupport.fromJavaObject(support, options: [])")
+            body.append(indentation, "let support_swift = SkipUI.EnvironmentSupport?.fromJavaObject(support, options: [])")
             body.append(indentation, "\(classType.peerSwiftTarget).Java_syncEnvironment_\(name)(\(argumentString))")
         }
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
