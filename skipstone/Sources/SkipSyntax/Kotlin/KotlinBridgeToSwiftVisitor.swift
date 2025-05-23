@@ -863,7 +863,7 @@ final class KotlinBridgeToSwiftVisitor {
                     continue
                 }
                 // Don't attempt to bridge @Composable functions
-                guard !syntaxTree.isBridgeFile || !functionDeclaration.attributes.attributes.contains(where: { $0.signature.isNamed("Composable") }) else {
+                guard !syntaxTree.isBridgeFile || !isComposeFunction(functionDeclaration, in: classDeclaration) else {
                     continue
                 }
                 guard !functionDeclaration.isEncode && !functionDeclaration.isDecodableConstructor else {
@@ -1018,6 +1018,17 @@ final class KotlinBridgeToSwiftVisitor {
                 cdeclFunction.append(to: output, indentation: indentation)
             })
         }
+    }
+
+    private func isComposeFunction(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration) -> Bool {
+        guard !functionDeclaration.attributes.attributes.contains(where: { $0.signature.isNamed("Composable") }) else {
+            return true
+        }
+        // Special case ConentModifier.modify
+        guard functionDeclaration.name != "modify" || !classDeclaration.inherits.contains(where: { $0.isNamed("ContentModifier", moduleName: "SkipUI", generics: []) }) else {
+            return true
+        }
+        return false
     }
 
     static func addSwiftProjecting(to classDeclaration: KotlinClassDeclaration, isBridgedSubclass: Bool, customProjection: [String]? = nil, options: KotlinBridgeOptions, translator: KotlinTranslator) -> CDeclFunction {
