@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: I want help writing my application
+    url: https://github.com/orgs/skiptools/discussions/new?category=q-a
+    about: Ask your questions about how to achieve a particular effect in Skip or get help with using a particular API.
