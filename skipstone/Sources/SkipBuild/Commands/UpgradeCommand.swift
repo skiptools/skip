@@ -26,7 +26,7 @@ struct UpgradeCommand: MessageCommand, ToolOptionsCommand {
         if latestSkipVersion == skipVersion {
             await out.yield(MessageBlock(status: .pass, "Skip \(skipVersion) is up to date."))
         } else if let latestSkipVersion = latestSkipVersion {
-            try await run(with: out, "Upgrade Skip to \(latestSkipVersion)", ["brew", "upgrade", "skip"], additionalEnvironment: ["HOMEBREW_AUTO_UPDATE_SECS": "0"])
+            try await run(with: out, "Upgrade Skip to \(latestSkipVersion)", ["brew", "upgrade", "skip"], additionalEnvironment: ["HOMEBREW_AUTO_UPDATE_SECS": "0", "HOMEBREW_NO_INSTALL_CLEANUP": "1"])
         }
     }
 }

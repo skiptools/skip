@@ -426,7 +426,7 @@ extension OutputOptions {
         let startTime = Date.now
 
         func clearLine() {
-            writeString(clearLineString + "\r", terminator: "", flush: true)
+            writeString(clearLineString + "\r", terminator: "", flush: false)
         }
 
         var progressMonitor: Task<(), Error>? = nil

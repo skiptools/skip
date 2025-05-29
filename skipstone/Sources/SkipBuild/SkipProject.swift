@@ -2242,73 +2242,73 @@ New features and better performance.
 
         // Darwin/Sources/Main.swift
         let appMainContents = """
-        \(sourceHeader)import SwiftUI
-        import \(primaryModuleName)
+\(sourceHeader)import SwiftUI
+import \(primaryModuleName)
 
-        /// The entry point to the app simply loads the App implementation from SPM module.
-        @main struct AppMain: App {
-            @AppDelegateAdaptor(AppMainDelegate.self) var appDelegate
-            @Environment(\\.scenePhase) private var scenePhase
+/// The entry point to the app simply loads the App implementation from SPM module.
+@main struct AppMain: App {
+    @AppDelegateAdaptor(AppMainDelegate.self) var appDelegate
+    @Environment(\\.scenePhase) private var scenePhase
 
-            var body: some Scene {
-                WindowGroup {
-                    \(primaryModuleName)RootView()
-                }
-                .onChange(of: scenePhase) { oldPhase, newPhase in
-                    switch newPhase {
-                    case .active:
-                        AppDelegate.shared.onResume()
-                    case .inactive:
-                        AppDelegate.shared.onPause()
-                    case .background:
-                        AppDelegate.shared.onStop()
-                    @unknown default:
-                        print("unknown app phase: \\(newPhase)")
-                    }
-                }
+    var body: some Scene {
+        WindowGroup {
+            \(primaryModuleName)RootView()
+        }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            switch newPhase {
+            case .active:
+                AppDelegate.shared.onResume()
+            case .inactive:
+                AppDelegate.shared.onPause()
+            case .background:
+                AppDelegate.shared.onStop()
+            @unknown default:
+                print("unknown app phase: \\(newPhase)")
             }
         }
+    }
+}
 
-        typealias AppDelegate = \(primaryModuleName)AppDelegate
-        #if canImport(UIKit)
-        typealias AppDelegateAdaptor = UIApplicationDelegateAdaptor
-        typealias AppMainDelegateBase = UIApplicationDelegate
-        typealias AppType = UIApplication
-        #elseif canImport(AppKit)
-        typealias AppDelegateAdaptor = NSApplicationDelegateAdaptor
-        typealias AppMainDelegateBase = NSApplicationDelegate
-        typealias AppType = NSApplication
-        #endif
+typealias AppDelegate = \(primaryModuleName)AppDelegate
+#if canImport(UIKit)
+typealias AppDelegateAdaptor = UIApplicationDelegateAdaptor
+typealias AppMainDelegateBase = UIApplicationDelegate
+typealias AppType = UIApplication
+#elseif canImport(AppKit)
+typealias AppDelegateAdaptor = NSApplicationDelegateAdaptor
+typealias AppMainDelegateBase = NSApplicationDelegate
+typealias AppType = NSApplication
+#endif
 
-        class AppMainDelegate: NSObject, AppMainDelegateBase {
-            let application = AppType.shared
+class AppMainDelegate: NSObject, AppMainDelegateBase {
+    let application = AppType.shared
 
-            #if canImport(UIKit)
-            func application(_ application: UIApplication, willFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
-                AppDelegate.shared.onStart()
-                return true
-            }
+    #if canImport(UIKit)
+    func application(_ application: UIApplication, willFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+        AppDelegate.shared.onStart()
+        return true
+    }
 
-            func applicationWillTerminate(_ application: UIApplication) {
-                AppDelegate.shared.onDestroy()
-            }
+    func applicationWillTerminate(_ application: UIApplication) {
+        AppDelegate.shared.onDestroy()
+    }
 
-            func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
-                AppDelegate.shared.onLowMemory()
-            }
-            #elseif canImport(AppKit)
-            func applicationWillFinishLaunching(_ notification: Notification) {
-                AppDelegate.shared.onStart()
-            }
+    func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
+        AppDelegate.shared.onLowMemory()
+    }
+    #elseif canImport(AppKit)
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        AppDelegate.shared.onStart()
+    }
 
-            func applicationWillTerminate(_ application: Notification) {
-                AppDelegate.shared.onDestroy()
-            }
-            #endif
+    func applicationWillTerminate(_ application: Notification) {
+        AppDelegate.shared.onDestroy()
+    }
+    #endif
 
-        }
+}
 
-        """
+"""
         try appMainContents.write(to: primaryModuleAppMainURL.createParentDirectory(), atomically: false, encoding: .utf8)
 
         // Sources/Playground/PlaygroundApp.swift
@@ -3376,141 +3376,141 @@ extension FrameworkProjectLayout {
     }
 
     static func createKotlinMain(appModulePackage: String, appModuleName: String, nativeLibrary: String?) -> String {
-        """
-        package \(appModulePackage)
+"""
+package \(appModulePackage)
 
-        import skip.lib.*
-        import skip.model.*
-        import skip.foundation.*
-        import skip.ui.*
+import skip.lib.*
+import skip.model.*
+import skip.foundation.*
+import skip.ui.*
 
-        import android.Manifest
-        import android.app.Application
-        import androidx.activity.enableEdgeToEdge
-        import androidx.activity.compose.setContent
-        import androidx.appcompat.app.AppCompatActivity
-        import androidx.compose.foundation.isSystemInDarkTheme
-        import androidx.compose.foundation.layout.fillMaxSize
-        import androidx.compose.foundation.layout.Box
-        import androidx.compose.runtime.Composable
-        import androidx.compose.runtime.SideEffect
-        import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-        import androidx.compose.ui.Alignment
-        import androidx.compose.ui.Modifier
-        import androidx.core.app.ActivityCompat
+import android.Manifest
+import android.app.Application
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.compose.setContent
+import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.core.app.ActivityCompat
 
-        internal val logger: SkipLogger = SkipLogger(subsystem = "\(appModulePackage)", category = "\(appModuleName)")
+internal val logger: SkipLogger = SkipLogger(subsystem = "\(appModulePackage)", category = "\(appModuleName)")
 
-        /// AndroidAppMain is the `android.app.Application` entry point, and must match `application android:name` in the AndroidMainfest.xml file.
-        open class AndroidAppMain: Application {
-            constructor() {
-            }
+/// AndroidAppMain is the `android.app.Application` entry point, and must match `application android:name` in the AndroidMainfest.xml file.
+open class AndroidAppMain: Application {
+    constructor() {
+    }
 
-            override fun onCreate() {
-                super.onCreate()
-                logger.info("starting app")
-                ProcessInfo.launch(applicationContext)
-            }
+    override fun onCreate() {
+        super.onCreate()
+        logger.info("starting app")
+        ProcessInfo.launch(applicationContext)
+    }
 
-            companion object {
-            }
-        }
+    companion object {
+    }
+}
 
-        /// AndroidAppMain is initial `androidx.appcompat.app.AppCompatActivity`, and must match `activity android:name` in the AndroidMainfest.xml file.
-        open class MainActivity: AppCompatActivity {
-            constructor() {
-            }
+/// AndroidAppMain is initial `androidx.appcompat.app.AppCompatActivity`, and must match `activity android:name` in the AndroidMainfest.xml file.
+open class MainActivity: AppCompatActivity {
+    constructor() {
+    }
 
-            override fun onCreate(savedInstanceState: android.os.Bundle?) {
-                super.onCreate(savedInstanceState)
-                logger.info("starting activity")
-                UIApplication.launch(this)
-                enableEdgeToEdge()
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        logger.info("starting activity")
+        UIApplication.launch(this)
+        enableEdgeToEdge()
 
-                setContent {
-                    val saveableStateHolder = rememberSaveableStateHolder()
-                    saveableStateHolder.SaveableStateProvider(true) {
-                        PresentationRootView(ComposeContext())
-                        SideEffect { saveableStateHolder.removeState(true) }
-                    }
-                }
-
-                // Example of requesting permissions on startup.
-                // These must match the permissions in the AndroidManifest.xml file.
-                //let permissions = listOf(
-                //    Manifest.permission.ACCESS_COARSE_LOCATION,
-                //    Manifest.permission.ACCESS_FINE_LOCATION
-                //    Manifest.permission.CAMERA,
-                //    Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                //)
-                //let requestTag = 1
-                //ActivityCompat.requestPermissions(self, permissions.toTypedArray(), requestTag)
-            }
-
-            override fun onStart() {
-                super.onStart()
-                \(appModuleName)AppDelegate.shared.onStart()
-            }
-
-            override fun onResume() {
-                super.onResume()
-                \(appModuleName)AppDelegate.shared.onResume()
-            }
-
-            override fun onPause() {
-                super.onPause()
-                \(appModuleName)AppDelegate.shared.onPause()
-            }
-
-            override fun onStop() {
-                super.onStop()
-                \(appModuleName)AppDelegate.shared.onStop()
-            }
-
-            override fun onDestroy() {
-                super.onDestroy()
-                \(appModuleName)AppDelegate.shared.onDestroy()
-            }
-
-            override fun onLowMemory() {
-                super.onLowMemory()
-                \(appModuleName)AppDelegate.shared.onLowMemory()
-            }
-
-            override fun onRestart() {
-                logger.info("onRestart")
-                super.onRestart()
-            }
-
-            override fun onSaveInstanceState(bundle: android.os.Bundle): Unit = super.onSaveInstanceState(bundle)
-
-            override fun onRestoreInstanceState(bundle: android.os.Bundle) {
-                // Usually you restore your state in onCreate(). It is possible to restore it in onRestoreInstanceState() as well, but not very common. (onRestoreInstanceState() is called after onStart(), whereas onCreate() is called before onStart().
-                logger.info("onRestoreInstanceState")
-                super.onRestoreInstanceState(bundle)
-            }
-
-            override fun onRequestPermissionsResult(requestCode: Int, permissions: kotlin.Array<String>, grantResults: IntArray) {
-                super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-                logger.info("onRequestPermissionsResult: ${requestCode}")
-            }
-
-            companion object {
+        setContent {
+            val saveableStateHolder = rememberSaveableStateHolder()
+            saveableStateHolder.SaveableStateProvider(true) {
+                PresentationRootView(ComposeContext())
+                SideEffect { saveableStateHolder.removeState(true) }
             }
         }
 
-        @Composable
-        internal fun PresentationRootView(context: ComposeContext) {
-            val colorScheme = if (isSystemInDarkTheme()) ColorScheme.dark else ColorScheme.light
-            PresentationRoot(defaultColorScheme = colorScheme, context = context) { ctx ->
-                val contentContext = ctx.content()
-                Box(modifier = ctx.modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    \(appModuleName)RootView().Compose(context = contentContext)
-                }
-            }
-        }
+        // Example of requesting permissions on startup.
+        // These must match the permissions in the AndroidManifest.xml file.
+        //let permissions = listOf(
+        //    Manifest.permission.ACCESS_COARSE_LOCATION,
+        //    Manifest.permission.ACCESS_FINE_LOCATION
+        //    Manifest.permission.CAMERA,
+        //    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+        //)
+        //let requestTag = 1
+        //ActivityCompat.requestPermissions(self, permissions.toTypedArray(), requestTag)
+    }
 
-        """
+    override fun onStart() {
+        super.onStart()
+        \(appModuleName)AppDelegate.shared.onStart()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        \(appModuleName)AppDelegate.shared.onResume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        \(appModuleName)AppDelegate.shared.onPause()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        \(appModuleName)AppDelegate.shared.onStop()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        \(appModuleName)AppDelegate.shared.onDestroy()
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        \(appModuleName)AppDelegate.shared.onLowMemory()
+    }
+
+    override fun onRestart() {
+        logger.info("onRestart")
+        super.onRestart()
+    }
+
+    override fun onSaveInstanceState(bundle: android.os.Bundle): Unit = super.onSaveInstanceState(bundle)
+
+    override fun onRestoreInstanceState(bundle: android.os.Bundle) {
+        // Usually you restore your state in onCreate(). It is possible to restore it in onRestoreInstanceState() as well, but not very common. (onRestoreInstanceState() is called after onStart(), whereas onCreate() is called before onStart().
+        logger.info("onRestoreInstanceState")
+        super.onRestoreInstanceState(bundle)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: kotlin.Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        logger.info("onRequestPermissionsResult: ${requestCode}")
+    }
+
+    companion object {
+    }
+}
+
+@Composable
+internal fun PresentationRootView(context: ComposeContext) {
+    val colorScheme = if (isSystemInDarkTheme()) ColorScheme.dark else ColorScheme.light
+    PresentationRoot(defaultColorScheme = colorScheme, context = context) { ctx ->
+        val contentContext = ctx.content()
+        Box(modifier = ctx.modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            \(appModuleName)RootView().Compose(context = contentContext)
+        }
+    }
+}
+
+"""
     }
 
     /// See https://github.com/skiptools/skip/issues/95 for why we need to be so permissive
