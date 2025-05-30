@@ -3525,6 +3525,7 @@ internal fun PresentationRootView(context: ComposeContext) {
         -keep class com.sun.jna.** { *; }
         -dontwarn java.awt.**
         -keep class * implements com.sun.jna.** { *; }
+        -keep class * implements skip.bridge.** { *; }
         -keep class \(packageName).** { *; }
 
         """
