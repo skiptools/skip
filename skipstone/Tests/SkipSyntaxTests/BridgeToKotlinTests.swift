@@ -8041,7 +8041,7 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_VM_Swift_1composableBody")
         public func VM_Swift_composableBody(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ content: JavaObjectPointer) -> JavaObjectPointer? {
             let peer_swift: SwiftValueTypeBox<VM> = Swift_peer.pointee()!
-            let content_swift = JavaBackedView(content)
+            let content_swift = JavaBackedView(content)!
             return SkipBridge.assumeMainActorUnchecked {
                 let body = peer_swift.value.body(content: content_swift)
                 return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])

@@ -243,6 +243,21 @@ extension TypeSignature {
         return kotlin ? .module("java.lang", .named("Void", [])) : .void
     }
 
+    /// Whether this is a SwiftUI view.
+    var isView: Bool {
+        return isNamed("View", moduleName: "SwiftUI", generics: []) || isNamed("View", moduleName: "SkipUI", generics: []) || isNamed("View", moduleName: "SkipSwiftUI", generics: [])
+    }
+
+    /// Whether this is a SwiftUI view modifier..
+    var isViewModifier: Bool {
+        return isNamed("ViewModifier", moduleName: "SwiftUI", generics: []) || isNamed("ViewModifier", moduleName: "SkipUI", generics: []) || isNamed("ViewModifier", moduleName: "SkipSwiftUI", generics: [])
+    }
+
+    /// Whether this is a SwiftUI toobar content.
+    var isToolbarContent: Bool {
+        return isNamed("ToolbarContent", moduleName: "SwiftUI", generics: []) || isNamed("ToolbarContent", moduleName: "SkipUI", generics: []) || isNamed("ToolbarContent", moduleName: "SkipSwiftUI", generics: [])
+    }
+
     /// The generated native type used when bridging a protocol with unknown implementation.
     var protocolBridgeImpl: TypeSignature {
         let moduleName = self.moduleName
@@ -309,6 +324,9 @@ extension TypeSignature {
             } else if strategy == .error {
                 let converted = "JThrowable.toThrowable(\(value), options: \(options.jconvertibleOptions))"
                 return isOptional ? converted : converted + "!"
+            } else if strategy == .view {
+                let converted = "(\(value).Java_viewOrEmpty as! JConvertible).toJavaObject(options: \(options.jconvertibleOptions))"
+                return isOptional ? converted : converted + "!"
             } else {
                 let converted = value + ".toJavaObject(options: \(options.jconvertibleOptions))"
                 return isOptional ? converted : converted + "!"
@@ -331,6 +349,8 @@ extension TypeSignature {
         case .error:
             let converted = "JThrowable.toError(\(value), options: \(options.jconvertibleOptions))"
             return converted + (isOptional ? "" : "!")
+        case .view:
+            return "JavaBackedView(\(value))"
         default:
             break
         }
@@ -424,6 +444,9 @@ extension TypeSignature {
             } else if strategy == .error {
                 let converted = "JThrowable.toThrowable(\(value), options: \(optionsString))"
                 return isOptional ? converted : converted + "!"
+            } else if strategy == .view {
+                let converted = "(\(value).Java_viewOrEmpty as! JConvertible).toJavaObject(options: \(optionsString))"
+                return isOptional ? converted : converted + "!"
             } else {
                 let converted = value + ".toJavaObject(options: \(optionsString))"
                 return isOptional ? converted : converted + "!"
@@ -445,6 +468,9 @@ extension TypeSignature {
             return castOptionalAny(converted)
         case .error:
             let converted = "JThrowable.toError(\(value), options: \(options.jconvertibleOptions))"
+            return converted + (isOptional ? "" : "!")
+        case .view:
+            let converted = "JavaBackedView(\(value))"
             return converted + (isOptional ? "" : "!")
         default:
             break
@@ -784,6 +810,7 @@ struct Bridgable {
         case polymorphic
         case `protocol`
         case error
+        case view
         case unknown
     }
 
@@ -843,7 +870,7 @@ extension KotlinVariableDeclaration {
             return nil
         }
         let type = declaredType.or(propertyType)
-        let generics = (parent as? KotlinClassDeclaration)?.generics ?? (parent as? KotlinInterfaceDeclaration)?.generics
+        let generics = (parent as? KotlinClassDeclaration)?.generics ?? (parent as? KotlinInterfaceDeclaration)?.generics ?? extends?.1
         return type.checkBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo, sourceDerived: self, source: translator.syntaxTree.source)
     }
 }
@@ -898,7 +925,7 @@ extension KotlinFunctionDeclaration {
         guard let codebaseInfo = translator.codebaseInfo else {
             return nil
         }
-        var generics = (parent as? KotlinClassDeclaration)?.generics ?? (parent as? KotlinInterfaceDeclaration)?.generics
+        var generics = (parent as? KotlinClassDeclaration)?.generics ?? (parent as? KotlinInterfaceDeclaration)?.generics ?? extends?.1
         if generics != nil {
             generics = generics!.merge(overrides: self.generics, addNew: true)
         } else {
@@ -1240,6 +1267,11 @@ extension TypeSignature {
                 }
             }
             return Bridgable(type: self, kotlinType: self, genericType: constrainedType, isGenericEntry: true, strategy: bridgable?.strategy ?? .unknown)
+        }
+
+        // Special case for e.g. `some View`
+        if self.isView && codebaseInfo.global.moduleName != "SkipUI" {
+            return Bridgable(type: .skipSwiftUIView, kotlinType: .skipUIView, genericType: nil, strategy: .view)
         }
 
         let typeInfos = codebaseInfo.typeInfos(forNamed: self)

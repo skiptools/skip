@@ -51,7 +51,11 @@ extension Message {
     }
 
     static func kotlinBridgeExtensionFunction(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .error, message: "This API is implemented as a Kotlin extension function. This release does not support bridging extension functions", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .error, message: "This API is implemented as a Kotlin extension function. This release does not support bridging from Swift to Kotlin extension functions", sourceDerived: sourceDerived, source: source)
+    }
+
+    static func kotlinBridgeExtensionFunctionStatic(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .error, message: "This API is implemented as a Kotlin Companion extension function. This release does not support bridging from Kotlin Companion extension functions to Swift", sourceDerived: sourceDerived, source: source)
     }
 
     static func kotlinBridgeGenericMember(_ sourceDerived: SourceDerived, source: Source) -> Message {

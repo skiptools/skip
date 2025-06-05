@@ -21,6 +21,15 @@ struct StatementExtras {
         case symbolFile
         /// Marker for a statement in a `#if SKIP` block.
         case ifSkipBlock(IfSkipBlockType)
+
+        var isIfSkipBlock: Bool {
+            switch self {
+            case .ifSkipBlock:
+                return true
+            default:
+                return false
+            }
+        }
     }
 
     var directives: [Directive]

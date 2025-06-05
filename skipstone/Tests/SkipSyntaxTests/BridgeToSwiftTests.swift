@@ -4199,8 +4199,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
-    func testExtensionFunction() async throws {
-        try await checkProducesMessage(swift: """
+    func testExtensionVariable() async throws {
+        try await check(swift: """
         #if !SKIP_BRIDGE
         extension Int {
             public var zero: Int {
@@ -4208,6 +4208,62 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         #endif
+        """, kotlin: """
+        val Int.zero: Int
+            get() = 0
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        extension Int {
+            public var zero: Int {
+                get {
+                    return jniContext {
+                        let self_java = Int32(self).toJavaParameter(options: [])
+                        let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_zero_methodID, options: [], args: [self_java])
+                        return Int(value_java)
+                    }
+                }
+            }
+        }
+        private let Java_get_zero_methodID = Java_SourceKt.getStaticMethodID(name: "getZero", sig: "(I)I")!
+        """, transformers: transformers)
+
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        extension Int {
+            public var zero: Int {
+                get {
+                    return 0
+                }
+                set {
+                }
+            }
+        }
+        #endif
+        """, kotlin: """
+        var Int.zero: Int
+            get() = 0
+            set(newValue) {
+            }
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        public var zero: Int {
+            get {
+                return jniContext {
+                    let self_java = Int32(self).toJavaParameter(options: [])
+                    let value_java: Int32 = try! Java_SourceKt.callStatic(method: Java_get_zero_methodID, options: [], args: [self_java])
+                    return Int(value_java)
+                }
+            }
+            set {
+                jniContext {
+                    let self_java = Int32(self).toJavaParameter(options: [])
+                    let value_java = Int32(newValue).toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_set_zero_methodID, options: [], args: [self_java, value_java])
+                }
+            }
+        }
+        private let Java_get_zero_methodID = Java_SourceKt.getStaticMethodID(name: "getZero", sig: "(I)I")!
+        private let Java_set_zero_methodID = Java_SourceKt.getStaticMethodID(name: "setZero", sig: "(I, I)V")!
         """, transformers: transformers)
 
         try await check(swift: """
@@ -4237,6 +4293,47 @@ final class BridgeToSwiftTests: XCTestCase {
         val Int.zero: Int
             get() = 0
         """, swiftBridgeSupport: """
+        """, transformers: transformers)
+    }
+
+    func testStaticExtensionVariable() async throws {
+        try await checkProducesMessage(swift: """
+        #if !SKIP_BRIDGE
+        extension Int {
+            public static var zero: Int {
+                get {
+                    return 0
+                }
+                set {
+                }
+            }
+        }
+        #endif
+        """, transformers: transformers)
+    }
+
+    func testExtensionFunction() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        extension Int {
+            public func isZero(): Bool {
+                return self == 0
+            }
+        }
+        #endif
+        """, kotlin: """
+        fun Int.isZero(): Unit = this == 0
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        extension Int {
+            public func isZero() {
+                jniContext {
+                    let self_java = Int32(self).toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_isZero_0_methodID, options: [], args: [self_java])
+                }
+            }
+        }
+        private let Java_isZero_0_methodID = Java_SourceKt.getStaticMethodID(name: "isZero", sig: "(I)V")!
         """, transformers: transformers)
     }
 
@@ -5390,6 +5487,69 @@ final class BridgeToSwiftTests: XCTestCase {
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
         }
+        """, transformers: transformers)
+    }
+
+    func testViewExtension() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        import SwiftUI
+        extension View {
+            public var myModifierVar: some View {
+                return EmptyView()
+            }
+            public func myModifierFunc(i: Int) -> some View {
+                return EmptyView()
+            }
+        }
+        #endif
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
+
+        val View.myModifierVar: View
+            get() = EmptyView()
+        fun View.myModifierFunc(i: Int): View = EmptyView()
+        """, swiftBridgeSupport: """
+
+        import SkipFuseUI
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        extension SkipSwiftUI.View {
+            public var myModifierVar: (some SkipSwiftUI.View) {
+                get {
+                    return SkipSwiftUI.ModifierView(target: self) { target in
+                        return jniContext {
+                            let target_java = (target.Java_viewOrEmpty as! JConvertible).toJavaObject(options: [])!.toJavaParameter(options: [])
+                            let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_myModifierVar_methodID, options: [], args: [target_java])
+                            return JavaBackedView(value_java)!
+                        }
+                    }
+                }
+            }
+        }
+        private let Java_get_myModifierVar_methodID = Java_SourceKt.getStaticMethodID(name: "getMyModifierVar", sig: "(Lskip/ui/View;)Lskip/ui/View;")!
+        extension SkipSwiftUI.View {
+            public func myModifierFunc(i p_0: Int) -> (some SkipSwiftUI.View) {
+                return SkipSwiftUI.ModifierView(target: self) { target in
+                    return jniContext {
+                        let target_java = (target.Java_viewOrEmpty as! JConvertible).toJavaObject(options: [])!.toJavaParameter(options: [])
+                        let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                        let f_return_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_myModifierFunc_0_methodID, options: [], args: [target_java, p_0_java])
+                        return JavaBackedView(f_return_java)!
+                    }
+                }
+            }
+        }
+        private let Java_myModifierFunc_0_methodID = Java_SourceKt.getStaticMethodID(name: "myModifierFunc", sig: "(Lskip/ui/View;I)Lskip/ui/View;")!
         """, transformers: transformers)
     }
 }

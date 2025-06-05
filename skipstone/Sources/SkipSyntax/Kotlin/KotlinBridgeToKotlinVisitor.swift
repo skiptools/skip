@@ -1000,15 +1000,15 @@ final class KotlinBridgeToKotlinVisitor {
         let isError = classDeclaration.inherits.first?.isNamed("Exception") == true && classDeclaration.inherits.contains { $0.isNamed("Error", moduleName: "Swift", generics: []) }
         var swiftUIType: SwiftUIType = .none
         let mappedInherits: [TypeSignature] = classDeclaration.inherits.compactMap {
-            guard !includesUI || (!$0.isNamed("View", moduleName: "SwiftUI", generics: []) && !$0.isNamed("View", moduleName: "SkipSwiftUI", generics: [])) else {
+            guard !includesUI || !$0.isView else {
                 swiftUIType = .view
                 return .skipUIView
             }
-            guard !includesUI || (!$0.isNamed("ViewModifier", moduleName: "SwiftUI", generics: []) && !$0.isNamed("ViewModifier", moduleName: "SkipSwiftUI", generics: [])) else {
+            guard !includesUI || !$0.isViewModifier else {
                 swiftUIType = .viewModifier
                 return .skipUIViewModifier
             }
-            guard !includesUI || (!$0.isNamed("ToolbarContent", moduleName: "SwiftUI", generics: []) && !$0.isNamed("ToolbarContent", moduleName: "SkipSwiftUI", generics: [])) else {
+            guard !includesUI || !$0.isToolbarContent else {
                 swiftUIType = .toolbarContent
                 return .skipUIToolbarContent
             }
@@ -1758,7 +1758,7 @@ final class KotlinBridgeToKotlinVisitor {
                 bodyInvocation = "let body = \(classType.peerSwiftTarget).body"
             }
         } else {
-            cdeclSource.append("let content_swift = JavaBackedView(content)")
+            cdeclSource.append("let content_swift = JavaBackedView(content)!")
             if classType == .generic {
                 bodyInvocation = "let body = \(classType.peerSwiftTarget).body(content_swift)"
             } else {
