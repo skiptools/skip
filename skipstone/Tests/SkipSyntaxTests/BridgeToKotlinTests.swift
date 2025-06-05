@@ -5591,6 +5591,96 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testEnumWithAssociatedValueCompatibilityOption() async throws {
+        // Note that the enum's associated value is wrong (https://github.com/skiptools/skip-bridge/issues/87)
+        let transformers = builtinKotlinTransformers() + [KotlinBridgeTransformer(options: .kotlincompat)]
+        try await check(supportingSwift: """
+        class URL: SwiftCustomBridged, KotlinConverting<java.net.URI> {
+        }
+        """, swiftBridge: """
+        public protocol P {
+            func u(url: URL) -> Void
+        }
+        public enum E {
+            case a(URL)
+        }
+        """, kotlins: ["""
+        interface P {
+            fun u(url: java.net.URI)
+        }
+        sealed class E: skip.lib.SwiftProjecting {
+
+            class ACase(val associated0: URL): E() {
+            }
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+                fun a(associated0: URL): E = ACase(associated0)
+            }
+        }
+        """, """
+        internal open class URL: SwiftCustomBridged, KotlinConverting<java.net.URI> {
+        }
+        """], swiftBridgeSupport: """
+        public final class P_BridgeImpl: P, BridgedFromKotlin {
+            nonisolated private static let Java_class = try! JClass(name: "P")
+            public let Java_peer: JObject
+            public required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            public func u(url p_0: URL) {
+                jniContext {
+                    let p_0_java = p_0.toJavaObject(options: [.kotlincompat])!.toJavaParameter(options: [.kotlincompat])
+                    try! Java_peer.call(method: Self.Java_u_0_methodID, options: [.kotlincompat], args: [p_0_java])
+                }
+            }
+            nonisolated private static let Java_u_0_methodID = Java_class.getMethodID(name: "u", sig: "(Ljava/net/URI;)V")!
+            nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            nonisolated public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+        }
+        extension E: BridgedToKotlin {
+            nonisolated private static let Java_class = try! JClass(name: "E")
+            nonisolated private static let Java_Companion_class = try! JClass(name: "E$Companion")
+            nonisolated private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: "Companion", sig: "LE$Companion;")!, options: [.kotlincompat]))
+            nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let className = Java_className(of: obj!, options: options)
+                return fromJavaClassName(className, obj!, options: options)
+            }
+            nonisolated fileprivate static func fromJavaClassName(_ className: String, _ obj: JavaObjectPointer, options: JConvertibleOptions) -> Self {
+                switch className {
+                case "E$ACase":
+                    let associated0_java: JavaObjectPointer = try! obj.call(method: Self.Java_a_associated0_methodID, options: options, args: [])
+                    let associated0 = URL.fromJavaObject(associated0_java, options: [.kotlincompat])
+                    return .a(associated0)
+                default: fatalError()
+                }
+            }
+            nonisolated public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                switch self {
+                case .a(let associated0):
+                    let associated0_java = associated0.toJavaObject(options: options)!.toJavaParameter(options: options)
+                    return try! Self.Java_Companion.call(method: Self.Java_Companion_a_methodID, options: options, args: [associated0_java])
+                }
+            }
+            nonisolated private static let Java_a_class = try! JClass(name: "E$ACase")
+            nonisolated private static let Java_a_associated0_methodID = Java_a_class.getMethodID(name: "getAssociated0", sig: "()Ljava/net/URI;")!
+            nonisolated private static let Java_Companion_a_methodID = Java_Companion_class.getMethodID(name: "a", sig: "(Ljava/net/URI;)LE;")!
+        }
+        @_cdecl("Java_E_Swift_1projectionImpl")
+        public func E_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = E.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [.kotlincompat])!
+        }
+        """, transformers: transformers)
+    }
+
     func testActor() async throws {
         try await check(swiftBridge: """
         public actor A {

@@ -1883,7 +1883,7 @@ CODE_SIGN_ENTITLEMENTS = Entitlements.plist
 name: \(projectName)
 on:
   push:
-    branches: '*'
+    branches: [ main ]
     tags: "[0-9]+.[0-9]+.[0-9]+"
   # example of daily scheduled build
   #schedule:
