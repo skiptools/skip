@@ -1100,7 +1100,8 @@ final class KotlinBridgeToSwiftVisitor {
         }
         if !isEmptyEnum {
             if isEnum {
-                swift.append(1, Self.swiftForEnumJConvertibleContract(className: classRef.className, generics: classRef.generics, isSealedClassesEnum: classDeclaration.isSealedClassesEnum, caseDeclarations: enumCases, visibility: finalMemberVisibility, options: options, translator: translator))
+                let caseBridgables = enumCases.compactMap({ $0.checkBridgable(direction: .toSwift, options: options, translator: translator) })
+                swift.append(1, Self.swiftForEnumJConvertibleContract(className: classRef.className, generics: classRef.generics, isSealedClassesEnum: classDeclaration.isSealedClassesEnum, caseDeclarations: enumCases, bridgables: caseBridgables, visibility: finalMemberVisibility, options: options, translator: translator))
             } else if !isBridgedSubclass {
                 swift.append(1, Self.swiftForJConvertibleContract(in: classDeclaration.declarationType, visibility: finalMemberVisibility))
             }
@@ -1227,8 +1228,7 @@ final class KotlinBridgeToSwiftVisitor {
     /// Return the Swift statements implementing the `JConvertible` contract for an enum.
     ///
     /// - Warning: If this is a sealed classes enum, it will use `Java_Companion_class` and `Java_Companion`. Make sure to declare them.
-    static func swiftForEnumJConvertibleContract(className: String, generics: [TypeSignature], isSealedClassesEnum: Bool, caseDeclarations: [KotlinEnumCaseDeclaration], visibility: Modifiers.Visibility, options: KotlinBridgeOptions, translator: KotlinTranslator) -> [String] {
-        let caseBridgables = caseDeclarations.compactMap({ $0.checkBridgable(direction: .any, options: options, translator: translator) })
+    static func swiftForEnumJConvertibleContract(className: String, generics: [TypeSignature], isSealedClassesEnum: Bool, caseDeclarations: [KotlinEnumCaseDeclaration], bridgables caseBridgables: [[Bridgable]], visibility: Modifiers.Visibility, options: KotlinBridgeOptions, translator: KotlinTranslator) -> [String] {
         guard caseBridgables.count == caseDeclarations.count else {
             return []
         }
@@ -1306,8 +1306,7 @@ final class KotlinBridgeToSwiftVisitor {
     /// pack it into a Java object.
     ///
     /// - Warning: It will use `Java_Companion_class` and `Java_Companion`. Make sure to declare them.
-    static func swiftForGenericEnumToJavaObjectSwitch(className: String, generics: [TypeSignature], peerName: String, caseDeclarations: [KotlinEnumCaseDeclaration], visibility: Modifiers.Visibility, options: KotlinBridgeOptions, translator: KotlinTranslator) -> (code: [String], declarations: [String]) {
-        let caseBridgables = caseDeclarations.compactMap({ $0.checkBridgable(direction: .any, options: options, translator: translator) })
+    static func swiftForGenericEnumToJavaObjectSwitch(className: String, generics: [TypeSignature], peerName: String, caseDeclarations: [KotlinEnumCaseDeclaration], bridgables caseBridgables: [[Bridgable]], visibility: Modifiers.Visibility, options: KotlinBridgeOptions, translator: KotlinTranslator) -> (code: [String], declarations: [String]) {
         guard caseBridgables.count == caseDeclarations.count else {
             return ([], [])
         }

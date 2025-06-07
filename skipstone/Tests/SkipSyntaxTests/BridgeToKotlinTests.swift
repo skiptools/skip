@@ -5610,14 +5610,14 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         sealed class E: skip.lib.SwiftProjecting {
 
-            class ACase(val associated0: URL): E() {
+            class ACase(val associated0: java.net.URI): E() {
             }
 
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
             private external fun Swift_projectionImpl(options: Int): () -> Any
 
             companion object {
-                fun a(associated0: URL): E = ACase(associated0)
+                fun a(associated0: java.net.URI): E = ACase(associated0)
             }
         }
         """, """

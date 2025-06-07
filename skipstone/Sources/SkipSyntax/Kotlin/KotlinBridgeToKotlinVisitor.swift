@@ -1152,9 +1152,18 @@ final class KotlinBridgeToKotlinVisitor {
         var bridgedVariableDeclarations: [KotlinVariableDeclaration] = []
         var bridgedFunctionDeclarations: [(KotlinFunctionDeclaration, Int?)] = []
         var enumCases: [KotlinEnumCaseDeclaration] = []
+        var enumCaseBridgables: [[Bridgable]] = []
         for member in classDeclaration.members {
             if let enumCaseDeclaration = member as? KotlinEnumCaseDeclaration {
                 enumCases.append(enumCaseDeclaration)
+                if let bridgables = enumCaseDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator) {
+                    enumCaseBridgables.append(bridgables)
+                    enumCaseDeclaration.associatedValues = enumCaseDeclaration.associatedValues.enumerated().map { entry in
+                        var associatedValue = entry.element
+                        associatedValue.declaredType = bridgables[entry.offset].kotlinType
+                        return associatedValue
+                    }
+                }
             } else if let variableDeclaration = member as? KotlinVariableDeclaration {
                 if (swiftUIType == .view || swiftUIType == .toolbarContent), variableDeclaration.propertyName == "body" {
                     // We substitute our own body
@@ -1260,7 +1269,7 @@ final class KotlinBridgeToKotlinVisitor {
                 swift.append(1, declareStaticLet("Java_Companion", ofType: "JObject", in: classDeclaration.signature, value: "JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: \"Companion\", sig: \"L\(classRef.className)$Companion;\")!, options: \(options.jconvertibleOptions)))"))
             }
             if isNonGenericEnum {
-                swift.append(1, KotlinBridgeToSwiftVisitor.swiftForEnumJConvertibleContract(className: classRef.className, generics: classRef.generics, isSealedClassesEnum: classDeclaration.isSealedClassesEnum, caseDeclarations: enumCases, visibility: finalMemberVisibility, options: options, translator: translator))
+                swift.append(1, KotlinBridgeToSwiftVisitor.swiftForEnumJConvertibleContract(className: classRef.className, generics: classRef.generics, isSealedClassesEnum: classDeclaration.isSealedClassesEnum, caseDeclarations: enumCases, bridgables: enumCaseBridgables, visibility: finalMemberVisibility, options: options, translator: translator))
             } else {
                 let finalMemberVisibilityString = finalMemberVisibility.swift(suffix: " ")
                 if subclassDepth < 1 {
@@ -1290,7 +1299,7 @@ final class KotlinBridgeToKotlinVisitor {
                         swift.append(2, "let Swift_peer = SwiftObjectPointer.pointer(to: box, retain: true)")
                     }
                     if classDeclaration.declarationType == .enumDeclaration {
-                        let (code, declarations) = KotlinBridgeToSwiftVisitor.swiftForGenericEnumToJavaObjectSwitch(className: classRef.className, generics: classRef.generics, peerName: "Swift_peer", caseDeclarations: enumCases, visibility: finalMemberVisibility, options: options, translator: translator)
+                        let (code, declarations) = KotlinBridgeToSwiftVisitor.swiftForGenericEnumToJavaObjectSwitch(className: classRef.className, generics: classRef.generics, peerName: "Swift_peer", caseDeclarations: enumCases, bridgables: enumCaseBridgables, visibility: finalMemberVisibility, options: options, translator: translator)
                         swift.append(2, code)
                         additionalSwiftDeclarations += declarations
                     } else if subclassDepth == 0 {
