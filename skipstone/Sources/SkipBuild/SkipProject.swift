@@ -1209,7 +1209,6 @@ struct TestData : Codable, Hashable {
                 // add implicit dependency on SkipUI (for app target), SkipModel, and SkipFoundation, based in their position in the chain
                 if isAppModule {
                     if isNativeAppModule {
-                        modDeps.append(PackageModule(repositoryName: "skip-fuse-ui", moduleName: "SwiftUI", condition: ".when(platforms: [.android])"))
                         modDeps.append(PackageModule(repositoryName: "skip-fuse-ui", moduleName: "SkipFuseUI"))
                     } else {
                         modDeps.append(PackageModule(repositoryName: "skip-ui", moduleName: "SkipUI"))

@@ -1134,7 +1134,6 @@ final class SkipCommandTests: XCTestCase {
             targets: [
                 .target(name: "AppModule", dependencies: [
                     "ModelModule",
-                    .product(name: "SwiftUI", package: "skip-fuse-ui", condition: .when(platforms: [.android])),
                     .product(name: "SkipFuseUI", package: "skip-fuse-ui")
                 ], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .target(name: "ModelModule", dependencies: [
@@ -1244,7 +1243,6 @@ final class SkipCommandTests: XCTestCase {
             ],
             targets: [
                 .target(name: "AppModule", dependencies: [
-                    .product(name: "SwiftUI", package: "skip-fuse-ui", condition: .when(platforms: [.android])),
                     .product(name: "SkipFuseUI", package: "skip-fuse-ui")
                 ], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
