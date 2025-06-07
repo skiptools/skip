@@ -12,17 +12,17 @@ struct InitCommand: MessageCommand, CreateOptionsCommand, ProjectCommand, ToolOp
         commandName: "init",
         abstract: "Initialize a new Skip project",
         usage: """
-# Create a new transpiled app project
-skip init --appid=some.app.id app-project AppName
-
-# Create a new native app project
+# Create a new native Skip Fuse app project
 skip init --native-app --appid=some.app.id app-project AppName
 
-# Create a new transpiled library project
-skip init lib-project ModuleName
+# Create a new transpiled Skip Lite app project
+skip init --transpiled-app --appid=some.app.id app-project AppName
 
 # Create a new native library project
 skip init --native-model lib-project ModuleName
+
+# Create a new transpiled library project
+skip init --transpiled-model lib-project ModuleName
 
 # Create a new app project with multiple modules
 skip init --native-app --appid=some.app.id app-project AppName ModuleName
@@ -40,6 +40,9 @@ This command will create a conventional Skip app or library project.
     @OptionGroup(title: "Create Options")
     var createOptions: CreateOptions
 
+    @OptionGroup(title: "Project Options")
+    var projectOptions: ProjectOptions
+
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
 
@@ -48,9 +51,6 @@ This command will create a conventional Skip app or library project.
 
     @Argument(help: ArgumentHelp("Project folder name"))
     var projectName: String
-
-    @Argument(help: ArgumentHelp("The module name(s) to create"))
-    var moduleNames: [String] = []
 
     @Option(help: ArgumentHelp("Embed the library as an app with the given bundle id", valueName: "bundleID"))
     var appid: String? = nil
@@ -88,6 +88,9 @@ This command will create a conventional Skip app or library project.
     @Flag(help: ArgumentHelp("Open the resulting Gradle project"))
     var openGradle: Bool = false
 
+    @Argument(help: ArgumentHelp("The module name(s) to create"))
+    var moduleNames: [String]
+
     //@Flag(help: ArgumentHelp("Open the resulting project in Android Studio"))
     //var openStudio: Bool = false
 
@@ -110,6 +113,30 @@ This command will create a conventional Skip app or library project.
         }
     }
 
+    var nativeApp: Bool {
+        projectOptions.projectMode.contains(.nativeApp)
+    }
+
+    var nativeMode: NativeMode {
+        var mode: NativeMode = []
+        if self.nativeApp {
+            mode.insert(.nativeApp)
+        }
+        // model will be native iff
+        if projectOptions.projectMode.contains(.nativeModel) || (!projectOptions.projectMode.contains(.transpiledModel) && self.nativeApp) {
+            mode.insert(.nativeModel)
+        }
+        return mode
+    }
+
+    var isNative: Bool {
+        !nativeMode.isEmpty
+    }
+
+    var moduleMode: ModuleMode {
+        isNative && createOptions.kotlincompat ? ModuleMode.kotlincompat : isNative ? (nativeApp ? .native : .nativeBridged) : .transpiled
+    }
+
     func runInit(with out: MessageQueue) async throws {
         await out.yield(MessageBlock(status: nil, "Initializing Skip \(appid == nil && !createOptions.appfair ? "library" : "application") \(self.projectName)"))
 
@@ -118,8 +145,9 @@ This command will create a conventional Skip app or library project.
         let modules = try self.modules
         let icon: IconParameters? = noIcon == true ? nil : IconParameters(iconBackgroundColor: iconBackground, iconForegroundColor: iconForeground, iconSources: icon, iconShadow: iconShadow, iconInset: iconInset)
 
-        let moduleMode = self.createOptions.moduleMode
-        let nativeMode = self.createOptions.nativeMode
+        let isApp = appid != nil || self.projectOptions.projectMode.contains(.nativeApp) || self.projectOptions.projectMode.contains(.transpiledApp)
+        let moduleMode = self.moduleMode
+        let nativeMode = self.nativeMode
         // for now we default to creating tests only when non-native
         let createTests = self.createOptions.moduleTests ?? nativeMode.isEmpty
 
@@ -139,6 +167,7 @@ This command will create a conventional Skip app or library project.
             free: createOptions.free,
             appfair: createOptions.appfair,
             zero: createOptions.zero,
+            app: isApp,
             appid: self.appid,
             icon: icon,
             version: self.version,
@@ -157,7 +186,7 @@ This command will create a conventional Skip app or library project.
         await out.yield(MessageBlock(status: .pass, "Created module \(modules.map(\.moduleName).joined(separator: ", ")) in \(createdURL.path)"))
 
         if openXcode {
-            try await run(with: out, "Opening Xcode project", ["open", project.darwinProjectFolder.path])
+            try await run(with: out, "Opening Xcode project", ["open", project.workspaceFolder.path])
         }
 
         if openGradle {
@@ -330,25 +359,32 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         return hashes
     }
 
-    func initSkipProject(baseName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: BuildConfiguration, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, appfair: Bool? = nil, zero skipZeroSupport: Bool, appid: String?, appModuleName: String = "app", icon: IconParameters?, version: String?, swiftVersion: String, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests: Bool, github: Bool, fastlane: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
+    func initSkipProject(baseName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: BuildConfiguration, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, appfair: Bool? = nil, zero skipZeroSupport: Bool, app isApp: Bool, appid: String?, appModuleName: String = "app", icon: IconParameters?, version: String?, swiftVersion: String, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests: Bool, github: Bool, fastlane: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
 
         // the initial build/test is done with debug configuration regardless of the configuration setting; this is because unit tests don't always run correctly in release mode
         let debugConfiguration = "debug"
         let re = messagePrefix ?? ""
-        let appid = appid ?? (appfair == true ? "io.github.\(baseName)" : nil)
-        let projectNameModule = baseName.replacingOccurrences(of: "-", with: "")
         let free = appfair == true ? true : free
         let github = appfair == true ? true : free
 
         // the `appfair` flag changed the meaning of `baseName` to be the base name of the project and modules: "Sun-Bow" creates the modules "SunBow" and "SubBowModel" and the appid "io.github.Sun-Bow" and the project name "sun-bow-app"
-        let modules = !modules.isEmpty ? modules : (appfair == true ? [PackageModule(moduleName: projectNameModule, dependencies: [PackageModule(organizationName: "appfair", repositoryName: "appfair-app", repositoryVersion: "1.0.0", moduleName: "AppFairUI")]), PackageModule(moduleName: projectNameModule + "Model")] : [])
+        var modules = modules
+
+        if appfair == true, !modules.isEmpty {
+            modules[0].dependencies += [PackageModule(organizationName: "appfair", repositoryName: "appfair-app", repositoryVersion: "1.0.0", moduleName: "AppFairUI")]
+        }
+
         let projectName = appfair == true ? baseName.lowercased() + "-app" : baseName
 
         let primaryModuleName = modules.first?.moduleName ?? "Module"
+
+        let defaultAppId = projectName + "." + primaryModuleName
+        let appid = appid ?? defaultAppId
+
         // the embedded framework must have a different name from the app name, or else it will try to archive a framework instead of an app
         let primaryModuleFrameworkName = primaryModuleName + AppProjectLayout.appProductSuffix
 
-        let (projectURL, project) = try await AppProjectLayout.createSkipAppProject(projectName: projectName, productName: primaryModuleFrameworkName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, chain: chain, gitRepo: gitRepo, appfair: appfair == true, free: free, zero: skipZeroSupport, appid: appid, icon: icon, version: version, swiftVersion: swiftVersion, nativeMode: nativeMode, moduleMode: moduleMode, moduleTests: moduleTests, github: github, fastlane: fastlane, packageResolved: packageResolvedURL)
+        let (projectURL, project) = try await AppProjectLayout.createSkipAppProject(projectName: projectName, productName: primaryModuleFrameworkName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, chain: chain, gitRepo: gitRepo, appfair: appfair == true, free: free, zero: skipZeroSupport, app: isApp, appid: appid, icon: icon, version: version, swiftVersion: swiftVersion, nativeMode: nativeMode, moduleMode: moduleMode, moduleTests: moduleTests, github: github, fastlane: fastlane, packageResolved: packageResolvedURL)
         let projectPath = try projectURL.absolutePath
 
         if build == true || apk == true {

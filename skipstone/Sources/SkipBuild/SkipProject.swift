@@ -234,7 +234,7 @@ class FrameworkProjectLayout {
                 if isNativeModule {
                     skipYamlModule += """
 
-                    # this is a natively-compiled module
+                    # this is a natively-compiled SkipFuse module
                     skip:
                       mode: 'native'
 
@@ -257,6 +257,10 @@ class FrameworkProjectLayout {
 
                 let skipYamlAppTranspiled = """
                 # Configuration file for https://skip.tools project
+                # this is a transpiled SkipLite module
+                skip:
+                  mode: 'transpiled'
+
                 build:
                   contents:
 
@@ -1571,6 +1575,9 @@ class AppProjectLayout : FrameworkProjectLayout {
     let moduleTestsFolder: URL
     let moduleResourcesFolder: URL
 
+    let workspaceFolder: URL
+    let workspaceContents: URL
+
     let darwinFolder: URL
     let darwinREADME: URL
     let darwinAssetsFolder: URL
@@ -1630,6 +1637,9 @@ class AppProjectLayout : FrameworkProjectLayout {
         self.testsFolder = root.resolve("Tests/", check: optional) // Tests are optional
         self.moduleTestsFolder = testsFolder.resolve(moduleName + "Tests/", check: optional)
 
+        self.workspaceFolder = try root.resolve("Project.xcworkspace/", check: check)
+        self.workspaceContents = try workspaceFolder.resolve("contents.xcworkspacedata", check: check)
+
         self.darwinFolder = try root.resolve("Darwin/", check: check)
         self.darwinREADME = darwinFolder.resolve("README.md", check: optional)
         self.darwinSourcesFolder = try darwinFolder.resolve("Sources/", check: check)
@@ -1675,7 +1685,7 @@ class AppProjectLayout : FrameworkProjectLayout {
         try super.init(root: root, check: check)
     }
 
-    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, appfair: Bool, free: Bool, zero skipZeroSupport: Bool, appid: String?, icon: IconParameters?, version: String?, swiftVersion: String, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests: Bool, github: Bool, fastlane: Bool, packageResolved packageResolvedURL: URL? = nil) async throws -> (baseURL: URL, project: AppProjectLayout) {
+    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, appfair: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, appid: String?, icon: IconParameters?, version: String?, swiftVersion: String, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests: Bool, github: Bool, fastlane: Bool, packageResolved packageResolvedURL: URL? = nil) async throws -> (baseURL: URL, project: AppProjectLayout) {
         let sourceHeader = free ? (SourceLicense.defaultLicense(app: true).sourceHeader + "\n\n") : ""
 
         if let invalidProjectName = isValidProjectName(projectName) {
@@ -1702,12 +1712,9 @@ class AppProjectLayout : FrameworkProjectLayout {
             if !appid.contains(".") {
                 throw InitError(errorDescription: "Appid must be a valid bundle identifier containing at least one dot: \(appid)")
             }
-            if nativeMode.contains(.nativeModel) && modules.count < 2 {
-                throw InitError(errorDescription: "skip init --native-model requires at least two modules")
-            }
         }
 
-        let projectURL = try createSkipLibrary(projectName: projectName, productName: productName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: appid != nil, swiftVersion: swiftVersion, nativeMode: nativeMode, moduleMode: moduleMode, moduleTests: moduleTests, packageResolved: packageResolvedURL)
+        let projectURL = try createSkipLibrary(projectName: projectName, productName: productName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: app, swiftVersion: swiftVersion, nativeMode: nativeMode, moduleMode: moduleMode, moduleTests: moduleTests, packageResolved: packageResolvedURL)
 
         // the second module should always be imported
         let secondModule = modules.dropFirst().first
@@ -1730,7 +1737,7 @@ class AppProjectLayout : FrameworkProjectLayout {
         // The Xcode product name for the app
         let APP_PRODUCT = "\(APP_NAME)\(AppProjectLayout.appProductSuffix)" // note: blank for new scheme
 
-        guard let appid = appid else { // we have specified that an app should be created
+        guard app, let appid = appid else { // we have specified that an app should be created
             return (projectURL, appProject)
         }
 
@@ -3217,6 +3224,17 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 
         let xcodeProjectSchemeURL = appProject.darwinSchemesFolder.appending(path: "\(APP_TARGET).xcscheme")
         try xcschemeContents.write(to: xcodeProjectSchemeURL.createParentDirectory(), atomically: false, encoding: .utf8)
+
+        let workspaceData = """
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:Darwin/\(APP_NAME).xcodeproj">
+   </FileRef>
+</Workspace>
+"""
+        try workspaceData.write(to: appProject.workspaceContents.createParentDirectory(), atomically: false, encoding: .utf8)
 
         let androidIconName: String? = hasIcon ? "mipmap/ic_launcher" : nil
         try createAndroidManifest(androidIconName: androidIconName).write(to: appProject.androidManifest.createParentDirectory(), atomically: false, encoding: .utf8)

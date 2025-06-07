@@ -18,7 +18,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitZeroCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "zero-project", zero: true, moduleNames: "SomeModule")
+        let (projectURL, projectTree) = try await skipInit(projectName: "zero-project", zero: true, mode: [.transpiledModel], moduleNames: "SomeModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Package.swift
@@ -48,7 +48,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 5.9
+        // swift-tools-version: 6.0
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -80,7 +80,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitNoTestCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "tiny-project", zero: false, tests: false, moduleNames: "TeenyModule")
+        let (projectURL, projectTree) = try await skipInit(projectName: "tiny-project", zero: false, mode: [.transpiledModel], tests: false, moduleNames: "TeenyModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Package.swift
@@ -99,7 +99,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 5.9
+        // swift-tools-version: 6.0
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -125,7 +125,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitNoZeroCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "basic-project", zero: false, moduleNames: "SomeModule")
+        let (projectURL, projectTree) = try await skipInit(projectName: "basic-project", zero: false, mode: [.transpiledModel], moduleNames: "SomeModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Package.swift
@@ -196,7 +196,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 5.9
+        // swift-tools-version: 6.0
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -226,7 +226,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitFreeCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "free-project", free: true, zero: false, tests: true, moduleNames: "FreeModule")
+        let (projectURL, projectTree) = try await skipInit(projectName: "free-project", free: true, zero: false, mode: [.transpiledModel], tests: true, moduleNames: "FreeModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ LICENSE.LGPL
@@ -264,7 +264,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 5.9
+        // swift-tools-version: 6.0
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -297,7 +297,7 @@ final class SkipCommandTests: XCTestCase {
         let projectName = "cool-app"
         let moduleName = "APPNAME"
         let appid = "some.cool.app"
-        let (_, projectTree) = try await skipInit(projectName: projectName, free: true, fastlane: false, appid: appid, moduleNames: moduleName)
+        let (_, projectTree) = try await skipInit(projectName: projectName, free: true, mode: [.transpiledApp], fastlane: false, appid: appid, moduleNames: moduleName)
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -333,6 +333,8 @@ final class SkipCommandTests: XCTestCase {
         │     └─ Main.swift
         ├─ LICENSE.GPL
         ├─ Package.swift
+        ├─ Project.xcworkspace
+        │  └─ contents.xcworkspacedata
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
@@ -363,7 +365,7 @@ final class SkipCommandTests: XCTestCase {
         let projectName = "cool-app"
         let moduleName = "APPNAME"
         let appid = "some.cool.app"
-        let (_, projectTree) = try await skipInit(projectName: projectName, free: true, fastlane: true, appid: appid, moduleNames: moduleName)
+        let (_, projectTree) = try await skipInit(projectName: projectName, free: true, mode: [.transpiledApp], fastlane: true, appid: appid, moduleNames: moduleName)
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -427,6 +429,8 @@ final class SkipCommandTests: XCTestCase {
         │        └─ rating.json
         ├─ LICENSE.GPL
         ├─ Package.swift
+        ├─ Project.xcworkspace
+        │  └─ contents.xcworkspacedata
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
@@ -457,7 +461,7 @@ final class SkipCommandTests: XCTestCase {
         let projectName = "cool-app"
         let moduleName = "APPNAME"
         let appid = "some.cool.app"
-        let (projectURL, projectTree) = try await skipInit(projectName: projectName, free: true, fastlane: false, appid: appid, backgroundColor: "4994EC", moduleNames: moduleName)
+        let (projectURL, projectTree) = try await skipInit(projectName: projectName, free: true, mode: [.transpiledApp], fastlane: false, appid: appid, backgroundColor: "4994EC", moduleNames: moduleName)
         #if os(macOS) // icons are not generated on Linux
         XCTAssertEqual(projectTree ?? "", """
         .
@@ -541,6 +545,8 @@ final class SkipCommandTests: XCTestCase {
         │     └─ Main.swift
         ├─ LICENSE.GPL
         ├─ Package.swift
+        ├─ Project.xcworkspace
+        │  └─ contents.xcworkspacedata
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
@@ -581,7 +587,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitNativeModelCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "basic-project", native: .nativeModel, tests: true, moduleNames: "SomeModule")
+        let (projectURL, projectTree) = try await skipInit(projectName: "basic-project", mode: [.nativeModel], tests: true, moduleNames: "SomeModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Package.swift
@@ -671,7 +677,7 @@ final class SkipCommandTests: XCTestCase {
         #      contents:
         #        - 'implementation("androidx.compose.runtime:runtime")'
 
-        # this is a natively-compiled module
+        # this is a natively-compiled SkipFuse module
         skip:
           mode: 'native'
           bridging: true
@@ -710,7 +716,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitKotlincompatCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "basic-project", native: .nativeModel, kotlincompat: true, moduleNames: "SomeModule")
+        let (projectURL, projectTree) = try await skipInit(projectName: "basic-project", mode: [.nativeModel], kotlincompat: true, moduleNames: "SomeModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Package.swift
@@ -757,7 +763,7 @@ final class SkipCommandTests: XCTestCase {
         #      contents:
         #        - 'implementation("androidx.compose.runtime:runtime")'
 
-        # this is a natively-compiled module
+        # this is a natively-compiled SkipFuse module
         skip:
           mode: 'native'
           bridging:
@@ -795,7 +801,7 @@ final class SkipCommandTests: XCTestCase {
 
     /// A multi-module native app with transpiled app and compiled model
     func testLibInitAppNativeModelCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, native: .nativeModel, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "AppModule", "ModelModule")
+        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, mode: [.nativeModel], tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "AppModule", "ModelModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -830,6 +836,8 @@ final class SkipCommandTests: XCTestCase {
         │  └─ Sources
         │     └─ Main.swift
         ├─ Package.swift
+        ├─ Project.xcworkspace
+        │  └─ contents.xcworkspacedata
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
@@ -869,6 +877,10 @@ final class SkipCommandTests: XCTestCase {
         let AppSkipYML = try load("Sources/AppModule/Skip/skip.yml")
         XCTAssertEqual(AppSkipYML, """
         # Configuration file for https://skip.tools project
+        # this is a transpiled SkipLite module
+        skip:
+          mode: 'transpiled'
+
         build:
           contents:
 
@@ -885,7 +897,7 @@ final class SkipCommandTests: XCTestCase {
         #      contents:
         #        - 'implementation("androidx.compose.runtime:runtime")'
 
-        # this is a natively-compiled module
+        # this is a natively-compiled SkipFuse module
         skip:
           mode: 'native'
           bridging: true
@@ -975,7 +987,7 @@ final class SkipCommandTests: XCTestCase {
 
     /// A multi-module native app
     func testLibInitAppNativeAppModelCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, native: .nativeApp, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "AppModule", "ModelModule")
+        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, mode: [.nativeApp], tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "AppModule", "ModelModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -1010,6 +1022,8 @@ final class SkipCommandTests: XCTestCase {
         │  └─ Sources
         │     └─ Main.swift
         ├─ Package.swift
+        ├─ Project.xcworkspace
+        │  └─ contents.xcworkspacedata
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
@@ -1050,7 +1064,7 @@ final class SkipCommandTests: XCTestCase {
         #      contents:
         #        - 'implementation("androidx.compose.runtime:runtime")'
 
-        # this is a natively-compiled module
+        # this is a natively-compiled SkipFuse module
         skip:
           mode: 'native'
 
@@ -1067,7 +1081,7 @@ final class SkipCommandTests: XCTestCase {
         #      contents:
         #        - 'implementation("androidx.compose.runtime:runtime")'
 
-        # this is a natively-compiled module
+        # this is a natively-compiled SkipFuse module
         skip:
           mode: 'native'
 
@@ -1152,7 +1166,7 @@ final class SkipCommandTests: XCTestCase {
 
     /// A single-module native app
     func testLibInitAppNativeAppCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, native: .nativeApp, tests: nil, fastlane: false, appid: "some.cool.app", swiftVersion: "6.0", moduleNames: "AppModule")
+        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, mode: [.nativeApp], tests: nil, fastlane: false, appid: "some.cool.app", swiftVersion: "6.0", moduleNames: "AppModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -1187,6 +1201,8 @@ final class SkipCommandTests: XCTestCase {
         │  └─ Sources
         │     └─ Main.swift
         ├─ Package.swift
+        ├─ Project.xcworkspace
+        │  └─ contents.xcworkspacedata
         ├─ README.md
         ├─ Skip.env
         └─ Sources
@@ -1218,7 +1234,7 @@ final class SkipCommandTests: XCTestCase {
         #      contents:
         #        - 'implementation("androidx.compose.runtime:runtime")'
 
-        # this is a natively-compiled module
+        # this is a natively-compiled SkipFuse module
         skip:
           mode: 'native'
 
@@ -1252,7 +1268,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitAppFair() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "Free-App", free: false, appfair: true) // appfair should override free
+        let (projectURL, projectTree) = try await skipInit(projectName: "Free-App", free: false, appfair: true, mode: [.transpiledApp], moduleNames: "FreeApp", "FreeAppModel") // appfair should override free
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -1316,6 +1332,8 @@ final class SkipCommandTests: XCTestCase {
         │        └─ rating.json
         ├─ LICENSE.GPL
         ├─ Package.swift
+        ├─ Project.xcworkspace
+        │  └─ contents.xcworkspacedata
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
@@ -1356,7 +1374,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 5.9
+        // swift-tools-version: 6.0
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -1365,7 +1383,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
             products: [
-                .library(name: "FreeApp\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["FreeApp"]),
+                .library(name: "FreeApp", type: .dynamic, targets: ["FreeApp"]),
                 .library(name: "FreeAppModel", type: .dynamic, targets: ["FreeAppModel"]),
             ],
             dependencies: [
@@ -1404,7 +1422,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitApp3ModuleCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: true, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "TopModule", "MiddleModule", "BottomModule")
+        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: true, mode: [.transpiledModel], tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "TopModule", "MiddleModule", "BottomModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -1439,6 +1457,8 @@ final class SkipCommandTests: XCTestCase {
         │        └─ xcschemes
         │           └─ TopModule App.xcscheme
         ├─ Package.swift
+        ├─ Project.xcworkspace
+        │  └─ contents.xcworkspacedata
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
@@ -1493,7 +1513,7 @@ final class SkipCommandTests: XCTestCase {
         XCTAssertTrue(AndroidManifest.contains("android.intent.category.LAUNCHER"))
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 5.9
+        // swift-tools-version: 6.0
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -1543,7 +1563,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitApp5ModuleNoZeroCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, tests: false, fastlane: false, appid: "some.cool.app", moduleNames: "M1", "M2", "M3", "M4", "M5")
+        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, mode: [.transpiledApp], tests: false, fastlane: false, appid: "some.cool.app", moduleNames: "M1", "M2", "M3", "M4", "M5")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -1578,6 +1598,8 @@ final class SkipCommandTests: XCTestCase {
         │  └─ Sources
         │     └─ Main.swift
         ├─ Package.swift
+        ├─ Project.xcworkspace
+        │  └─ contents.xcworkspacedata
         ├─ README.md
         ├─ Skip.env
         └─ Sources
@@ -1622,7 +1644,7 @@ final class SkipCommandTests: XCTestCase {
         XCTAssertTrue(AndroidManifest.contains("android.intent.category.LAUNCHER"))
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 5.9
+        // swift-tools-version: 6.0
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -1668,7 +1690,7 @@ final class SkipCommandTests: XCTestCase {
     }
 
     func testLibInitApp5NativeModuleCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, native: .nativeModel, tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "M1", "M2", "M3", "M4", "M5")
+        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, mode: [.nativeModel], tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "M1", "M2", "M3", "M4", "M5")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -1703,6 +1725,8 @@ final class SkipCommandTests: XCTestCase {
         │  └─ Sources
         │     └─ Main.swift
         ├─ Package.swift
+        ├─ Project.xcworkspace
+        │  └─ contents.xcworkspacedata
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
@@ -1801,7 +1825,7 @@ final class SkipCommandTests: XCTestCase {
     /// Default arguments for `skip init` tests
     let initTestArgs = ["-jA", "--no-build", "--no-test", "--show-tree"]
 
-    func skipInit(projectName: String, documented: Bool = false, free: Bool? = nil, zero: Bool? = nil, appfair: Bool? = nil, native: NativeMode = [], kotlincompat: Bool = false, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, swiftVersion: String? = nil, resourcePath: String? = "Resources", backgroundColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
+    func skipInit(projectName: String, documented: Bool = false, free: Bool? = nil, zero: Bool? = nil, appfair: Bool? = nil, mode: [ProjectMode], kotlincompat: Bool = false, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, swiftVersion: String? = nil, resourcePath: String? = "Resources", backgroundColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["init"] + initTestArgs
@@ -1828,15 +1852,21 @@ final class SkipCommandTests: XCTestCase {
             cmd += ["--no-appfair"]
         }
 
-        if native.contains(.nativeApp) {
+        if mode.contains(.nativeApp) {
             cmd += ["--native-app"]
         }
+        if mode.contains(.transpiledApp) {
+            cmd += ["--transpiled-app"]
+        }
 
-        if native.contains(.nativeModel) {
+        if mode.contains(.nativeModel) {
             cmd += ["--native-model"]
             if kotlincompat == true {
                 cmd += ["--kotlincompat"]
             }
+        }
+        if mode.contains(.transpiledModel) {
+            cmd += ["--transpiled-model"]
         }
 
         if moduleTests == true {

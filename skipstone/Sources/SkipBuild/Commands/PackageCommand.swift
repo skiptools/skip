@@ -13,6 +13,13 @@ protocol CreateOptionsCommand : ParsableArguments {
     var createOptions: CreateOptions { get }
 }
 
+enum ProjectMode : String, EnumerableFlag {
+    case nativeApp
+    case transpiledApp
+    case nativeModel
+    case transpiledModel
+}
+
 struct NativeMode : OptionSet {
     static let nativeModel = NativeMode(rawValue: 1 << 0)
     static let nativeApp = NativeMode(rawValue: 1 << 1)
@@ -24,8 +31,16 @@ struct NativeMode : OptionSet {
     }
 
     var swiftVersion: String {
-        isEmpty ? "5.9" : "6.0"
+        //isEmpty ? "5.9" : "6.0"
+        "6.0"
     }
+}
+
+
+struct ProjectOptions : ParsableArguments {
+    /// This is not part of `CreateOptions` since it is non-optional, and the `CreateCommand` must accept no arguments
+    @Flag
+    var projectMode: [ProjectMode]
 }
 
 struct CreateOptions : ParsableArguments {
@@ -70,12 +85,6 @@ struct CreateOptions : ParsableArguments {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary of the new files", valueName: "show"))
     var showTree: Bool = false
 
-    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create a fully native app", valueName: "native"))
-    var nativeApp: Bool = false
-
-    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create a native model layer", valueName: "native"))
-    var nativeModel: Bool = false
-
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether native model should use kotlincompat", valueName: "kotlincompat"))
     var kotlincompat: Bool = false
 
@@ -90,25 +99,6 @@ struct CreateOptions : ParsableArguments {
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Validate generated Package.swift files", valueName: "validate"))
     var validatePackage: Bool = true
-
-    var nativeMode: NativeMode {
-        var mode: NativeMode = []
-        if self.nativeApp == true {
-            mode.insert(.nativeApp)
-        }
-        if self.nativeModel == true {
-            mode.insert(.nativeModel)
-        }
-        return mode
-    }
-
-    var isNative: Bool {
-        !nativeMode.isEmpty
-    }
-
-    var moduleMode: ModuleMode {
-        isNative && kotlincompat ? ModuleMode.kotlincompat : isNative ? (nativeApp ? .native : .nativeBridged) : .transpiled
-    }
 
     var projectTemplateURL: URL {
         get throws {

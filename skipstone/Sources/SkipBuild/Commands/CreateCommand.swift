@@ -237,6 +237,7 @@ Create a new project by following a series of interactive prompts.
             free: freeProject,
             appfair: nil,
             zero: createOptions.zero,
+            app: isApp,
             appid: appid,
             icon: nil,
             version: createOptions.swiftVersion,
@@ -248,8 +249,8 @@ Create a new project by following a series of interactive prompts.
             fastlane: fastlane,
             validatePackage: createOptions.validatePackage,
             packageResolved: nil,
-            apk: isApp,
-            ipa: isApp,
+            apk: buildProject && isApp,
+            ipa: buildProject && isApp,
             with: out
         )
 

@@ -122,6 +122,7 @@ This command performs a full system checkup to ensure that Skip can create and b
                 gitRepo: false,
                 free: true,
                 zero: !isNative,
+                app: true,
                 appid: "skip.hello.App",
                 icon: nil,
                 version: "1.0.0",

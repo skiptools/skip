@@ -588,7 +588,7 @@ extension StreamingCommand {
         if let failCount = messageTypes[.fail]?.count, failCount > 0 {
             throw StreamCommandError(errorDescription: "\(failCount) \(failCount == 1 ? "error" : "errors")", messages: messages)
             // this is useful for unit test failures, but is too verbose for command-line failures
-            //throw StreamCommandError(errorDescription: "\(failCount) \(failCount == 1 ? "error" : "errors"): \(messages.compactMap({ $0.message(term: .plain) }))")
+            //throw StreamCommandError(errorDescription: "\(failCount) \(failCount == 1 ? "error" : "errors"): \(messages.compactMap({ $0.message(term: .plain) }))", messages: messages)
         }
     }
 }
