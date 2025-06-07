@@ -50,6 +50,7 @@ public struct Transpiler {
                     // bubble up to the user because these trees are only used to gather information, and we re-parse
                     // for only bridging below. Look for e.g. '#if SKIP' or '// SKIP @bridge' or Views that auto-bridge
                     var shouldBridge = bridgeSource.content.contains("SKIP")
+                        || bridgeSource.content.contains("SwiftUI")
                         || bridgeSource.content.contains("SkipFuseUI")
                         || bridgeSource.content.contains("SkipSwiftUI")
                         || bridgeSource.content.contains("@Observable")

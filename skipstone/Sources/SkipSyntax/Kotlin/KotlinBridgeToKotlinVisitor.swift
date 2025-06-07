@@ -18,7 +18,7 @@ final class KotlinBridgeToKotlinVisitor {
         self.options = options
         self.translator = translator
         self.codebaseInfo = codebaseInfo
-        self.includesUI = translator.syntaxTree.root.statements.compactMap({ $0 as? ImportDeclaration }).contains { $0.modulePath.first == "SkipSwiftUI"  || $0.modulePath.first == "SkipFuseUI" }
+        self.includesUI = translator.syntaxTree.root.statements.compactMap({ $0 as? ImportDeclaration }).contains { $0.modulePath.first == "SwiftUI" || $0.modulePath.first == "SkipSwiftUI" || $0.modulePath.first == "SkipFuseUI" }
     }
 
     func visit() -> [KotlinTransformerOutput] {

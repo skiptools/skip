@@ -1209,6 +1209,7 @@ struct TestData : Codable, Hashable {
                 // add implicit dependency on SkipUI (for app target), SkipModel, and SkipFoundation, based in their position in the chain
                 if isAppModule {
                     if isNativeAppModule {
+                        modDeps.append(PackageModule(repositoryName: "skip-fuse-ui", moduleName: "SwiftUI", condition: ".when(platforms: [.android])"))
                         modDeps.append(PackageModule(repositoryName: "skip-fuse-ui", moduleName: "SkipFuseUI"))
                     } else {
                         modDeps.append(PackageModule(repositoryName: "skip-ui", moduleName: "SkipUI"))
@@ -1263,7 +1264,11 @@ struct TestData : Codable, Hashable {
                     if !packageDependencies.contains(packDep) {
                         packageDependencies.append(packDep)
                     }
-                    let dep = ".product(name: \"\(modDep.moduleName)\", package: \"\(repoName)\")"
+                    var dep = ".product(name: \"\(modDep.moduleName)\", package: \"\(repoName)\""
+                    if let condition = modDep.condition {
+                        dep += ", condition: \(condition)"
+                    }
+                    dep += ")"
                     if !skipModuleDeps.contains(dep) {
                         skipModuleDeps.append(dep)
                     }
@@ -2235,7 +2240,7 @@ New features and better performance.
         }
 
         let isNativeAppModule = nativeMode.contains(.nativeApp)
-        let swiftUIImport = isNativeAppModule ? "import SkipFuseUI" : "import SwiftUI"
+        let swiftUIImport = "import SwiftUI"
         let osLogImport = isNativeAppModule ? "import SkipFuse" : "import OSLog"
         // explicitly bridge the public app functions that need to be accessed from Main.kt
         let skipBridge = isNativeAppModule ? "/* SKIP @bridge */" : ""

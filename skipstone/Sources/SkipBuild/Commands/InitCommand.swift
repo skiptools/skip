@@ -405,13 +405,15 @@ struct PackageModule {
     var moduleName: String
     var repositoryVersion: String?
     var dependencies: [PackageModule]
+    var condition: String?
 
-    init(organizationName: String? = nil, repositoryName: String? = nil, repositoryVersion: String? = nil, moduleName: String, dependencies: [PackageModule] = []) {
+    init(organizationName: String? = nil, repositoryName: String? = nil, repositoryVersion: String? = nil, moduleName: String, dependencies: [PackageModule] = [], condition: String? = nil) {
         self.organizationName = organizationName
         self.repositoryName = repositoryName
         self.repositoryVersion = repositoryVersion
         self.moduleName = moduleName
         self.dependencies = dependencies
+        self.condition = condition
     }
 
     init(parse: String) throws {
@@ -421,6 +423,7 @@ struct PackageModule {
         self.repositoryVersion = nil
         self.organizationName = nil
         self.dependencies = []
+        self.condition = nil
         for dep in parts.dropFirst() {
             // parse PlaygroundModel:skiptools/skip-model/SkipModel:skip-foundation@0.1.0/SkipFoundation
             var depParts = dep.split(separator: "/").map(\.description)
