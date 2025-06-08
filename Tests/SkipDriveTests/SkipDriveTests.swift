@@ -183,6 +183,8 @@ class SkipCommandTests : XCTestCase {
         │        └─ rating.json
         ├─ Package.resolved
         ├─ Package.swift
+        ├─ Project.xcworkspace
+        │  └─ contents.xcworkspacedata
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
@@ -290,6 +292,8 @@ class SkipCommandTests : XCTestCase {
         │        └─ rating.json
         ├─ LICENSE.GPL
         ├─ Package.swift
+        ├─ Project.xcworkspace
+        │  └─ contents.xcworkspacedata
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
@@ -409,6 +413,8 @@ class SkipCommandTests : XCTestCase {
         │        └─ rating.json
         ├─ LICENSE.GPL
         ├─ Package.swift
+        ├─ Project.xcworkspace
+        │  └─ contents.xcworkspacedata
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
@@ -534,6 +540,8 @@ class SkipCommandTests : XCTestCase {
         │        └─ rating.json
         ├─ LICENSE.GPL
         ├─ Package.swift
+        ├─ Project.xcworkspace
+        │  └─ contents.xcworkspacedata
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
@@ -676,6 +684,8 @@ class SkipCommandTests : XCTestCase {
         │        └─ rating.json
         ├─ LICENSE.GPL
         ├─ Package.swift
+        ├─ Project.xcworkspace
+        │  └─ contents.xcworkspacedata
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
@@ -830,6 +840,8 @@ class SkipCommandTests : XCTestCase {
         ├─ LICENSE.GPL
         ├─ Package.resolved
         ├─ Package.swift
+        ├─ Project.xcworkspace
+        │  └─ contents.xcworkspacedata
         ├─ README.md
         ├─ Skip.env
         ├─ Sources
