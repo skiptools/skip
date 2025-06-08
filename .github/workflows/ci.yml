@@ -12,7 +12,7 @@ on:
 
 jobs:
   skip-init:
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - uses: gradle/actions/setup-gradle@v4
         with:
