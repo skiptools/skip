@@ -62,7 +62,7 @@ class SkipCommandTests : XCTestCase {
         let projectName = "hello-skip"
         let dir = tempDir + "/" + projectName + "/"
         let appName = "HelloSkip"
-        let out = try await skip("init", "-jA", "-v", "--show-tree", "-d", dir, "--appid", "com.company.HelloSkip", projectName, appName)
+        let out = try await skip("init", "-jA", "-v", "--show-tree", "-d", dir, "--transpiled-app", "--appid", "com.company.HelloSkip", projectName, appName)
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip application \(projectName)", msgs.first)
@@ -214,7 +214,7 @@ class SkipCommandTests : XCTestCase {
         let dir = tempDir + "/" + name + "/"
         let appName = "Demo"
         // generate an app scaffold without building it, just so we can see what the file tree looks like
-        let createApp = { try await self.skip("init", "-jA", "--show-tree", "--no-icon", "--no-build", "--zero", "--free", "-v", "-d", dir, "--appid", "demo.app.App", name, appName) }
+        let createApp = { try await self.skip("init", "-jA", "--show-tree", "--no-icon", "--no-build", "--zero", "--free", "-v", "-d", dir, "--transpiled-app", "--appid", "demo.app.App", name, appName) }
         var out = try await createApp()
         var msgs = try out.out.parseJSONMessages()
 
@@ -708,7 +708,7 @@ class SkipCommandTests : XCTestCase {
         let projectName = "Hello-Skip"
         let dir = tempDir + "/" + projectName + "/"
         let appName = "HelloSkip"
-        let out = try await skip("init", "-jA", "-v", "--show-tree", "-d", dir, "--appfair", projectName)
+        let out = try await skip("init", "-jA", "-v", "--show-tree", "-d", dir, "--transpiled-app", "--appfair", projectName)
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip application \(projectName)", msgs.first)
@@ -874,7 +874,7 @@ class SkipCommandTests : XCTestCase {
         let tempDir = try mktmp()
         let name = "cool-lib"
         let dir = tempDir + "/" + name + "/"
-        let out = try await skip("init", "-jA", "-v", "--show-tree", "-d", dir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE")
+        let out = try await skip("init", "-jA", "-v", "--show-tree", "--transpiled-model", "-d", dir, name, "CoolA", "CoolB", "CoolC", "CoolD", "CoolE")
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip library \(name)", msgs.first)
@@ -966,7 +966,7 @@ class SkipCommandTests : XCTestCase {
         let tempDir = try mktmp()
         let name = "neat-lib"
         let dir = tempDir + "/" + name + "/"
-        let out = try await skip("init", "-jA", "-v", "--git-repo", "--show-tree", "-d", dir, name, "NeatA")
+        let out = try await skip("init", "-jA", "-v", "--git-repo", "--show-tree", "--transpiled-model", "-d", dir, name, "NeatA")
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip library \(name)", msgs.first)
@@ -1014,7 +1014,7 @@ class SkipCommandTests : XCTestCase {
         let name = "demo-framework"
         let dir = tempDir + "/" + name + "/"
         let moduleName = "DemoFramework"
-        let out = try await skip("init", "-jA", "--show-tree", "-v", "-d", dir, name, moduleName)
+        let out = try await skip("init", "-jA", "--show-tree", "-v", "--transpiled-model", "-d", dir, name, moduleName)
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip library \(name)", msgs.first)
@@ -1031,7 +1031,7 @@ class SkipCommandTests : XCTestCase {
         let name = "demo-app"
         let dir = tempDir + "/" + name + "/"
         let appName = "Demo"
-        let out = try await skip("init", "-jA", "--show-tree", "--zero", "--free", "-v", "-d", dir, "--appid", "demo.app.App", name, appName)
+        let out = try await skip("init", "-jA", "--show-tree", "--zero", "--free", "-v", "-d", dir, "--transpiled-app", "--appid", "demo.app.App", name, appName)
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip application \(name)", msgs.first)
@@ -1049,7 +1049,7 @@ class SkipCommandTests : XCTestCase {
         let name = "demo-app-native"
         let dir = tempDir + "/" + name + "/"
         // create a three-module native app
-        let out = try await skip("init", "-jA", "--show-tree", "--native", "--free", "-v", "-d", dir, "--appid", "demo.app.App", name, "Demo", "DemoModel", "DemoLogic")
+        let out = try await skip("init", "-jA", "--show-tree", "--free", "-v", "-d", dir, "--native-app", "--appid", "demo.app.App", name, "Demo", "DemoModel", "DemoLogic")
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip application \(name)", msgs.first)
