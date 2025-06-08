@@ -25,7 +25,7 @@ jobs:
 
       - run: skip init --transpiled-model demo-module DemoModule
       - run: skip init --transpiled-app --appid=xyz.skip.Demo demo-app DemoApp DemoModule
-      - run: skip init --transpiled-app --appfair DemoFairApp
+      - run: skip init --transpiled-app --appfair demo-appfair DemoFairApp
 
       # native model and app init
       - run: skip android sdk install --verbose

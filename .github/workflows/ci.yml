@@ -33,11 +33,17 @@ jobs:
           repository: skiptools/skip
           path: skip
 
-      - name: Swift Test
+      - name: Setup SKIPLOCAL
+        run: |
+          echo "SKIPLOCAL=$PWD/skipstone" >> $GITHUB_ENV
+          echo "PATH=$PWD/skip/.build/plugins/tools/debug:$PATH" >> $GITHUB_ENV
+
+      - name: Build Skip
         working-directory: skip
-        #run: SKIPLOCAL=${PWD}/../skipstone swift test
-        #run: brew install skiptools/skip/skip && swift test
-        # running locally against skipstone checkout broken as of
-        run: PATH=$PWD/.build/plugins/tools/debug:$PATH SKIPLOCAL=${PWD}/../skipstone swift test
+        run: swift build
+
+      - name: Test Skip
+        working-directory: skip
+        run: swift test
 
 

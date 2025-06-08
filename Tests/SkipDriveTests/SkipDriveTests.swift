@@ -715,10 +715,11 @@ class SkipCommandTests : XCTestCase {
 
     func testSkipFair() async throws {
         let tempDir = try mktmp()
-        let projectName = "Hello-Skip"
+        let projectName = "hello-skip"
         let dir = tempDir + "/" + projectName + "/"
         let appName = "HelloSkip"
-        let out = try await skip("init", "-jA", "-v", "--show-tree", "-d", dir, "--transpiled-app", "--appfair", projectName)
+        let modelName = "HelloSkipModel"
+        let out = try await skip("init", "-jA", "-v", "--show-tree", "-d", dir, "--transpiled-app", "--appfair", projectName, appName, modelName)
         let msgs = try out.out.parseJSONMessages()
 
         XCTAssertEqual("Initializing Skip application \(projectName)", msgs.first)
@@ -1152,8 +1153,8 @@ class SkipCommandTests : XCTestCase {
         // the default SPM location of the current skip CLI for testing
         var skiptools = [
             ".build/artifacts/skip/skip/skip.artifactbundle/macos/skip",
-            //".build/artifactbundle/skip.artifactbundle/macos/skip",
-            ".build/plugins/tools/debug/skip", // the SKIPLOCAL build path
+            ".build/plugins/tools/debug/skip", // the SKIPLOCAL build path macOS 14-
+            ".build/arm64-apple-macosx/debug/skip", // the SKIPLOCAL build path macOS 15+
         ]
 
         // when running tests from Xcode, we need to use the tool download folder, which seems to be placed in one of the environment property `__XCODE_BUILT_PRODUCTS_DIR_PATHS`, so check those folders and override if skip is found
