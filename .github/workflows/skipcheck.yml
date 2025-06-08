@@ -23,9 +23,9 @@ jobs:
       - run: skip checkup
       #- run: skip checkup --verbose --double-check
 
-      - run: skip init demo-module DemoModule
-      - run: skip init --appid=xyz.skip.Demo demo-app DemoApp DemoModule
-      - run: skip init --appfair DemoFairApp
+      - run: skip init --transpiled-model demo-module DemoModule
+      - run: skip init --transpiled-app --appid=xyz.skip.Demo demo-app DemoApp DemoModule
+      - run: skip init --transpiled-app --appfair DemoFairApp
 
       # native model and app init
       - run: skip android sdk install --verbose
