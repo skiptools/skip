@@ -12,7 +12,7 @@ import FoundationXML // for non-Darwin
 struct UpgradeCommand: MessageCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "upgrade",
-        abstract: "Upgrade to the latest Skip version using Homebrew",
+        abstract: "Upgrade to the latest Skip version",
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")
@@ -27,6 +27,13 @@ struct UpgradeCommand: MessageCommand, ToolOptionsCommand {
             await out.yield(MessageBlock(status: .pass, "Skip \(skipVersion) is up to date."))
         } else if let latestSkipVersion = latestSkipVersion {
             try await run(with: out, "Upgrade Skip to \(latestSkipVersion)", ["brew", "upgrade", "skip"], additionalEnvironment: ["HOMEBREW_AUTO_UPDATE_SECS": "0", "HOMEBREW_NO_INSTALL_CLEANUP": "1"])
+        }
+
+        // if we are currently in a package, update it
+        let packagePath = "." // TODO: enable path with folder?
+        if FileManager.default.isReadableFile(atPath: "\(packagePath)/Package.swift") {
+            try await run(with: out, "Update package dependencies", ["swift", "package", "update", "-v", "--package-path", packagePath])
+            try registerPluginFingerprint(for: URL(fileURLWithPath: "\(packagePath)/Package.resolved"))
         }
     }
 }

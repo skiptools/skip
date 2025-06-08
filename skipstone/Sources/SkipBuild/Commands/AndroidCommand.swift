@@ -579,15 +579,11 @@ fileprivate extension AndroidOperationCommand {
             }
     }
 
-    private var homeDir: URL {
-        FileManager.default.homeDirectoryForCurrentUser // or URL.homeDirectory, but unavailable on Linux
-    }
-
     func buildToolchainConfiguration(for arch: AndroidArch) throws -> ToolchainPaths {
         let apiLevel = toolchainOptions.androidAPILevel
 
         // look for swift-sdks like: ~/Library/org.swift.swiftpm/swift-sdks/swift-6.0.2-RELEASE-android-24-0.1.artifactbundle
-        let localSDKsPath = (toolchainOptions.swiftSDKHome ?? ProcessInfo.processInfo.environment["SWIFT_SDK_HOME"]).flatMap(URL.init(fileURLWithPath:)) ?? homeDir.appendingPathComponent("Library/org.swift.swiftpm/swift-sdks", isDirectory: true)
+        let localSDKsPath = (toolchainOptions.swiftSDKHome ?? ProcessInfo.processInfo.environment["SWIFT_SDK_HOME"]).flatMap(URL.init(fileURLWithPath:)) ?? swiftPMConfigFolder.appendingPathComponent("swift-sdks", isDirectory: true)
 
         let installAdvice = "Install the Swift Android SDK using `skip android sdk install`."
 

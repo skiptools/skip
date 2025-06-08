@@ -142,10 +142,11 @@ This command performs a full system checkup to ensure that Skip can create and b
 
         // build a sample project (twice when performing a double-check)
         let (p1URL, project, p1) = try await buildSampleProject()
+        let packageResolvedURL = p1URL.appendingPathComponent("Package.resolved", isDirectory: false)
+        try registerPluginFingerprint(for: packageResolvedURL)
         if doubleCheck {
             // use the Package.resolved from the initial build to ensure that use double-check build uses the same dependency versions as the initial build
             // otherwise if a new version of a Skip library is tagged in between the two builds, the checksums won't match
-            let packageResolvedURL = p1URL.appendingPathComponent("Package.resolved", isDirectory: false)
             let (_, project2, p2) = try await buildSampleProject(packageResolvedURL: packageResolvedURL)
 
             let (_, _) = (project, project2)

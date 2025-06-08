@@ -983,7 +983,57 @@ protocol ToolOptionsCommand : OutputOptionsCommand {
     var toolOptions: ToolOptions { get set }
 }
 
+extension ToolOptionsCommand {
+    var homeDir: URL {
+        FileManager.default.homeDirectoryForCurrentUser // or URL.homeDirectory, but unavailable on Linux
+    }
+
+    var swiftPMConfigFolder: URL {
+        homeDir.appendingPathComponent("Library/org.swift.swiftpm", isDirectory: true)
+    }
+}
+
 extension ToolOptionsCommand where Self : StreamingCommand {
+
+    /// Extract the skip plugin fingerprint from the `Package.resolved` and add it to the trusted plugins in `~/Library/org.swift.swiftpm/security/plugins.json`
+    func registerPluginFingerprint(for packageResolvedURL: URL) throws {
+        // load the latest skip hash from `Package.resolved` and update it in the `security/plugins.json` file
+        guard let packageResolved = try? JSONDecoder().decode(PackageResolved.self, from: Data(contentsOf: packageResolvedURL)) else {
+            return // tolerate parse failures, since Package.resolved is not an especially stable format
+        }
+
+        guard let skipPin = packageResolved.pins.first(where: { $0.identity == "skip" && $0.kind == "remoteSourceControl" }) else {
+            return
+        }
+
+        //let resolvedSkipVersion = skipPin.state.version
+        let resolvedSkipFingerprint = skipPin.state.revision
+
+        let pluginsFile = swiftPMConfigFolder.appendingPathComponent("security/plugins.json", isDirectory: false)
+        var pluginsContent = try JSONDecoder().decode([PluginSecurity].self, from: (try? Data(contentsOf: pluginsFile)) ?? "[]".utf8Data)
+        let originalPluginsContent = pluginsContent
+        func isSkipPlugin(_ fingerprint: PluginSecurity) -> Bool {
+            fingerprint.packageIdentity == "skip" && fingerprint.targetName == "skipstone"
+        }
+        var skipPlugin = pluginsContent.first(where: isSkipPlugin) ?? PluginSecurity(fingerprint: "", packageIdentity: "skip", targetName: "skipstone")
+        if skipPlugin.fingerprint == resolvedSkipFingerprint {
+            return // no change in latest plugin fingerprint
+        }
+        skipPlugin.fingerprint = resolvedSkipFingerprint
+
+        pluginsContent = pluginsContent.filter { !isSkipPlugin($0) } + [skipPlugin]
+
+        pluginsContent.sort { $0.packageIdentity < $1.packageIdentity }
+
+        // if there were no changes, do not write out any changes
+        if Set(pluginsContent) == Set(originalPluginsContent) { return }
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+        let pluginsContentData = try encoder.encode(pluginsContent)
+        try pluginsContentData.write(to: try pluginsFile.createParentDirectory())
+    }
+
     /// Run swift package dump-package and return the parsed JSON results
     func parseSwiftPackage(with out: MessageQueue, at projectPath: String, swift swiftCommand: String = "swift") async throws -> PackageManifest {
         try await decodeCommand(with: out, title: "Check Swift Package", cmd: [swiftCommand, "package", "dump-package", "--package-path", projectPath]).get()
@@ -1238,8 +1288,25 @@ public struct PackageManifest : Hashable, Decodable {
 /// An incomplete representation of Package.resolved JSON.
 public struct PackageResolved : Hashable, Decodable {
     public var version: Int
+    public var originHash: String?
     public var pins: [Pin]
 
+    /**
+     A package pin. E.g.:
+
+     ```
+     {
+           "identity" : "skip",
+           "kind" : "remoteSourceControl",
+           "location" : "https://source.skip.tools/skip.git",
+           "state" : {
+             "revision" : "18aba366924bf622d047b97f3249560e1471cc25",
+             "version" : "1.5.21"
+           }
+         }
+     }
+     ```
+     */
     public struct Pin : Hashable, Decodable {
         public var identity: String
         public var kind: String
@@ -1251,6 +1318,30 @@ public struct PackageResolved : Hashable, Decodable {
             public var version: String
         }
     }
+}
+
+/**
+ The `~/Library/org.swift.swiftpm/security/plugins.json` file with hashes for trusted plugins, e.g.:
+
+ ```
+ [
+   {
+     "fingerprint" : "18aba366924bf622d047b97f3249560e1471cc25",
+     "packageIdentity" : "skip",
+     "targetName" : "skipstone"
+   },
+   {
+     "fingerprint" : "755c0ec69bd667aa4e8ba50c8b710585d302879e",
+     "packageIdentity" : "swift-openapi-generator",
+     "targetName" : "OpenAPIGenerator"
+   }
+ ]
+ ```
+ */
+public struct PluginSecurity : Hashable, Codable {
+    public var fingerprint: String
+    public var packageIdentity: String
+    public var targetName: String
 }
 
 

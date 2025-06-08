@@ -1637,8 +1637,8 @@ class AppProjectLayout : FrameworkProjectLayout {
         self.testsFolder = root.resolve("Tests/", check: optional) // Tests are optional
         self.moduleTestsFolder = testsFolder.resolve(moduleName + "Tests/", check: optional)
 
-        self.workspaceFolder = try root.resolve("Project.xcworkspace/", check: check)
-        self.workspaceContents = try workspaceFolder.resolve("contents.xcworkspacedata", check: check)
+        self.workspaceFolder = root.resolve("Project.xcworkspace/", check: optional)
+        self.workspaceContents = workspaceFolder.resolve("contents.xcworkspacedata", check: optional)
 
         self.darwinFolder = try root.resolve("Darwin/", check: check)
         self.darwinREADME = darwinFolder.resolve("README.md", check: optional)
