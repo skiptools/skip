@@ -36,7 +36,7 @@ jobs:
       - name: Setup SKIPLOCAL
         run: |
           echo "SKIPLOCAL=$PWD/skipstone" >> $GITHUB_ENV
-          echo "PATH=$PWD/skip/.build/plugins/tools/debug:$PATH" >> $GITHUB_ENV
+          echo "PATH=$PWD/skip/.build/plugins/tools/debug:$PWD/skip/.build/debug:$PATH" >> $GITHUB_ENV
 
       - name: Build Skip
         working-directory: skip

@@ -1154,7 +1154,7 @@ class SkipCommandTests : XCTestCase {
         var skiptools = [
             ".build/artifacts/skip/skip/skip.artifactbundle/macos/skip",
             ".build/plugins/tools/debug/skip", // the SKIPLOCAL build path macOS 14-
-            ".build/arm64-apple-macosx/debug/skip", // the SKIPLOCAL build path macOS 15+
+            ".build/debug/skip", // the SKIPLOCAL build path macOS 15+
         ]
 
         // when running tests from Xcode, we need to use the tool download folder, which seems to be placed in one of the environment property `__XCODE_BUILT_PRODUCTS_DIR_PATHS`, so check those folders and override if skip is found
