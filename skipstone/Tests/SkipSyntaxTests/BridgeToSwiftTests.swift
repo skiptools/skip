@@ -614,8 +614,8 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -678,8 +678,8 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -1254,8 +1254,8 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -1496,8 +1496,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -1563,11 +1563,11 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         open class C: BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            public init(Java_peer: JObject) {
+            nonisolated public init(Java_peer: JObject) {
                 self.Java_peer = Java_peer
             }
             public init() {
@@ -1701,8 +1701,8 @@ final class BridgeToSwiftTests: XCTestCase {
         extension A {
             public final class B: BridgedFromKotlin, BridgedFinalClass {
                 nonisolated private static let Java_class = try! JClass(name: "A$B")
-                public let Java_peer: JObject
-                public required init(Java_ptr: JavaObjectPointer) {
+                nonisolated public let Java_peer: JObject
+                nonisolated public required init(Java_ptr: JavaObjectPointer) {
                     Java_peer = JObject(Java_ptr)
                 }
                 public init() {
@@ -1729,8 +1729,8 @@ final class BridgeToSwiftTests: XCTestCase {
         extension A.B {
             public struct C: BridgedFromKotlin {
                 nonisolated private static let Java_class = try! JClass(name: "A$B$C")
-                public var Java_peer: JObject
-                public init(Java_ptr: JavaObjectPointer) {
+                nonisolated public var Java_peer: JObject
+                nonisolated public init(Java_ptr: JavaObjectPointer) {
                     Java_peer = JObject(Java_ptr)
                 }
                 nonisolated private static let Java_scopy_methodID = Java_class.getMethodID(name: "scopy", sig: "()Lskip/lib/MutableStruct;")!
@@ -1800,8 +1800,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
@@ -1842,8 +1842,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
@@ -1893,8 +1893,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
@@ -1952,8 +1952,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -1999,8 +1999,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -2048,8 +2048,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -2114,8 +2114,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -2180,8 +2180,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -2240,8 +2240,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -2289,8 +2289,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -2357,8 +2357,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -2431,8 +2431,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -2511,8 +2511,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: Equatable, Hashable, Comparable, BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -2619,8 +2619,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public struct S: Hashable, BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "S")
-            public var Java_peer: JObject
-            public init(Java_ptr: JavaObjectPointer) {
+            nonisolated public var Java_peer: JObject
+            nonisolated public init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public static func ==(lhs: S, rhs: S) -> Bool {
@@ -2723,8 +2723,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -2838,11 +2838,11 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public class Base: BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "Base")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            public init(Java_peer: JObject) {
+            nonisolated public init(Java_peer: JObject) {
                 self.Java_peer = Java_peer
             }
             nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
@@ -2886,10 +2886,10 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         public class Sub1: Base {
             nonisolated private static let Java_class = try! JClass(name: "Sub1")
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 super.init(Java_ptr: Java_ptr)
             }
-            public override init(Java_peer: JObject) {
+            nonisolated public override init(Java_peer: JObject) {
                 super.init(Java_peer: Java_peer)
             }
         
@@ -2929,10 +2929,10 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         public class Sub2: Base {
             nonisolated private static let Java_class = try! JClass(name: "Sub2")
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 super.init(Java_ptr: Java_ptr)
             }
-            public override init(Java_peer: JObject) {
+            nonisolated public override init(Java_peer: JObject) {
                 super.init(Java_peer: Java_peer)
             }
         
@@ -3003,11 +3003,11 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public class Base: BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "Base")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            public init(Java_peer: JObject) {
+            nonisolated public init(Java_peer: JObject) {
                 self.Java_peer = Java_peer
             }
             public init() {
@@ -3032,10 +3032,10 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         public class Sub: Base {
             nonisolated private static let Java_class = try! JClass(name: "Sub")
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 super.init(Java_ptr: Java_ptr)
             }
-            public override init(Java_peer: JObject) {
+            nonisolated public override init(Java_peer: JObject) {
                 super.init(Java_peer: Java_peer)
             }
             public init() {
@@ -3125,11 +3125,11 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public class Sub1: BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "Sub1")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            public init(Java_peer: JObject) {
+            nonisolated public init(Java_peer: JObject) {
                 self.Java_peer = Java_peer
             }
             nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
@@ -3174,11 +3174,11 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         public class Sub2: BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "Sub2")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            public init(Java_peer: JObject) {
+            nonisolated public init(Java_peer: JObject) {
                 self.Java_peer = Java_peer
             }
             nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
@@ -3273,8 +3273,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public struct S: BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "S")
-            public var Java_peer: JObject
-            public init(Java_ptr: JavaObjectPointer) {
+            nonisolated public var Java_peer: JObject
+            nonisolated public init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             nonisolated private static let Java_scopy_methodID = Java_class.getMethodID(name: "scopy", sig: "()Lskip/lib/MutableStruct;")!
@@ -3366,8 +3366,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public struct S: BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "S")
-            public var Java_peer: JObject
-            public init(Java_ptr: JavaObjectPointer) {
+            nonisolated public var Java_peer: JObject
+            nonisolated public init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             nonisolated private static let Java_scopy_methodID = Java_class.getMethodID(name: "scopy", sig: "()Lskip/lib/MutableStruct;")!
@@ -3446,8 +3446,8 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         public final class P_BridgeImpl: P, BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "P")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public var i: Int {
@@ -3482,8 +3482,8 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         public final class C: P, BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -3550,8 +3550,8 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         public final class P_BridgeImpl: P, BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "P")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
@@ -3563,8 +3563,8 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -3660,8 +3660,8 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         public final class P_BridgeImpl: P, BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "P")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public func a(i p_0: Int) -> Int {
@@ -3782,7 +3782,7 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public enum E: Int, BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "E")
-            private var Java_peer: JavaObjectPointer {
+            nonisolated private var Java_peer: JavaObjectPointer {
                 return toJavaObject(options: [])!
             }
             nonisolated private static let Java_Companion_class = try! JClass(name: "E$Companion")
@@ -3878,8 +3878,8 @@ final class BridgeToSwiftTests: XCTestCase {
         extension E {
             public struct S: BridgedFromKotlin {
                 nonisolated private static let Java_class = try! JClass(name: "E$S")
-                public var Java_peer: JObject
-                public init(Java_ptr: JavaObjectPointer) {
+                nonisolated public var Java_peer: JObject
+                nonisolated public init(Java_ptr: JavaObjectPointer) {
                     Java_peer = JObject(Java_ptr)
                 }
                 public init() {
@@ -3949,7 +3949,7 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public enum E: BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "E")
-            private var Java_peer: JavaObjectPointer {
+            nonisolated private var Java_peer: JavaObjectPointer {
                 return toJavaObject(options: [])!
             }
             nonisolated private static let Java_Companion_class = try! JClass(name: "E$Companion")
@@ -4043,11 +4043,11 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public class C: BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            public init(Java_peer: JObject) {
+            nonisolated public init(Java_peer: JObject) {
                 self.Java_peer = Java_peer
             }
             public init() {
@@ -4113,8 +4113,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -4172,8 +4172,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public final class C: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -4385,7 +4385,7 @@ final class BridgeToSwiftTests: XCTestCase {
         public actor A: BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "A")
             nonisolated public let Java_peer: JObject
-            public init(Java_ptr: JavaObjectPointer) {
+            nonisolated public init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -4497,8 +4497,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public struct CustomError: BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "CustomError")
-            public var Java_peer: JObject
-            public init(Java_ptr: JavaObjectPointer) {
+            nonisolated public var Java_peer: JObject
+            nonisolated public init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -4556,7 +4556,7 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public enum E: BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "E")
-            private var Java_peer: JavaObjectPointer {
+            nonisolated private var Java_peer: JavaObjectPointer {
                 return toJavaObject(options: [])!
             }
             nonisolated private static let Java_Companion_class = try! JClass(name: "E$Companion")
@@ -4652,11 +4652,11 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public class C<T>: BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static var Java_class: JClass { try! JClass(name: "C") }
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            public init(Java_peer: JObject) {
+            nonisolated public init(Java_peer: JObject) {
                 self.Java_peer = Java_peer
             }
             nonisolated private static var Java_Companion_class: JClass { try! JClass(name: "C$Companion") }
@@ -4781,8 +4781,8 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         public final class P_BridgeImpl: P, BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "P")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
@@ -4794,11 +4794,11 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         public class C<T>: BridgedFromKotlin, BridgedFinalClass where T: P {
             nonisolated private static var Java_class: JClass { try! JClass(name: "C") }
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            public init(Java_peer: JObject) {
+            nonisolated public init(Java_peer: JObject) {
                 self.Java_peer = Java_peer
             }
             nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
@@ -4906,8 +4906,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public struct S<T>: BridgedFromKotlin {
             nonisolated private static var Java_class: JClass { try! JClass(name: "S") }
-            public var Java_peer: JObject
-            public init(Java_ptr: JavaObjectPointer) {
+            nonisolated public var Java_peer: JObject
+            nonisolated public init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             nonisolated private static var Java_scopy_methodID: JavaMethodID { Java_class.getMethodID(name: "scopy", sig: "()Lskip/lib/MutableStruct;")! }
@@ -5017,8 +5017,8 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         public final class P_BridgeImpl<T>: P, BridgedFromKotlin {
             nonisolated private static var Java_class: JClass { try! JClass(name: "P") }
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public func f(p p_0: T) -> T {
@@ -5038,8 +5038,8 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         public final class C: P, BridgedFromKotlin, BridgedFinalClass {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             public init() {
@@ -5119,7 +5119,7 @@ final class BridgeToSwiftTests: XCTestCase {
         """, swiftBridgeSupport: """
         public enum E<T>: BridgedFromKotlin {
             nonisolated private static var Java_class: JClass { try! JClass(name: "E") }
-            private var Java_peer: JavaObjectPointer {
+            nonisolated private var Java_peer: JavaObjectPointer {
                 return toJavaObject(options: [])!
             }
             nonisolated private static var Java_Companion_class: JClass { try! JClass(name: "E$Companion") }
@@ -5227,8 +5227,8 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         public final class P_BridgeImpl: P, BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "P")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
@@ -5240,11 +5240,11 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         public class C: BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "C")
-            public let Java_peer: JObject
-            public required init(Java_ptr: JavaObjectPointer) {
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
-            public init(Java_peer: JObject) {
+            nonisolated public init(Java_peer: JObject) {
                 self.Java_peer = Java_peer
             }
             public init() {
@@ -5439,8 +5439,8 @@ final class BridgeToSwiftTests: XCTestCase {
         import SkipFuseUI
         public struct V: SkipUI.View, SkipSwiftUI.View, SkipSwiftUI.SkipUIBridging, BridgedFromKotlin {
             nonisolated private static let Java_class = try! JClass(name: "V")
-            public var Java_peer: JObject
-            public init(Java_ptr: JavaObjectPointer) {
+            nonisolated public var Java_peer: JObject
+            nonisolated public init(Java_ptr: JavaObjectPointer) {
                 Java_peer = JObject(Java_ptr)
             }
             nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
@@ -5450,7 +5450,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 return Java_peer.safePointer()
             }
             public typealias Body = Never
-            public var Java_view: any SkipUI.View {
+            nonisolated public var Java_view: any SkipUI.View {
                 return self
             }
 

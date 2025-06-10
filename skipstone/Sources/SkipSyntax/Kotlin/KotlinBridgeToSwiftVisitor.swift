@@ -921,7 +921,7 @@ final class KotlinBridgeToSwiftVisitor {
         var isView = false
         let inherits = typeInfos.flatMap(\.inherits).flatMap { (inherit: TypeSignature) -> [TypeSignature] in
             let inherit = inherit.withGenerics([])
-            if inherit.isView, codebaseInfo.global.moduleName != "SkipUI" {
+            if inherit.swiftUIType == .view, codebaseInfo.global.moduleName != "SkipUI" {
                 isView = true
                 return [.skipUIView, .skipSwiftUIView, .skipSwiftUIBridging]
             }
@@ -1028,14 +1028,14 @@ final class KotlinBridgeToSwiftVisitor {
         }
         if !isEmptyEnum {
             if isEnum {
-                swift.append(1, "private var Java_peer: JavaObjectPointer {")
+                swift.append(1, "nonisolated private var Java_peer: JavaObjectPointer {")
                 swift.append(2, "return toJavaObject(options: \(optionsString))!")
                 swift.append(1, "}")
             } else {
                 if !isBridgedSubclass {
-                    swift.append(1, "\(isActor ? "nonisolated " : "")\(finalMemberVisibilityString)\(isStruct ? "var" : "let") Java_peer: JObject")
+                    swift.append(1, "nonisolated \(finalMemberVisibilityString)\(isStruct ? "var" : "let") Java_peer: JObject")
                 }
-                swift.append(1, "\(finalMemberVisibilityString)\(isStruct || isActor ? "" : "required ")init(Java_ptr: JavaObjectPointer) {")
+                swift.append(1, "nonisolated \(finalMemberVisibilityString)\(isStruct || isActor ? "" : "required ")init(Java_ptr: JavaObjectPointer) {")
                 if isBridgedSubclass {
                     swift.append(2, "super.init(Java_ptr: Java_ptr)")
                 } else {
@@ -1046,10 +1046,10 @@ final class KotlinBridgeToSwiftVisitor {
                 if primaryTypeInfo.declarationType == .classDeclaration && (isBridgedSubclass || !primaryTypeInfo.modifiers.isFinal) {
                     // Create a constructor allowing subclasses to set the peer directly
                     if isBridgedSubclass {
-                        swift.append(1, "\(finalMemberVisibilityString)override init(Java_peer: JObject) {")
+                        swift.append(1, "nonisolated \(finalMemberVisibilityString)override init(Java_peer: JObject) {")
                         swift.append(2, "super.init(Java_peer: Java_peer)")
                     } else {
-                        swift.append(1, "\(finalMemberVisibilityString)init(Java_peer: JObject) {")
+                        swift.append(1, "nonisolated \(finalMemberVisibilityString)init(Java_peer: JObject) {")
                         swift.append(2, "self.Java_peer = Java_peer")
                     }
                     swift.append(1, "}")
@@ -1108,7 +1108,7 @@ final class KotlinBridgeToSwiftVisitor {
         }
         if isView {
             swift.append(1, "\(finalMemberVisibilityString)typealias Body = Never")
-            swift.append(1, "\(finalMemberVisibilityString)var Java_view: any SkipUI.View {")
+            swift.append(1, "nonisolated \(finalMemberVisibilityString)var Java_view: any SkipUI.View {")
             swift.append(2, "return self")
             swift.append(1, "}")
         }
@@ -1457,8 +1457,8 @@ final class KotlinBridgeToSwiftVisitor {
 
         let classRef = JavaClassRef(for: type, packageName: packageName)
         swift.append(1, classRef.declaration())
-        swift.append(1, "\(visibilityString)let Java_peer: JObject")
-        swift.append(1, "\(visibilityString)required init(Java_ptr: JavaObjectPointer) {")
+        swift.append(1, "nonisolated \(visibilityString)let Java_peer: JObject")
+        swift.append(1, "nonisolated \(visibilityString)required init(Java_ptr: JavaObjectPointer) {")
         swift.append(2, "Java_peer = JObject(Java_ptr)")
         swift.append(1, "}")
 

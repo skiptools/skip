@@ -998,19 +998,18 @@ final class KotlinBridgeToKotlinVisitor {
         }
 
         let isError = classDeclaration.inherits.first?.isNamed("Exception") == true && classDeclaration.inherits.contains { $0.isNamed("Error", moduleName: "Swift", generics: []) }
-        var swiftUIType: SwiftUIType = .none
         let mappedInherits: [TypeSignature] = classDeclaration.inherits.compactMap {
-            guard !includesUI || !$0.isView else {
-                swiftUIType = .view
-                return .skipUIView
-            }
-            guard !includesUI || !$0.isViewModifier else {
-                swiftUIType = .viewModifier
-                return .skipUIViewModifier
-            }
-            guard !includesUI || !$0.isToolbarContent else {
-                swiftUIType = .toolbarContent
-                return .skipUIToolbarContent
+            if includesUI {
+                switch $0.swiftUIType {
+                case .none:
+                    break
+                case .view:
+                    return .skipUIView
+                case .viewModifier:
+                    return .skipUIViewModifier
+                case .toolbarContent:
+                    return .skipUIToolbarContent
+                }
             }
             if (classDeclaration.declarationType == .actorDeclaration && $0.isNamed("Actor"))
                 || (isError && $0.isNamed("Exception"))
@@ -1024,6 +1023,7 @@ final class KotlinBridgeToKotlinVisitor {
                 return nil
             }
         }
+        let swiftUIType = classDeclaration.swiftUIType
         if swiftUIType != .none && classDeclaration.modifiers.visibility == .private {
             classDeclaration.messages.append(.kotlinBridgeViewPrivate(classDeclaration, source: syntaxTree.source))
             return false
@@ -1325,7 +1325,7 @@ final class KotlinBridgeToKotlinVisitor {
         swiftDefinitions.append(swiftDefinition)
 
         if !classDeclaration.generics.isEmpty {
-            swiftDefinitions.append(typeErasedPeerSwift(for: classDeclaration, variableDeclarations: bridgedVariableDeclarations, functionDeclarations: bridgedFunctionDeclarations, swiftUIType: swiftUIType, stateVariables: swiftUIStateVariables, visibility: finalMemberVisibility))
+            swiftDefinitions.append(typeErasedPeerSwift(for: classDeclaration, variableDeclarations: bridgedVariableDeclarations, functionDeclarations: bridgedFunctionDeclarations, stateVariables: swiftUIStateVariables, visibility: finalMemberVisibility))
         }
 
         let customProjection: [String]? = classDeclaration.generics.isEmpty ? nil : [
@@ -1341,13 +1341,13 @@ final class KotlinBridgeToKotlinVisitor {
         return true
     }
 
-    private func typeErasedPeerSwift(for classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], functionDeclarations: [(KotlinFunctionDeclaration, uniquifier: Int?)], swiftUIType: SwiftUIType, stateVariables: [(String, Attributes, Modifiers)], visibility: Modifiers.Visibility) -> SwiftDefinition {
+    private func typeErasedPeerSwift(for classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], functionDeclarations: [(KotlinFunctionDeclaration, uniquifier: Int?)], stateVariables: [(String, Attributes, Modifiers)], visibility: Modifiers.Visibility) -> SwiftDefinition {
         let visibilityString = visibility.swift(suffix: " ")
         var swift: [String] = []
         swift.append("extension \(classDeclaration.signature.withGenerics([])): TypeErasedConvertible {")
         swift.append(1, "nonisolated \(visibilityString)func toTypeErased() -> AnyObject {")
         swift.append(2, "let typeErased = \(classDeclaration.signature.typeErasedClass)(self)")
-        swift.append(2, typeErasedClosureSwift(for: classDeclaration, to: "typeErased", variableDeclarations: variableDeclarations, functionDeclarations: functionDeclarations, swiftUIType: swiftUIType, stateVariables: stateVariables))
+        swift.append(2, typeErasedClosureSwift(for: classDeclaration, to: "typeErased", variableDeclarations: variableDeclarations, functionDeclarations: functionDeclarations, stateVariables: stateVariables))
         swift.append(2, "return typeErased")
         swift.append(1, "}")
         swift.append("}")
@@ -1428,6 +1428,7 @@ final class KotlinBridgeToKotlinVisitor {
             swift.append(1, "var islessthan: (\(mainActorString)(Any) -> Bool)!")
         }
 
+        let swiftUIType = classDeclaration.swiftUIType
         if swiftUIType == .view || swiftUIType == .toolbarContent {
             swift.append(1, "var body: (@MainActor () -> Any)!")
         } else if swiftUIType != .none {
@@ -1447,7 +1448,7 @@ final class KotlinBridgeToKotlinVisitor {
         return SwiftDefinition(swift: swift)
     }
 
-    private func typeErasedClosureSwift(for classDeclaration: KotlinClassDeclaration, to target: String, variableDeclarations: [KotlinVariableDeclaration], functionDeclarations: [(KotlinFunctionDeclaration, uniquifier: Int?)], swiftUIType: SwiftUIType, stateVariables: [(String, Attributes, Modifiers)]) -> [String] {
+    private func typeErasedClosureSwift(for classDeclaration: KotlinClassDeclaration, to target: String, variableDeclarations: [KotlinVariableDeclaration], functionDeclarations: [(KotlinFunctionDeclaration, uniquifier: Int?)], stateVariables: [(String, Attributes, Modifiers)]) -> [String] {
         var swift: [String] = []
         for variableDeclaration in variableDeclarations {
             let tryString = variableDeclaration.apiFlags.throwsType != .none ? "try " : ""
@@ -1521,6 +1522,7 @@ final class KotlinBridgeToKotlinVisitor {
             swift.append(1, "\(target).islessthan = { [unowned \(target)] in (\(target).genericvalue as! Self) < $0 as! Self }")
         }
 
+        let swiftUIType = classDeclaration.swiftUIType
         if swiftUIType == .view || swiftUIType == .toolbarContent {
             swift.append("\(target).body = { [unowned \(target)] in (\(target).genericvalue as! Self).body }")
         } else if swiftUIType != .none {
@@ -1538,7 +1540,7 @@ final class KotlinBridgeToKotlinVisitor {
         return swift
     }
 
-    private func addSwiftUIImplementation(_ swiftUIType: SwiftUIType, to classDeclaration: KotlinClassDeclaration, visibility: Modifiers.Visibility) -> (stateVariables: [(String, Attributes, Modifiers)], statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func addSwiftUIImplementation(_ swiftUIType: TypeSignature.SwiftUIType, to classDeclaration: KotlinClassDeclaration, visibility: Modifiers.Visibility) -> (stateVariables: [(String, Attributes, Modifiers)], statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         var statements: [KotlinStatement] = []
         var swift: [String] = []
         var cdeclFunctions: [CDeclFunction] = []
@@ -1572,11 +1574,11 @@ final class KotlinBridgeToKotlinVisitor {
                         supportTypeName = "StateSupport"
                         boxName = "valueBox"
                     }
-                    (initStatements, initSwift, initCdeclFunctions) = swiftUIInitState(for: name, in: classDeclaration, supportTypeName: supportTypeName, boxName: boxName, attributes: attributes, modifiers: modifiers)
-                    (syncStatements, syncSwift, syncCdeclFunctions) = swiftUISyncState(for: name, in: classDeclaration, supportTypeName: supportTypeName, boxName: boxName, attributes: attributes, modifiers: modifiers)
+                    (initStatements, initSwift, initCdeclFunctions) = swiftUIInitState(swiftUIType, for: name, in: classDeclaration, supportTypeName: supportTypeName, boxName: boxName, attributes: attributes, modifiers: modifiers)
+                    (syncStatements, syncSwift, syncCdeclFunctions) = swiftUISyncState(swiftUIType, for: name, in: classDeclaration, supportTypeName: supportTypeName, boxName: boxName, attributes: attributes, modifiers: modifiers)
                 } else if attributes.environmentAttribute != nil {
-                    (initStatements, initSwift, initCdeclFunctions) = swiftUIInitEnvironment(for: name, in: classDeclaration, attributes: attributes, modifiers: modifiers)
-                    (syncStatements, syncSwift, syncCdeclFunctions) = swiftUISyncEnvironment(for: name, in: classDeclaration, attributes: attributes, modifiers: modifiers)
+                    (initStatements, initSwift, initCdeclFunctions) = swiftUIInitEnvironment(swiftUIType, for: name, in: classDeclaration, attributes: attributes, modifiers: modifiers)
+                    (syncStatements, syncSwift, syncCdeclFunctions) = swiftUISyncEnvironment(swiftUIType, for: name, in: classDeclaration, attributes: attributes, modifiers: modifiers)
                 }
                 statements += initStatements + syncStatements
                 swift += initSwift + syncSwift
@@ -1592,7 +1594,7 @@ final class KotlinBridgeToKotlinVisitor {
         return (stateVariables, statements, swift, cdeclFunctions)
     }
 
-    private func swiftUIComposeContent(_ swiftUIType: SwiftUIType, for classDeclaration: KotlinClassDeclaration, stateVariables: [(name: String, attributes: Attributes, modifiers: Modifiers)]) -> [KotlinStatement] {
+    private func swiftUIComposeContent(_ swiftUIType: TypeSignature.SwiftUIType, for classDeclaration: KotlinClassDeclaration, stateVariables: [(name: String, attributes: Attributes, modifiers: Modifiers)]) -> [KotlinStatement] {
         let functionName = swiftUIType == .view || swiftUIType == .toolbarContent ? "ComposeContent" : "Compose"
         let functionDeclaration = KotlinFunctionDeclaration(name: functionName)
         if swiftUIType == .view || swiftUIType == .toolbarContent {
@@ -1626,7 +1628,7 @@ final class KotlinBridgeToKotlinVisitor {
         return [functionDeclaration]
     }
 
-    private func swiftUIInitState(for name: String, in classDeclaration: KotlinClassDeclaration, supportTypeName: String, boxName: String, attributes: Attributes, modifiers: Modifiers) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func swiftUIInitState(_ swiftUIType: TypeSignature.SwiftUIType, for name: String, in classDeclaration: KotlinClassDeclaration, supportTypeName: String, boxName: String, attributes: Attributes, modifiers: Modifiers) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let classType = ClassType(classDeclaration)
         let externalName = "Swift_initState_\(name)"
         let externalSourceCode = "private external fun \(externalName)(\(classType.peerExternalParameter)): skip.ui.\(supportTypeName)"
@@ -1634,8 +1636,8 @@ final class KotlinBridgeToKotlinVisitor {
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
-        let mainActorString = attributes.contains(.mainActor) ? "@MainActor " : ""
-        source.append("\(mainActorString)func Java_initState_\(name)() -> SkipUI.\(supportTypeName) {")
+        let isolationString = modifiers.isNonisolated ? "nonisolated " : ""
+        source.append("\(isolationString)func Java_initState_\(name)() -> SkipUI.\(supportTypeName) {")
         source.append(1, "return $\(name).\(boxName)!.Java_initStateSupport()")
         source.append("}")
 
@@ -1649,7 +1651,7 @@ final class KotlinBridgeToKotlinVisitor {
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
-    private func swiftUISyncState(for name: String, in classDeclaration: KotlinClassDeclaration, supportTypeName: String, boxName: String, attributes: Attributes, modifiers: Modifiers) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func swiftUISyncState(_ swiftUIType: TypeSignature.SwiftUIType, for name: String, in classDeclaration: KotlinClassDeclaration, supportTypeName: String, boxName: String, attributes: Attributes, modifiers: Modifiers) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let classType = ClassType(classDeclaration)
         let externalName = "Swift_syncState_\(name)"
         let externalSourceCode = "private external fun \(externalName)(\(classType.peerExternalParameter), support: skip.ui.\(supportTypeName))"
@@ -1657,8 +1659,8 @@ final class KotlinBridgeToKotlinVisitor {
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
-        let mainActorString = attributes.contains(.mainActor) ? "@MainActor " : ""
-        source.append("\(mainActorString)func Java_syncState_\(name)(support: SkipUI.\(supportTypeName)) {")
+        let isolationString = modifiers.isNonisolated ? "nonisolated " : ""
+        source.append("\(isolationString)func Java_syncState_\(name)(support: SkipUI.\(supportTypeName)) {")
         source.append(1, "$\(name).\(boxName)!.Java_syncStateSupport(support)")
         source.append("}")
 
@@ -1674,7 +1676,7 @@ final class KotlinBridgeToKotlinVisitor {
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
-    private func swiftUIInitEnvironment(for name: String, in classDeclaration: KotlinClassDeclaration, attributes: Attributes, modifiers: Modifiers) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func swiftUIInitEnvironment(_ swiftUIType: TypeSignature.SwiftUIType, for name: String, in classDeclaration: KotlinClassDeclaration, attributes: Attributes, modifiers: Modifiers) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let classType = ClassType(classDeclaration)
         let externalName = "Swift_initEnvironment_\(name)"
         let externalSourceCode = "private external fun \(externalName)(\(classType.peerExternalParameter)): String"
@@ -1682,8 +1684,8 @@ final class KotlinBridgeToKotlinVisitor {
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
-        let mainActorString = attributes.contains(.mainActor) ? "@MainActor " : ""
-        source.append("\(mainActorString)func Java_initEnvironment_\(name)() -> String {")
+        let isolationString = modifiers.isNonisolated ? "nonisolated " : ""
+        source.append("\(isolationString)func Java_initEnvironment_\(name)() -> String {")
         source.append(1, "return $\(name).key")
         source.append("}")
 
@@ -1697,7 +1699,7 @@ final class KotlinBridgeToKotlinVisitor {
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
-    private func swiftUISyncEnvironment(for name: String, in classDeclaration: KotlinClassDeclaration, attributes: Attributes, modifiers: Modifiers) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func swiftUISyncEnvironment(_ swiftUIType: TypeSignature.SwiftUIType, for name: String, in classDeclaration: KotlinClassDeclaration, attributes: Attributes, modifiers: Modifiers) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let classType = ClassType(classDeclaration)
         let externalName = "Swift_syncEnvironment_\(name)"
         let externalSourceCode = "private external fun \(externalName)(\(classType.peerExternalParameter), support: skip.ui.EnvironmentSupport?)"
@@ -1705,8 +1707,8 @@ final class KotlinBridgeToKotlinVisitor {
         externalFunctionDeclaration.parent = classDeclaration
 
         var source: [String] = []
-        let mainActorString = attributes.contains(.mainActor) ? "@MainActor " : ""
-        source.append("\(mainActorString)func Java_syncEnvironment_\(name)(support: SkipUI.EnvironmentSupport?) {")
+        let isolationString = modifiers.isNonisolated ? "nonisolated " : ""
+        source.append("\(isolationString)func Java_syncEnvironment_\(name)(support: SkipUI.EnvironmentSupport?) {")
         source.append(1, "$\(name).Java_syncEnvironmentSupport(support)")
         source.append("}")
 
@@ -1722,7 +1724,7 @@ final class KotlinBridgeToKotlinVisitor {
         return ([externalFunctionDeclaration], source, [cdeclFunction])
     }
 
-    private func swiftUIBodyImplementation(_ swiftUIType: SwiftUIType, for classDeclaration: KotlinClassDeclaration, visibility: Modifiers.Visibility) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
+    private func swiftUIBodyImplementation(_ swiftUIType: TypeSignature.SwiftUIType, for classDeclaration: KotlinClassDeclaration, visibility: Modifiers.Visibility) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let classType = ClassType(classDeclaration)
         let externalName = "Swift_composableBody"
         let externalParameters = swiftUIType == .view || swiftUIType == .toolbarContent ? classType.peerExternalParameter : "\(classType.peerExternalParameter), content: skip.ui.View"
@@ -1879,11 +1881,16 @@ private enum ClassType : Equatable {
     }
 }
 
-private enum SwiftUIType : Equatable {
-    case none
-    case view
-    case viewModifier
-    case toolbarContent
+private extension KotlinClassDeclaration {
+    var swiftUIType: TypeSignature.SwiftUIType {
+        for inherit in inherits {
+            let swiftUIType = inherit.swiftUIType
+            guard swiftUIType == .none else {
+                return swiftUIType
+            }
+        }
+        return .none
+    }
 }
 
 private extension KotlinVariableDeclaration {
@@ -1935,5 +1942,14 @@ private func isMainActorIsolated(in classDeclaration: KotlinClassDeclaration?, a
     guard !attributes.contains(.mainActor) else {
         return true
     }
-    return classDeclaration?.attributes.contains(.mainActor) == true && !isAsync
+    guard !isAsync else {
+        return false
+    }
+    guard classDeclaration?.attributes.contains(.mainActor) != true else {
+        return true
+    }
+    guard let swiftUIType = classDeclaration?.swiftUIType else {
+        return false
+    }
+    return swiftUIType != .none
 }
