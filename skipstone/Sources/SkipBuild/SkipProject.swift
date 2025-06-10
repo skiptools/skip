@@ -2304,7 +2304,6 @@ class AppMainDelegate: NSObject, AppMainDelegateBase {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
         AppDelegate.shared.onLaunch()
-        application.registerForRemoteNotifications()
         return true
     }
 
@@ -2369,17 +2368,10 @@ let logger: Logger = Logger(subsystem: "\(appid)", category: "\(primaryModuleNam
 
     \(skipBridge)public func onInit() {
         logger.debug("onInit")
-
-        // Uncomment to configure Firebase and notifications
-        //FirebaseApp.configure()
-        //Messaging.messaging().delegate = messageDelegate
-        //UNUserNotificationCenter.current().delegate = notificationDelegate
     }
 
     \(skipBridge)public func onLaunch() {
         logger.debug("onLaunch")
-        // Ask for permissions at a time appropriate for your app
-        //notificationDelegate.requestPermission()
     }
 
     \(skipBridge)public func onResume() {
@@ -3484,8 +3476,6 @@ open class MainActivity: AppCompatActivity {
             }
         }
 
-        // when using Messaging, uncomment to register for message receipt
-        //Messaging.messaging().onActivityCreated(this)
         AppDelegate.shared.onLaunch()
 
         // Example of requesting permissions on startup.
