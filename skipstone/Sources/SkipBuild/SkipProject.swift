@@ -2256,6 +2256,9 @@ New features and better performance.
 \(sourceHeader)import SwiftUI
 import \(primaryModuleName)
 
+private typealias AppRootView = \(primaryModuleName)RootView
+private typealias AppDelegate = \(primaryModuleName)AppDelegate
+
 /// The entry point to the app simply loads the App implementation from SPM module.
 @main struct AppMain: App {
     @AppDelegateAdaptor(AppMainDelegate.self) var appDelegate
@@ -2263,7 +2266,7 @@ import \(primaryModuleName)
 
     var body: some Scene {
         WindowGroup {
-            \(primaryModuleName)RootView()
+            AppRootView()
         }
         .onChange(of: scenePhase) { oldPhase, newPhase in
             switch newPhase {
@@ -2280,7 +2283,6 @@ import \(primaryModuleName)
     }
 }
 
-typealias AppDelegate = \(primaryModuleName)AppDelegate
 #if canImport(UIKit)
 typealias AppDelegateAdaptor = UIApplicationDelegateAdaptor
 typealias AppMainDelegateBase = UIApplicationDelegate
@@ -2296,7 +2298,13 @@ class AppMainDelegate: NSObject, AppMainDelegateBase {
 
     #if canImport(UIKit)
     func application(_ application: UIApplication, willFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
-        AppDelegate.shared.onStart()
+        AppDelegate.shared.onInit()
+        return true
+    }
+
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+        AppDelegate.shared.onLaunch()
+        application.registerForRemoteNotifications()
         return true
     }
 
@@ -2309,7 +2317,11 @@ class AppMainDelegate: NSObject, AppMainDelegateBase {
     }
     #elseif canImport(AppKit)
     func applicationWillFinishLaunching(_ notification: Notification) {
-        AppDelegate.shared.onStart()
+        AppDelegate.shared.onInit()
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        AppDelegate.shared.onLaunch()
     }
 
     func applicationWillTerminate(_ application: Notification) {
@@ -2355,8 +2367,19 @@ let logger: Logger = Logger(subsystem: "\(appid)", category: "\(primaryModuleNam
     private init() {
     }
 
-    \(skipBridge)public func onStart() {
-        logger.debug("onStart")
+    \(skipBridge)public func onInit() {
+        logger.debug("onInit")
+
+        // Uncomment to configure Firebase and notifications
+        //FirebaseApp.configure()
+        //Messaging.messaging().delegate = messageDelegate
+        //UNUserNotificationCenter.current().delegate = notificationDelegate
+    }
+
+    \(skipBridge)public func onLaunch() {
+        logger.debug("onLaunch")
+        // Ask for permissions at a time appropriate for your app
+        //notificationDelegate.requestPermission()
     }
 
     \(skipBridge)public func onResume() {
@@ -2503,7 +2526,7 @@ struct WelcomeView : View {
                 .foregroundStyle(.red)
                 .scaleEffect(heartBeating ? 1.5 : 1.0)
                 .animation(.easeInOut(duration: 1).repeatForever(), value: heartBeating)
-                .onAppear { heartBeating = true }
+                .task { heartBeating = true }
         }
         .font(.largeTitle)
     }
@@ -3423,6 +3446,9 @@ import androidx.core.app.ActivityCompat
 
 internal val logger: SkipLogger = SkipLogger(subsystem = "\(appModulePackage)", category = "\(appModuleName)")
 
+private typealias AppRootView = \(appModuleName)RootView
+private typealias AppDelegate = \(appModuleName)AppDelegate
+
 /// AndroidAppMain is the `android.app.Application` entry point, and must match `application android:name` in the AndroidMainfest.xml file.
 open class AndroidAppMain: Application {
     constructor() {
@@ -3432,6 +3458,7 @@ open class AndroidAppMain: Application {
         super.onCreate()
         logger.info("starting app")
         ProcessInfo.launch(applicationContext)
+        AppDelegate.shared.onInit()
     }
 
     companion object {
@@ -3457,6 +3484,10 @@ open class MainActivity: AppCompatActivity {
             }
         }
 
+        // when using Messaging, uncomment to register for message receipt
+        //Messaging.messaging().onActivityCreated(this)
+        AppDelegate.shared.onLaunch()
+
         // Example of requesting permissions on startup.
         // These must match the permissions in the AndroidManifest.xml file.
         //let permissions = listOf(
@@ -3470,33 +3501,33 @@ open class MainActivity: AppCompatActivity {
     }
 
     override fun onStart() {
+        logger.info("onStart")
         super.onStart()
-        \(appModuleName)AppDelegate.shared.onStart()
     }
 
     override fun onResume() {
         super.onResume()
-        \(appModuleName)AppDelegate.shared.onResume()
+        AppDelegate.shared.onResume()
     }
 
     override fun onPause() {
         super.onPause()
-        \(appModuleName)AppDelegate.shared.onPause()
+        AppDelegate.shared.onPause()
     }
 
     override fun onStop() {
         super.onStop()
-        \(appModuleName)AppDelegate.shared.onStop()
+        AppDelegate.shared.onStop()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        \(appModuleName)AppDelegate.shared.onDestroy()
+        AppDelegate.shared.onDestroy()
     }
 
     override fun onLowMemory() {
         super.onLowMemory()
-        \(appModuleName)AppDelegate.shared.onLowMemory()
+        AppDelegate.shared.onLowMemory()
     }
 
     override fun onRestart() {
@@ -3527,7 +3558,7 @@ internal fun PresentationRootView(context: ComposeContext) {
     PresentationRoot(defaultColorScheme = colorScheme, context = context) { ctx ->
         val contentContext = ctx.content()
         Box(modifier = ctx.modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            \(appModuleName)RootView().Compose(context = contentContext)
+            AppRootView().Compose(context = contentContext)
         }
     }
 }
