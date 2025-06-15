@@ -2183,7 +2183,6 @@ submission_information({
   "violenceRealisticProlongedGraphicOrSadistic": "NONE",
   "violenceRealistic": "NONE",
   "gambling": false,
-  "seventeenPlus": false,
   "unrestrictedWebAccess": false
 }
 
