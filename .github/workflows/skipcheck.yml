@@ -8,7 +8,13 @@ on:
 jobs:
   skip-init:
     runs-on: macos-15
+    timeout-minutes: 200
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     steps:
+      # larger projects sometimes yield: Unhandled exception. System.IO.IOException: No space left on device : '/Users/runner/runners/…
+      - name: Free Disk Space
+        run: sudo rm -rf /Applications/Xcode_14*.app /Applications/Xcode_15*.app /Applications/Xcode_16.app /Applications/Xcode_16.1.app /Applications/Xcode_16_2.app /Applications/Xcode_16.3.app
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: current
