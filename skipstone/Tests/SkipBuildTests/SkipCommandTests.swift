@@ -59,7 +59,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "zero-project",
             defaultLocalization: "en",
-            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
                 .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
             ],
@@ -106,7 +106,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "tiny-project",
             defaultLocalization: "en",
-            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
                 .library(name: "TeenyModule", type: .dynamic, targets: ["TeenyModule"]),
             ],
@@ -203,7 +203,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "basic-project",
             defaultLocalization: "en",
-            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
                 .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
             ],
@@ -271,7 +271,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "free-project",
             defaultLocalization: "en",
-            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
                 .library(name: "FreeModule", type: .dynamic, targets: ["FreeModule"]),
             ],
@@ -693,7 +693,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "basic-project",
             defaultLocalization: "en",
-            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
                 .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
             ],
@@ -781,7 +781,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "basic-project",
             defaultLocalization: "en",
-            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
                 .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
             ],
@@ -951,7 +951,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "cool-app",
             defaultLocalization: "en",
-            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
                 .library(name: "AppModule\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["AppModule"]),
                 .library(name: "ModelModule", type: .dynamic, targets: ["ModelModule"]),
@@ -1134,7 +1134,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "cool-app",
             defaultLocalization: "en",
-            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
                 .library(name: "AppModule\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["AppModule"]),
                 .library(name: "ModelModule", type: .dynamic, targets: ["ModelModule"]),
@@ -1249,7 +1249,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "cool-app",
             defaultLocalization: "en",
-            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
                 .library(name: "AppModule\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["AppModule"]),
             ],
@@ -1381,7 +1381,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "free-app-app",
             defaultLocalization: "en",
-            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
                 .library(name: "FreeApp", type: .dynamic, targets: ["FreeApp"]),
                 .library(name: "FreeAppModel", type: .dynamic, targets: ["FreeAppModel"]),
@@ -1524,7 +1524,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "cool-app",
             defaultLocalization: "en",
-            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
                 .library(name: "TopModule\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["TopModule"]),
                 .library(name: "MiddleModule", type: .dynamic, targets: ["MiddleModule"]),
@@ -1651,7 +1651,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "cool-app",
             defaultLocalization: "en",
-            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
                 .library(name: "M1\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["M1"]),
                 .library(name: "M2", type: .dynamic, targets: ["M2"]),
@@ -1777,7 +1777,7 @@ final class SkipCommandTests: XCTestCase {
         let package = Package(
             name: "cool-app",
             defaultLocalization: "en",
-            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
                 .library(name: "M1\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["M1"]),
                 .library(name: "M2", type: .dynamic, targets: ["M2"]),

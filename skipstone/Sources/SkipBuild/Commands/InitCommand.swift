@@ -151,8 +151,10 @@ This command will create a conventional Skip app or library project.
         // for now we default to creating tests only when non-native
         let createTests = self.createOptions.moduleTests ?? nativeMode.isEmpty
 
+        let options = createOptions.projectOptionValues(projectName: self.projectName)
+
         let (createdURL, project, _) = try await initSkipProject(
-            baseName: self.projectName,
+            options: options,
             modules: modules,
             resourceFolder: createOptions.resourcePath,
             dir: dir,
@@ -162,21 +164,13 @@ This command will create a conventional Skip app or library project.
             test: buildOptions.test,
             returnHashes: false,
             showTree: self.createOptions.showTree,
-            chain: createOptions.chain,
-            gitRepo: createOptions.gitRepo,
-            free: createOptions.free,
-            appfair: createOptions.appfair,
-            zero: createOptions.zero,
             app: isApp,
             appid: self.appid,
             icon: icon,
             version: self.version,
-            swiftVersion: self.createOptions.swiftVersion ?? nativeMode.swiftVersion,
             nativeMode: nativeMode,
             moduleMode: moduleMode,
             moduleTests: createTests,
-            github: self.createOptions.github,
-            fastlane: self.createOptions.fastlane,
             validatePackage: self.createOptions.validatePackage,
             apk: apk,
             ipa: ipa,
@@ -359,22 +353,24 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         return hashes
     }
 
-    func initSkipProject(baseName: String, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: BuildConfiguration, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, chain: Bool, gitRepo: Bool, free: Bool, appfair: Bool? = nil, zero skipZeroSupport: Bool, app isApp: Bool, appid: String?, appModuleName: String = "app", icon: IconParameters?, version: String?, swiftVersion: String, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests: Bool, github: Bool, fastlane: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
+    func initSkipProject(options: ProjectOptionValues, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: BuildConfiguration, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, app isApp: Bool, appid: String?, appModuleName: String = "app", icon: IconParameters?, version: String?, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
+        var options = options
+        let baseName = options.projectName
 
         // the initial build/test is done with debug configuration regardless of the configuration setting; this is because unit tests don't always run correctly in release mode
         let debugConfiguration = "debug"
         let re = messagePrefix ?? ""
-        let free = appfair == true ? true : free
-        let github = appfair == true ? true : free
+        let free = options.appfair == true ? true : options.free
 
         // the `appfair` flag changed the meaning of `baseName` to be the base name of the project and modules: "Sun-Bow" creates the modules "SunBow" and "SubBowModel" and the appid "io.github.Sun-Bow" and the project name "sun-bow-app"
         var modules = modules
 
-        if appfair == true, !modules.isEmpty {
+        if options.appfair == true, !modules.isEmpty {
             modules[0].dependencies += [PackageModule(organizationName: "appfair", repositoryName: "appfair-app", repositoryVersion: "1.0.0", moduleName: "AppFairUI")]
         }
 
-        let projectName = appfair == true ? baseName.lowercased() + "-app" : baseName
+        let projectName = options.appfair == true ? baseName.lowercased() + "-app" : baseName
+        options.projectName = projectName
 
         let primaryModuleName = modules.first?.moduleName ?? "Module"
 
@@ -384,7 +380,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         // the embedded framework must have a different name from the app name, or else it will try to archive a framework instead of an app
         let primaryModuleFrameworkName = primaryModuleName + AppProjectLayout.appProductSuffix
 
-        let (projectURL, project) = try await AppProjectLayout.createSkipAppProject(projectName: projectName, productName: primaryModuleFrameworkName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, chain: chain, gitRepo: gitRepo, appfair: appfair == true, free: free, zero: skipZeroSupport, app: isApp, appid: appid, icon: icon, version: version, swiftVersion: swiftVersion, nativeMode: nativeMode, moduleMode: moduleMode, moduleTests: moduleTests, github: github, fastlane: fastlane, packageResolved: packageResolvedURL)
+        let (projectURL, project) = try await AppProjectLayout.createSkipAppProject(options: options, productName: primaryModuleFrameworkName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, configuration: configuration, build: build, test: test, app: isApp, appid: appid, icon: icon, version: version, nativeMode: nativeMode, moduleMode: moduleMode, moduleTests: moduleTests, packageResolved: packageResolvedURL)
         let projectPath = try projectURL.absolutePath
 
         if build == true || apk == true {
@@ -417,7 +413,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
             artifactHashes.merge(apkFiles, uniquingKeysWith: { $1 })
         }
 
-        if gitRepo == true {
+        if options.gitRepo == true {
             // https://github.com/skiptools/skip/issues/407
             try await run(with: out, "Initializing git repository", ["git", "-C", projectURL.path, "init"])
             try await run(with: out, "Adding files to git repository", ["git", "-C", projectURL.path, "add", "."])

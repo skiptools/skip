@@ -16,6 +16,26 @@ enum ModuleMode {
     case kotlincompat
 }
 
+struct ProjectOptionValues {
+    var projectName: String
+    var swiftVersion: String
+    var iOSMinVersion: Double
+    var macOSMinVersion: Double?
+    var chain: Bool
+    var gitRepo: Bool
+    var appfair: Bool
+    var free: Bool
+    var zero: Bool
+    var github: Bool
+    var fastlane: Bool
+    
+    /// Prior to iOS 26, the default macOS version is 3 below the iOS version in terms of API compatibility (i.e., iOS 18.0 == macOS 15.0)
+    var macOSMinVersionCalculated: Double {
+        macOSMinVersion ?? (iOSMinVersion < 26.0 ? iOSMinVersion - 3.0 : iOSMinVersion)
+    }
+
+}
+
 func isValidProjectName(_ name: String) -> String? {
     let invalidDesc = "Project name must contain only lower-case letters or a dash"
 
@@ -122,7 +142,8 @@ class FrameworkProjectLayout {
         return pname
     }
 
-    static func createSkipLibrary(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, chain: Bool, gitRepo: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, swiftVersion: String, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests createModuleTests: Bool, packageResolved packageResolvedURL: URL?) throws -> URL {
+    static func createSkipLibrary(options: ProjectOptionValues, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, app: Bool, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests createModuleTests: Bool, packageResolved packageResolvedURL: URL?) throws -> URL {
+        let projectName = options.projectName
         if modules.isEmpty {
             throw InitError(errorDescription: "Must specify at least one module name")
         }
@@ -140,11 +161,11 @@ class FrameworkProjectLayout {
         let sourcesURL = try projectFolderURL.append(path: "Sources", create: true)
 
         // a free app is GPL, a free library is LGPL
-        let sourceHeader = free ? (SourceLicense.defaultLicense(app: app).sourceHeader + "\n\n") : ""
+        let sourceHeader = options.free ? (SourceLicense.defaultLicense(app: app).sourceHeader + "\n\n") : ""
 
         // the part of a target parameter that will only include skip when zero is not set
-        //let skipCondition = skipZeroSupport ? ", condition: skip" : "" // we don't use the condition parameter of target because it excludes
-        let skipPluginArray = skipZeroSupport ? "skipstone" : #"[.plugin(name: "skipstone", package: "skip")]"#
+        //let skipCondition = options.zero ? ", condition: skip" : "" // we don't use the condition parameter of target because it excludes
+        let skipPluginArray = options.zero ? "skipstone" : #"[.plugin(name: "skipstone", package: "skip")]"#
 
         var products = """
             products: [
@@ -163,7 +184,7 @@ class FrameworkProjectLayout {
         let skipPackageVersion = skipVersion
 #endif
         var packageHeader = """
-        // swift-tools-version: \(swiftVersion)
+        // swift-tools-version: \(options.swiftVersion)
 
         """
 
@@ -174,7 +195,7 @@ class FrameworkProjectLayout {
 
         packageHeader += """
         import PackageDescription
-        \(skipZeroSupport ? """
+        \(options.zero ? """
 
         // Set SKIP_ZERO=1 to build without Skip libraries
         let zero = Context.environment["SKIP_ZERO"] != nil
@@ -1204,7 +1225,7 @@ struct TestData : Codable, Hashable {
             }
 
             var moduleDeps: [String] = []
-            if let nextModuleName = nextModuleName, chain == true {
+            if let nextModuleName = nextModuleName, options.chain == true {
                 moduleDeps.append("\"" + nextModuleName + "\"") // the internal module names are just referred to by string
             }
 
@@ -1217,7 +1238,7 @@ struct TestData : Codable, Hashable {
                     } else {
                         modDeps.append(PackageModule(repositoryName: "skip-ui", moduleName: "SkipUI"))
                     }
-                } else if (isFinalModule || chain == false) && !isDependentNativeModule {
+                } else if (isFinalModule || options.chain == false) && !isDependentNativeModule {
                     // only add SkipFoundation to the innermost module
                     if isNativeModule {
                         modDeps.append(PackageModule(repositoryName: "skip-fuse", moduleName: "SkipFuse"))
@@ -1282,14 +1303,14 @@ struct TestData : Codable, Hashable {
             let bracket = { $0.isEmpty ? "[]" : "[\n            " + $0 + "\n        ]" }
             let interModuleDep = moduleDeps.joined(separator: ",\n            ")
             let skipModuleDep = skipModuleDeps.joined(separator: ",\n            ")
-            let zeroSkipModuleCondition = skipZeroSupport && !skipModuleDeps.isEmpty ? "(zero ? [] : " + bracket(skipModuleDep) + ")" : bracket(skipModuleDep)
+            let zeroSkipModuleCondition = options.zero && !skipModuleDeps.isEmpty ? "(zero ? [] : " + bracket(skipModuleDep) + ")" : bracket(skipModuleDep)
 
             let moduleDep = !interModuleDep.isEmpty && !skipModuleDep.isEmpty
-                ? (!skipZeroSupport
+                ? (!options.zero
                    ? bracket(interModuleDep + ",\n            " + skipModuleDep)
                    : bracket(interModuleDep) + " + " + zeroSkipModuleCondition)
                 : !skipModuleDep.isEmpty
-                    ? (skipZeroSupport ? zeroSkipModuleCondition : bracket(skipModuleDep))
+                    ? (options.zero ? zeroSkipModuleCondition : bracket(skipModuleDep))
                 : bracket(interModuleDep)
 
             let pluginSuffix = isDependentNativeModule ? "" : ", plugins: \(skipPluginArray)"
@@ -1301,7 +1322,7 @@ struct TestData : Codable, Hashable {
 
             if createTestModule {
                 let skipTestProduct = #".product(name: "SkipTest", package: "skip")"#
-                let skipTestDependency = skipZeroSupport
+                let skipTestDependency = options.zero
                     ? "] + (zero ? [] : [\(skipTestProduct)])"
                     : ",\n            \(skipTestProduct)\n        ]"
 
@@ -1327,7 +1348,7 @@ struct TestData : Codable, Hashable {
         let package = Package(
             name: "\(projectName)",
             defaultLocalization: "en",
-            platforms: [.iOS(.v17), .macOS(.v14), .tvOS(.v17), .watchOS(.v10), .macCatalyst(.v17)],
+            platforms: [.iOS(.v\(Int(options.iOSMinVersion))), .macOS(.v\(Int(options.macOSMinVersionCalculated)))],
         \(products),
         \(dependencies),
         \(targets)
@@ -1352,13 +1373,13 @@ struct TestData : Codable, Hashable {
         var libREADME = """
         # \(primaryModuleName)
 
-        This is a \(free ? "free " : "")[Skip](https://skip.tools) Swift/Kotlin library project containing the following modules:
+        This is a \(options.free ? "free " : "")[Skip](https://skip.tools) Swift/Kotlin library project containing the following modules:
 
         \(modules.map(\.moduleName).joined(separator: "\n"))
 
         ## Building
 
-        This project is a \(free ? "free " : "")Swift Package Manager module that uses the
+        This project is a \(options.free ? "free " : "")Swift Package Manager module that uses the
         [Skip](https://skip.tools) plugin to transpile Swift into Kotlin.
 
         Building the module requires that Skip be installed using
@@ -1378,7 +1399,7 @@ struct TestData : Codable, Hashable {
 
         """
 
-        if free {
+        if options.free {
             libREADME += """
             
             ## License
@@ -1398,7 +1419,7 @@ struct TestData : Codable, Hashable {
         var appREADME = """
         # \(primaryModuleName)
 
-        This is a \(free ? "free " : "")[Skip](https://skip.tools) dual-platform app project.
+        This is a \(options.free ? "free " : "")[Skip](https://skip.tools) dual-platform app project.
         It builds a native app for both iOS and Android.
 
         ## Building
@@ -1441,7 +1462,7 @@ struct TestData : Codable, Hashable {
 
         """
 
-        if free {
+        if options.free {
             appREADME += """
             
             ## License
@@ -1453,7 +1474,7 @@ struct TestData : Codable, Hashable {
 
         try (app ? appREADME : libREADME).write(to: readmeURL, atomically: false, encoding: .utf8)
 
-        if free == true {
+        if options.free == true {
             if app {
                 try licenseGPL2Contents.write(to: projectFolderURL.appending(path: "LICENSE.GPL"), atomically: false, encoding: .utf8)
             } else {
@@ -1685,9 +1706,10 @@ class AppProjectLayout : FrameworkProjectLayout {
         try super.init(root: root, check: check)
     }
 
-    static func createSkipAppProject(projectName: String, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, chain: Bool, gitRepo: Bool, appfair: Bool, free: Bool, zero skipZeroSupport: Bool, app: Bool, appid: String?, icon: IconParameters?, version: String?, swiftVersion: String, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests: Bool, github: Bool, fastlane: Bool, packageResolved packageResolvedURL: URL? = nil) async throws -> (baseURL: URL, project: AppProjectLayout) {
-        let sourceHeader = free ? (SourceLicense.defaultLicense(app: true).sourceHeader + "\n\n") : ""
+    static func createSkipAppProject(options: ProjectOptionValues, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, app: Bool, appid: String?, icon: IconParameters?, version: String?, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests: Bool, packageResolved packageResolvedURL: URL? = nil) async throws -> (baseURL: URL, project: AppProjectLayout) {
+        let sourceHeader = options.free ? (SourceLicense.defaultLicense(app: true).sourceHeader + "\n\n") : ""
 
+        let projectName = options.projectName
         if let invalidProjectName = isValidProjectName(projectName) {
             throw InitError(errorDescription: "\(invalidProjectName): \(projectName)")
         }
@@ -1714,7 +1736,7 @@ class AppProjectLayout : FrameworkProjectLayout {
             }
         }
 
-        let projectURL = try createSkipLibrary(projectName: projectName, productName: productName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, chain: chain, gitRepo: gitRepo, free: free, zero: skipZeroSupport, app: app, swiftVersion: swiftVersion, nativeMode: nativeMode, moduleMode: moduleMode, moduleTests: moduleTests, packageResolved: packageResolvedURL)
+        let projectURL = try createSkipLibrary(options: options, productName: productName, modules: modules, resourceFolder: resourceFolder, dir: outputFolder, app: app, nativeMode: nativeMode, moduleMode: moduleMode, moduleTests: moduleTests, packageResolved: packageResolvedURL)
 
         // the second module should always be imported
         let secondModule = modules.dropFirst().first
@@ -1808,9 +1830,7 @@ ANDROID_PACKAGE_NAME = \(appModulePackage)
         let skipEnvBaseName = "Skip.env"
         let skipEnvFileName = "../\(skipEnvBaseName)"
 
-        let iOSMinVersion = "17.0"
-        let macOSMinVersion = "14.0"
-        let swiftVersionMajor = swiftVersion.split(separator: ".").first ?? "6"
+        let swiftVersionMajor = options.swiftVersion.split(separator: ".").first ?? "6"
 
         // create the top-level ModuleName.xcconfig which is the source or truth for the iOS and Android builds
         let configContents = """
@@ -1842,8 +1862,8 @@ INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphone*] = YES
 INFOPLIST_KEY_UIStatusBarStyle[sdk=iphone*] = UIStatusBarStyleDefault
 INFOPLIST_KEY_UISupportedInterfaceOrientations[sdk=iphone*] = UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown
 
-IPHONEOS_DEPLOYMENT_TARGET = \(iOSMinVersion)
-MACOSX_DEPLOYMENT_TARGET = \(macOSMinVersion)
+IPHONEOS_DEPLOYMENT_TARGET = \(options.iOSMinVersion)
+MACOSX_DEPLOYMENT_TARGET = \(options.macOSMinVersionCalculated)
 SUPPORTS_MACCATALYST = NO
 
 // iPhone + iPad
@@ -1879,7 +1899,7 @@ CODE_SIGN_ENTITLEMENTS = Entitlements.plist
         let xcconfigFileName = appProject.darwinProjectConfig.lastPathComponent
         let _ = xcconfigFileName
 
-        if github {
+        if options.github {
             try createGithubConfig()
         }
 
@@ -1927,7 +1947,7 @@ jobs:
 """.write(to: appProject.githubFolder.appendingPathComponent("workflows/\(projectName).yml").createParentDirectory(), atomically: false, encoding: .utf8)
         }
 
-        if fastlane {
+        if options.fastlane {
             try createFastlaneMetadata()
         }
 
@@ -2403,12 +2423,12 @@ let logger: Logger = Logger(subsystem: "\(appid)", category: "\(primaryModuleNam
         try FileManager.default.createDirectory(at: appModuleApplicationStubFileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try appExtContents.write(to: appModuleApplicationStubFileURL, atomically: false, encoding: .utf8)
 
-        let secondImport = appfair == true ? "\nimport AppFairUI" : ""
+        let secondImport = options.appfair == true ? "\nimport AppFairUI" : ""
         let thirdImport = secondModule.flatMap({ "\nimport \($0.moduleName)" }) ?? ""
         let appOrg = appid.split(separator: ".").last?.description ?? appid
-        let appLink = appfair == true ? "https://github.com/\(appOrg)/\(appOrg)" : "https://skip.tools"
-        let settingsFormView = appfair == true ? "AppFairSettings" : "Form"
-        let demoSettingsCode = appfair == true ? "" : """
+        let appLink = options.appfair == true ? "https://github.com/\(appOrg)/\(appOrg)" : "https://skip.tools"
+        let settingsFormView = options.appfair == true ? "AppFairSettings" : "Form"
+        let demoSettingsCode = options.appfair == true ? "" : """
 
             if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
                let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
@@ -2462,23 +2482,30 @@ struct PlatformHeartView : View {
 """
 
         // the platform-specific view is different between a native app module and a transpiled module
-        let platformHeartView = appfair == true ? "" : isNativeAppModule ? nativeAppModulePlatformView : transpiledAppModulePlatformView
+        let platformHeartView = options.appfair == true ? "" : isNativeAppModule ? nativeAppModulePlatformView : transpiledAppModulePlatformView
 
-        // Sources/Playground/PlaygroundApp.swift
-        let contentViewContents = """
-\(sourceHeader)\(swiftUIImport)\(secondImport)\(thirdImport)
-
-enum ContentTab: String, Hashable {
-    case welcome, home, settings
-}
-
-struct ContentView: View {
-    @AppStorage("tab") var tab = ContentTab.welcome
-    @AppStorage("name") var welcomeName = "Skipper"
-    @AppStorage("appearance") var appearance = ""
-    @State var viewModel = ViewModel()
-
-    var body: some View {
+        let contentViewTabBodyContents: String
+        if options.iOSMinVersion >= 18.0 {
+            // iOS 18+ uses newer Tab construct
+            contentViewTabBodyContents = """
+        TabView(selection: $tab) {
+            Tab("Welcome", systemImage: "heart.fill", value: ContentTab.welcome) {
+                WelcomeView(welcomeName: $welcomeName)
+            }
+            Tab("Home", systemImage: "house.fill", value: ContentTab.home) {
+                NavigationStack {
+                    ItemListView()
+                        .navigationTitle(Text("\\(viewModel.items.count) Items"))
+                }
+            }
+            Tab("Settings", systemImage: "gearshape.fill", value: ContentTab.settings) {
+                SettingsView(appearance: $appearance, welcomeName: $welcomeName)
+                    .navigationTitle("Settings")
+            }
+        }
+"""
+        } else {
+            contentViewTabBodyContents = """
         TabView(selection: $tab) {
             NavigationStack {
                 WelcomeView(welcomeName: $welcomeName)
@@ -2500,6 +2527,25 @@ struct ContentView: View {
             .tabItem { Label("Settings", systemImage: "gearshape.fill") }
             .tag(ContentTab.settings)
         }
+"""
+        }
+
+        // Sources/Playground/PlaygroundApp.swift
+        let contentViewContents = """
+\(sourceHeader)\(swiftUIImport)\(secondImport)\(thirdImport)
+
+enum ContentTab: String, Hashable {
+    case welcome, home, settings
+}
+
+struct ContentView: View {
+    @AppStorage("tab") var tab = ContentTab.welcome
+    @AppStorage("name") var welcomeName = "Skipper"
+    @AppStorage("appearance") var appearance = ""
+    @State var viewModel = ViewModel()
+
+    var body: some View {
+\(contentViewTabBodyContents)
         .environment(viewModel)
         .preferredColorScheme(appearance == "dark" ? .dark : appearance == "light" ? .light : nil)
     }

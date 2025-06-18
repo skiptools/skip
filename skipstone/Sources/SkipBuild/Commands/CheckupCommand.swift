@@ -105,9 +105,11 @@ This command performs a full system checkup to ensure that Skip can create and b
             }
             let runTests = primary && nativeMode.isEmpty
 
+            let options = ProjectOptionValues(projectName: projectName, swiftVersion: nativeMode.swiftVersion, iOSMinVersion: 17.0, chain: true, gitRepo: false, appfair: false, free: true, zero: !isNative, github: true, fastlane: true)
+
             // create a project differently based on the index, but the ultimate binary output should be identical
             return try await initSkipProject(
-                baseName: projectName,
+                options: options,
                 modules: checkupModules,
                 resourceFolder: "Resources",
                 dir: URL(fileURLWithPath: tmpdir, isDirectory: true),
@@ -118,20 +120,13 @@ This command performs a full system checkup to ensure that Skip can create and b
                 returnHashes: doubleCheck,
                 messagePrefix: !primary ? "Re-" : "",
                 showTree: false,
-                chain: true,
-                gitRepo: false,
-                free: true,
-                zero: !isNative,
                 app: true,
                 appid: "skip.hello.App",
                 icon: nil,
                 version: "1.0.0",
-                swiftVersion: nativeMode.swiftVersion,
                 nativeMode: nativeMode,
                 moduleMode: moduleMode,
                 moduleTests: runTests,
-                github: true,
-                fastlane: true,
                 validatePackage: true,
                 packageResolved: packageResolvedURL,
                 apk: true,

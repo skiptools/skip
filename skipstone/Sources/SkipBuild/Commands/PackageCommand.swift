@@ -65,7 +65,13 @@ struct CreateOptions : ParsableArguments {
     var resourcePath: String = "Resources"
 
     @Option(help: ArgumentHelp("Swift version for project"))
-    var swiftVersion: String? = nil
+    var swiftVersion: String = "6.0"
+
+    @Option(help: ArgumentHelp("Minimum iOS version to target"))
+    var iosMinVersion: Double = 17.0
+
+    @Option(help: ArgumentHelp("Minimum macOS version to target"))
+    var macosMinVersion: Double?
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Create library dependencies between modules", valueName: "show"))
     var chain: Bool = true
@@ -134,6 +140,10 @@ struct CreateOptions : ParsableArguments {
             let templateURL = url.appending(path: "releases/latest/download/skip-template-source.zip")
             return templateURL
         }
+    }
+
+    func projectOptionValues(projectName: String) -> ProjectOptionValues {
+        ProjectOptionValues(projectName: projectName, swiftVersion: self.swiftVersion, iOSMinVersion: self.iosMinVersion, macOSMinVersion: self.macosMinVersion, chain: self.chain, gitRepo: self.gitRepo, appfair: self.appfair, free: self.free || self.appfair, zero: self.zero, github: self.github, fastlane: self.fastlane)
     }
 }
 

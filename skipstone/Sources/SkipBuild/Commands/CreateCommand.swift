@@ -220,8 +220,14 @@ Create a new project by following a series of interactive prompts.
 
         let dir = URL(fileURLWithPath: self.createOptions.dir ?? projectName, isDirectory: true)
 
+        var options = createOptions.projectOptionValues(projectName: projectName)
+        // override with options specified interactively
+        options.gitRepo = gitRepo
+        options.free = freeProject
+        options.fastlane = fastlane
+
         let (createdURL, project, _) = try await initSkipProject(
-            baseName: projectName,
+            options: options,
             modules: modules,
             resourceFolder: "Resources",
             dir: dir,
@@ -232,21 +238,13 @@ Create a new project by following a series of interactive prompts.
             returnHashes: false,
             messagePrefix: nil,
             showTree: createOptions.showTree,
-            chain: createOptions.chain,
-            gitRepo: gitRepo,
-            free: freeProject,
-            appfair: nil,
-            zero: createOptions.zero,
             app: isApp,
             appid: appid,
             icon: nil,
-            version: createOptions.swiftVersion,
-            swiftVersion: nativeMode.swiftVersion,
+            version: "1.0.0",
             nativeMode: nativeMode,
             moduleMode: moduleMode,
             moduleTests: createTests ?? true,
-            github: gitRepo,
-            fastlane: fastlane,
             validatePackage: createOptions.validatePackage,
             packageResolved: nil,
             apk: buildProject && isApp,
