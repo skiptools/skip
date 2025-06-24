@@ -3630,7 +3630,7 @@ internal fun PresentationRootView(context: ComposeContext) {
     }
 
     /// the Gradle version string to generate
-    static let gradleVersion = "8.10.2"
+    static let gradleVersion = "8.14.2"
 
     static func defaultGradleWrapperProperties() -> String {
         """
