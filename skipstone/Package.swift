@@ -18,7 +18,7 @@ let package = Package(
         .executable(name: "SkipKey", targets: ["SkipKey"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "600.0.1"),
+        .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "601.0.1"),
         .package(url: "https://github.com/swiftlang/swift-tools-support-core.git", from: "0.6.1"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.8.1"),
