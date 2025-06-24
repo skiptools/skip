@@ -14,7 +14,7 @@ public final class SyntaxTree: PrettyPrintable {
         self.autoBridge = autoBridge
         self.decodeLevel = decodeLevel
         self.preprocessorSymbols = preprocessorSymbols
-        var parser = Parser(source.content, experimentalFeatures: [.sendingArgsAndResults])
+        var parser = Parser(source.content, experimentalFeatures: [])
         let syntax = SourceFileSyntax.parse(from: &parser)
         self.root.statements = StatementDecoder.decode(syntaxListContainer: syntax, context: DecodeContext(), in: self)
 

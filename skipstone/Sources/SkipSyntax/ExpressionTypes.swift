@@ -553,9 +553,15 @@ final class Closure: Expression {
                     type = .weak
                 }
             }
-            let expression = ExpressionDecoder.decode(syntax: item.expression, in: syntaxTree)
-            let label = item.name?.text
-            return (type, LabeledValue(label: label, value: expression))
+            let label = item.name.text
+            let labeledValue: LabeledValue<Expression>
+            if let valueSyntax = item.initializer?.value {
+                let expression = ExpressionDecoder.decode(syntax: valueSyntax, in: syntaxTree)
+                labeledValue = LabeledValue(label: label, value: expression)
+            } else {
+                labeledValue = LabeledValue(label: nil, value: Identifier(name: label))
+            }
+            return (type, labeledValue)
         } ?? []
         let (returnType, parameters, messages) = closureExpr.signature?.typeSignatures(in: syntaxTree) ?? (.none, [], [])
         let attributes = Attributes.for(syntax: closureExpr.signature?.attributes, in: syntaxTree)
@@ -950,7 +956,14 @@ final class Identifier: Expression, APICallExpression {
             name = "super"
         } else if syntax.kind == .genericSpecializationExpr, let specializeExpr = syntax.as(GenericSpecializationExprSyntax.self), specializeExpr.expression.kind == .declReferenceExpr, let identifierExpr = specializeExpr.expression.as(DeclReferenceExprSyntax.self) {
             name = identifierExpr.baseName.text
-            generics = specializeExpr.genericArgumentClause.arguments.map { TypeSignature.for(syntax: $0.argument, in: syntaxTree) }
+            generics = specializeExpr.genericArgumentClause.arguments.compactMap {
+                switch $0.argument {
+                case .type(let typeSyntax):
+                    return TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
+                default:
+                    return nil
+                }
+            }
         } else {
             return nil
         }
@@ -1343,7 +1356,14 @@ final class MemberAccess: Expression, APICallExpression, MemberAccessExpression 
         var generics: [TypeSignature]? = nil
         if syntax.kind == .genericSpecializationExpr, let specializeExpr = syntax.as(GenericSpecializationExprSyntax.self), specializeExpr.expression.kind == .memberAccessExpr {
             syntax = specializeExpr.expression
-            generics = specializeExpr.genericArgumentClause.arguments.map { TypeSignature.for(syntax: $0.argument, in: syntaxTree) }
+            generics = specializeExpr.genericArgumentClause.arguments.compactMap {
+                switch $0.argument {
+                case .type(let typeSyntax):
+                    return TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
+                default:
+                    return nil
+                }
+            }
         }
         guard syntax.kind == .memberAccessExpr, let memberAccessExpr = syntax.as(MemberAccessExprSyntax.self) else {
             return nil

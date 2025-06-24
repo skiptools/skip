@@ -1662,7 +1662,14 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             let name = simpleType.name.text
             var genericTypes: [TypeSignature] = []
             if let generics = simpleType.genericArgumentClause?.arguments {
-                genericTypes = generics.map { self.for(syntax: $0.argument, in: syntaxTree) }
+                genericTypes = generics.map {
+                    switch $0.argument {
+                    case .type(let typeSyntax):
+                        return self.for(syntax: typeSyntax, in: syntaxTree)
+                    default: // value generics?
+                        return .none
+                    }
+                }
                 guard !genericTypes.contains(.none) else {
                     return .none
                 }
@@ -1728,7 +1735,14 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             let name = memberType.name.text
             var genericTypes: [TypeSignature] = []
             if let generics = memberType.genericArgumentClause?.arguments {
-                genericTypes = generics.map { self.for(syntax: $0.argument, in: syntaxTree) }
+                genericTypes = generics.map {
+                    switch $0.argument {
+                    case .type(let typeSyntax):
+                        return self.for(syntax: typeSyntax, in: syntaxTree)
+                    default: // value generics?
+                        return .none
+                    }
+                }
                 guard !genericTypes.contains(.none) else {
                     return .none
                 }

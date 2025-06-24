@@ -564,7 +564,9 @@ struct Generics: Equatable, Codable {
         for requirementSyntax in whereSyntax.requirements {
             switch requirementSyntax.requirement {
             case .sameTypeRequirement(let syntax):
-                apply(entryType: syntax.leftType, constrainedTo: syntax.rightType, whereEqual: true, in: syntaxTree, messages: &messages)
+                if case .type(let leftTypeSyntax) = syntax.leftType, case .type(let rightTypeSyntax) = syntax.rightType {
+                    apply(entryType: leftTypeSyntax, constrainedTo: rightTypeSyntax, whereEqual: true, in: syntaxTree, messages: &messages)
+                }
             case .conformanceRequirement(let syntax):
                 apply(entryType: syntax.leftType, constrainedTo: syntax.rightType, whereEqual: false, in: syntaxTree, messages: &messages)
             case .layoutRequirement:
