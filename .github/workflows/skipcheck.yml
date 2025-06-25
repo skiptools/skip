@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  skip-init:
+  skip-checks:
     runs-on: macos-15
     timeout-minutes: 200
     env:
@@ -25,8 +25,11 @@ jobs:
           path: ~/Library/Caches/Homebrew
           key: homebrew-packages
 
-      - run: brew install skiptools/skip/skip
-      - run: skip checkup
+      - name: Install Skip
+        run: brew install skiptools/skip/skip || (brew update && brew install skiptools/skip/skip)
+
+      - name: Skip Checkup
+        run: skip checkup
       #- run: skip checkup --verbose --double-check
 
       - run: skip init --transpiled-model demo-module DemoModule

@@ -11,7 +11,7 @@ on:
 #  DEVELOPER_DIR: /Applications/Xcode_16.2.app
 
 jobs:
-  skip-init:
+  skip-ci:
     runs-on: macos-15
     steps:
       - uses: gradle/actions/setup-gradle@v4
