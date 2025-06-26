@@ -178,6 +178,10 @@ final class KotlinBridgeToSwiftVisitor {
         } else {
             bridgableExtends = nil
         }
+        if let annotation = variableDeclaration.preventJVMNameManglingAnnotation() {
+            variableDeclaration.annotations.append(annotation)
+        }
+
         let propertyName = variableDeclaration.preEscapedPropertyName ?? variableDeclaration.propertyName
         let swift: [String]
         if variableDeclaration.isAppendAsFunction {
@@ -206,6 +210,9 @@ final class KotlinBridgeToSwiftVisitor {
         let modifiers = info?.modifiers ?? variableDeclaration.modifiers
         guard !addConstantDefinition(for: variableDeclaration, type: bridgable.type, modifiers: modifiers, to: &swiftDefinitions) else {
             return false
+        }
+        if let annotation = variableDeclaration.preventJVMNameManglingAnnotation() {
+            variableDeclaration.annotations.append(annotation)
         }
         Self.appendCallbackFunction(for: variableDeclaration, bridgable: bridgable, modifiers: modifiers)
         // Don't add Swift for protocol extension members that were merged into Kotlin interface
@@ -493,6 +500,10 @@ final class KotlinBridgeToSwiftVisitor {
         } else {
             bridgableExtends = nil
         }
+        if let annotation = functionDeclaration.preventJVMNameManglingAnnotation() {
+            functionDeclaration.annotations.append(annotation)
+        }
+
         let name = functionDeclaration.preEscapedName ?? functionDeclaration.name
         let type = functionDeclaration.preEscapedFunctionType
         let modifiers = functionDeclaration.modifiers
@@ -515,6 +526,9 @@ final class KotlinBridgeToSwiftVisitor {
         // Don't add Swift for protocol extension members that were merged into Kotlin interface
         guard info != nil || parentStatement.type != .interfaceDeclaration else {
             return true
+        }
+        if let annotation = functionDeclaration.preventJVMNameManglingAnnotation() {
+            functionDeclaration.annotations.append(annotation)
         }
 
         let (inType, inSignature) = declarationTypeInfo(for: parentStatement)

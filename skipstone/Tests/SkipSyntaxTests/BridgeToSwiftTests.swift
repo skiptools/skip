@@ -330,6 +330,72 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testUnsignedVar() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public let i = UInt(1)
+        #endif
+        """, kotlin: """
+        val i = 1U
+        """, swiftBridgeSupport: """
+        public let i: UInt = 1
+        """, transformers: transformers)
+
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public var i = UInt(1)
+        #endif
+        """, kotlin: """
+        @set:JvmName("setI")
+        var i = 1U
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        public var i: UInt {
+            get {
+                return jniContext {
+                    let value_java: UInt32 = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, options: [], args: [])
+                    return UInt(value_java)
+                }
+            }
+            set {
+                jniContext {
+                    let value_java = UInt32(newValue).toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_set_i_methodID, options: [], args: [value_java])
+                }
+            }
+        }
+        private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()I")!
+        private let Java_set_i_methodID = Java_SourceKt.getStaticMethodID(name: "setI", sig: "(I)V")!
+        """, transformers: transformers)
+
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public var i: UInt? = UInt(1)
+        #endif
+        """, kotlin: """
+        @set:JvmName("setI")
+        var i: UInt? = 1U
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        public var i: UInt? {
+            get {
+                return jniContext {
+                    let value_java: JavaObjectPointer? = try! Java_SourceKt.callStatic(method: Java_get_i_methodID, options: [], args: [])
+                    return UInt?.fromJavaObject(value_java, options: [])
+                }
+            }
+            set {
+                jniContext {
+                    let value_java = newValue.toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_set_i_methodID, options: [], args: [value_java])
+                }
+            }
+        }
+        private let Java_get_i_methodID = Java_SourceKt.getStaticMethodID(name: "getI", sig: "()Lkotlin/UInt;")!
+        private let Java_set_i_methodID = Java_SourceKt.getStaticMethodID(name: "setI", sig: "(Lkotlin/UInt;)V")!
+        """, transformers: transformers)
+    }
+
     func testUnavailableVar() async throws {
         try await check(swift: """
         @available(*, unavailable)
@@ -1187,6 +1253,27 @@ final class BridgeToSwiftTests: XCTestCase {
             }
         }
         private let Java_f_1_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "(I)I")!
+        """, transformers: transformers)
+    }
+
+    func testFunctionWithUnsignedParameters() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public func f(i: UInt) {
+        }
+        #endif
+        """, kotlin: """
+        @JvmName("f")
+        fun f(i: UInt) = Unit
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        public func f(i p_0: UInt) {
+            jniContext {
+                let p_0_java = UInt32(p_0).toJavaParameter(options: [])
+                try! Java_SourceKt.callStatic(method: Java_f_0_methodID, options: [], args: [p_0_java])
+            }
+        }
+        private let Java_f_0_methodID = Java_SourceKt.getStaticMethodID(name: "f", sig: "(I)V")!
         """, transformers: transformers)
     }
 
