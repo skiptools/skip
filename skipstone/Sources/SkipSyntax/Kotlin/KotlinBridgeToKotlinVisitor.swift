@@ -292,6 +292,9 @@ final class KotlinBridgeToKotlinVisitor {
                 externalName + "_set(" + setterArguments + ")"
             ]
             variableDeclaration.setter = Accessor(parameterName: "newValue", body: KotlinCodeBlock(statements: setterBody.map { KotlinRawStatement(sourceCode: $0) }))
+            if let annotation = variableDeclaration.preventJVMNameManglingAnnotation(name: externalName + "_set", isFunction: true) {
+                externalFunctionDeclarations.append(annotation)
+            }
             externalFunctionDeclarations.append("private external fun \(externalName)_set(\(setterInstanceParameter)value: \(bridgable.externalType.kotlin))")
 
             var cdeclSetterBody: [String] = []
@@ -664,6 +667,10 @@ final class KotlinBridgeToKotlinVisitor {
             }
             externalFunctionDeclaration += ": " + returnType.kotlin
         }
+        var externalFunctionDeclarations: [String] = [externalFunctionDeclaration]
+        if let annotation = functionDeclaration.preventJVMNameManglingAnnotation(name: externalName) {
+            externalFunctionDeclarations.insert(annotation, at: 0)
+        }
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: isCompanionCall, name: externalName, translator: translator)
         let instanceParameter: [TypeSignature.Parameter]
@@ -679,7 +686,7 @@ final class KotlinBridgeToKotlinVisitor {
         cdeclFunctions.append(cdeclFunction)
 
         let bodyCodeBlock = KotlinCodeBlock(statements: body.map { KotlinRawStatement(sourceCode: $0) })
-        let externalStatements = [KotlinRawStatement(sourceCode: externalFunctionDeclaration, isStatic: isCompanionCall)]
+        let externalStatements = externalFunctionDeclarations.map { KotlinRawStatement(sourceCode: $0, isStatic: isCompanionCall) }
         return (bodyCodeBlock, externalStatements)
     }
 

@@ -390,6 +390,8 @@ extension TypeSignature {
             return .javaString
         case .tuple:
             return .javaObjectPointer
+        case .uint:
+            return .uint32
         case .unwrappedOptional(let type):
             return type.cdecl(strategy: strategy, options: options)
         default:
@@ -415,6 +417,12 @@ extension TypeSignature {
         case .tuple:
             let converted = "SwiftTuple.javaObject(for: \(value), options: \(options.jconvertibleOptions))"
             return isOptional ? converted : converted + "!"
+        case .uint:
+            if isOptional {
+                return value + ".toJavaObject(options: \(options.jconvertibleOptions))"
+            } else {
+                return "UInt32(\(value))"
+            }
         case .unwrappedOptional(let type):
             return type.convertToCDecl(value: value, strategy: strategy, options: options)
         default:
@@ -466,7 +474,7 @@ extension TypeSignature {
             return "\(converted)\(isOptional ? "" : "!") as \(TypeSignature.function(parameters, signature, apiFlags, attributes))"
         case .int:
             if isOptional {
-                return description + ".fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
+                return "Int?.fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
             } else {
                 return "Int(\(value))"
             }
@@ -475,6 +483,12 @@ extension TypeSignature {
         case .tuple:
             let converted = "SwiftTuple.tuple(forJavaObject: \(value), options: \(options.jconvertibleOptions))"
             return "\(converted)\(isOptional ? "" : "!") as \(self)"
+        case .uint:
+            if isOptional {
+                return "UInt?.fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
+            } else {
+                return "UInt(\(value))"
+            }
         case .unwrappedOptional(let type):
             return type.convertFromCDecl(value: value, strategy: strategy, options: options)
         default:
@@ -512,6 +526,8 @@ extension TypeSignature {
             return .optional(.javaObjectPointer)
         case .tuple:
             return .javaObjectPointer
+        case .uint:
+            return .uint32
         case .unwrappedOptional(let type):
             return type.java(strategy: strategy, options: options)
         default:
@@ -535,6 +551,8 @@ extension TypeSignature {
         case .tuple:
             let converted = "SwiftTuple.javaObject(for: \(value), options: \(optionsString))"
             return isOptional ? converted : converted + "!"
+        case .uint:
+            return isOptional ? value : "UInt32(\(value))"
         case .unwrappedOptional(let type):
             return type.convertToJava(value: value, strategy: strategy, optionsString: optionsString)
         default:
@@ -584,15 +602,18 @@ extension TypeSignature {
         case .int:
             return "Int(\(value))"
         case .optional(let type):
-            if case .function = type {
+            switch type {
+            case .function:
                 return type.convertClosureFromJava(value: value, isOptional: true, options: options)
-            } else if case .tuple = type {
+            case .tuple:
                 return "SwiftTuple.tuple(forJavaObject: \(value), options: \(options.jconvertibleOptions))"
-            } else {
+            default:
                 return description + ".fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
             }
         case .tuple:
             return "SwiftTuple.tuple(forJavaObject: \(value), options: \(options.jconvertibleOptions))!"
+        case .uint:
+            return "UInt(\(value))"
         case .unwrappedOptional(let type):
             return type.convertFromJava(value: value, strategy: strategy, options: options)
         default:
@@ -649,17 +670,17 @@ extension TypeSignature {
             } else {
                 return "Lkotlin/jvm/functions/Function\(parameters.count);"
             }
-        case .int:
+        case .int, .uint:
             return "I"
-        case .int8:
+        case .int8, .uint8:
             return "B"
-        case .int16:
+        case .int16, .uint16:
             return "S"
-        case .int32:
+        case .int32, .uint32:
             return "I"
-        case .int64:
+        case .int64, .uint64:
             return "J"
-        case .int128:
+        case .int128, .uint128:
             return "Ljava/math/BigInteger;"
         case .member(let parent, let type):
             var parentJNI = parent.jni(options: options, isPartialMember: true)
@@ -726,7 +747,16 @@ extension TypeSignature {
                 return "Ljava/lang/Integer;"
             case .int64:
                 return "Ljava/lang/Long;"
-            // TODO: Unsigned types
+            case .uint:
+                return "Lkotlin/UInt;"
+            case .uint8:
+                return "Lkotlin/UByte;"
+            case .uint16:
+                return "Lkotlin/UShort;"
+            case .uint32:
+                return "Lkotlin/UInt;"
+            case .uint64:
+                return "Lkotlin/ULong;"
             default:
                 return type.jni(options: options)
             }
@@ -750,18 +780,6 @@ extension TypeSignature {
             }
         case .typealiased(_, let type):
             return type.jni(options: options)
-        case .uint:
-            return "Ljava/lang/Object;"
-        case .uint8:
-            return "Ljava/lang/Object;"
-        case .uint16:
-            return "Ljava/lang/Object;"
-        case .uint32:
-            return "Ljava/lang/Object;"
-        case .uint64:
-            return "Ljava/lang/Object;"
-        case .uint128:
-            return "Ljava/lang/Object;"
         case .unwrappedOptional(let type):
             return type.jni(options: options)
         case .void:
@@ -975,6 +993,19 @@ extension KotlinVariableDeclaration {
         let generics = (parent as? KotlinClassDeclaration)?.generics ?? (parent as? KotlinInterfaceDeclaration)?.generics ?? extends?.1
         return type.checkBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo, sourceDerived: self, source: translator.syntaxTree.source)
     }
+
+    /// Return the annotation necessary to prevent the Kotlin compiler from mangling the name of this variable.
+    func preventJVMNameManglingAnnotation(name: String? = nil, isFunction: Bool = false) -> String? {
+        // The Kotlin compiler appends a hash to the names of functions using unsigned parameters
+        guard propertyType.isUnsigned, apiFlags.options.contains(.writeable) && (modifiers.setVisibility == .default || modifiers.setVisibility >= .public) else {
+            return nil
+        }
+        if isFunction {
+            return "@JvmName(\"\(name ?? propertyName.setterName)\")"
+        } else {
+            return "@set:JvmName(\"\(name ?? propertyName.setterName)\")"
+        }
+    }
 }
 
 extension KotlinFunctionDeclaration {
@@ -1034,6 +1065,15 @@ extension KotlinFunctionDeclaration {
             generics = self.generics
         }
         return functionType.checkFunctionBridgable(direction: direction, isConstructor: type == .constructorDeclaration, options: options, generics: generics, codebaseInfo: codebaseInfo, sourceDerived: self, source: translator.syntaxTree.source)
+    }
+
+    /// Return the annotation necessary to prevent the Kotlin compiler from mangling the name of this function.
+    func preventJVMNameManglingAnnotation(name: String? = nil) -> String? {
+        // The Kotlin compiler appends a hash to the names of functions using unsigned parameters
+        guard parameters.contains(where: { $0.declaredType.isUnsigned }) else {
+            return nil
+        }
+        return "@JvmName(\"\(name ?? self.name)\")"
     }
 }
 
@@ -1304,11 +1344,7 @@ extension TypeSignature {
         case .typealiased(_, let type):
             return type.checkBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source)
         case .uint, .uint8, .uint16, .uint32, .uint64:
-            // TODO
-            if let sourceDerived, let source {
-                sourceDerived.messages.append(.kotlinBridgeUnsupportedFeature(sourceDerived, feature: description, source: source))
-            }
-            return nil
+            return Bridgable(type: self, kotlinType: self, strategy: .direct)
         case .uint128:
             // TODO
             if let sourceDerived, let source {

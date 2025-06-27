@@ -246,6 +246,65 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testUnsignedVar() async throws {
+        try await check(swiftBridge: """
+        public let i = UInt(1)
+        """, kotlin: """
+        val i: UInt
+            get() = Swift_i()
+        private external fun Swift_i(): UInt
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1i")
+        public func BridgeKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> UInt32 {
+            return UInt32(i)
+        }
+        """, transformers: transformers)
+
+        try await check(swiftBridge: """
+        public var i = UInt(1)
+        """, kotlin: """
+        var i: UInt
+            get() = Swift_i()
+            set(newValue) {
+                Swift_i_set(newValue)
+            }
+        private external fun Swift_i(): UInt
+        @JvmName("Swift_i_set")
+        private external fun Swift_i_set(value: UInt)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1i")
+        public func BridgeKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> UInt32 {
+            return UInt32(i)
+        }
+        @_cdecl("Java_BridgeKt_Swift_1i_1set")
+        public func BridgeKt_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: UInt32) {
+            i = UInt(value)
+        }
+        """, transformers: transformers)
+
+        try await check(swiftBridge: """
+        public var i: UInt? = UInt(1)
+        """, kotlin: """
+        var i: UInt?
+            get() = Swift_i()
+            set(newValue) {
+                Swift_i_set(newValue)
+            }
+        private external fun Swift_i(): UInt?
+        @JvmName("Swift_i_set")
+        private external fun Swift_i_set(value: UInt?)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1i")
+        public func BridgeKt_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer? {
+            return i.toJavaObject(options: [])
+        }
+        @_cdecl("Java_BridgeKt_Swift_1i_1set")
+        public func BridgeKt_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer?) {
+            i = UInt?.fromJavaObject(value, options: [])
+        }
+        """, transformers: transformers)
+    }
+
     func testUnavailableVar() async throws {
         try await check(swiftBridge: """
         @available(*, unavailable)
@@ -1092,6 +1151,23 @@ final class BridgeToKotlinTests: XCTestCase {
             let p_0_swift = Int(p_0)
             let f_return_swift = f(value: p_0_swift)
             return Int32(f_return_swift)
+        }
+        """, transformers: transformers)
+    }
+
+    func testFunctionWithUnsignedParameters() async throws {
+        try await check(swiftBridge: """
+        public func f(i: UInt) {
+        }
+        """, kotlin: """
+        fun f(i: UInt): Unit = Swift_f_0(i)
+        @JvmName("Swift_f_0")
+        private external fun Swift_f_0(i: UInt)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1f_10")
+        public func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: UInt32) {
+            let p_0_swift = UInt(p_0)
+            f(i: p_0_swift)
         }
         """, transformers: transformers)
     }
