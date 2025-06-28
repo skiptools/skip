@@ -532,7 +532,7 @@ final class KotlinBridgeToSwiftVisitor {
         }
 
         let (inType, inSignature) = declarationTypeInfo(for: parentStatement)
-        let name = info?.name ?? functionDeclaration.preEscapedName ?? functionDeclaration.name
+        let name = (info != nil && info!.name != "init") ? info!.name : (functionDeclaration.preEscapedName ?? functionDeclaration.name)
         let isConstructor = info != nil ? info?.declarationType == .initDeclaration : functionDeclaration.type == .constructorDeclaration
         let isFactory = isConstructor && functionDeclaration.type != .constructorDeclaration
         let type = info?.signature ?? functionDeclaration.preEscapedFunctionType
@@ -942,6 +942,9 @@ final class KotlinBridgeToSwiftVisitor {
             guard inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.isSendable || inherit.checkBridgable(direction: .toSwift, options: options, generics: classDeclaration.generics, codebaseInfo: codebaseInfo) != nil else {
                 return []
             }
+            if inherit.isNamed("java.lang.Object") {
+                return [.named("NSObject", [])]
+            }
             return [inherit]
         }
 
@@ -987,7 +990,7 @@ final class KotlinBridgeToSwiftVisitor {
                 guard !functionDeclaration.isEncode && !functionDeclaration.isDecodableConstructor else {
                     continue
                 }
-                let info = typeInfos.flatMap({ $0.functions }).first(where: { $0.name == (functionDeclaration.preEscapedName ?? functionDeclaration.name) && $0.signature == functionDeclaration.functionType && $0.modifiers.visibility >= .fileprivate })
+                let info = typeInfos.flatMap({ $0.functions }).first(where: { (($0.declarationType == .initDeclaration && functionDeclaration.type == .constructorDeclaration) || $0.name == (functionDeclaration.preEscapedName ?? functionDeclaration.name)) && $0.signature == functionDeclaration.functionType && $0.modifiers.visibility >= .fileprivate })
                 if functionDeclaration.isEqualImplementation {
                     hasEqualsDefinition = true
                     updateEqualsDeclaration(functionDeclaration, in: classDeclaration, info: info, swiftDefinitions: &memberDefinitions)
@@ -1414,7 +1417,7 @@ final class KotlinBridgeToSwiftVisitor {
         let visibilityString = primaryTypeInfo.modifiers.visibility.swift(suffix: " ")
         let inherits = primaryTypeInfo.inherits.compactMap {
             let inherit = $0.withGenerics([])
-            return inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.isSendable || inherit.checkBridgable(direction: .toSwift, options: options, generics: interfaceDeclaration.generics, codebaseInfo: codebaseInfo) != nil ? inherit : nil
+            return inherit.isEquatable || inherit.isHashable || inherit.isComparable || inherit.isSendable || inherit.isNamed("NSObjectProtocol") || inherit.checkBridgable(direction: .toSwift, options: options, generics: interfaceDeclaration.generics, codebaseInfo: codebaseInfo) != nil ? inherit : nil
         }
         let inheritsString = inherits.isEmpty ? "" : ": " + inherits.map { $0.description }.joined(separator: ", ")
 

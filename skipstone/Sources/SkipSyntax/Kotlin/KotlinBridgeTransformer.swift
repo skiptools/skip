@@ -1000,10 +1000,11 @@ extension KotlinVariableDeclaration {
         guard propertyType.isUnsigned, apiFlags.options.contains(.writeable) && (modifiers.setVisibility == .default || modifiers.setVisibility >= .public) else {
             return nil
         }
+        // Interface members and their overrides need to suppress INAPPLICABLE_JVM_NAME, so do for all
         if isFunction {
-            return "@JvmName(\"\(name ?? propertyName.setterName)\")"
+            return "@Suppress(\"INAPPLICABLE_JVM_NAME\") @JvmName(\"\(name ?? propertyName.setterName)\")"
         } else {
-            return "@set:JvmName(\"\(name ?? propertyName.setterName)\")"
+            return "@Suppress(\"INAPPLICABLE_JVM_NAME\") @set:JvmName(\"\(name ?? propertyName.setterName)\")"
         }
     }
 }
@@ -1073,7 +1074,12 @@ extension KotlinFunctionDeclaration {
         guard parameters.contains(where: { $0.declaredType.isUnsigned }) else {
             return nil
         }
-        return "@JvmName(\"\(name ?? self.name)\")"
+        let name = name ?? self.name
+        guard name != "constructor" else {
+            return nil
+        }
+        // Interface members and their overrides need to suppress INAPPLICABLE_JVM_NAME, so do for all
+        return "@Suppress(\"INAPPLICABLE_JVM_NAME\") @JvmName(\"\(name)\")"
     }
 }
 
@@ -1276,6 +1282,10 @@ extension TypeSignature {
                 return Bridgable(type: self, kotlinType: self, strategy: .unknown)
             } else if isNamed("Nothing", moduleName: "Swift", generics: []) {
                 return Bridgable(type: .none, kotlinType: .javaVoid(kotlin: true), strategy: .unknown)
+            } else if isNamed("NSNumber", moduleName: "Foundation", generics: []) || description == "java.lang.Number" {
+                // Special case NSNumber, which is just typealiased to java.lang.Number in SkipLib
+                let kotlinType: TypeSignature = .module("java.lang", .named("Number", []))
+                return Bridgable(type: .named("NSNumber", []), kotlinType: kotlinType, strategy: .convertible)
             } else {
                 return checkNamedBridgable(direction: direction, options: options, generics: generics, codebaseInfo: codebaseInfo, sourceDerived: sourceDerived, source: source)
             }

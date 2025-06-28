@@ -346,7 +346,7 @@ final class BridgeToSwiftTests: XCTestCase {
         public var i = UInt(1)
         #endif
         """, kotlin: """
-        @set:JvmName("setI")
+        @Suppress(\"INAPPLICABLE_JVM_NAME\") @set:JvmName("setI")
         var i = 1U
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
@@ -373,7 +373,7 @@ final class BridgeToSwiftTests: XCTestCase {
         public var i: UInt? = UInt(1)
         #endif
         """, kotlin: """
-        @set:JvmName("setI")
+        @Suppress(\"INAPPLICABLE_JVM_NAME\") @set:JvmName("setI")
         var i: UInt? = 1U
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
@@ -1263,7 +1263,7 @@ final class BridgeToSwiftTests: XCTestCase {
         }
         #endif
         """, kotlin: """
-        @JvmName("f")
+        @Suppress(\"INAPPLICABLE_JVM_NAME\") @JvmName("f")
         fun f(i: UInt) = Unit
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
