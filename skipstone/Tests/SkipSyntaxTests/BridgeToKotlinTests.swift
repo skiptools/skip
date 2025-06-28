@@ -269,7 +269,7 @@ final class BridgeToKotlinTests: XCTestCase {
                 Swift_i_set(newValue)
             }
         private external fun Swift_i(): UInt
-        @JvmName("Swift_i_set")
+        @Suppress(\"INAPPLICABLE_JVM_NAME\") @JvmName("Swift_i_set")
         private external fun Swift_i_set(value: UInt)
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1i")
@@ -291,7 +291,7 @@ final class BridgeToKotlinTests: XCTestCase {
                 Swift_i_set(newValue)
             }
         private external fun Swift_i(): UInt?
-        @JvmName("Swift_i_set")
+        @Suppress(\"INAPPLICABLE_JVM_NAME\") @JvmName("Swift_i_set")
         private external fun Swift_i_set(value: UInt?)
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1i")
@@ -1161,7 +1161,7 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         """, kotlin: """
         fun f(i: UInt): Unit = Swift_f_0(i)
-        @JvmName("Swift_f_0")
+        @Suppress(\"INAPPLICABLE_JVM_NAME\") @JvmName("Swift_f_0")
         private external fun Swift_f_0(i: UInt)
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1f_10")
