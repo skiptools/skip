@@ -49,5 +49,5 @@ jobs:
       - run: skip checkup --verbose --native-app
       - run: skip init --native-app --appid=xyz.skip.Demo demo-app-native DemoApp
       - run: skip init --native-app --native-model --appid=xyz.skip.Demo demo-app-native-model DemoApp DemoModel
-      - run: skip export --project demo-app-native-model
+      - run: skip export --project demo-app-native-model --arch x86_64 --arch aarch64 --arch armv7
 
