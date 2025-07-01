@@ -77,6 +77,9 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
     @Option(help: ArgumentHelp("Project scheme name to export", valueName: "scheme"))
     var schemeName: String? = nil
 
+    @Option(help: ArgumentHelp("Destination architectures for native libraries", valueName: "arch"))
+    var arch: [AndroidArchArgument] = []
+
     func performCommand(with out: MessageQueue) async {
         await withLogStream(with: out) {
             try await runExport(with: out)
@@ -141,7 +144,12 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
         let outputFolder = self.dir ?? "\(buildFolder)/skip-export"
         let outputFolderAbsolute = try AbsolutePath(validating: outputFolder, relativeTo: fs.currentWorkingDirectory!)
 
-        let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths // environment that includes a default ANDROID_HOME
+        var env = ProcessInfo.processInfo.environmentWithDefaultToolPaths // environment that includes a default ANDROID_HOME
+
+        if !arch.isEmpty {
+            // take the arch flag(s) and set them in the `SKIP_EXPORT_ARCHS` environment, which will be processed by the AndroidCommand when it sees the SkipBridge `--arch automatic` setting
+            env[AndroidArchArgument.exportArchsEnironment] = arch.map(\.rawValue).joined(separator: ",")
+        }
 
         let assembleAction = variants == [.debug] ? "assembleDebug" : variants == [.release] ? "assembleRelease" : "assemble"
         let bundleAction = variants == [.debug] ? "bundleDebug" : variants == [.release] ? "bundleRelease" : "bundle"

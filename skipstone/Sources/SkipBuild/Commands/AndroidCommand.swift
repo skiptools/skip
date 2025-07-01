@@ -650,7 +650,7 @@ fileprivate extension AndroidOperationCommand {
             .appendingPathComponent("usr/lib", isDirectory: true)
 
         let libSysrootArch = libSysrootBase
-            .appendingPathComponent(arch.libpathDynamic, isDirectory: true)
+            .appendingPathComponent(arch.triple, isDirectory: true)
 
         if !isDir(libSysrootArch) {
             throw CrossCompilerError(errorDescription: "The Swift Android NDK library path was not found at: \(libSysrootArch.path)")
@@ -945,12 +945,17 @@ enum AndroidArchArgument: String, ExpressibleByArgument, CaseIterable {
     case armv7
     case x86_64
 
+    static let exportArchsEnironment = "SKIP_EXPORT_ARCHS"
+
     var architectures: [AndroidArch] {
         switch self {
         case .automatic:
             // For debug builds, just build for the current architecture.
             // Ideally we would use `ONLY_ACTIVE_ARCH`, but that seems to be always set to "YES" even for Release builds.
-            if ProcessInfo.processInfo.environment["CONFIGURATION"]?.uppercased() == "DEBUG" {
+            // The "SKIP_EXPORT_ARCHS" is used to pass the flags from `skip export --arch …` through the gradle process, which always exports with "automatic"
+            if let archList = ProcessInfo.processInfo.environment[Self.exportArchsEnironment], !archList.isEmpty {
+                return archList.split(separator: ",").compactMap(String.init).compactMap(AndroidArch.init)
+            } else if ProcessInfo.processInfo.environment["CONFIGURATION"]?.uppercased() == "DEBUG" {
                 return AndroidArchArgument.current.architectures
             } else {
                 return AndroidArchArgument.`default`.architectures
