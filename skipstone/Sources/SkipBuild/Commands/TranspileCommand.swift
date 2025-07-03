@@ -486,7 +486,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 }
 
                 // write support files
-                for supportFileName in [KotlinDynamicObjectTransformer.supportFileName, KotlinBundleTransformer.supportFileName, KotlinUserDefaultsTransformer.supportFileName] {
+                for supportFileName in [KotlinDynamicObjectTransformer.supportFileName, KotlinBundleTransformer.supportFileName, KotlinFoundationBridgeTransformer.supportFileName] {
                     let supportContents: String
                     if let supportTranspilation = swiftBridgeFileNameTranspilationMap[supportFileName] {
                         supportContents = supportTranspilation.output.content
