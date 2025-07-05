@@ -1,6 +1,6 @@
-/// Generate code to support `UserDefaults` bridging to Android.
-public final class KotlinUserDefaultsTransformer: KotlinTransformer {
-    public static let supportFileName = "UserDefaults_Support.swift"
+/// Generate code to support various `Foundation` types bridging to Android.
+public final class KotlinFoundationBridgeTransformer: KotlinTransformer {
+    public static let supportFileName = "FoundationBridge_Support.swift"
 
     public init() {
     }
@@ -10,7 +10,7 @@ public final class KotlinUserDefaultsTransformer: KotlinTransformer {
     }
 
     public func apply(toPackage syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
-        // Generate UserDefaults support for any native module using SkipAndroidBridge
+        // Generate support for any native module using SkipAndroidBridge
         let needsAndroidBridge = translator.codebaseInfo?.global.needsAndroidBridge == true
         guard needsAndroidBridge else {
             return []
@@ -27,6 +27,7 @@ public final class KotlinUserDefaultsTransformer: KotlinTransformer {
             import SkipAndroidBridge
             
             typealias UserDefaults = AndroidUserDefaults
+            typealias LocalizedStringResource = AndroidLocalizedStringResource
             """)
         }
         return [KotlinTransformerOutput(file: outputFile, node: outputNode, type: .bridgeToSwift)]
