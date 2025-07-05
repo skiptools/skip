@@ -334,7 +334,7 @@ import PackagePlugin
             let nativeSupportFileNames = [
                 "AnyDynamicObject_Support.swift", // SkipSyntax.KotlinDynamicObjectTransformer.supportFileName
                 "Bundle_Support.swift", // SkipSyntax.KotlinBundleTransformer.supportFileName
-                "UserDefaults_Support.swift", // SkipSyntax.KotlinUserDefaultsTransformer.supportFileName
+                "FoundationBridge_Support.swift", // SkipSyntax.KotlinFoundationBridgeTransformer.supportFileName
             ]
             for fileName in nativeSupportFileNames {
                 outputFiles.append(skipBridgeOutputDir.appending(subpath: fileName))
