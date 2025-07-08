@@ -117,7 +117,7 @@ final class SkipCommandTests: XCTestCase {
             targets: [
                 .target(name: "TeenyModule", dependencies: [
                     .product(name: "SkipFoundation", package: "skip-foundation")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
 
@@ -599,6 +599,8 @@ final class SkipCommandTests: XCTestCase {
         │     └─ SomeModule.swift
         └─ Tests
            └─ SomeModuleTests
+              ├─ Resources
+              │  └─ TestData.json
               ├─ Skip
               │  └─ skip.yml
               ├─ SomeModuleTests.swift
@@ -704,11 +706,11 @@ final class SkipCommandTests: XCTestCase {
             targets: [
                 .target(name: "SomeModule", dependencies: [
                     .product(name: "SkipFuse", package: "skip-fuse")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .testTarget(name: "SomeModuleTests", dependencies: [
                     "SomeModule",
                     .product(name: "SkipTest", package: "skip")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
 
@@ -792,7 +794,7 @@ final class SkipCommandTests: XCTestCase {
             targets: [
                 .target(name: "SomeModule", dependencies: [
                     .product(name: "SkipFuse", package: "skip-fuse")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
 
@@ -864,6 +866,8 @@ final class SkipCommandTests: XCTestCase {
            │  └─ XCSkipTests.swift
            └─ ModelModuleTests
               ├─ ModelModuleTests.swift
+              ├─ Resources
+              │  └─ TestData.json
               ├─ Skip
               │  └─ skip.yml
               └─ XCSkipTests.swift
@@ -953,7 +957,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "AppModule\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["AppModule"]),
+                .library(name: "AppModule", type: .dynamic, targets: ["AppModule"]),
                 .library(name: "ModelModule", type: .dynamic, targets: ["ModelModule"]),
             ],
             dependencies: [
@@ -974,11 +978,11 @@ final class SkipCommandTests: XCTestCase {
                 .target(name: "ModelModule", dependencies: [
                     .product(name: "SkipFuse", package: "skip-fuse"),
                     .product(name: "SkipModel", package: "skip-model")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .testTarget(name: "ModelModuleTests", dependencies: [
                     "ModelModule",
                     .product(name: "SkipTest", package: "skip")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
 
@@ -1043,6 +1047,8 @@ final class SkipCommandTests: XCTestCase {
         └─ Tests
            └─ ModelModuleTests
               ├─ ModelModuleTests.swift
+              ├─ Resources
+              │  └─ TestData.json
               ├─ Skip
               │  └─ skip.yml
               └─ XCSkipTests.swift
@@ -1136,7 +1142,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "AppModule\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["AppModule"]),
+                .library(name: "AppModule", type: .dynamic, targets: ["AppModule"]),
                 .library(name: "ModelModule", type: .dynamic, targets: ["ModelModule"]),
             ],
             dependencies: [
@@ -1149,15 +1155,15 @@ final class SkipCommandTests: XCTestCase {
                 .target(name: "AppModule", dependencies: [
                     "ModelModule",
                     .product(name: "SkipFuseUI", package: "skip-fuse-ui")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .target(name: "ModelModule", dependencies: [
                     .product(name: "SkipFuse", package: "skip-fuse"),
                     .product(name: "SkipModel", package: "skip-model")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .testTarget(name: "ModelModuleTests", dependencies: [
                     "ModelModule",
                     .product(name: "SkipTest", package: "skip")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
 
@@ -1251,7 +1257,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "AppModule\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["AppModule"]),
+                .library(name: "AppModule", type: .dynamic, targets: ["AppModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -1260,7 +1266,7 @@ final class SkipCommandTests: XCTestCase {
             targets: [
                 .target(name: "AppModule", dependencies: [
                     .product(name: "SkipFuseUI", package: "skip-fuse-ui")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
 
@@ -1526,7 +1532,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "TopModule\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["TopModule"]),
+                .library(name: "TopModule", type: .dynamic, targets: ["TopModule"]),
                 .library(name: "MiddleModule", type: .dynamic, targets: ["MiddleModule"]),
                 .library(name: "BottomModule", type: .dynamic, targets: ["BottomModule"]),
             ],
@@ -1653,7 +1659,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "M1\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["M1"]),
+                .library(name: "M1", type: .dynamic, targets: ["M1"]),
                 .library(name: "M2", type: .dynamic, targets: ["M2"]),
                 .library(name: "M3", type: .dynamic, targets: ["M3"]),
                 .library(name: "M4", type: .dynamic, targets: ["M4"]),
@@ -1669,20 +1675,20 @@ final class SkipCommandTests: XCTestCase {
                 .target(name: "M1", dependencies: [
                     "M2",
                     .product(name: "SkipUI", package: "skip-ui")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .target(name: "M2", dependencies: [
                     "M3",
                     .product(name: "SkipModel", package: "skip-model")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .target(name: "M3", dependencies: [
                     "M4"
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .target(name: "M4", dependencies: [
                     "M5"
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .target(name: "M5", dependencies: [
                     .product(name: "SkipFoundation", package: "skip-foundation")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
 
@@ -1759,6 +1765,8 @@ final class SkipCommandTests: XCTestCase {
            │  └─ XCSkipTests.swift
            └─ M2Tests
               ├─ M2Tests.swift
+              ├─ Resources
+              │  └─ TestData.json
               ├─ Skip
               │  └─ skip.yml
               └─ XCSkipTests.swift
@@ -1779,7 +1787,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "M1\(AppProjectLayout.appProductSuffix)", type: .dynamic, targets: ["M1"]),
+                .library(name: "M1", type: .dynamic, targets: ["M1"]),
                 .library(name: "M2", type: .dynamic, targets: ["M2"]),
                 .library(name: "M3", type: .dynamic, targets: ["M3"]),
                 .library(name: "M4", type: .dynamic, targets: ["M4"]),
@@ -1804,18 +1812,18 @@ final class SkipCommandTests: XCTestCase {
                     "M3",
                     .product(name: "SkipModel", package: "skip-model"),
                     .product(name: "SkipFuse", package: "skip-fuse")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .testTarget(name: "M2Tests", dependencies: [
                     "M2",
                     .product(name: "SkipTest", package: "skip")
-                ], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .target(name: "M3", dependencies: [
                     "M4"
-                ]),
+                ], resources: [.process("Resources")]),
                 .target(name: "M4", dependencies: [
                     "M5"
-                ]),
-                .target(name: "M5", dependencies: []),
+                ], resources: [.process("Resources")]),
+                .target(name: "M5", dependencies: [], resources: [.process("Resources")]),
             ]
         )
 

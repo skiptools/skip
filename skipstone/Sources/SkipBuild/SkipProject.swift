@@ -444,7 +444,8 @@ public class \(moduleName)Module {
                 try moduleCode.write(to: moduleSwiftFile, atomically: false, encoding: .utf8)
             }
 
-            var resourcesAttribute: String = ""
+            let resourcesAttribute: String = resourceFolder.flatMap { resourceFolder in ", resources: [.process(\"\(resourceFolder)\")]" } ?? ""
+
             if !isDependentNativeModule, (!isNativeModule || isNativeAppModule),
                let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
                 let sourceResourcesDir = try sourceDir.append(path: resourceFolder, create: true)
@@ -1198,7 +1199,7 @@ struct TestData : Codable, Hashable {
                 let testSkipYamlFile = testSkipDir.appending(path: "skip.yml")
                 try (isAppModule ? skipYamlAppTests : skipYamlModuleTests).write(to: testSkipYamlFile, atomically: false, encoding: .utf8)
 
-                if let resourceFolder = resourceFolder, !resourceFolder.isEmpty, !isNativeModule {
+                if let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
                     let testResourcesDir = try testDir.append(path: resourceFolder, create: true)
                     let testResourcesFile = testResourcesDir.appending(path: "TestData.json")
                     try """
@@ -1206,8 +1207,6 @@ struct TestData : Codable, Hashable {
                       "testModuleName": "\(moduleName)"
                     }
                     """.write(to: testResourcesFile, atomically: false, encoding: .utf8)
-
-                    resourcesAttribute = ", resources: [.process(\"\(resourceFolder)\")]"
                 }
             }
 
