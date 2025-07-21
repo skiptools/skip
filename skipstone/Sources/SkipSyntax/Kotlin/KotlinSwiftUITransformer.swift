@@ -254,7 +254,7 @@ private final class TranslateVisitor {
     private func translateFunctionCall(_ functionCall: KotlinFunctionCall) {
         // Translate .environment(\.keyPath, value) calls. The key path will have been transpiled
         // to a closure that reads the named property, but we want to set it in EnvironmentValues
-        if (functionCall.function as? KotlinMemberAccess)?.member == "environment" || (functionCall.function as? KotlinIdentifier)?.name == "environment", functionCall.arguments.count == 2, let keyPath = functionCall.arguments[0].value as? KotlinKeyPathLiteral {
+        if (functionCall.function as? KotlinMemberAccess)?.member == "environment" || (functionCall.function as? KotlinIdentifier)?.name == "environment", let keyPath = functionCall.arguments[0].value as? KotlinKeyPathLiteral, (functionCall.arguments.count == 2 || (functionCall.arguments.count == 3 && functionCall.arguments[2].label == "affectsEvaluate")) {
             updateEnvironmentFunctionCallParameters(for: keyPath, in: functionCall)
             return
         }
@@ -312,17 +312,17 @@ private final class TranslateVisitor {
         let bindingVariables = variableDeclarations.filter { $0.attributes.contains(.binding) }
         let bindableVariables = variableDeclarations.filter { $0.attributes.contains(.bindable) || $0.attributes.contains(.observedObject) }
         let appStorageVariables = variableDeclarations.filter { $0.attributes.contains(.appStorage) }
-        if !stateVariables.isEmpty || !focusStateVariables.isEmpty || !environmentVariables.isEmpty || !bindableVariables.isEmpty || !appStorageVariables.isEmpty {
-            let composeFunction = synthesizeComposeFunction(isModifier: isModifier, stateVariables: stateVariables, focusStateVariables: focusStateVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables)
-            classDeclaration.insert(statements: [composeFunction], after: body)
+        if !stateVariables.isEmpty || !focusStateVariables.isEmpty || !environmentVariables.isEmpty || !appStorageVariables.isEmpty {
+            let evaluateFunction = synthesizeEvaluateFunction(isModifier: isModifier, stateVariables: stateVariables, focusStateVariables: focusStateVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables)
+            classDeclaration.insert(statements: [evaluateFunction], after: body)
+        }
 
-            for stateVariable in stateVariables {
-                synthesizeStateBacking(variable: stateVariable, propertyWrapperTypeName: "skip.ui.State")
-            }
-            for environmentVariable in environmentVariables {
-                if environmentVariable.attributes.contains(.environmentObject) || environmentVariable.attributes.environmentAttribute?.tokenTypeSignature != nil {
-                    synthesizeStateBacking(variable: environmentVariable, propertyWrapperTypeName: "skip.ui.Environment", create: true)
-                }
+        for stateVariable in stateVariables {
+            synthesizeStateBacking(variable: stateVariable, propertyWrapperTypeName: "skip.ui.State")
+        }
+        for environmentVariable in environmentVariables {
+            if environmentVariable.attributes.contains(.environmentObject) || environmentVariable.attributes.environmentAttribute?.tokenTypeSignature != nil {
+                synthesizeStateBacking(variable: environmentVariable, propertyWrapperTypeName: "skip.ui.Environment", create: true)
             }
         }
         for focusStateVariable in focusStateVariables {
@@ -339,71 +339,80 @@ private final class TranslateVisitor {
         }
     }
 
-    /// Create an override of the SkipUI `Compose` function on views and modifiers to handle state synchronization, etc.
-    private func synthesizeComposeFunction(isModifier: Bool, stateVariables: [KotlinVariableDeclaration], focusStateVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], appStorageVariables: [KotlinVariableDeclaration]) -> KotlinStatement {
-        let composeFunction = KotlinFunctionDeclaration(name: isModifier ? "Compose" : "ComposeContent")
-        composeFunction.modifiers.visibility = .public
-        composeFunction.modifiers.isOverride = true
-        composeFunction.annotations.append("@Composable")
+    /// Create an override of the SkipUI `Evaluate` function on views and modifiers to handle state synchronization, etc.
+    private func synthesizeEvaluateFunction(isModifier: Bool, stateVariables: [KotlinVariableDeclaration], focusStateVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], appStorageVariables: [KotlinVariableDeclaration]) -> KotlinStatement {
+        let evaluateFunction = KotlinFunctionDeclaration(name: "Evaluate")
+        evaluateFunction.modifiers.visibility = .public
+        evaluateFunction.modifiers.isOverride = true
+        evaluateFunction.annotations.append("@Composable")
         if !stateVariables.isEmpty {
-            composeFunction.annotations.append("@Suppress(\"UNCHECKED_CAST\")")
+            evaluateFunction.annotations.append("@Suppress(\"UNCHECKED_CAST\")")
         }
+        evaluateFunction.returnType = .named("kotlin.collections.List", [.named("Renderable", [])])
         if isModifier {
-            composeFunction.parameters.append(Parameter(externalLabel: "content", declaredType: .named("View", [])))
+            evaluateFunction.parameters.append(Parameter(externalLabel: "content", declaredType: .named("View", [])))
         }
-        composeFunction.parameters.append(Parameter(externalLabel: "composectx", declaredType: .named("ComposeContext", [])))
-        composeFunction.isGenerated = true
-        composeFunction.extras = .singleNewline
+        evaluateFunction.parameters.append(Parameter(externalLabel: "composectx", declaredType: .named("ComposeContext", [])))
+        evaluateFunction.parameters.append(Parameter(externalLabel: "options", declaredType: .int))
+        evaluateFunction.isGenerated = true
+        evaluateFunction.extras = .singleNewline
 
-        var composeBodyStatements: [KotlinStatement] = []
+        let syncStateStatements = self.syncStateStatements(stateVariables: stateVariables, focusStateVariables: focusStateVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables)
+
+        var bodyInvocation: [String] = ["StateTracking.pushBody()"]
+        if isModifier {
+            bodyInvocation.append("val renderables = body(content).Evaluate(composectx, options)")
+        } else {
+            bodyInvocation.append("val renderables = body().Evaluate(composectx, options)")
+        }
+        bodyInvocation += [
+            "StateTracking.popBody()",
+            "return renderables"
+        ]
+        let bodyInvocationStatements = bodyInvocation.map { KotlinRawStatement(sourceCode: $0) }
+        if !syncStateStatements.isEmpty {
+            bodyInvocationStatements[0].extras = .singleNewline
+        }
+
+        let body = KotlinCodeBlock(statements: syncStateStatements + bodyInvocationStatements)
+        evaluateFunction.body = body
+        evaluateFunction.assignParentReferences()
+        return evaluateFunction
+    }
+
+    private func syncStateStatements(stateVariables: [KotlinVariableDeclaration], focusStateVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], appStorageVariables: [KotlinVariableDeclaration]) -> [KotlinStatement] {
+        var syncStateStatements: [KotlinStatement] = []
         for stateVariable in stateVariables {
             let statements = synthesizeStateSync(variable: stateVariable, propertyWrapperTypeName: "skip.ui.State")
-            if !composeBodyStatements.isEmpty {
+            if !syncStateStatements.isEmpty {
                 statements[0].extras = .singleNewline
             }
-            composeBodyStatements += statements
+            syncStateStatements += statements
         }
         for focusStateVariable in focusStateVariables {
             let statements = synthesizeStateSync(variable: focusStateVariable, propertyWrapperTypeName: "skip.ui.FocusState")
-            if !composeBodyStatements.isEmpty {
+            if !syncStateStatements.isEmpty {
                 statements[0].extras = .singleNewline
             }
-            composeBodyStatements += statements
+            syncStateStatements += statements
         }
         for i in 0..<environmentVariables.count {
             guard let statement = synthesizeEnvironmentSync(variable: environmentVariables[i]) else {
                 continue
             }
-            if i == 0 && !composeBodyStatements.isEmpty {
+            if i == 0 && !syncStateStatements.isEmpty {
                 statement.extras = .singleNewline
             }
-            composeBodyStatements.append(statement)
+            syncStateStatements.append(statement)
         }
         for appStorageVariable in appStorageVariables {
             let statements = synthesizeStateSync(variable: appStorageVariable, propertyWrapperTypeName: "skip.ui.AppStorage")
-            if !composeBodyStatements.isEmpty {
+            if !syncStateStatements.isEmpty {
                 statements[0].extras = .singleNewline
             }
-            composeBodyStatements += statements
+            syncStateStatements += statements
         }
-
-        var superCall = "super.\(composeFunction.name)("
-        for (i, parameter) in composeFunction.parameters.enumerated() {
-            if i > 0 {
-                superCall += ", "
-            }
-            superCall += parameter.internalLabel
-        }
-        superCall += ")"
-        let statement = KotlinRawStatement(sourceCode: superCall)
-        statement.extras = .singleNewline
-        composeBodyStatements.append(statement)
-
-        let body = KotlinCodeBlock(statements: composeBodyStatements)
-        composeFunction.body = body
-        
-        composeFunction.assignParentReferences()
-        return composeFunction
+        return syncStateStatements
     }
 
     /// Create code to remember and sync a state variable.

@@ -7102,6 +7102,8 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    //~~~ NEED TO UPDATE BRIDGING OF VIEWS AND MODIFIERS
+
     func testUnbridgedView() async throws {
         try await check(swiftBridge: """
         import SkipFuseUI
