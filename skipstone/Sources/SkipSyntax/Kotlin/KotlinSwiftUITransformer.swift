@@ -352,7 +352,7 @@ private final class TranslateVisitor {
         if isModifier {
             evaluateFunction.parameters.append(Parameter(externalLabel: "content", declaredType: .named("View", [])))
         }
-        evaluateFunction.parameters.append(Parameter(externalLabel: "composectx", declaredType: .named("ComposeContext", [])))
+        evaluateFunction.parameters.append(Parameter(externalLabel: "context", declaredType: .named("ComposeContext", [])))
         evaluateFunction.parameters.append(Parameter(externalLabel: "options", declaredType: .int))
         evaluateFunction.isGenerated = true
         evaluateFunction.extras = .singleNewline
@@ -361,9 +361,9 @@ private final class TranslateVisitor {
 
         var bodyInvocation: [String] = ["StateTracking.pushBody()"]
         if isModifier {
-            bodyInvocation.append("val renderables = body(content).Evaluate(composectx, options)")
+            bodyInvocation.append("val renderables = body(content).Evaluate(context, options)")
         } else {
-            bodyInvocation.append("val renderables = body().Evaluate(composectx, options)")
+            bodyInvocation.append("val renderables = body().Evaluate(context, options)")
         }
         bodyInvocation += [
             "StateTracking.popBody()",
@@ -420,7 +420,7 @@ private final class TranslateVisitor {
         // We save and restore the State object rather than its wrappedValue so that bindings can mutate the value even if this
         // view has disappeared from the Compose tree (e.g. is on the back stack). The State object uses a Compose MutableState
         // internally so that all reads and writes are tracked by Compose, including those from bindings
-        let stateValue = KotlinRawStatement(sourceCode: "val remembered\(variable.propertyName) by rememberSaveable(stateSaver = composectx.stateSaver as Saver<\(propertyWrapperTypeName)<\(variable.propertyType.kotlin)>, Any>) { mutableStateOf(_\(variable.propertyName)) }")
+        let stateValue = KotlinRawStatement(sourceCode: "val remembered\(variable.propertyName) by rememberSaveable(stateSaver = context.stateSaver as Saver<\(propertyWrapperTypeName)<\(variable.propertyType.kotlin)>, Any>) { mutableStateOf(_\(variable.propertyName)) }")
         let updateStateValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName) = remembered\(variable.propertyName)")
         return [stateValue, updateStateValue]
     }
@@ -453,14 +453,14 @@ private final class TranslateVisitor {
 
         var sourceCode: String
         if entry.key == "self" {
-            sourceCode = variable.propertyName + " = EnvironmentValues.shared"
+            sourceCode = "this.\(variable.propertyName) = EnvironmentValues.shared"
         } else if entry.isObject {
-            sourceCode = "_" + variable.propertyName + ".wrappedValue = EnvironmentValues.shared.environmentObject(type = \(entry.key))"
+            sourceCode = "_\(variable.propertyName).wrappedValue = EnvironmentValues.shared.environmentObject(type = \(entry.key))"
             if variable.declaredType.isOptional == false {
                 sourceCode += "!!"
             }
         } else {
-            sourceCode = variable.propertyName + " = EnvironmentValues.shared.\(entry.key)"
+            sourceCode = "this.\(variable.propertyName) = EnvironmentValues.shared.\(entry.key)"
         }
         return KotlinRawStatement(sourceCode: sourceCode)
     }
