@@ -358,13 +358,14 @@ private final class TranslateVisitor {
 
         var statements = syncStateStatements(stateVariables: stateVariables, focusStateVariables: focusStateVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables)
 
-        let superInvocation: String
+        let superInvocation: KotlinStatement
         if isModifier {
-            superInvocation = "return super.Evaluate(content, context, options)"
+            superInvocation = KotlinRawStatement(sourceCode: "return super.Evaluate(content, context, options)")
         } else {
-            superInvocation = "return super.Evaluate(context, options)"
+            superInvocation = KotlinRawStatement(sourceCode: "return super.Evaluate(context, options)")
         }
-        statements.append(KotlinRawStatement(sourceCode: superInvocation))
+        superInvocation.extras = .singleNewline
+        statements.append(superInvocation)
 
         let body = KotlinCodeBlock(statements: statements)
         evaluateFunction.body = body
