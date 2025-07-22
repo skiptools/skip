@@ -258,7 +258,6 @@ private final class TranslateVisitor {
             updateEnvironmentFunctionCallParameters(for: keyPath, in: functionCall)
             return
         }
-        addWarningsForGroupModifiers(to: functionCall)
         // Look for closures passed as ViewBuilder arguments to function calls
         guard case .function(let parameterTypes, _, _, _) = functionCall.apiMatch?.signature, parameterTypes.count == functionCall.arguments.count else {
             return
@@ -757,21 +756,6 @@ private final class TranslateVisitor {
         if let match = codebaseInfo.matchIdentifier(name: property, inConstrained: .named("EnvironmentValues", [])) {
             memberAccess.baseType = match.signature
         }
-    }
-
-    private func addWarningsForGroupModifiers(to functionCall: KotlinFunctionCall) {
-        // We're looking for a modifier function call on a Group/ForEach function call, as in:
-        // Group(content: { ... }).modifier()
-        guard let memberAccess = functionCall.function as? KotlinMemberAccess, memberAccess.member != "Compose", let subject = memberAccess.base as? KotlinFunctionCall, let identifier = subject.function as? KotlinIdentifier else {
-            return
-        }
-        guard identifier.name == "Group" || identifier.name == "Section" || (identifier.name == "ForEach" && memberAccess.member != "onDelete" && memberAccess.member != "onMove") else {
-            return
-        }
-        guard isInSwiftUIElement("List", node: functionCall) else {
-            return
-        }
-        functionCall.messages.append(.kotlinSwiftUIGroupModifier(functionCall, source: translator.syntaxTree.source))
     }
 
     private func updateTableColumnFunctionCallParameters(in node: KotlinSyntaxNode) {
