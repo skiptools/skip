@@ -357,24 +357,17 @@ private final class TranslateVisitor {
         evaluateFunction.isGenerated = true
         evaluateFunction.extras = .singleNewline
 
-        let syncStateStatements = self.syncStateStatements(stateVariables: stateVariables, focusStateVariables: focusStateVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables)
+        var statements = syncStateStatements(stateVariables: stateVariables, focusStateVariables: focusStateVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables)
 
-        var bodyInvocation: [String] = ["StateTracking.pushBody()"]
+        let superInvocation: String
         if isModifier {
-            bodyInvocation.append("val renderables = body(content).Evaluate(context, options)")
+            superInvocation = "return super.Evaluate(content, context, options)"
         } else {
-            bodyInvocation.append("val renderables = body().Evaluate(context, options)")
+            superInvocation = "return super.Evaluate(context, options)"
         }
-        bodyInvocation += [
-            "StateTracking.popBody()",
-            "return renderables"
-        ]
-        let bodyInvocationStatements = bodyInvocation.map { KotlinRawStatement(sourceCode: $0) }
-        if !syncStateStatements.isEmpty {
-            bodyInvocationStatements[0].extras = .singleNewline
-        }
+        statements.append(KotlinRawStatement(sourceCode: superInvocation))
 
-        let body = KotlinCodeBlock(statements: syncStateStatements + bodyInvocationStatements)
+        let body = KotlinCodeBlock(statements: statements)
         evaluateFunction.body = body
         evaluateFunction.assignParentReferences()
         return evaluateFunction

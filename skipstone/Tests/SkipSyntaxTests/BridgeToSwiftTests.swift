@@ -5469,6 +5469,8 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    //~~~
+
     func testView() async throws {
         try await check(swift: """
         #if !SKIP_BRIDGE

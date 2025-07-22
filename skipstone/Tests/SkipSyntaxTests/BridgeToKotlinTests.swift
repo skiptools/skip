@@ -6989,6 +6989,8 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    //~~~
+
     func testBridgedView() async throws {
         try await check(swiftBridge: """
         #if canImport(SkipFuseUI)
@@ -7101,8 +7103,6 @@ final class BridgeToKotlinTests: XCTestCase {
         }
         """, transformers: transformers)
     }
-
-    //~~~ NEED TO UPDATE BRIDGING OF VIEWS AND MODIFIERS
 
     func testUnbridgedView() async throws {
         try await check(swiftBridge: """
