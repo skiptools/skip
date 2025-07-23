@@ -5504,11 +5504,11 @@ final class BridgeToSwiftTests: XCTestCase {
 
             @Composable
             @Suppress("UNCHECKED_CAST")
-            override fun ComposeContent(composectx: ComposeContext) {
-                val rememberedi by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_i) }
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedi by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_i) }
                 _i = rememberedi
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
 
             constructor(i: Int = 0) {

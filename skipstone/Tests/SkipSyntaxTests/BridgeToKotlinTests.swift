@@ -7141,10 +7141,10 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun hashCode(): Int = Swift_peer.hashCode()
 
             @androidx.compose.runtime.Composable
-            override fun ComposeContent(composectx: skip.ui.ComposeContext) {
-                val rememberedcount = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_count(Swift_peer)) }
+            override fun Evaluate(context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedcount = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_count(Swift_peer)) }
                 Swift_syncState_count(Swift_peer, rememberedcount.value)
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
             private external fun Swift_initState_count(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport
             private external fun Swift_syncState_count(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.StateSupport)
@@ -7254,10 +7254,10 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun hashCode(): Int = Swift_peer.hashCode()
 
             @androidx.compose.runtime.Composable
-            override fun ComposeContent(composectx: skip.ui.ComposeContext) {
-                val rememberedt = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_t(Swift_peer)) }
+            override fun Evaluate(context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedt = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_t(Swift_peer)) }
                 Swift_syncState_t(Swift_peer, rememberedt.value)
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
             private external fun Swift_initState_t(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport
             private external fun Swift_syncState_t(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.StateSupport)
@@ -7387,10 +7387,10 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun hashCode(): Int = Swift_peer.hashCode()
 
             @androidx.compose.runtime.Composable
-            override fun ComposeContent(composectx: skip.ui.ComposeContext) {
-                val rememberedi = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_i(Swift_peer)) }
+            override fun Evaluate(context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedi = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_i(Swift_peer)) }
                 Swift_syncState_i(Swift_peer, rememberedi.value)
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
             private external fun Swift_initState_i(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport
             private external fun Swift_syncState_i(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.StateSupport)
@@ -7687,10 +7687,10 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun hashCode(): Int = Swift_peer.hashCode()
 
             @androidx.compose.runtime.Composable
-            override fun ComposeContent(composectx: skip.ui.ComposeContext) {
-                val rememberedfocused = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_focused(Swift_peer)) }
+            override fun Evaluate(context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedfocused = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_focused(Swift_peer)) }
                 Swift_syncState_focused(Swift_peer, rememberedfocused.value)
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
             private external fun Swift_initState_focused(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport
             private external fun Swift_syncState_focused(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.StateSupport)
@@ -7800,10 +7800,10 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun hashCode(): Int = Swift_peer.hashCode()
 
             @androidx.compose.runtime.Composable
-            override fun ComposeContent(composectx: skip.ui.ComposeContext) {
-                val rememberedi = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_i(Swift_peer)) }
+            override fun Evaluate(context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedi = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_i(Swift_peer)) }
                 Swift_syncState_i(Swift_peer, rememberedi.value)
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
             private external fun Swift_initState_i(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport
             private external fun Swift_syncState_i(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.StateSupport)
@@ -7913,10 +7913,10 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun hashCode(): Int = Swift_peer.hashCode()
 
             @androidx.compose.runtime.Composable
-            override fun ComposeContent(composectx: skip.ui.ComposeContext) {
-                val rememberedvalue = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.AppStorageSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_value(Swift_peer)) }
+            override fun Evaluate(context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedvalue = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.AppStorageSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_value(Swift_peer)) }
                 Swift_syncState_value(Swift_peer, rememberedvalue.value)
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
             private external fun Swift_initState_value(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.AppStorageSupport
             private external fun Swift_syncState_value(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.AppStorageSupport)
@@ -8038,10 +8038,10 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun hashCode(): Int = Swift_peer.hashCode()
 
             @androidx.compose.runtime.Composable
-            override fun Compose(content: skip.ui.View, composectx: skip.ui.ComposeContext) {
-                val rememberedcount = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_count(Swift_peer)) }
+            override fun Evaluate(content: skip.ui.View, context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedcount = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_count(Swift_peer)) }
                 Swift_syncState_count(Swift_peer, rememberedcount.value)
-                super.Compose(content, composectx)
+                return super.Evaluate(content, context, options)
             }
             private external fun Swift_initState_count(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport
             private external fun Swift_syncState_count(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.StateSupport)
@@ -8217,10 +8217,10 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun hashCode(): Int = Swift_peer.hashCode()
 
             @androidx.compose.runtime.Composable
-            override fun ComposeContent(composectx: skip.ui.ComposeContext) {
-                val rememberedcount = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_count(Swift_peer)) }
+            override fun Evaluate(context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedcount = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_count(Swift_peer)) }
                 Swift_syncState_count(Swift_peer, rememberedcount.value)
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
             private external fun Swift_initState_count(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport
             private external fun Swift_syncState_count(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.StateSupport)
@@ -8699,11 +8699,11 @@ final class BridgeToKotlinTests: XCTestCase {
 
             @Composable
             @Suppress("UNCHECKED_CAST")
-            override fun ComposeContent(composectx: ComposeContext) {
-                val rememberedcount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_count) }
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedcount by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_count) }
                 _count = rememberedcount
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
 
             constructor(count: Int) {

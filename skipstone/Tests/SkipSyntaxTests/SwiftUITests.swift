@@ -643,14 +643,14 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress("UNCHECKED_CAST")
-            override fun ComposeContent(composectx: ComposeContext) {
-                val remembereds by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_s) }
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val remembereds by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_s) }
                 _s = remembereds
 
-                val rememberedo by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<O>, Any>) { mutableStateOf(_o) }
+                val rememberedo by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.State<O>, Any>) { mutableStateOf(_o) }
                 _o = rememberedo
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
 
             constructor(s: Int = 0, o: O = O()) {
@@ -733,11 +733,11 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress("UNCHECKED_CAST")
-            override fun ComposeContent(composectx: ComposeContext) {
-                val remembereds by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<S>, Any>) { mutableStateOf(_s) }
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val remembereds by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.State<S>, Any>) { mutableStateOf(_s) }
                 _s = remembereds
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
 
             constructor(s: S = S()) {
@@ -788,11 +788,11 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress("UNCHECKED_CAST")
-            override fun ComposeContent(composectx: ComposeContext) {
-                val rememberedviewModel by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<SubViewModel>, Any>) { mutableStateOf(_viewModel) }
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedviewModel by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.State<SubViewModel>, Any>) { mutableStateOf(_viewModel) }
                 _viewModel = rememberedviewModel
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
 
             private constructor(viewModel: SubViewModel = SubViewModel(), privatep: Nothing? = null) {
@@ -856,11 +856,11 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress("UNCHECKED_CAST")
-            override fun ComposeContent(composectx: ComposeContext) {
-                val rememberedx by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<String?>, Any>) { mutableStateOf(_x) }
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedx by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.State<String?>, Any>) { mutableStateOf(_x) }
                 _x = rememberedx
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
 
             constructor(x: String? = null) {
@@ -928,14 +928,14 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
-            override fun ComposeContent(composectx: ComposeContext) {
-                val rememberedb by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.FocusState<Boolean>, Any>) { mutableStateOf(_b) }
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedb by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.FocusState<Boolean>, Any>) { mutableStateOf(_b) }
                 _b = rememberedb
 
-                val rememberede by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.FocusState<FocusField?>, Any>) { mutableStateOf(_e) }
+                val rememberede by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.FocusState<FocusField?>, Any>) { mutableStateOf(_e) }
                 _e = rememberede
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
         }
         """)
@@ -985,10 +985,10 @@ final class SwiftUITests: XCTestCase {
             }
         
             @Composable
-            override fun ComposeContent(composectx: ComposeContext) {
-                envvalue = EnvironmentValues.shared.envvalue
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                this.envvalue = EnvironmentValues.shared.envvalue
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
             internal val isMin: Boolean
                 get() = envvalue == Int.min
@@ -1034,10 +1034,10 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
-            override fun ComposeContent(composectx: ComposeContext) {
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
                 _envvalue.wrappedValue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)!!
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
         }
         """)
@@ -1074,10 +1074,10 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
-            override fun ComposeContent(composectx: ComposeContext) {
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
                 _envvalue.wrappedValue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)!!
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
         }
         """)
@@ -1118,10 +1118,10 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
-            override fun ComposeContent(composectx: ComposeContext) {
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
                 _envvalue.wrappedValue = EnvironmentValues.shared.environmentObject(type = V.EnvValue::class)!!
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
             internal open class EnvValue {
             }
@@ -1168,10 +1168,10 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
-            override fun ComposeContent(composectx: ComposeContext) {
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
                 _envvalue.wrappedValue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
         }
         """)
@@ -1231,14 +1231,14 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress("UNCHECKED_CAST")
-            override fun ComposeContent(composectx: ComposeContext) {
-                val rememberedcount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_count) }
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedcount by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_count) }
                 _count = rememberedcount
 
                 _envvalue1.wrappedValue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)!!
                 _envvalue2.wrappedValue = EnvironmentValues.shared.environmentObject(type = EnvValue::class)!!
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
 
             constructor(count: Int = 0) {
@@ -1325,11 +1325,11 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress("UNCHECKED_CAST")
-            override fun ComposeContent(composectx: ComposeContext) {
-                val rememberedtext by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<String>, Any>) { mutableStateOf(_text) }
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedtext by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.State<String>, Any>) { mutableStateOf(_text) }
                 _text = rememberedtext
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
 
             constructor(text: String = "") {
@@ -1376,11 +1376,11 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress("UNCHECKED_CAST")
-            override fun ComposeContent(composectx: ComposeContext) {
-                val rememberedtext by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<String>, Any>) { mutableStateOf(_text) }
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedtext by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.State<String>, Any>) { mutableStateOf(_text) }
                 _text = rememberedtext
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
 
             constructor(text: String = "") {
@@ -1445,11 +1445,11 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress("UNCHECKED_CAST")
-            override fun ComposeContent(composectx: ComposeContext) {
-                val remembereditem by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Item>, Any>) { mutableStateOf(_item) }
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val remembereditem by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.State<Item>, Any>) { mutableStateOf(_item) }
                 _item = remembereditem
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
 
             constructor(item: Item = Item(id = UUID(), s = "New Item")) {
@@ -1551,12 +1551,6 @@ final class SwiftUITests: XCTestCase {
                 return ComposeBuilder { composectx: ComposeContext -> TextField(Binding({ _o.wrappedValue.string }, { it -> _o.wrappedValue.string = it })).Compose(composectx) }
             }
 
-            @Composable
-            override fun ComposeContent(composectx: ComposeContext) {
-
-                super.ComposeContent(composectx)
-            }
-
             constructor(o: O) {
                 this._o = skip.ui.Bindable(o)
             }
@@ -1601,12 +1595,6 @@ final class SwiftUITests: XCTestCase {
                 return ComposeBuilder { composectx: ComposeContext -> TextField(Binding({ this._o.wrappedValue.s.string }, { it -> this._o.wrappedValue.s.string = it })).Compose(composectx) }
             }
 
-            @Composable
-            override fun ComposeContent(composectx: ComposeContext) {
-
-                super.ComposeContent(composectx)
-            }
-
             constructor(o: O) {
                 this._o = skip.ui.Bindable(o)
             }
@@ -1648,12 +1636,6 @@ final class SwiftUITests: XCTestCase {
             internal var _o: skip.ui.Bindable<O>
             override fun body(): View {
                 return ComposeBuilder { composectx: ComposeContext -> TextField(Binding({ _o.wrappedValue.strings[0] }, { it -> _o.wrappedValue.strings[0] = it })).Compose(composectx) }
-            }
-
-            @Composable
-            override fun ComposeContent(composectx: ComposeContext) {
-
-                super.ComposeContent(composectx)
             }
 
             constructor(o: O) {
@@ -1772,13 +1754,13 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress("UNCHECKED_CAST")
-            override fun ComposeContent(composectx: ComposeContext) {
-                val rememberedcount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_count) }
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedcount by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_count) }
                 _count = rememberedcount
 
-                envvalue = EnvironmentValues.shared.envvalue
+                this.envvalue = EnvironmentValues.shared.envvalue
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
 
             constructor(count: Int = 0, text: Binding<String>, o: O, i: Int = 0) {
@@ -1864,13 +1846,13 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress("UNCHECKED_CAST")
-            override fun ComposeContent(composectx: ComposeContext) {
-                val rememberedcount by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_count) }
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedcount by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.State<Int>, Any>) { mutableStateOf(_count) }
                 _count = rememberedcount
 
-                envvalue = EnvironmentValues.shared.envvalue
+                this.envvalue = EnvironmentValues.shared.envvalue
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
 
             private constructor(copy: MutableStruct) {
@@ -2280,11 +2262,11 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
-            override fun ComposeContent(composectx: ComposeContext) {
-                val rememberedappStorageProp by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.AppStorage<String>, Any>) { mutableStateOf(_appStorageProp) }
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedappStorageProp by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.AppStorage<String>, Any>) { mutableStateOf(_appStorageProp) }
                 _appStorageProp = rememberedappStorageProp
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
 
             constructor(appStorageProp: String = "appStorageDefaultValue") {
@@ -2342,11 +2324,11 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
-            override fun ComposeContent(composectx: ComposeContext) {
-                val remembereddoublePref by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.AppStorage<Double>, Any>) { mutableStateOf(_doublePref) }
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val remembereddoublePref by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.AppStorage<Double>, Any>) { mutableStateOf(_doublePref) }
                 _doublePref = remembereddoublePref
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
 
             constructor(doublePref: Double = 1.0) {
@@ -2406,14 +2388,14 @@ final class SwiftUITests: XCTestCase {
             }
 
             @Composable
-            override fun ComposeContent(composectx: ComposeContext) {
-                val rememberedenumProp by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.AppStorage<E>, Any>) { mutableStateOf(_enumProp) }
+            override fun Evaluate(context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedenumProp by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.AppStorage<E>, Any>) { mutableStateOf(_enumProp) }
                 _enumProp = rememberedenumProp
 
-                val rememberedstructProp by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.AppStorage<S>, Any>) { mutableStateOf(_structProp) }
+                val rememberedstructProp by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.AppStorage<S>, Any>) { mutableStateOf(_structProp) }
                 _structProp = rememberedstructProp
 
-                super.ComposeContent(composectx)
+                return super.Evaluate(context, options)
             }
 
             constructor(enumProp: E = E.a, structProp: S = S(rawValue = 1)) {
@@ -2552,11 +2534,11 @@ final class SwiftUITests: XCTestCase {
 
             @Composable
             @Suppress("UNCHECKED_CAST")
-            override fun Compose(content: View, composectx: ComposeContext) {
-                val rememberedisPresented by rememberSaveable(stateSaver = composectx.stateSaver as Saver<skip.ui.State<Boolean>, Any>) { mutableStateOf(_isPresented) }
+            override fun Evaluate(content: View, context: ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedisPresented by rememberSaveable(stateSaver = context.stateSaver as Saver<skip.ui.State<Boolean>, Any>) { mutableStateOf(_isPresented) }
                 _isPresented = rememberedisPresented
 
-                super.Compose(content, composectx)
+                return super.Evaluate(content, context, options)
             }
 
             constructor(isPresented: Boolean = false) {
@@ -2780,36 +2762,8 @@ final class SwiftUITests: XCTestCase {
                 }
             }
 
-            @Composable
-            override fun ComposeContent(composectx: ComposeContext) {
-
-                super.ComposeContent(composectx)
-            }
-
             constructor(o: O) {
                 this._o = skip.ui.Bindable(o)
-            }
-        }
-        """)
-    }
-
-    func testGroupModifier() async throws {
-        try await checkProducesMessage(swift: baseSupportingSwift + """
-        struct List: View {
-            init(@ViewBuilder content: () -> some View) {
-            }
-        }
-        struct ForEach: View {
-            init(@ViewBuilder content: () -> some View) {
-            }
-        }
-        struct ListView: View {
-            var body: some View {
-                List {
-                    ForEach {
-                    }
-                    .mod()
-                }
             }
         }
         """)

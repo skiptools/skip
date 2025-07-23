@@ -1563,7 +1563,7 @@ final class KotlinBridgeToKotlinVisitor {
             return (name, attributes, modifiers)
         }
         if !stateVariables.isEmpty {
-            statements += swiftUIComposeContent(swiftUIType, for: classDeclaration, stateVariables: stateVariables)
+            statements += swiftUIEvaluate(swiftUIType, for: classDeclaration, stateVariables: stateVariables)
             for (name, attributes, modifiers) in stateVariables {
                 var initStatements: [KotlinStatement] = []
                 var syncStatements: [KotlinStatement] = []
@@ -1601,14 +1601,16 @@ final class KotlinBridgeToKotlinVisitor {
         return (stateVariables, statements, swift, cdeclFunctions)
     }
 
-    private func swiftUIComposeContent(_ swiftUIType: TypeSignature.SwiftUIType, for classDeclaration: KotlinClassDeclaration, stateVariables: [(name: String, attributes: Attributes, modifiers: Modifiers)]) -> [KotlinStatement] {
-        let functionName = swiftUIType == .view || swiftUIType == .toolbarContent ? "ComposeContent" : "Compose"
-        let functionDeclaration = KotlinFunctionDeclaration(name: functionName)
-        if swiftUIType == .view || swiftUIType == .toolbarContent {
-            functionDeclaration.parameters = [Parameter<KotlinExpression>(externalLabel: "composectx", declaredType: .named("skip.ui.ComposeContext", []))]
-        } else {
-            functionDeclaration.parameters = [Parameter<KotlinExpression>(externalLabel: "content", declaredType: .named("skip.ui.View", [])), Parameter<KotlinExpression>(externalLabel: "composectx", declaredType: .named("skip.ui.ComposeContext", []))]
+    private func swiftUIEvaluate(_ swiftUIType: TypeSignature.SwiftUIType, for classDeclaration: KotlinClassDeclaration, stateVariables: [(name: String, attributes: Attributes, modifiers: Modifiers)]) -> [KotlinStatement] {
+        let functionDeclaration = KotlinFunctionDeclaration(name: "Evaluate")
+        var functionParameters: [Parameter<KotlinExpression>] = []
+        if swiftUIType != .view && swiftUIType != .toolbarContent {
+            functionParameters.append(Parameter<KotlinExpression>(externalLabel: "content", declaredType: .named("skip.ui.View", [])))
         }
+        functionParameters.append(Parameter<KotlinExpression>(externalLabel: "context", declaredType: .named("skip.ui.ComposeContext", [])))
+        functionParameters.append(Parameter<KotlinExpression>(externalLabel: "options", declaredType: .int))
+        functionDeclaration.parameters = functionParameters
+        functionDeclaration.returnType = .named("kotlin.collections.List", [.named("Renderable", [])])
         functionDeclaration.modifiers = Modifiers(visibility: .public, isOverride: true)
         functionDeclaration.attributes.attributes.append(Attribute(signature: .named("androidx.compose.runtime.Composable", [])))
         functionDeclaration.extras = .singleNewline
@@ -1618,7 +1620,7 @@ final class KotlinBridgeToKotlinVisitor {
         for (name, attributes, _) in stateVariables {
             if attributes.stateAttribute != nil || attributes.contains(.focusState) || attributes.contains(.gestureState) || attributes.contains(.appStorage) {
                 let supportTypeName = attributes.contains(.appStorage) ? "AppStorageSupport" : "StateSupport"
-                bodyKotlin.append("val remembered\(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = composectx.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.\(supportTypeName), Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_\(name)(\(classType.peerExternalArgument))) }")
+                bodyKotlin.append("val remembered\(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.\(supportTypeName), Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_\(name)(\(classType.peerExternalArgument))) }")
                 bodyKotlin.append("Swift_syncState_\(name)(\(classType.peerExternalArgument), remembered\(name).value)")
             } else if attributes.environmentAttribute != nil {
                 bodyKotlin.append("val envkey\(name) = Swift_initEnvironment_\(name)(\(classType.peerExternalArgument))")
@@ -1626,10 +1628,10 @@ final class KotlinBridgeToKotlinVisitor {
                 bodyKotlin.append("Swift_syncEnvironment_\(name)(\(classType.peerExternalArgument), envvalue\(name))")
             }
         }
-        if swiftUIType == .view || swiftUIType == .toolbarContent {
-            bodyKotlin.append("super.ComposeContent(composectx)")
+        if swiftUIType != .view && swiftUIType != .toolbarContent {
+            bodyKotlin.append("return super.Evaluate(content, context, options)")
         } else {
-            bodyKotlin.append("super.Compose(content, composectx)")
+            bodyKotlin.append("return super.Evaluate(context, options)")
         }
         functionDeclaration.body = KotlinCodeBlock(statements: bodyKotlin.map { KotlinRawStatement(sourceCode: $0) })
         return [functionDeclaration]
