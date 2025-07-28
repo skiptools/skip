@@ -446,8 +446,7 @@ public class \(moduleName)Module {
 
             let resourcesAttribute: String = resourceFolder.flatMap { resourceFolder in ", resources: [.process(\"\(resourceFolder)\")]" } ?? ""
 
-            if !isDependentNativeModule, (!isNativeModule || isNativeAppModule),
-               let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
+            if let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
                 let sourceResourcesDir = try sourceDir.append(path: resourceFolder, create: true)
                 let sourceResourcesFile = sourceResourcesDir.appending(path: "Localizable.xcstrings")
                 try """

@@ -594,6 +594,8 @@ final class SkipCommandTests: XCTestCase {
         ├─ README.md
         ├─ Sources
         │  └─ SomeModule
+        │     ├─ Resources
+        │     │  └─ Localizable.xcstrings
         │     ├─ Skip
         │     │  └─ skip.yml
         │     └─ SomeModule.swift
@@ -725,6 +727,8 @@ final class SkipCommandTests: XCTestCase {
         ├─ README.md
         └─ Sources
            └─ SomeModule
+              ├─ Resources
+              │  └─ Localizable.xcstrings
               ├─ Skip
               │  └─ skip.yml
               └─ SomeModule.swift
@@ -853,6 +857,8 @@ final class SkipCommandTests: XCTestCase {
         │  │  └─ Skip
         │  │     └─ skip.yml
         │  └─ ModelModule
+        │     ├─ Resources
+        │     │  └─ Localizable.xcstrings
         │     ├─ Skip
         │     │  └─ skip.yml
         │     └─ ViewModel.swift
@@ -1041,6 +1047,8 @@ final class SkipCommandTests: XCTestCase {
         │  │  └─ Skip
         │  │     └─ skip.yml
         │  └─ ModelModule
+        │     ├─ Resources
+        │     │  └─ Localizable.xcstrings
         │     ├─ Skip
         │     │  └─ skip.yml
         │     └─ ViewModel.swift
@@ -1746,15 +1754,23 @@ final class SkipCommandTests: XCTestCase {
         │  │  └─ Skip
         │  │     └─ skip.yml
         │  ├─ M2
+        │  │  ├─ Resources
+        │  │  │  └─ Localizable.xcstrings
         │  │  ├─ Skip
         │  │  │  └─ skip.yml
         │  │  └─ ViewModel.swift
         │  ├─ M3
-        │  │  └─ M3.swift
+        │  │  ├─ M3.swift
+        │  │  └─ Resources
+        │  │     └─ Localizable.xcstrings
         │  ├─ M4
-        │  │  └─ M4.swift
+        │  │  ├─ M4.swift
+        │  │  └─ Resources
+        │  │     └─ Localizable.xcstrings
         │  └─ M5
-        │     └─ M5.swift
+        │     ├─ M5.swift
+        │     └─ Resources
+        │        └─ Localizable.xcstrings
         └─ Tests
            ├─ M1Tests
            │  ├─ M1Tests.swift
