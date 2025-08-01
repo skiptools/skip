@@ -111,43 +111,6 @@ struct PluginCommand: MessageCommand, ToolOptionsCommand {
             return basePath
         }
 
-        /*
-         // local override of BUILT_PRODUCTS_DIR
-         if (System.getenv("BUILT_PRODUCTS_DIR") == null) {
-             //System.setProperty("BUILT_PRODUCTS_DIR", "${System.getProperty("user.home")}/Library/Developer/Xcode/DerivedData/MySkipProject-aqywrhrzhkbvfseiqgxuufbdwdft/Build/Products/Debug-iphonesimulator")
-         }
-
-         // the source for the plugin is linked as part of the SkipUnit transpilation
-         val skipOutput = System.getenv("BUILT_PRODUCTS_DIR") ?: System.getProperty("BUILT_PRODUCTS_DIR")
-
-         val outputExt = if (skipOutput != null) ".output" else "" // Xcode saves output in package-name.output; SPM has no suffix
-         val skipOutputs: File = if (skipOutput != null) {
-             // BUILT_PRODUCTS_DIR is set when building from Xcode, in which case we will use Xcode's DerivedData plugin output
-             var outputs = file(skipOutput).resolve("../../../Build/Intermediates.noindex/BuildToolPluginIntermediates/") // Xcode 16.3+
-             if (!outputs.isDirectory) {
-                 outputs = file(skipOutput).resolve("../../../SourcePackages/plugins/") // Xcode 16.2-
-             }
-             outputs
-         } else {
-             exec {
-                 // create transpiled Kotlin and generate Gradle projects from SwiftPM modules
-                 commandLine("sh", "-c", "xcrun swift build --triple arm64-apple-ios --sdk $(xcrun --sdk iphoneos --show-sdk-path)")
-                 workingDir = file("..")
-             }
-             // SPM output folder is a peer of the parent Package.swift
-             rootDir.resolve("../.build/plugins/outputs/")
-         }
-
-         // load the Skip plugin (part of the skip-unit project), which handles configuring the Android project
-         // because this path is a symlink, we need to use the canonical path or gradle will mis-interpret it as a different build source
-         var pluginSource = skipOutputs.resolve("skip-unit${outputExt}/SkipUnit/destination/skipstone/buildSrc/").canonicalFile // SwiftPM 6+
-         if (!pluginSource.isDirectory) {
-             pluginSource = skipOutputs.resolve("skip-unit${outputExt}/SkipUnit/skipstone/buildSrc/").canonicalFile // SwiftPM 5.10-
-         }
-
-         print("pluginSource.path: ${pluginSource.path}\n")
-         */
-
         let basePath = try installSkipGradlePlugin()
         // the command just outputs the path where the plugin was setup; this will be read by the settings.gradle.kts script so it can include the plugin with `includeBuild(pluginPath.readText())`
         if let pluginRef = pluginRef {

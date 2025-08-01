@@ -98,7 +98,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
                     return CheckStatus(status: .fail, message: "Contents too long (\(contents.count) < \(length.upperBound)): \(file.relativePath)")
                 }
 
-                if isURL == true && (contents.hasPrefix("https://") == false || URL(string: contents) == nil) {
+                if isURL == true && (contents.hasPrefix("https://") == false || URL(string: contents.trimmingCharacters(in: .newlines)) == nil) {
                     return CheckStatus(status: .fail, message: "Contents not a valid URL: \(file.relativePath)")
                 }
 
