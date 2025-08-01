@@ -639,6 +639,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 func addIncludeModule(_ moduleName: String) {
                     settingsContents += """
                     include(":\(moduleName)")
+                    project(":\(moduleName)").projectDir = file("\(moduleName)")
 
                     """
 

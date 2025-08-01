@@ -60,13 +60,12 @@ Create a new project by following a series of interactive prompts.
                 cout(pmpt)
             }
 
-            var firstPrompt = true
             while true {
-                cout(firstPrompt ? "Enter selection (default: \(defaultCase.name)) [1..\(prompt.allCases.count)] " : "Please enter a value between 1 and \(prompt.allCases.count) ", newLine: false)
-                firstPrompt = false
+                cout("Enter selection (default: \(defaultCase.name)) [1..\(prompt.allCases.count)] ", newLine: false)
                 let input = readLine(strippingNewline: true) ?? "\(defaultCaseIndex)"
                 let index = input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? defaultCaseIndex : Int(input)
                 guard let index, index > 0, index <= prompt.allCases.count else {
+                    cout(Term.ansi.red("Please enter a value between 1 and \(prompt.allCases.count)"))
                     continue
                 }
                 return Array(prompt.allCases)[index - 1]
@@ -74,14 +73,14 @@ Create a new project by following a series of interactive prompts.
         }
 
         func prompt(_ message: String, validate: (String) -> String?) -> String {
-            var invalidMessage: String? = nil
             while true {
-                cout((invalidMessage ?? message) + ": ", newLine: false)
+                cout(message + ": ", newLine: false)
                 guard let input = readLine(strippingNewline: true) else {
                     continue
                 }
-                invalidMessage = validate(input)
-                if invalidMessage == nil {
+                if let invalidMessage = validate(input) {
+                    cout(Term.ansi.red(invalidMessage))
+                } else {
                     return input
                 }
             }
@@ -124,20 +123,20 @@ Create a new project by following a series of interactive prompts.
         }
 
         enum ProjectModeOption : PromptOption, CaseIterable {
-            case fuse
             case lite
+            case fuse
 
             var name: String {
                 switch self {
-                case .fuse: return "Skip Fuse"
                 case .lite: return "Skip Lite"
+                case .fuse: return "Skip Fuse"
                 }
             }
 
             var desc: String? {
                 switch self {
-                case .fuse: return "natively compiled project"
                 case .lite: return "transpiled project"
+                case .fuse: return "natively compiled project"
                 }
             }
         }
@@ -157,12 +156,27 @@ Create a new project by following a series of interactive prompts.
             return nil
         })
 
-        let moduleName = prompt("Enter the CamelCase name of the \(projectType.name) module", validate: isValidModuleName)
+        var moduleNames: [String] = []
 
-        var moduleNames = [moduleName]
+        func isValidProjectModuleName(_ moduleName: String) -> String? {
+            if let invalidMessage = isValidModuleName(moduleName) {
+                return invalidMessage
+            }
+            if moduleNames.contains(moduleName) {
+                return "The module name \"\(moduleName)\" is already used"
+            }
+            if moduleName.lowercased() == projectName.lowercased() {
+                return "The module name \"\(moduleName)\" must be different from the project name"
+            }
+            return nil
+        }
+        let moduleName = prompt("Enter the CamelCase name of the \(projectType.name) module", validate: isValidProjectModuleName)
+
+        moduleNames += [moduleName]
+
         while true {
             let extraModuleName = prompt("Optionally enter additional module names", validate: {
-                moduleNames.contains($0) ? "Module name already exists" : $0.isEmpty ? nil : isValidModuleName($0)
+                moduleNames.contains($0) ? "Module name already exists" : $0.isEmpty ? nil : isValidProjectModuleName($0)
             })
             if extraModuleName.isEmpty {
                 break
@@ -226,40 +240,40 @@ Create a new project by following a series of interactive prompts.
         options.free = freeProject
         options.fastlane = fastlane
 
-        let (createdURL, project, _) = try await initSkipProject(
-            options: options,
-            modules: modules,
-            resourceFolder: "Resources",
-            dir: dir,
-            verify: false,
-            configuration: .debug,
-            build: buildProject,
-            test: runTests,
-            returnHashes: false,
-            messagePrefix: nil,
-            showTree: createOptions.showTree,
-            app: isApp,
-            appid: appid,
-            icon: nil,
-            version: "1.0.0",
-            nativeMode: nativeMode,
-            moduleMode: moduleMode,
-            moduleTests: createTests ?? true,
-            validatePackage: createOptions.validatePackage,
-            packageResolved: nil,
-            apk: buildProject && isApp,
-            ipa: buildProject && isApp,
-            with: out
-        )
+        await withLogStream(with: out) {
+            let (createdURL, project, _) = try await initSkipProject(
+                options: options,
+                modules: modules,
+                resourceFolder: "Resources",
+                dir: dir,
+                verify: false,
+                configuration: .debug,
+                build: buildProject,
+                test: runTests,
+                returnHashes: false,
+                messagePrefix: nil,
+                showTree: createOptions.showTree,
+                app: isApp,
+                appid: appid,
+                icon: nil,
+                version: "1.0.0",
+                nativeMode: nativeMode,
+                moduleMode: moduleMode,
+                moduleTests: createTests ?? true,
+                validatePackage: createOptions.validatePackage,
+                packageResolved: nil,
+                apk: buildProject && isApp,
+                ipa: buildProject && isApp,
+                with: out
+            )
 
-        let _ = createdURL
+            if openXcode {
+                let projectPath = isApp ? project.darwinProjectFolder : project.packageSwift
+                try await run(with: out, "Opening Xcode project", ["open", projectPath.path])
+            }
 
-        if openXcode {
-            let projectPath = isApp ? project.darwinProjectFolder : project.packageSwift
-            try await run(with: out, "Opening Xcode project", ["open", projectPath.path])
+            cout("Project successfully created at \(createdURL.path)")
         }
-
-        cout("Project successfully created at \(createdURL.path)")
     }
 }
 

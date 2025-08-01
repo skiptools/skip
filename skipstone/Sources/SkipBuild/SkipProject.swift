@@ -3429,6 +3429,7 @@ extension FrameworkProjectLayout {
 
             lintOptions {
                 disable.add("Instantiatable")
+                disable.add("MissingPermission")
             }
 
             // default signing configuration tries to load from keystore.properties
