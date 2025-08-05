@@ -311,7 +311,9 @@ extension GradleHarness {
 
         if FileManager.default.fileExists(atPath: project.path) {
             if let settingsContents = try? String(String(contentsOf: project, encoding: .utf8)) {
-                if !settingsContents.contains(#"skip plugin --prebuild"#) { // check for the new "skip plugin --prebuild" command we should be running
+                if !settingsContents.contains(#"skip plugin --prebuild"#) // check for the new "skip plugin --prebuild" command we should be running
+                    || !settingsContents.contains(#"providers.exec"#) // check for deprecated "exec" in settings, which was removed in Gradle 9.0
+                {
                     let issue = GradleIssue(kind: .warning, message: "Android project upgrade required. Please open a Terminal and cd to the project folder, then run `skip upgrade` and `skip verify --fix` to update the project.", location: SourceLocation(path: project.path, position: SourceLocation.Position(line: 0, column: 0)))
                     print(issue.xcodeMessageString)
                 }
