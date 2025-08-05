@@ -319,8 +319,9 @@ import PackagePlugin
             }
         }
 
-        if skipBridgeMode {
+        if skipBridgeMode && inputFiles.contains(where: { path in path.string.hasSuffix(".swift") }) {
             // when we are running with SKIP_BRIDGE, we also output NAME_Bridge.swift files for each Swift file that contains bridging information
+            // note that we only add these if the input files have at least one .swift file, in order to exclude modules that contain only C/C++ files
             let skipBridgeOutputDir = outputFolder.appending(subpath: "SkipBridgeGenerated")
             let bridgeSuffix = "_Bridge.swift" // SkipSyntax.Source.FilePath.bridgeFileSuffix
 
