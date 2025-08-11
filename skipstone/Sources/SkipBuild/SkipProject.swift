@@ -1551,18 +1551,11 @@ Package.resolved
 Carthage/Build/
 
 # fastlane
-#
-# It is recommended to not store the screenshots in the git repo.
-# Instead, use fastlane to re-generate the screenshots whenever they are needed.
-# For more information about the recommended setup visit:
-# https://docs.fastlane.tools/best-practices/source-control/#source-control
 
 **/fastlane/apikey.json
 **/fastlane/report.xml
 **/fastlane/README.md
 **/fastlane/Preview.html
-**/fastlane/screenshots/**/*.png
-**/fastlane/metadata/android/*/images/**/*.png
 **/fastlane/test_output
 
 """
