@@ -147,16 +147,19 @@ private final class TranslateVisitor {
     }
 
     private func translateClassDeclaration(_ classDeclaration: KotlinClassDeclaration) {
-        var environmentKeyIndex: Int? = nil
         for i in 0..<classDeclaration.inherits.count {
             if classDeclaration.inherits[i].isNamed("EnvironmentKey", moduleName: "SwiftUI") {
-                environmentKeyIndex = i
+                translateEnvironmentKey(classDeclaration, inheritsIndex: i)
+                break
+            }
+            if classDeclaration.inherits[i].isNamed("PreferenceKey", moduleName: "SwiftUI") {
+                translatePreferenceKey(classDeclaration, inheritsIndex: i)
                 break
             }
         }
-        guard let environmentKeyIndex else {
-            return
-        }
+    }
+
+    private func translateEnvironmentKey(_ classDeclaration: KotlinClassDeclaration, inheritsIndex: Int) {
         guard let defaultValueDeclaration = classDeclaration.members
             .compactMap({ $0 as? KotlinVariableDeclaration })
             .first(where: { $0.propertyName == "defaultValue" && $0.isStatic }),
@@ -164,14 +167,33 @@ private final class TranslateVisitor {
             classDeclaration.messages.append(.kotlinEnvironmentValuesKeyDefault(classDeclaration, source: translator.syntaxTree.source))
             return
         }
-
-        // Kotlin requires that the key type be public in order to reflect on it from the SkipUI package
-        classDeclaration.modifiers.visibility = .public
-
         defaultValueDeclaration.modifiers.isOverride = true
         defaultValueDeclaration.modifiers.visibility = .public
-        classDeclaration.inherits[environmentKeyIndex] = .named("EnvironmentKey", [defaultValueDeclaration.propertyType])
+
+        classDeclaration.inherits[inheritsIndex] = .named("EnvironmentKey", [defaultValueDeclaration.propertyType])
         classDeclaration.companionInherits.append(.interface(.named("EnvironmentKeyCompanion", [defaultValueDeclaration.propertyType])))
+    }
+
+    private func translatePreferenceKey(_ classDeclaration: KotlinClassDeclaration, inheritsIndex: Int) {
+        guard let defaultValueDeclaration = classDeclaration.members
+            .compactMap({ $0 as? KotlinVariableDeclaration })
+            .first(where: { $0.propertyName == "defaultValue" && $0.isStatic }),
+            defaultValueDeclaration.propertyType != .none else {
+            classDeclaration.messages.append(.kotlinPreferenceKeyDefault(classDeclaration, source: translator.syntaxTree.source))
+            return
+        }
+        defaultValueDeclaration.modifiers.isOverride = true
+        defaultValueDeclaration.modifiers.visibility = .public
+
+        if let reduceDeclaration = classDeclaration.members
+            .compactMap({ $0 as? KotlinFunctionDeclaration })
+            .first(where: { $0.name == "reduce" && $0.isStatic && $0.parameters.count == 2 && $0.parameters[0].externalLabel == "value" && $0.parameters[1].externalLabel == "nextValue" }) {
+            reduceDeclaration.modifiers.isOverride = true
+            reduceDeclaration.modifiers.visibility = .public
+        }
+
+        classDeclaration.inherits[inheritsIndex] = .named("PreferenceKey", [defaultValueDeclaration.propertyType])
+        classDeclaration.companionInherits.append(.interface(.named("PreferenceKeyCompanion", [defaultValueDeclaration.propertyType])))
     }
 
     private func translateConstructorDeclaration(_ functionDeclaration: KotlinFunctionDeclaration) {

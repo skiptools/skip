@@ -363,6 +363,10 @@ extension Message {
         return Message(kind: .error, message: "Skip only supports OptionSets that are structs. Change this type to a struct", sourceDerived: sourceDerived, source: source)
     }
 
+    static func kotlinPreferenceKeyDefault(_ sourceDerived: SourceDerived, source: Source) -> Message {
+        return Message(kind: .warning, message: "Skip is unable to determine the default value of this PreferenceKey type. Make sure it declares a static 'defaultValue' property with an explicitly declared type", sourceDerived: sourceDerived, source: source)
+    }
+
     static func kotlinProtocolMemberVisibility(_ sourceDerived: SourceDerived, source: Source) -> Message {
         return Message(kind: .warning, message: "Kotlin does not support protocol members with lower visibility than their declaring protocol. Skip will elevate the visibility of this member, which may cause problems if it exposes internal types", sourceDerived: sourceDerived, source: source)
     }

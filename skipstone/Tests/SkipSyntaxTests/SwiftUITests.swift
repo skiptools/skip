@@ -2165,7 +2165,7 @@ final class SwiftUITests: XCTestCase {
         import skip.ui.*
         import skip.foundation.*
         import skip.model.*
-        class MyKey: EnvironmentKey<String> {
+        internal class MyKey: EnvironmentKey<String> {
 
             companion object: EnvironmentKeyCompanion<String> {
 
@@ -2210,6 +2210,39 @@ final class SwiftUITests: XCTestCase {
             override fun body(): View {
                 return ComposeBuilder { composectx: ComposeContext ->
                     VStack().environment({ it -> EnvironmentValues.shared.setfont(it) }, Font.body).Compose(composectx)
+                }
+            }
+        }
+        """)
+    }
+
+    func testCustomPreferenceKey() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct MyKey: PreferenceKey {
+            static let defaultValue = ""
+            static func reduce(value: inout String, nextValue: () -> String) {
+                value = nextValue()
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
+        internal class MyKey: PreferenceKey<String> {
+
+            companion object: PreferenceKeyCompanion<String> {
+                override val defaultValue = ""
+                override fun reduce(value: InOut<String>, nextValue: () -> String) {
+                    value.value = nextValue()
                 }
             }
         }
