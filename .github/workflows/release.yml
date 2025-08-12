@@ -2,7 +2,7 @@ name: skip release
 
 on:
   push:
-    branches: [ * ]
+    #branches: [ main ]
   workflow_dispatch:
 jobs:
   skip-release:
