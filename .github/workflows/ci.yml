@@ -38,6 +38,12 @@ jobs:
           # need to fetch tags so we know the most recent version
           fetch-tags: true
 
+      - name: Checkout homebrew-skip
+        uses: actions/checkout@v4
+        with:
+          repository: skiptools/homebrew-skip
+          path: homebrew-skip
+
       - name: Setup Static Linux SDK
         if: ${{ startsWith(matrix.os, 'macos-') }}
         run: |
