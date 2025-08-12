@@ -13,9 +13,7 @@ jobs:
         with:
           repository: skiptools/skipstone
           path: skipstone
-          #ref: main
-          # TODO: go back to main
-          ref: linux
+          ref: main
           token: ${{ secrets.REPO_ACCESS_TOKEN }}
 
       - name: Checkout skip
