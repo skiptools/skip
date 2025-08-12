@@ -2,7 +2,7 @@
 #if !SKIP
 #if canImport(SkipDrive)
 import SkipDrive
-#if os(macOS)
+#if os(macOS) || os(Linux)
 @_exported import XCTest
 
 /// A `XCTestCase` that invokes the `gradle` process.
@@ -15,10 +15,6 @@ import SkipDrive
 public protocol XCGradleHarness : GradleHarness {
 }
 
-@available(macOS 13, macCatalyst 16, *)
-@available(iOS, unavailable, message: "Gradle tests can only be run on macOS")
-@available(watchOS, unavailable, message: "Gradle tests can only be run on macOS")
-@available(tvOS, unavailable, message: "Gradle tests can only be run on macOS")
 extension XCGradleHarness where Self : XCTestCase {
 
     /// Invoke the Gradle tests using the Robolectric simulator, or the specified device emulator/device ID (or blank string to use the first one)
@@ -502,6 +498,48 @@ struct GradleBuildError : LocalizedError {
     var errorDescription: String?
 }
 
-#endif // os(macOS)
+#if os(Linux)
+// no-op compatibility shims for Linux
+struct XCTSourceCodeLocation {
+    let filePath: String
+    let lineNumber: Int
+}
+
+struct XCTSourceCodeContext {
+    var location: XCTSourceCodeLocation?
+}
+
+struct XCTIssue {
+    //(type: .assertionFailure, compactDescription: issue.message, detailedDescription: issue.message, sourceCodeContext: XCTSourceCodeContext(location: swiftLocation.contextLocation), associatedError: nil, attachments: [])
+
+    let type: XCTIssueReference.IssueType
+    let compactDescription: String?
+    let detailedDescription: String?
+    let sourceCodeContext: XCTSourceCodeContext?
+    let associatedError: Error?
+    let attachments: [String]
+}
+
+struct XCTIssueReference {
+    enum IssueType {
+        case assertionFailure
+    }
+}
+
+extension XCTestCase {
+    var className: String? {
+        nil
+    }
+
+    func record(_ issue: XCTIssue) {
+        print("issue: \(issue)")
+    }
+}
+
+
+#endif
+
+
+#endif // os(macOS) || os(Linux)
 #endif // canImport(SkipDrive)
 #endif // !SKIP
