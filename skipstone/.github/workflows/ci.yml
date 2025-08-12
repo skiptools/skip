@@ -2,14 +2,10 @@ name: Continuous Integration
 
 on:
   push:
-    branches:
-      - 'main'
+    branches: [main]
     tags: "[0-9]+.[0-9]+.[0-9]+"
-  pull_request_target:
-    branches:
-      - '*'
-  #schedule:
-    #- cron: '0 0,12 * * *'
+  workflow_dispatch:
+  pull_request:
 
 jobs:
   #ci-skiphub:
@@ -24,31 +20,6 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: Setup
-        run: |
-          # convert "refs/tags/1.0.0" to "1.0.0"
-          # and "refs/heads/main" to "main"
-          TAG=${GITHUB_REF#refs/*/}
-          # the version if it matches the semantic tag pattern, otherwise "dev"
-          echo "RELTAG=${TAG:-'dev'}" >> $GITHUB_ENV
-          # the path to generate the artifacts (.ipa, .apk, etc.)
-          echo "RELDIR=Skip/build/artifacts" >> $GITHUB_ENV
-
-          echo "COMMIT_DATE=$(git log -1 --format=%ad --date=iso-strict ${TAG})" >> $GITHUB_ENV
-
-      #- uses: swift-actions/setup-swift@v1
-      - name: Get swift version
-        run: swift --version
-
-      - name: Install dependencies
-        # this is only needed for ubuntu-20.04
-        if: false
-        # need to update first or libcurl4-nss-dev isn't found
-        # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/customizing-github-hosted-runners#installing-software-on-ubuntu-runners
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y binutils git gnupg2 libc6-dev libcurl4 libedit2 libgcc-9-dev libpython2.7 libsqlite3-0 libstdc++-9-dev libxml2 libz3-dev pkg-config tzdata uuid-dev zlib1g-dev
-
       # checkout both skipstone.git and skip.git for the linked SkipDrive
       - name: Checkout skipstone.git
         uses: actions/checkout@v4
@@ -61,31 +32,38 @@ jobs:
           repository: skiptools/skip
           path: skip
 
+      - name: Setup
+        run: |
+          # convert "refs/tags/1.0.0" to "1.0.0"
+          # and "refs/heads/main" to "main"
+          TAG=${GITHUB_REF#refs/*/}
+          # the version if it matches the semantic tag pattern, otherwise "dev"
+          echo "RELTAG=${TAG:-'dev'}" >> $GITHUB_ENV
+
+          echo "COMMIT_DATE=$(git log -1 --format=%ad --date=iso-strict ${TAG})" >> $GITHUB_ENV
+
+      #- uses: swift-actions/setup-swift@next
+      #  with:
+      #    swift-version: "6.1.2"
+
+      - name: Get swift version
+        run: swift --version
+
+      - name: Install dependencies
+        # this is only needed for ubuntu-20.04
+        if: false
+        # need to update first or libcurl4-nss-dev isn't found
+        # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/customizing-github-hosted-runners#installing-software-on-ubuntu-runners
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binutils git gnupg2 libc6-dev libcurl4 libedit2 libgcc-9-dev libpython2.7 libsqlite3-0 libstdc++-9-dev libxml2 libz3-dev pkg-config tzdata uuid-dev zlib1g-dev
+
       - name: Check kotlinc
         run: which kotlinc
 
       - name: Swift Test (Debug)
         working-directory: skipstone
         run: KOTLINC=kotlinc swift test -v -c debug --parallel
-
-      - name: Build SkipRunner (Release)
-        if: false
-        #if: ${{ startsWith(github.ref, 'refs/tags/') }}
-        working-directory: skipstone
-        run: |
-          # needs a clean build or else we get linker errors
-          rm -rf .build
-          swift build --product SkipRunner -c release --static-swift-stdlib
-          #swift build --product SkipKey -c release --static-swift-stdlib
-          ls -lah .build/x86_64-unknown-linux-gnu/release/
-          .build/x86_64-unknown-linux-gnu/release/SkipRunner version
-          mkdir -p .build/dist/
-          cp -a .build/x86_64-unknown-linux-gnu/release/SkipRunner .build/dist/skip
-          cd .build/dist/
-          zip -9 -q skip-linux-ubuntu-focal-${RELTAG}.zip skip
-          ls -lah
-          rm skip
-          cd -
 
       - name: "Release"
         # disabled due to "HTTP 403: Resource not accessible by integration"

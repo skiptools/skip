@@ -118,7 +118,9 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         //await checkVersion(title: "ECHO2 VERSION", cmd: ["sh", "-c", "echo ONE ; sleep 1; echo TWO ; sleep 1; echo THREE ; sleep 1; echo 3.2.1"], min: Version("1.2.3"), pattern: "([0-9.]+)", watch: true)
 
         try await checkVersion(title: "Skip version", cmd: [skipcmd, "version"], min: Version(skipVersion), pattern: "Skip version ([0-9.]+)")
+        #if os(macOS)
         try await checkVersion(title: "macOS version", cmd: ["sw_vers", "--productVersion"], min: Version("13.5.0"), pattern: "([0-9.]+)")
+        #endif
         if ProcessInfo.isARM {
             // only check for Rosetta when we are on an ARM machine
             try await checkRosetta()
@@ -127,14 +129,18 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         if checkNative {
             try await checkVersion(title: "Swift Android SDK version", cmd: [skipcmd, "android", "toolchain", "version"], min: Version("6.1.0"), pattern: "Swift Package Manager - Swift ([0-9.]+)", hint: " (install with: skip android sdk install)")
         }
+        #if os(macOS)
         // TODO: add advice to run `xcode-select -s /Applications/Xcode.app/Contents/Developer` to work around https://github.com/skiptools/skip/issues/18
         try await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)", hint: " (install from: https://developer.apple.com/xcode/)")
         await checkXcodeCommandLineTools(with: out)
         try await checkVersion(title: "Homebrew version", cmd: ["brew", "--version"], min: Version("4.1.0"), pattern: "Homebrew ([0-9.]+)", hint: " (install from: https://brew.sh)")
+        #endif
         try await checkVersion(title: "Gradle version", cmd: ["gradle", "-version"], min: Version("8.6.0"), pattern: "Gradle ([0-9.]+)", hint: " (install with: brew install gradle)")
         try await checkVersion(title: "Java version", cmd: ["java", "-version"], min: Version("21.0.0"), pattern: "version \"([0-9._]+)\"", hint: ProcessInfo.processInfo.environment["JAVA_HOME"] == nil ? nil : " (check JAVA_HOME environment: \(ProcessInfo.processInfo.environment["JAVA_HOME"] ?? "unset"))") // we don't necessarily need java in the path (which it doesn't seem to be by default with Homebrew)
         try await checkVersion(title: "Android Debug Bridge version", cmd: ["adb", "version"], min: Version("1.0.40"), pattern: "version ([0-9.]+)")
+        #if os(macOS)
         await checkAndroidStudioVersion(with: out)
+        #endif
         await checkSkipLicense(with: out)
     }
 
