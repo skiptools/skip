@@ -4,6 +4,13 @@ import Foundation
 #if canImport(FoundationXML)
 import FoundationXML
 #endif
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#else
+#error("Unsupported platform")
+#endif
 
 /// An async stream of standard out + err data resulting from process execution
 public typealias AsyncLineOutput = AsyncThrowingStream<(line: String, err: Bool), Swift.Error>
@@ -976,11 +983,11 @@ public final class Process {
                 posix_spawn_file_actions_addchdir_np(&fileActions, workingDirectory)
             }
 #elseif os(Linux)
-            guard SPM_posix_spawn_file_actions_addchdir_np_supported() else {
-                throw Process.Error.workingDirectoryNotSupported
-            }
+            //guard SPM_posix_spawn_file_actions_addchdir_np_supported() else {
+                //throw Process.Error.workingDirectoryNotSupported
+            //}
 
-            SPM_posix_spawn_file_actions_addchdir_np(&fileActions, workingDirectory)
+            //SPM_posix_spawn_file_actions_addchdir_np(&fileActions, workingDirectory)
 #else
             throw Process.Error.workingDirectoryNotSupported
 #endif
@@ -1278,7 +1285,7 @@ public final class Process {
         }
 #else
         assert(self.launched, "The process is not yet launched.")
-        _ = Darwin.kill(startNewProcessGroup ? -processID : processID, signal)
+        _ = kill(startNewProcessGroup ? -processID : processID, signal)
 #endif
     }
 }
@@ -1542,13 +1549,13 @@ extension SystemError: CustomStringConvertible {
 #if os(Windows)
             let cap = 128
             var buf = [Int8](repeating: 0, count: cap)
-            let _ = Darwin.strerror_s(&buf, 128, errno)
+            let _ = strerror_s(&buf, 128, errno)
             return "\(String(cString: buf)) (\(errno))"
 #else
             var cap = 64
             while cap <= 16 * 1024 {
                 var buf = [Int8](repeating: 0, count: cap)
-                let err = Darwin.strerror_r(errno, &buf, buf.count)
+                let err = strerror_r(errno, &buf, buf.count)
                 if err == EINVAL {
                     return "Unknown error \(errno)"
                 }
@@ -1742,11 +1749,10 @@ private func WTERMSIG(_ status: Int32) -> Int32 {
     return status & 0x7f
 }
 
-#if canImport(Darwin)
 
 /// Open the given pipe.
-private func open(pipe: inout [Int32]) throws {
-    let rv = Darwin.pipe(&pipe)
+private func open(pipe p: inout [Int32]) throws {
+    let rv = pipe(&p)
     guard rv == 0 else {
         throw SystemError.pipe(rv)
     }
@@ -1755,7 +1761,7 @@ private func open(pipe: inout [Int32]) throws {
 /// Close the given fd.
 private func close(fd: Int32) throws {
     func innerClose(_ fd: inout Int32) throws {
-        let rv = Darwin.close(fd)
+        let rv = close(fd)
         guard rv == 0 else {
             throw SystemError.close(rv)
         }
@@ -1764,7 +1770,6 @@ private func close(fd: Int32) throws {
     try innerClose(&innerFd)
 }
 
-#endif
 
 extension Process.Error: CustomStringConvertible {
     public var description: String {
@@ -2747,13 +2752,13 @@ extension FileSystemError: CustomNSError {
 public extension FileSystemError {
     init(errno: Int32, _ path: URL) {
         switch errno {
-        case Darwin.EACCES:
+        case EACCES:
             self.init(.invalidAccess, path)
-        case Darwin.EISDIR:
+        case EISDIR:
             self.init(.isDirectory, path)
-        case Darwin.ENOENT:
+        case ENOENT:
             self.init(.noEntry, path)
-        case Darwin.ENOTDIR:
+        case ENOTDIR:
             self.init(.notDirectory, path)
         default:
             self.init(.ioError(code: errno), path)

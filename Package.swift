@@ -22,15 +22,24 @@ let package = Package(
         .plugin(name: "skipstone", capability: .buildTool(), dependencies: ["skip"], path: "Plugins/SkipPlugin"),
         .plugin(name: "Create SkipLink", capability: .command(intent: .custom(verb: "SkipLink", description: "Create local links to transpiled output"), permissions: [.writeToPackageDirectory(reason: "This command will create local links to the skipstone output for the specified package(s), enabling access to the transpiled Kotlin")]), dependencies: ["skip"], path: "Plugins/SkipLink"),
         .target(name: "SkipDrive", dependencies: ["skipstone", .target(name: "skip")]),
-        .target(name: "SkipTest", dependencies: [.target(name: "SkipDrive", condition: .when(platforms: [.macOS]))]),
+        .target(name: "SkipTest", dependencies: [.target(name: "SkipDrive", condition: .when(platforms: [.macOS, .linux]))]),
         .testTarget(name: "SkipTestTests", dependencies: ["SkipTest"]),
         .testTarget(name: "SkipDriveTests", dependencies: ["SkipDrive"]),
-        .binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/1.6.11/skip.zip", checksum: "f1c7855dd065d72c1c5c1134422c9a5ee56b844005eca261f9bbbc9f55246491")
     ]
 )
 
 let env = Context.environment
 if (env["SKIPLOCAL"] != nil || env["PWD"]?.hasSuffix("skipstone") == true) {
-    package.dependencies = package.dependencies.dropLast() + [.package(path: env["SKIPLOCAL"] ?? "../skipstone")]
-    package.targets = package.targets.dropLast() + [.executableTarget(name: "skip", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
+    package.dependencies += [.package(path: env["SKIPLOCAL"] ?? "../skipstone")]
+    package.targets += [.executableTarget(name: "skip", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
+} else {
+    #if os(macOS)
+    package.targets += [.binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/1.6.12/skip.zip", checksum: "1584f9f5e4aeaa51bf18a43255adc196f7686deb61d1181146b8185b32d2f2c2")]
+    #elseif os(Linux)
+    package.targets += [.binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/1.6.12/skip-linux.zip", checksum: "53ea1dbe432ca1e43eaa9a340bc6a24f9661ffe7420a0b1779743b9cd1c3ca00")]
+    #else
+    package.dependencies += [.package(url: "https://source.skip.tools/skipstone.git", exact: "1.6.12")]
+    package.targets += [.executableTarget(name: "skip", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
+    #endif
 }
+

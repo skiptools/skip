@@ -6,13 +6,14 @@ on:
   schedule:
     - cron: '0 * * * *'
   workflow_dispatch:
-
-#env:
-#  DEVELOPER_DIR: /Applications/Xcode_16.2.app
-
+  pull_request:
 jobs:
   skip-ci:
-    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ['macos-15', 'ubuntu-24.04']
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -32,6 +33,8 @@ jobs:
         with:
           repository: skiptools/skip
           path: skip
+          # need to fetch tags so we know the most recent version
+          fetch-tags: true
 
       - name: Setup SKIPLOCAL
         run: |
@@ -43,6 +46,8 @@ jobs:
         run: swift build
 
       - name: Test Skip
+        # TODO: fix tests on Linux
+        if: ${{ startsWith(matrix.os, 'macos-') }}
         working-directory: skip
         run: swift test
 
