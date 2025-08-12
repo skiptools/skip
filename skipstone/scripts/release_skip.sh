@@ -54,8 +54,8 @@ SKIPBREWDIR="../homebrew-skip"
 
 # once we get this repo sync'd, we can rely on both tags being the same
 cd ${SKIPPKGDIR}
-git fetch --tags
-git tag -l --sort=-version:refname
+git fetch --tags --force
+#git tag -l --sort=-version:refname
 
 SKIP_VERSION_OLD=$(git tag -l --sort=-version:refname | grep '[0-9]*\.[0-9]*\.[0-9]*' | head -n 1)
 
@@ -81,7 +81,7 @@ case "${SEMVER_BUMP:-patch}" in
         return 2
 esac
 
-if [[ "${DRY_RUN:-'0'}" != '0' ]]; then
+if [[ "${DRY_RUN:-'0'}" == "1" ]]; then
     export SKIP_VERSION="${SKIP_VERSION_OLD}"
     echo "Dry run: not bumping Skip version from: ${SKIP_VERSION}"
 else
@@ -135,7 +135,7 @@ sed -I '' 's;.package(url: "https://.*/skipstone.git", from: ".*");.package(url:
 
 sed -I '' 's;.package(url: "https://.*/skip.git", from: ".*");.package(url: "https://source.skip.tools/skip.git", from: "'${SKIP_VERSION}'");g' "README.md"
 
-if [[ "${DRY_RUN:-'0'}" != '0' ]]; then
+if [[ "${DRY_RUN:-'0'}" == "1" ]]; then
     echo "DRY RUN: EXITING"
     exit 0
 fi
