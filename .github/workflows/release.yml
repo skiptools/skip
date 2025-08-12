@@ -1,0 +1,64 @@
+name: skip release
+
+on:
+  push:
+    branches: [ * ]
+  workflow_dispatch:
+jobs:
+  skip-release:
+    runs-on: macos-15
+    steps:
+      - name: Checkout skipstone
+        uses: actions/checkout@v4
+        with:
+          repository: skiptools/skipstone
+          path: skipstone
+          #ref: main
+          # TODO: go back to main
+          ref: linux
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+
+      - name: Checkout skip
+        uses: actions/checkout@v4
+        with:
+          repository: skiptools/skip
+          path: skip
+          # need to fetch tags so we know the most recent version
+          fetch-tags: true
+
+      - name: Checkout homebrew-skip
+        uses: actions/checkout@v4
+        with:
+          repository: skiptools/homebrew-skip
+          path: homebrew-skip
+
+      - name: Install Dependencies
+        run: |
+          brew install tree
+
+      - name: Setup Static Linux SDK
+        run: |
+          curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg
+          installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+          ~/.swiftly/bin/swiftly init --quiet-shell-followup
+          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
+          hash -r
+
+          SWIFT_VERSION=6.1.2
+          swiftly install --use ${SWIFT_VERSION}
+
+          curl -fsSL -o swift-static-linux-sdk.tar.gz https://download.swift.org/swift-${SWIFT_VERSION}-release/static-sdk/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz 
+          swift sdk install swift-static-linux-sdk.tar.gz
+          swift sdk list
+
+          # this version will be used by the release script for
+          # building the static Linux version
+          echo "SWIFT_VERSION=${SWIFT_VERSION}" >> $GITHUB_ENV
+
+      - name: Build Skip Release
+        working-directory: skipstone
+        run: ./scripts/release_skip.sh
+        env: 
+          DRY_RUN: 1
+          #GH_TOKEN: ${{ github.token }}
+
