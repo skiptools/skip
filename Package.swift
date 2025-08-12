@@ -35,8 +35,8 @@ if (env["SKIPLOCAL"] != nil || env["PWD"]?.hasSuffix("skipstone") == true) {
 } else {
     #if os(macOS)
     package.targets += [.binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/1.6.11/skip.zip", checksum: "f1c7855dd065d72c1c5c1134422c9a5ee56b844005eca261f9bbbc9f55246491")]
-    #elseif os(Linux)
-    package.targets += [.binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/1.6.11/skip-linux.zip", checksum: "0d388cf7f94c2d1622325d757e25423b22b85bf536b03e79683b02b023303176")]
+    #elseif os(Linux) && arch(x86_64)
+    package.targets += [.binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/1.6.11/skip-linux-x86_64.zip", checksum: "adc33e830b4c8b40d8ee4eb3857738aa59b5fad728c0d58b8238d492746af60f")]
     #endif
 }
 
