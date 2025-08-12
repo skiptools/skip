@@ -37,6 +37,7 @@ jobs:
           path: skip
 
       - name: Setup Static Linux SDK
+        if: ${{ startsWith(matrix.os, 'macos-') }}
         run: |
           curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg
           installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
@@ -56,6 +57,7 @@ jobs:
           echo "SWIFT_VERSION=${SWIFT_VERSION}" >> $GITHUB_ENV
 
       - name: Build Skip Release
+        if: ${{ startsWith(matrix.os, 'macos-') }}
         working-directory: skipstone
         run: ./scripts/release_skip.sh
         env: 
