@@ -28,6 +28,7 @@ jobs:
           #ref: main
           # TODO: go back to main
           ref: linux
+          fetch-tags: true
           token: ${{ secrets.REPO_ACCESS_TOKEN }}
 
       - name: Checkout skip
