@@ -28,14 +28,15 @@ let package = Package(
     ]
 )
 
-#if os(macOS)
-package.targets += [.binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/1.6.11/skip.zip", checksum: "f1c7855dd065d72c1c5c1134422c9a5ee56b844005eca261f9bbbc9f55246491")]
-#elseif os(Linux)
-package.targets += [.binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/1.6.11/skip-linux.zip", checksum: "f1c7855dd065d72c1c5c1134422c9a5ee56b844005eca261f9bbbc9f55246491")]
-#endif
-
 let env = Context.environment
 if (env["SKIPLOCAL"] != nil || env["PWD"]?.hasSuffix("skipstone") == true) {
-    package.dependencies = package.dependencies.dropLast() + [.package(path: env["SKIPLOCAL"] ?? "../skipstone")]
-    package.targets = package.targets.dropLast() + [.executableTarget(name: "skip", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
+    package.dependencies += [.package(path: env["SKIPLOCAL"] ?? "../skipstone")]
+    package.targets += [.executableTarget(name: "skip", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
+} else {
+    #if os(macOS)
+    package.targets += [.binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/1.6.11/skip.zip", checksum: "f1c7855dd065d72c1c5c1134422c9a5ee56b844005eca261f9bbbc9f55246491")]
+    #elseif os(Linux)
+    package.targets += [.binaryTarget(name: "skip", url: "https://source.skip.tools/skip/releases/download/1.6.11/skip-linux.zip", checksum: "0d388cf7f94c2d1622325d757e25423b22b85bf536b03e79683b02b023303176")]
+    #endif
 }
+
