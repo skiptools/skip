@@ -27,7 +27,7 @@ jobs:
           path: skipstone
           #ref: main
           # TODO: go back to main
-          branch: linux
+          ref: linux
           token: ${{ secrets.REPO_ACCESS_TOKEN }}
 
       - name: Checkout skip
