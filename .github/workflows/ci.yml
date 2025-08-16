@@ -41,7 +41,7 @@ jobs:
         run: |
           # workaround for missing iPhone 16 simulator:
           # https://github.com/actions/runner-images/issues/12758#issuecomment-3187301409
-          sudo xcode-select --switch /Applications/Xcode_16.4.app
+          sudo xcode-select --switch /Applications/Xcode_26.0.app
 
       - name: Setup SKIPLOCAL
         run: |
