@@ -148,7 +148,7 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
 
         if !arch.isEmpty {
             // take the arch flag(s) and set them in the `SKIP_EXPORT_ARCHS` environment, which will be processed by the AndroidCommand when it sees the SkipBridge `--arch automatic` setting
-            env[AndroidArchArgument.exportArchsEnironment] = arch.map(\.rawValue).joined(separator: ",")
+            env[AndroidArchArgument.exportArchsEnvironment] = arch.map(\.rawValue).joined(separator: ",")
         }
 
         let assembleAction = variants == [.debug] ? "assembleDebug" : variants == [.release] ? "assembleRelease" : "assemble"

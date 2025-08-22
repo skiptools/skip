@@ -39,7 +39,7 @@ struct GradleCommand: SkipCommand {
     func run() async throws {
         // when the environment "SKIP_ACTION" is set to "none", completely ignore the gradle launch command; this is to provide backwards compatibility for pre-existing projects that do not have updated Xcode target's Build Phases "Run script" actions.
         // https://github.com/skiptools/skip/issues/408
-        // TODO: should we just handle all the short-circuit envrionment variables here, like SKIP_ZERO, ENABLE_PREVIEWS, and ACTION="insall"?
+        // TODO: should we just handle all the short-circuit environment variables here, like SKIP_ZERO, ENABLE_PREVIEWS, and ACTION="insall"?
         if ProcessInfo.processInfo.environment["SKIP_ACTION"] == "none" {
             print("note: skipping skip due to SKIP_ACTION none")
             return

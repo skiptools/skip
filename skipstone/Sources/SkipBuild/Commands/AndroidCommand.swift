@@ -161,7 +161,7 @@ fileprivate extension AndroidOperationCommand {
         #else
 
         if outputOptions.verbose {
-            print("running command: \(command.joined(separator: " "))")
+            print("running command: \(env.sorted(by: { $0.key < $1.key }).map { "\($0)='\($1)'" }.joined(separator: " ")) \(command.joined(separator: " "))") // to: &TSCBasic.stderrStream) // stderrStream doesn't show up in Xcode logs
         }
 
         for try await outputLine in Process.streamLines(command: command, environment: env, includeStdErr: true, onExit: { result in
@@ -177,7 +177,7 @@ fileprivate extension AndroidOperationCommand {
                 if !outputOptions.verbose && (
                     // additional filters to to handle warnings raised by the way we replace remote dependencies with their local equivalents
                     outputLine.line.hasSuffix(" is not used by any target") // 'swift': dependency 'swift-system' is not used by any target
-                    || outputLine.line.hasSuffix(" this will be escalated to an error in future versions of SwiftPM.") // '…': '…' dependency on '…' conflicts with dependency on '…' which has the same identity '…'. this will be escalated to an error in future versions of SwiftPM.
+                    || outputLine.line.hasSuffix("will be escalated to an error in future versions of SwiftPM.") // '…': '…' dependency on '…' conflicts with dependency on '…' which has the same identity '…'. this will be escalated to an error in future versions of SwiftPM.
                     || outputLine.line.hasSuffix("unhandled; explicitly declare them as resources or exclude from the target")
                 ) {
                     continue
@@ -201,11 +201,12 @@ fileprivate extension AndroidOperationCommand {
 
     /// Run `swift build` for the given Android architectures, optionally running the test cases on the device or copying all the files to the given `archiveOutputFolder`
     func runSwiftPM(cleanup: Bool? = nil, execute executable: String? = nil, commandEnvironment: [String] = [], defaultArch: AndroidArchArgument, remoteFolder: String? = nil, copy: [String] = [], archiveOutputFolder: URL? = nil, testingLibrary: TestingLibrary?, with out: MessageQueue) async throws {
+        let buildConfig = toolchainOptions.configuration ?? BuildConfiguration.fromEnvironment() ?? .debug
         let packageDir = toolchainOptions.packagePath ?? "."
         let archs = !toolchainOptions.arch.isEmpty ? toolchainOptions.arch : [defaultArch]
         // pick the default architecture based on the current host; for running executables and tests, this will likely be the one that matches an attached emulator, but for an attached device, we don't know (e.g., an x86_64 host may be connecting to an aarch64 device).
 
-        let architectures = archs.flatMap(\.architectures).uniqueElements()
+        let architectures = archs.flatMap({ $0.architectures(configuration: buildConfig) }).uniqueElements()
         for arch in architectures {
             let tc = try buildToolchainConfiguration(for: arch)
 
@@ -220,6 +221,18 @@ fileprivate extension AndroidOperationCommand {
             // which will break the build.
             // So we manually clear the SDKROOT environment variable in case it is set.
             env["SDKROOT"] = nil
+
+            // We also need to clear out any environment variables that may change between runs (like LLBUILD_BUILD_ID='4288622949' LLBUILD_LANE_ID='9' LLBUILD_TASK_ID='31650009000f'), since those will prevent incremental builds from happening and force a complete rebuild each time
+            if env["XCODE_VERSION_MAJOR"] != nil {
+                let permittedEnvironment: Set<String> = [
+                    "PATH", "HOME", "HOMEBREW_PREFIX", "JAVA_HOME", "LANG", "LOGNAME", "PWD", "SHELL", "SWIFTLY_BIN_DIR", "SWIFTLY_HOME_DIR", "TMPDIR", "USER"
+                ]
+                env = env.filter({ (key, value) in
+                    permittedEnvironment.contains(key)
+                    && !key.hasPrefix("SKIP_")
+                    && !key.hasPrefix("ANDROID_") // "ANDROID_HOME", "ANDROID_NDK_HOME", "ANDROID_NDK_ROOT", "ANDROID_NDK", "ANDROID_SERIAL"
+                })
+            }
 
             // manually disable the skipstone plugin from being run again in the derived build; we don't need to transpile and bridge the code a second time, we only need to build the native libraries with the Android toolchain
             //env["SKIP_PLUGIN_DISABLED"] = "1"
@@ -339,7 +352,7 @@ fileprivate extension AndroidOperationCommand {
                 // the output folder is either the scratch path we have specified, or is the default package/.build output directory
                 toolchainOptions.scratchPath ?? (packageDir + "/.build"),
                 arch.target(api: toolchainOptions.androidAPILevel),
-                toolchainOptions.configuration?.rawValue ?? "debug",
+                buildConfig.rawValue,
             ].joined(separator: "/")
 
             let buildOutputFolderURL = URL(fileURLWithPath: buildOutputFolder)
@@ -945,20 +958,20 @@ enum AndroidArchArgument: String, ExpressibleByArgument, CaseIterable {
     case armv7
     case x86_64
 
-    static let exportArchsEnironment = "SKIP_EXPORT_ARCHS"
+    static let exportArchsEnvironment = "SKIP_EXPORT_ARCHS"
 
-    var architectures: [AndroidArch] {
+    func architectures(configuration: BuildConfiguration) -> [AndroidArch] {
         switch self {
         case .automatic:
             // For debug builds, just build for the current architecture.
             // Ideally we would use `ONLY_ACTIVE_ARCH`, but that seems to be always set to "YES" even for Release builds.
             // The "SKIP_EXPORT_ARCHS" is used to pass the flags from `skip export --arch …` through the gradle process, which always exports with "automatic"
-            if let archList = ProcessInfo.processInfo.environment[Self.exportArchsEnironment], !archList.isEmpty {
+            if let archList = ProcessInfo.processInfo.environment[Self.exportArchsEnvironment], !archList.isEmpty {
                 return archList.split(separator: ",").compactMap(String.init).compactMap(AndroidArch.init)
-            } else if ProcessInfo.processInfo.environment["CONFIGURATION"]?.uppercased() == "DEBUG" {
-                return AndroidArchArgument.current.architectures
+            } else if configuration == .release {
+                return AndroidArchArgument.`default`.architectures(configuration: configuration)
             } else {
-                return AndroidArchArgument.`default`.architectures
+                return AndroidArchArgument.current.architectures(configuration: configuration)
             }
         case .current:
             return ProcessInfo.isARM ? [.aarch64] : [.x86_64]

@@ -201,6 +201,11 @@ let androidBuildFolder = buildFolderName + "/Android"
 /// The build configuration, either `debug` or `release`.
 enum BuildConfiguration : String, ExpressibleByArgument {
     case debug, release
+
+    /// Returns the default value based on the `CONFIGURATION` environment variable.
+    static func fromEnvironment() -> BuildConfiguration? {
+        return BuildConfiguration(rawValue: ProcessInfo.processInfo.environment["CONFIGURATION"]?.lowercased() ?? "")
+    }
 }
 
 extension ToolOptionsCommand where Self : StreamingCommand {
