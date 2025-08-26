@@ -3388,15 +3388,18 @@ extension FrameworkProjectLayout {
         skip {
         }
 
+        kotlin {
+            compilerOptions {
+                jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.jvm.get().toString())
+            }
+        }
+
         android {
             namespace = group as String
             compileSdk = libs.versions.android.sdk.compile.get().toInt()
             compileOptions {
                 sourceCompatibility = JavaVersion.toVersion(libs.versions.jvm.get())
                 targetCompatibility = JavaVersion.toVersion(libs.versions.jvm.get())
-            }
-            kotlinOptions {
-                jvmTarget = libs.versions.jvm.get().toString()
             }
             packaging {
                 jniLibs {
@@ -3420,22 +3423,29 @@ extension FrameworkProjectLayout {
                 buildConfig = true
             }
 
-            lintOptions {
+            lint {
                 disable.add("Instantiatable")
                 disable.add("MissingPermission")
             }
 
             // default signing configuration tries to load from keystore.properties
+            // see: https://skip.tools/docs/deployment/#export-signing
             signingConfigs {
                 val keystorePropertiesFile = file("keystore.properties")
-                if (keystorePropertiesFile.isFile) {
-                    create("release") {
+                create("release") {
+                    if (keystorePropertiesFile.isFile) {
                         val keystoreProperties = Properties()
                         keystoreProperties.load(keystorePropertiesFile.inputStream())
                         keyAlias = keystoreProperties.getProperty("keyAlias")
                         keyPassword = keystoreProperties.getProperty("keyPassword")
                         storeFile = file(keystoreProperties.getProperty("storeFile"))
                         storePassword = keystoreProperties.getProperty("storePassword")
+                    } else {
+                        // when there is no keystore.properties file, fall back to signing with debug config
+                        keyAlias = signingConfigs.getByName("debug").keyAlias
+                        keyPassword = signingConfigs.getByName("debug").keyPassword
+                        storeFile = signingConfigs.getByName("debug").storeFile
+                        storePassword = signingConfigs.getByName("debug").storePassword
                     }
                 }
             }
@@ -3567,7 +3577,7 @@ open class MainActivity: AppCompatActivity {
         super.onRestart()
     }
 
-    override fun onSaveInstanceState(bundle: android.os.Bundle): Unit = super.onSaveInstanceState(bundle)
+    override fun onSaveInstanceState(outState: android.os.Bundle): Unit = super.onSaveInstanceState(outState)
 
     override fun onRestoreInstanceState(bundle: android.os.Bundle) {
         // Usually you restore your state in onCreate(). It is possible to restore it in onRestoreInstanceState() as well, but not very common. (onRestoreInstanceState() is called after onStart(), whereas onCreate() is called before onStart().

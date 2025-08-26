@@ -267,7 +267,7 @@ class SkipBuildPlugin @Inject constructor(private val os: ExecOperations) : Plug
         }
 
         if (findLine(startingWith = "jvmTarget = ", path = buildFilePath) == null) {
-            error("Manual upgrade required for Android/app/build.gradle.kts: android block should contain a kotlinOptions block with the line: jvmTarget = libs.versions.jvm.get().toString() Details: https://skip.tools/docs/kotlin2-migration/", path = buildFilePath)
+            error("Manual upgrade required for Android/app/build.gradle.kts: android block should contain a kotlin compilerOptions block with the line: jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.jvm.get().toString()) Details: https://skip.tools/docs/kotlin2-migration/", path = buildFilePath)
             validationFailures += 1
         }
 
