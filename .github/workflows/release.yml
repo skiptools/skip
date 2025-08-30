@@ -1,4 +1,4 @@
-name: skip release
+name: skip release builds
 
 on:
   push:
