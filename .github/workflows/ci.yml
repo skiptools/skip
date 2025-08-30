@@ -12,10 +12,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ['macos-14', 'macos-15', 'ubuntu-24.04']
+        os: ['macos-15', 'ubuntu-24.04']
     runs-on: ${{ matrix.os }}
     env:
-      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_26.0.app/Contents/Developer
     steps:
       - uses: gradle/actions/setup-gradle@v4
         with:
