@@ -31,7 +31,7 @@ This command performs a full system checkup to ensure that Skip can create and b
     var toolOptions: ToolOptions
 
     @Option(name: [.customShort("c"), .long], help: ArgumentHelp("Configuration debug/release", valueName: "c"))
-    var configuration: BuildConfiguration = .release
+    var configuration: BuildConfiguration = .debug
 
     @Flag(help: ArgumentHelp("Check twice that sample build outputs produce identical artifacts", valueName: "verify"))
     var doubleCheck: Bool = false

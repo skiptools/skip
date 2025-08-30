@@ -223,12 +223,16 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         // the expected path for the gradle output folder of the assemble action
 
         // for example: skipapp-playground/.build/plugins/outputs/skipapp-playground/Playground/skipstone/Playground/.build/skipapp-playground/outputs/apk/release/Playground-release.apk
-        let unsigned = configuration == .release ? "-unsigned" : "" // we do not sign the release builds for reproducibility, which leads to them having the "-unsigned" suffix
+        // let unsigned = configuration == .release ? "-unsigned" : "" // we do not sign the release builds for reproducibility, which leads to them having the "-unsigned" suffix
+        // now that we signed release builds with the debug key by default, this no longer builds as "unsigned"
 
         let apkTitle = primaryModuleName + cfgSuffix + ".apk" // the name of the .apk for reporting purposes (don't include the -unsigned)
-        let apkPath = outputsPath + "/apk/" + configuration.rawValue + "/" + appModuleName + cfgSuffix + unsigned + ".apk"
-        let apkURL = URL(fileURLWithPath: apkPath, isDirectory: false)
-        
+        let apkBasePath = outputsPath + "/apk/" + configuration.rawValue + "/" + appModuleName + cfgSuffix
+        var apkURL = URL(fileURLWithPath: apkBasePath + ".apk", isDirectory: false)
+        if !FileManager.default.fileExists(atPath: apkURL.path) {
+            apkURL = URL(fileURLWithPath: apkBasePath + "-unsigned" + ".apk", isDirectory: false)
+        }
+
         await checkFile(apkURL, with: out, title: "Verify \(apkTitle)") { title, url in
             return CheckStatus(status: .pass, message: try "\(title): \(url.fileSizeString)")
         }
