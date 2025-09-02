@@ -38,6 +38,14 @@ jobs:
           # need to fetch tags so we know the most recent version
           fetch-tags: true
 
+      - name: Setup Xcode
+        run: |
+          # workaround for failure to find iOS 26 simulator
+          # https://github.com/actions/runner-images/issues/12862#issuecomment-3239326872
+          xcrun simctl list > /dev/null
+          # alternatively https://github.com/actions/runner-images/issues/12904#issuecomment-3245474273
+          #xcodebuild -downloadPlatform iOS
+
       - name: Setup SKIPLOCAL
         run: |
           echo "SKIPLOCAL=$PWD/skipstone" >> $GITHUB_ENV
