@@ -42,9 +42,10 @@ jobs:
         run: |
           # workaround for failure to find iOS 26 simulator
           # https://github.com/actions/runner-images/issues/12862#issuecomment-3239326872
-          xcrun simctl list > /dev/null
+          xcrun simctl list || true
+
           # alternatively https://github.com/actions/runner-images/issues/12904#issuecomment-3245474273
-          #xcodebuild -downloadPlatform iOS
+          xcodebuild -downloadPlatform iOS || true
 
       - name: Setup SKIPLOCAL
         run: |
