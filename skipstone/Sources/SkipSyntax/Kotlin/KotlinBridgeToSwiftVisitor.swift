@@ -1158,6 +1158,9 @@ final class KotlinBridgeToSwiftVisitor {
             classDeclaration.inherits.append(.named("skip.lib.SwiftProjecting", []))
         }
 
+        // prevent renaming by R8/Proguard, which would break accessing the class by name from the Swift side
+        classDeclaration.addKeepAnnotation()
+
         let projectionFunc = KotlinFunctionDeclaration(name: "Swift_projection")
         let externalName = "Swift_projectionImpl"
         projectionFunc.parameters = [Parameter<KotlinExpression>(externalLabel: "options", declaredType: .int)]

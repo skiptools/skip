@@ -555,6 +555,7 @@ enum class E2_1 {
     b_2,
     c_2;
 
+    @androidx.annotation.Keep
     companion object {
     }
 }
@@ -563,6 +564,7 @@ enum class E2_2 {
     e_2,
     f_2;
 
+    @androidx.annotation.Keep
     companion object {
     }
 }
@@ -579,6 +581,7 @@ open class C2_1 {
         open fun i2_f1() = Unit
         open fun i2_f2() = Unit
 
+        @androidx.annotation.Keep
         companion object: CompanionClass() {
         }
         open class CompanionClass {
@@ -590,6 +593,7 @@ open class C2_1 {
         open fun if2_3() = Unit
         open fun if2_4() = Unit
 
+        @androidx.annotation.Keep
         companion object: CompanionClass() {
         }
         open class CompanionClass {
@@ -601,6 +605,7 @@ open class C2_1 {
     open fun f2_5() = Unit
     open fun f2_6() = Unit
 
+    @androidx.annotation.Keep
     companion object: CompanionClass() {
     }
     open class CompanionClass {
@@ -617,6 +622,7 @@ open class C2_2 {
     open var v2_8 = 1
     open var v2_7 = 1
 
+    @androidx.annotation.Keep
     companion object: CompanionClass() {
     }
     open class CompanionClass {
@@ -656,6 +662,7 @@ enum class E1 {
     b,
     c;
 
+    @androidx.annotation.Keep
     companion object {
     }
 }
@@ -664,6 +671,7 @@ enum class E2 {
     e,
     f;
 
+    @androidx.annotation.Keep
     companion object {
     }
 }
@@ -683,6 +691,7 @@ open class C1 {
         open fun if1() = Unit
         open fun if2() = Unit
 
+        @androidx.annotation.Keep
         companion object: CompanionClass() {
         }
         open class CompanionClass {
@@ -694,6 +703,7 @@ open class C1 {
         open fun if3() = Unit
         open fun if4() = Unit
 
+        @androidx.annotation.Keep
         companion object: CompanionClass() {
         }
         open class CompanionClass {
@@ -711,6 +721,7 @@ open class C1 {
     open var v1_3 = 1
     open var v1_4 = 1
 
+    @androidx.annotation.Keep
     companion object: CompanionClass() {
     }
     open class CompanionClass {
@@ -727,6 +738,7 @@ open class C2 {
     open var v8 = 1
     open var v7 = 1
 
+    @androidx.annotation.Keep
     companion object: CompanionClass() {
     }
     open class CompanionClass {
@@ -763,6 +775,7 @@ enum class E3_1 {
     b_3,
     c_3;
 
+    @androidx.annotation.Keep
     companion object {
     }
 }
@@ -771,6 +784,7 @@ enum class E3_2 {
     e_3,
     f_3;
 
+    @androidx.annotation.Keep
     companion object {
     }
 }
@@ -787,6 +801,7 @@ open class C3_1 {
         open fun i3_f1() = Unit
         open fun i3_f2() = Unit
 
+        @androidx.annotation.Keep
         companion object: CompanionClass() {
         }
         open class CompanionClass {
@@ -798,6 +813,7 @@ open class C3_1 {
         open fun if3_3() = Unit
         open fun if3_4() = Unit
 
+        @androidx.annotation.Keep
         companion object: CompanionClass() {
         }
         open class CompanionClass {
@@ -809,6 +825,7 @@ open class C3_1 {
     open fun f3_5() = Unit
     open fun f3_6() = Unit
 
+    @androidx.annotation.Keep
     companion object: CompanionClass() {
     }
     open class CompanionClass {
@@ -825,6 +842,7 @@ open class C3_2 {
     open var v3_8 = 1
     open var v3_7 = 1
 
+    @androidx.annotation.Keep
     companion object: CompanionClass() {
     }
     open class CompanionClass {

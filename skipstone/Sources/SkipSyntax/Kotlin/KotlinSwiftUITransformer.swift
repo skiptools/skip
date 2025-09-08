@@ -170,6 +170,7 @@ private final class TranslateVisitor {
         defaultValueDeclaration.modifiers.isOverride = true
         defaultValueDeclaration.modifiers.visibility = .public
 
+        classDeclaration.addKeepAnnotation()
         classDeclaration.inherits[inheritsIndex] = .named("EnvironmentKey", [defaultValueDeclaration.propertyType])
         classDeclaration.companionInherits.append(.interface(.named("EnvironmentKeyCompanion", [defaultValueDeclaration.propertyType])))
     }
@@ -192,6 +193,7 @@ private final class TranslateVisitor {
             reduceDeclaration.modifiers.visibility = .public
         }
 
+        classDeclaration.addKeepAnnotation()
         classDeclaration.inherits[inheritsIndex] = .named("PreferenceKey", [defaultValueDeclaration.propertyType])
         classDeclaration.companionInherits.append(.interface(.named("PreferenceKeyCompanion", [defaultValueDeclaration.propertyType])))
     }

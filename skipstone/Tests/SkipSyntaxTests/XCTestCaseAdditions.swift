@@ -260,7 +260,12 @@ extension XCTestCase {
     private func trimmedContent(transpilation: Transpilation) -> String {
         let content = transpilation.output.content
         let autoImport = "import skip.lib.*"
-        return content.split(separator: "\n", omittingEmptySubsequences: false).filter({ $0 != autoImport }).joined(separator: "\n")
+
+        return content
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .filter({ $0 != autoImport })
+            .filter({ !$0.hasSuffix(KotlinClassDeclaration.keepAnnotation) }) // trim @Keep insertions
+            .joined(separator: "\n")
     }
 
     /// Creates a temporary file with the given name and optional contents.

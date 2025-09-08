@@ -45,12 +45,14 @@ public final class KotlinBundleTransformer: KotlinTransformer {
         private val _moduleBundle: skip.foundation.Bundle by lazy {
             skip.foundation.Bundle(_ModuleBundleLocator::class)
         }
+        \(KotlinClassDeclaration.keepAnnotation)
         internal class _ModuleBundleLocator {}
         """]
         if needsAndroidBridge {
             // Native modules need access to our module bundle via reflection
             let className = moduleBundleAccessorClassName(moduleName: translator.codebaseInfo?.global.moduleName ?? "")
             declarations += ["""
+            \(KotlinClassDeclaration.keepAnnotation)
             class \(className) {
                 val moduleBundle = _moduleBundle
             }

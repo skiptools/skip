@@ -974,6 +974,9 @@ final class KotlinClassDeclaration: KotlinStatement {
     /// Names that conflict with built-in enum properties.
     private static let disallowedEnumPropertyNames: Set<String> = ["name", "ordinal"]
 
+    /// The name of the annotation that prevents R8/Proguard from renaming the given type
+    static let keepAnnotation = "@androidx.annotation.Keep"
+
     static func translate(statement: TypeDeclaration, translator: KotlinTranslator) -> [KotlinStatement] {
         let kstatement = KotlinClassDeclaration(statement: statement)
         kstatement.inherits = statement.inherits
@@ -1256,11 +1259,26 @@ final class KotlinClassDeclaration: KotlinStatement {
         output.append(indentation).append("}\n")
     }
 
+    /// Annotation for anything that must not be renamed by R8/Proguard.
+    ///
+    /// This should be added to anything with statics (because `.companionObjectInstance` uses reflection to load the type by name),
+    /// or anything that needs to be loaded externally (e.g., from Swift via SkipBridge).
+    func addKeepAnnotation() {
+        if !self.annotations.contains(Self.keepAnnotation) {
+            self.annotations += [Self.keepAnnotation]
+        }
+    }
+
     private func appendCompanion(to output: OutputGenerator, indentation: Indentation, type: KotlinCompanionType, staticMembers: [KotlinStatement], enumCases: [KotlinEnumCaseDeclaration]) {
         if type.isNone {
             return
         }
         output.append("\n")
+
+        // add the keep annotation to any class that contains any statics due to the need to use reflection
+        addKeepAnnotation()
+        // also need to also add the annotation to the companion object instance itself
+        output.append(indentation).append(Self.keepAnnotation).append("\n")
 
         // Output companion object with all static members
         output.append(indentation).append("companion object")

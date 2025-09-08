@@ -416,6 +416,7 @@ final class SkipCommandTests: XCTestCase {
         │     ├─ Fastfile
         │     ├─ README.md
         │     └─ metadata
+        │        ├─ app_privacy_details.json
         │        ├─ en-US
         │        │  ├─ description.txt
         │        │  ├─ keywords.txt
@@ -1333,6 +1334,7 @@ final class SkipCommandTests: XCTestCase {
         │     ├─ Fastfile
         │     ├─ README.md
         │     └─ metadata
+        │        ├─ app_privacy_details.json
         │        ├─ en-US
         │        │  ├─ description.txt
         │        │  ├─ keywords.txt

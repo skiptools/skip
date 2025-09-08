@@ -288,6 +288,7 @@ final class KotlinCodableTransformer: KotlinTransformer {
     }
 
     private func synthesizeDecodableCompanion(for classDeclaration: KotlinClassDeclaration, hasCustomDecode: Bool) {
+        classDeclaration.addKeepAnnotation()
         classDeclaration.companionInherits.append(.interface(.named("DecodableCompanion", [classDeclaration.signature])))
         // Special case for enums with custom decode constructors. Enums will already have constructors moved to inits
         guard classDeclaration.declarationType != .enumDeclaration || !hasCustomDecode else {

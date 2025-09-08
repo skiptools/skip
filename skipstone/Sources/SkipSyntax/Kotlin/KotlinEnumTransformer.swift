@@ -108,6 +108,7 @@ final class KotlinEnumTransformer: KotlinTransformer {
         } else {
             classDeclaration.companionInherits.append(.interface(inherit))
         }
+        classDeclaration.addKeepAnnotation()
         let typeInfos = codebaseInfo.typeInfos(forNamed: classDeclaration.signature)
         guard !typeInfos.contains(where: { $0.members.contains(where: \.isAllCasesVar) }) else {
             return

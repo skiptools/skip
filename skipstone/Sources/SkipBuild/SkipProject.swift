@@ -1504,7 +1504,8 @@ xcodebuild*.log
 default.profraw
 *.mobileprovision
 *.cer
-
+*.p12
+*.p12.password
 
 # Xcode automatically generates this directory with a .xcworkspacedata file and xcuserdata
 # hence it is not needed unless you have added a package configuration file to your project
@@ -1975,8 +1976,8 @@ The documentation of _fastlane_ can be found on [docs.fastlane.tools](https://do
 
 # Load the shared Skip.env properties with the app info
 require('dotenv')
-Dotenv.load '../../Skip.env'
-package_name(ENV['PRODUCT_BUNDLE_IDENTIFIER'])
+Dotenv.load('../../Skip.env')
+package_name(ENV['PRODUCT_BUNDLE_IDENTIFIER'].sub("-", "_"))
 
 # Path to the json secret file - Follow https://docs.fastlane.tools/actions/supply/#setup to get one
 json_key_file("fastlane/apikey.json")
@@ -2107,9 +2108,12 @@ end
 lane :release do |options|
   desc "Build and release app"
 
+  # see https://docs.fastlane.tools/uploading-app-privacy-details/
+  #upload_app_privacy_details_to_app_store(json_path: "fastlane/app_privacy_details.json")
+
   # if you have an apikey.json file (https://developer.apple.com/documentation/appstoreconnectapi/creating-api-keys-for-app-store-connect-api), fastlane can automatically fetch certificates and the ASC authentication information
   #get_certificates(api_key_path: "fastlane/apikey.json")
-  #get_provisioning_profile(api_key_path: "fastlane/apikey.json")
+  get_provisioning_profile(api_key_path: "fastlane/apikey.json")
 
   assemble
 
@@ -2130,7 +2134,7 @@ end
 
 require('dotenv')
 Dotenv.load '../../Skip.env'
-#app_identifier(ENV['PRODUCT_BUNDLE_IDENTIFIER'])
+app_identifier(ENV['PRODUCT_BUNDLE_IDENTIFIER'])
 
 # apple_id("my@email")
 
@@ -2178,6 +2182,18 @@ submission_information({
 
 """.write(to: appProject.darwinFastlaneFolder.appendingPathComponent("AppStore.xcconfig").createParentDirectory(), atomically: false, encoding: .utf8)
 
+            // app_privacy_details.json
+            try """
+[
+  {
+    "data_protections": [
+      "DATA_NOT_COLLECTED"
+    ]
+  }
+]
+
+""".write(to: appProject.darwinFastlaneMetadataFolder.appendingPathComponent("app_privacy_details.json").createParentDirectory(), atomically: false, encoding: .utf8)
+
             // rating.json
             try """
 {
@@ -2185,6 +2201,7 @@ submission_information({
   "contests": "NONE",
   "gamblingSimulated": "NONE",
   "horrorOrFearThemes": "NONE",
+  "koreaAgeRatingOverride": "NONE",
   "matureOrSuggestiveThemes": "NONE",
   "medicalOrTreatmentInformation": "NONE",
   "profanityOrCrudeHumor": "NONE",
@@ -2194,6 +2211,7 @@ submission_information({
   "violenceRealisticProlongedGraphicOrSadistic": "NONE",
   "violenceRealistic": "NONE",
   "gambling": false,
+  "lootBox": false,
   "unrestrictedWebAccess": false
 }
 
@@ -2303,7 +2321,7 @@ typealias AppMainDelegateBase = NSApplicationDelegate
 typealias AppType = NSApplication
 #endif
 
-class AppMainDelegate: NSObject, AppMainDelegateBase {
+@MainActor final class AppMainDelegate: NSObject, AppMainDelegateBase {
     let application = AppType.shared
 
     #if canImport(UIKit)
@@ -2481,7 +2499,9 @@ struct PlatformHeartView : View {
             contentViewTabBodyContents = """
         TabView(selection: $tab) {
             Tab("Welcome", systemImage: "heart.fill", value: ContentTab.welcome) {
-                WelcomeView(welcomeName: $welcomeName)
+                NavigationStack {
+                    WelcomeView(welcomeName: $welcomeName)
+                }
             }
             Tab("Home", systemImage: "house.fill", value: ContentTab.home) {
                 NavigationStack {
@@ -2490,8 +2510,10 @@ struct PlatformHeartView : View {
                 }
             }
             Tab("Settings", systemImage: "gearshape.fill", value: ContentTab.settings) {
-                SettingsView(appearance: $appearance, welcomeName: $welcomeName)
-                    .navigationTitle("Settings")
+                NavigationStack {
+                    SettingsView(appearance: $appearance, welcomeName: $welcomeName)
+                        .navigationTitle("Settings")
+                }
             }
         }
 """

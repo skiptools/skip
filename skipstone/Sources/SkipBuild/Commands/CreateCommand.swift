@@ -201,6 +201,8 @@ Create a new project by following a series of interactive prompts.
         }
 
         let freeProject = prompt("Create a free open-source project?", defaultValue: createOptions.free)
+        let appFairProject = !freeProject ? false : prompt("Create an App Fair Project?", defaultValue: createOptions.appfair)
+
         let gitRepo = prompt("Initialize git repository for the project?", defaultValue: createOptions.gitRepo)
 
         var fastlane = false
@@ -238,6 +240,7 @@ Create a new project by following a series of interactive prompts.
         // override with options specified interactively
         options.gitRepo = gitRepo
         options.free = freeProject
+        options.appfair = appFairProject
         options.fastlane = fastlane
 
         await withLogStream(with: out) {
