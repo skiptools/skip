@@ -39,6 +39,7 @@ jobs:
           fetch-tags: true
 
       - name: Setup Xcode
+        if: ${{ startsWith(matrix.os, 'macos-') }}
         run: |
           # workaround for failure to find iOS 26 simulator
           # https://github.com/actions/runner-images/issues/12862#issuecomment-3239326872
