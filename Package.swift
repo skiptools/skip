@@ -12,7 +12,6 @@ let package = Package(
         .macCatalyst(.v16),
     ],
     products: [
-        .executable(name: "skip", targets: ["skip"]),
         .plugin(name: "skipstone", targets: ["skipstone"]),
         .plugin(name: "skiplink", targets: ["Create SkipLink"]),
         .library(name: "SkipDrive", targets: ["SkipDrive"]),
