@@ -119,6 +119,7 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
                                                            subcommands: [
                                                             LicenseInfoCommand.self,
                                                             LicenseCreateCommand.self,
+                                                            LicenseUpdateCommand.self,
                                                            ])
 
     public init() {
@@ -137,7 +138,6 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
             id: \(id)
             type: \(type?.rawValue ?? "legacy")
             expiration: \(expiration)
-            expiration: \(ISO8601DateFormatter.string(from: expiration, timeZone: TimeZone(secondsFromGMT: 0)!))
             hostid: \(hostid ?? "")
             key: \(key)
             """
@@ -211,9 +211,65 @@ public struct SkipKeyExecutor: SkipCommandExecutor {
                 throw LicenseError.invalidNonceFormat
             }
             let keyString = try key.licenseKeyString(iv: iv)
-            return KeyOutput(id: id, type: key.licenseType, expiration: exp, key: keyString)
+            return KeyOutput(id: key.id, type: key.licenseType, expiration: key.expiration, hostid: key.hostid, key: keyString)
         }
     }
+
+    struct LicenseUpdateCommand: SingleStreamingCommand {
+        static var configuration = CommandConfiguration(commandName: "update", abstract: "Update an existing key with the specified arguments")
+
+        @Option(name: [.customShort("k"), .long], help: ArgumentHelp("The key to update", valueName: "key"))
+        var key: String
+
+        @Option(name: [.customShort("i"), .long], help: ArgumentHelp("The identifier for the key", valueName: "id"))
+        var id: String?
+
+        @Option(name: [.customShort("t"), .long], help: ArgumentHelp("The type of the license key", valueName: "type"))
+        var type: LicenseKey.LicenseType?
+
+        @Option(name: [.customShort("e"), .long], help: ArgumentHelp("The ISO-8601 key expiration date", valueName: "date"))
+        var expiration: String?
+
+        @Option(name: [.customShort("d"), .long], help: ArgumentHelp("The number of days before expiration", valueName: "days"))
+        var expirationDays: Int?
+
+        @Option(name: [.customShort("h"), .long], help: ArgumentHelp("The hostid for the key", valueName: "hostid"))
+        var hostid: String?
+
+        @Option(name: [.long], help: ArgumentHelp("A hex-encoded 12-byte initialization vector", valueName: "nonce"))
+        var nonce: String?
+
+        @OptionGroup(title: "Output Options")
+        var outputOptions: OutputOptions
+
+        typealias Output = KeyOutput
+
+        func executeCommand() async throws -> Output {
+            let licenseKey = try LicenseKey(licenseString: self.key)
+
+            func parseExpirationArgument() throws -> Date? {
+                if let expiration {
+                    // permit dates without the time specifier (e.g., 2026-04-24)
+                    return ISO8601DateFormatter().date(from: expiration)
+                    ?? ISO8601DateFormatter().date(from: expiration + "T00:00:00Z")
+                } else if let expirationDays {
+                    return Date.now.addingTimeInterval(60 * 60 * 24 * Double(expirationDays))
+                } else {
+                    return nil
+                }
+            }
+
+            let exp = try parseExpirationArgument()
+            let key = LicenseKey(id: id ?? licenseKey.id, expiration: exp ?? licenseKey.expiration, hostid: hostid ?? licenseKey.hostid, flags: type?.licenseFlags ?? licenseKey.flags)
+            let iv = nonce.flatMap(Data.init(hexString:))
+            if nonce != nil && iv?.count != 12 {
+                throw LicenseError.invalidNonceFormat
+            }
+            let keyString = try key.licenseKeyString(iv: iv)
+            return KeyOutput(id: key.id, type: key.licenseType, expiration: key.expiration, hostid: key.hostid, key: keyString)
+        }
+    }
+
 }
 
 extension LicenseKey.LicenseType : ExpressibleByArgument {
