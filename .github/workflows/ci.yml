@@ -13,8 +13,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: 'macos-15'
-            xcode: '16.4'
+          # fails with error redefinition of module 'ELFKitC'
+          #- os: 'macos-15'
+          #  xcode: '16.4'
           - os: 'macos-15'
             xcode: '26.0'
           - os: 'macos-26'
