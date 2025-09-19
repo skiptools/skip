@@ -4,6 +4,8 @@ on:
   push:
     #branches: [ main ]
   workflow_dispatch:
+  schedule:
+    - cron: '3 * * * *'
 jobs:
   skip-release:
     runs-on: macos-15
@@ -23,6 +25,9 @@ jobs:
           path: skip
           # need to fetch tags so we know the most recent version
           fetch-tags: true
+          # needed or else trigger from tag will fail
+          # https://github.com/actions/checkout/issues/1467
+          ref: ${{ github.ref }}
 
       - name: Checkout homebrew-skip
         uses: actions/checkout@v4
