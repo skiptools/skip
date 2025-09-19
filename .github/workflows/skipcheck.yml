@@ -9,6 +9,10 @@ jobs:
   skip-checks:
     runs-on: macos-15
     timeout-minutes: 200
+    strategy:
+      fail-fast: false
+      matrix:
+        android-sdk: [6.1, 6.2]
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     steps:
@@ -37,7 +41,7 @@ jobs:
       - run: skip init --transpiled-app --appfair demo-appfair DemoFairApp
 
       # native model and app init
-      - run: skip android sdk install --verbose
+      - run: skip android sdk install --version ${{ matrix.android-sdk }} --verbose
 
       - run: skip checkup --verbose --native
 
