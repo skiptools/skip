@@ -53,7 +53,7 @@ struct AndroidSDKInstallCommand: MessageCommand, ToolOptionsCommand {
         abstract: "Install the native Swift Android SDK",
         shouldDisplay: true)
 
-    static let defaultAndroidSDKVersion = "6.1"
+    static let defaultAndroidSDKVersion = "6.2"
 
     @Option(help: ArgumentHelp("Version of the Swift Android SDK to install", valueName: "version"))
     var version: String = Self.defaultAndroidSDKVersion
@@ -351,7 +351,7 @@ fileprivate extension AndroidOperationCommand {
             let buildOutputFolder = [
                 // the output folder is either the scratch path we have specified, or is the default package/.build output directory
                 toolchainOptions.scratchPath ?? (packageDir + "/.build"),
-                arch.target(api: toolchainOptions.androidAPILevel),
+                arch.tripleKey(api: toolchainOptions.androidAPILevel, sdkVersion: tc.swiftSDKVersion),
                 buildConfig.rawValue,
             ].joined(separator: "/")
 
@@ -622,9 +622,9 @@ fileprivate extension AndroidOperationCommand {
         }
 
         //let sdkName = sdkPath.deletingPathExtension().lastPathComponent // e.g. "swift-6.0.2-RELEASE-android-24-0.1"
-        let sdkName = arch.target(api: apiLevel)
         let swiftSDKVersion = sdkPath.lastPathComponent.split(separator: "-").dropFirst().first?.description ?? "latest" // e.g.: 6.0.2
-        let toolchainPath = try swiftToolchainFolder(sdkVersion: swiftSDKVersion.description)
+        let sdkName = arch.tripleKey(api: apiLevel, sdkVersion: swiftSDKVersion)
+        let toolchainPath = try swiftToolchainFolder(sdkVersion: swiftSDKVersion)
         let infoPath = sdkPath.appendingPathComponent("info.json", isDirectory: false)
         let sdkInfo = try JSONDecoder().decode(SDKInfo.self, from: Data(contentsOf: infoPath))
 
@@ -646,9 +646,8 @@ fileprivate extension AndroidOperationCommand {
         let schemaSDK = try JSONDecoder().decode(SchemaSDK.self, from: Data(contentsOf: sdkJSONURL))
 
         //let sysroot = try dirs(in: [sdkRoot]).first(where: { $0.lastPathComponent.hasSuffix("-sysroot") }) // e.g.: "android-27c-sysroot"
-        let tripleKey = arch.tripleKey(api: apiLevel)
-        guard let targetTriple = schemaSDK.targetTriples?[tripleKey] else {
-            throw CrossCompilerError(errorDescription: "The Swift Android SDK did not contain the specified target triple: \(tripleKey)")
+        guard let targetTriple = schemaSDK.targetTriples?[sdkName] else {
+            throw CrossCompilerError(errorDescription: "The Swift Android SDK did not contain the specified target triple: \(sdkName)")
         }
         let sysrootPath = targetTriple.sdkRootPath
         let swiftResourcesPath = targetTriple.swiftResourcesPath
@@ -682,7 +681,7 @@ fileprivate extension AndroidOperationCommand {
             .appendingPathComponent(swiftStaticResourcesPath, isDirectory: true)
 
         if !isDir(libPathStatic) {
-            throw CrossCompilerError(errorDescription: "The Swift Android SDK static library path for \(arch.tripleKey(api: apiLevel)) did not exist at: \(libPathStatic.path)")
+            throw CrossCompilerError(errorDescription: "The Swift Android SDK static library path for \(sdkName) did not exist at: \(libPathStatic.path)")
         }
 
         // folder containing the shared object files
@@ -704,7 +703,7 @@ fileprivate extension AndroidOperationCommand {
         }
 
         if !isDir(libPathDynamic) {
-            throw CrossCompilerError(errorDescription: "The Swift Android SDK dynamic library path for \(arch.tripleKey(api: apiLevel)) did not exist at: \(libPathDynamic.path)")
+            throw CrossCompilerError(errorDescription: "The Swift Android SDK dynamic library path for \(sdkName) did not exist at: \(libPathDynamic.path)")
         }
 
         return ToolchainPaths(toolchainPath: toolchainPath, swiftSDKVersion: swiftSDKVersion, destinationURL: nil, sdkName: sdkName, libPathDynamic: libPathDynamic, libPathStatic: libPathStatic, libSysrootArch: libSysrootArch)
@@ -995,24 +994,14 @@ enum AndroidArch: String {
     case armv7
     case x86_64
 
-    func target(api: Int) -> String {
-        switch self {
-        case .aarch64:
-            return "aarch64-unknown-linux-android\(api)"
-        case .armv7:
-            return "armv7-unknown-linux-androideabi\(api)"
-        case .x86_64:
-            return "x86_64-unknown-linux-android\(api)"
-        }
-    }
-
     /// The key in the `swift-sdk.json` file as decoded by `SchemaSDK`
-    func tripleKey(api: Int) -> String {
+    func tripleKey(api: Int, sdkVersion: String) -> String {
         switch self {
         case .aarch64:
             return "aarch64-unknown-linux-android\(api)"
         case .armv7:
-            return "armv7-unknown-linux-androideabi\(api)"
+            // older SDKs set the tripe name like armv7-unknown-linux-androideabi28, newer are just armv7-unknown-linux-android28
+            return sdkVersion.hasPrefix("5") || sdkVersion.hasPrefix("6.0") || sdkVersion.hasPrefix("6.1") ? "armv7-unknown-linux-androideabi\(api)" : "armv7-unknown-linux-android\(api)"
         case .x86_64:
             return "x86_64-unknown-linux-android\(api)"
         }
