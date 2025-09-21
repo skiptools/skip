@@ -285,7 +285,17 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         // load and merge each of the skip.yml files for the dependent modules
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
 
-        let isNativeModule = baseSkipConfig.skip?.mode?.lowercased() == "native"
+        let hasSkipFuse = configMap.keys.contains("SkipFuse")
+        let isNativeModule: Bool
+        let moduleType = baseSkipConfig.skip?.mode
+        switch moduleType {
+        case "native": isNativeModule = true
+        case "transpiled": isNativeModule = false
+        case "automatic", .none: isNativeModule = hasSkipFuse
+        default:
+            error("unknown skip mode: \(moduleType ?? "none")")
+            return
+        }
 
         // also add any files in the skipFolderFile to the list of sources (including the skip.yml and other metadata files)
         let skipFolderPathContents = try FileManager.default.enumeratedURLs(of: skipFolderPath.asURL)
