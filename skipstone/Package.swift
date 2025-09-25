@@ -18,14 +18,13 @@ let package = Package(
         .executable(name: "SkipKey", targets: ["SkipKey"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "601.0.1"),
+        .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "602.0.0"),
         .package(url: "https://github.com/swiftlang/swift-tools-support-core.git", from: "0.6.1"),
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
-        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.8.1"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.6.1"),
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.15.1"),
         .package(url: "https://github.com/marcprux/universal.git", from: "5.2.2"),
-        // needed until https://github.com/p-x9/ELFKit/pull/6 is released
         .package(url: "https://github.com/marcprux/ELFKit.git", from: "0.2.1"),
-        //.package(url: "https://github.com/p-x9/ELFKit.git", from: "0.2.1")
+        //.package(url: "https://github.com/p-x9/ELFKit.git", from: "0.3.0"),
     ],
     targets: [
         // SkipDriveExternal is a link to ../../skip/Sources/SkipDrive

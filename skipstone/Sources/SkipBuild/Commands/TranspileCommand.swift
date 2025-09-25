@@ -284,18 +284,28 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         // load and merge each of the skip.yml files for the dependent modules
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
-
         let hasSkipFuse = configMap.keys.contains("SkipFuse")
-        let isNativeModule: Bool
-        let moduleType = baseSkipConfig.skip?.mode
-        switch moduleType {
-        case "native": isNativeModule = true
-        case "transpiled": isNativeModule = false
-        case "automatic", .none: isNativeModule = hasSkipFuse
-        default:
-            error("unknown skip mode: \(moduleType ?? "none")")
-            return
+
+        func moduleMode(for moduleName: String?) -> ModuleMode {
+            let moduleMode: String?
+
+            if let moduleName {
+                moduleMode = configMap[moduleName]?.skip?.mode
+            } else {
+                moduleMode = baseSkipConfig.skip?.mode
+            }
+
+        switch moduleMode {
+            case "native": return .native
+            case "transpiled": return .transpiled
+            case "automatic", .none: return hasSkipFuse && (moduleName == primaryModuleName || moduleName == nil) ? .native : .transpiled
+            default:
+                error("Unknown skip mode for module \(moduleName ?? primaryModuleName): \(moduleMode ?? "none")")
+                return .transpiled
+            }
         }
+
+        let isNativeModule = moduleMode(for: nil) == .native
 
         // also add any files in the skipFolderFile to the list of sources (including the skip.yml and other metadata files)
         let skipFolderPathContents = try FileManager.default.enumeratedURLs(of: skipFolderPath.asURL)
@@ -653,7 +663,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
                     """
 
-                    if configMap[moduleName]?.skip?.mode == "native" {
+                    if moduleMode(for: moduleName) == .native {
                         bridgedModules.append(moduleName)
                     }
                 }

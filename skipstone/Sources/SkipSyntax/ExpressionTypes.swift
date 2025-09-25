@@ -1155,6 +1155,8 @@ final class KeyPathLiteral: Expression {
                 } else {
                     components.append(.unwrappedOptional)
                 }
+            default: // case .method(_), but cannot be accessed due to: 'method' is inaccessible due to '@_spi' protection level
+                throw Message.keyPathUnsupported(syntax, source: syntaxTree.source)
             }
         }
         return KeyPathLiteral(root: root, components: components, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))
