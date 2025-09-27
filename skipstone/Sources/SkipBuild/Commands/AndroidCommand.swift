@@ -715,16 +715,17 @@ fileprivate extension AndroidOperationCommand {
         let toolchain = try toolchainOptions.toolchain ?? {
             let toolchainOverride = ProcessInfo.processInfo.environment["SWIFT_TOOLCHAIN_DIR"].flatMap(URL.init(fileURLWithPath:))
 
-            let toolchainsHomeGlobal = URL(fileURLWithPath: "/Library/Developer/Toolchains", isDirectory: true)
             #if os(Linux)
             // TODO: should we also check for swiftly home at ~/.local/share/swiftly/toolchains/6.2.0 ?
             // note the difference in naming between ~/.swiftpm/toolchains/swift-6.2-RELEASE-ubuntu24.04 and ~/.local/share/swiftly/toolchains/6.2.0
-            let toolchainsHomeLocal = homeDir.appendingPathComponent("/.swiftpm/toolchains", isDirectory: true)
+            let toolchains1 = homeDir.appendingPathComponent("/.config/swiftpm/toolchains", isDirectory: true)
+            let toolchains2 = homeDir.appendingPathComponent("/.swiftpm/toolchains", isDirectory: true)
             #else
-            let toolchainsHomeLocal = homeDir.appendingPathComponent("/Library/Developer/Toolchains", isDirectory: true)
+            let toolchains1 = URL(fileURLWithPath: "/Library/Developer/Toolchains", isDirectory: true)
+            let toolchains2 = homeDir.appendingPathComponent("/Library/Developer/Toolchains", isDirectory: true)
             #endif
 
-            let toolchainDirs = toolchainOverride != nil ? [toolchainOverride!] : [toolchainsHomeGlobal, toolchainsHomeLocal]
+            let toolchainDirs = toolchainOverride != nil ? [toolchainOverride!] : [toolchains1, toolchains2]
 
             if toolchainDirs.filter({ isDir($0) }).isEmpty {
                 throw CrossCompilerError(errorDescription: "The Swift toolchains folder could not be located at: \(toolchainDirs.map(\.path))")

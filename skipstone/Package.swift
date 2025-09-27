@@ -43,7 +43,7 @@ let package = Package(
 
         .target(name: "SkipBuild", dependencies: [
             "SkipSyntax",
-            .target(name: "SkipDriveExternal", condition: .when(platforms: [.macOS])),
+            .target(name: "SkipDriveExternal", condition: .when(platforms: [.macOS, .linux])),
             .product(name: "SwiftParser", package: "swift-syntax"),
             .product(name: "ArgumentParser", package: "swift-argument-parser"),
             //.product(name: "SwiftPMDataModel-auto", package: "swift-package-manager"),

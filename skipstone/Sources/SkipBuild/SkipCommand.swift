@@ -1048,8 +1048,10 @@ extension ToolOptionsCommand {
         #if os(macOS)
         homeDir.appendingPathComponent("Library/org.swift.swiftpm", isDirectory: true)
         #else
-        // TODO: also check for ~/.config/swiftpm/swift-sdks/ and /root/.swiftpm/swift-sdks/?
-        homeDir.appendingPathComponent(".swiftpm/org.swift.swiftpm", isDirectory: true)
+        // there are a couple of "standard" locations for the swift package manager configuration
+        let cfg1 = homeDir.appendingPathComponent(".config/swiftpm", isDirectory: true)
+        let cfg2 = homeDir.appendingPathComponent(".swiftpm/org.swift.swiftpm", isDirectory: true)
+        return [cfg1, cfg2].first(where: { FileManager.default.fileExists(atPath: $0.path) }) ?? cfg1
         #endif
     }
 }
