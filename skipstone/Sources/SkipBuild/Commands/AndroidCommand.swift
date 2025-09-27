@@ -716,7 +716,13 @@ fileprivate extension AndroidOperationCommand {
             let toolchainOverride = ProcessInfo.processInfo.environment["SWIFT_TOOLCHAIN_DIR"].flatMap(URL.init(fileURLWithPath:))
 
             let toolchainsHomeGlobal = URL(fileURLWithPath: "/Library/Developer/Toolchains", isDirectory: true)
+            #if os(Linux)
+            // TODO: should we also check for swiftly home at ~/.local/share/swiftly/toolchains/6.2.0 ?
+            // note the difference in naming between ~/.swiftpm/toolchains/swift-6.2-RELEASE-ubuntu24.04 and ~/.local/share/swiftly/toolchains/6.2.0
+            let toolchainsHomeLocal = homeDir.appendingPathComponent("/.swiftpm/toolchains", isDirectory: true)
+            #else
             let toolchainsHomeLocal = homeDir.appendingPathComponent("/Library/Developer/Toolchains", isDirectory: true)
+            #endif
 
             let toolchainDirs = toolchainOverride != nil ? [toolchainOverride!] : [toolchainsHomeGlobal, toolchainsHomeLocal]
 
@@ -724,7 +730,7 @@ fileprivate extension AndroidOperationCommand {
                 throw CrossCompilerError(errorDescription: "The Swift toolchains folder could not be located at: \(toolchainDirs.map(\.path))")
             }
 
-            var toolchains = try dirs(in: toolchainDirs).filter({ $0.pathExtension == "xctoolchain" })
+            var toolchains = try dirs(in: toolchainDirs) // .filter({ $0.pathExtension == "xctoolchain" }) // Linux does not have an .xctoolchain suffix; maybe check the contents of the folder?
             let swiftVersion = toolchainOptions.swiftVersion ?? sdkVersion
             toolchains = toolchains.filter({ $0.lastPathComponent.hasPrefix("swift-\(swiftVersion)") })
 

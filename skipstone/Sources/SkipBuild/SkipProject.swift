@@ -1413,26 +1413,68 @@ struct TestData : Codable, Hashable {
             """
         }
 
+        let appStoreLinks = options.appfair ? """
+        <!-- TODO: fill in details when releasing to app/play store
+        <div align="center">
+          <a href="https://play.google.com/store/apps/details?id=ANDROID_APP_ID" style="display: inline-block;"><img src="https://appfair.org/assets/badges/google-play-store.svg" alt="Download on the Google Play Store" style="height: 60px; vertical-align: middle; object-fit: contain;" /></a>
+          <a href="https://apps.apple.com/us/app/APPLE_APP_NAME/idAPPLE_APP_ID" style="display: inline-block;"><img src="https://appfair.org/assets/badges/apple-app-store.svg" alt="Download on the Apple App Store" style="height: 60px; vertical-align: middle; object-fit: contain;" /></a>
+        </div>
+        -->
+        
+
+        """ : ""
 
         var appREADME = """
         # \(primaryModuleName)
 
-        This is a \(options.free ? "free " : "")[Skip](https://skip.tools) dual-platform app project.
-        It builds a native app for both iOS and Android.
+        This is a \(options.free ? "free and open-source " : "")[Skip](https://skip.tools) dual-platform app project\(options.appfair ? " distributed through the [App Fair](https://appfair.org)" : "").
+
+        \(appStoreLinks)
+        <!-- TODO: add iOS screenshots to fastlane metadata
+        ## iPhone Screenshots
+
+        <img alt="iPhone Screenshot" src="Darwin/fastlane/screenshots/en-US/1_en-US.png" style="width: 18%" /> <img alt="iPhone Screenshot" src="Darwin/fastlane/screenshots/en-US/2_en-US.png" style="width: 18%" /> <img alt="iPhone Screenshot" src="Darwin/fastlane/screenshots/en-US/3_en-US.png" style="width: 18%" /> <img alt="iPhone Screenshot" src="Darwin/fastlane/screenshots/en-US/4_en-US.png" style="width: 18%" /> <img alt="iPhone Screenshot" src="Darwin/fastlane/screenshots/en-US/5_en-US.png" style="width: 18%" />
+        -->
+
+        <!-- TODO: add Android screenshots to fastlane metadata
+        ## Android Screenshots
+
+        <img alt="Android Screenshot" src="Android/fastlane/metadata/android/en-US/images/phoneScreenshots/1_en-US.png" style="width: 18%" /> <img alt="Android Screenshot" src="Android/fastlane/metadata/android/en-US/images/phoneScreenshots/2_en-US.png" style="width: 18%" /> <img alt="Android Screenshot" src="Android/fastlane/metadata/android/en-US/images/phoneScreenshots/3_en-US.png" style="width: 18%" /> <img alt="Android Screenshot" src="Android/fastlane/metadata/android/en-US/images/phoneScreenshots/4_en-US.png" style="width: 18%" /> <img alt="Android Screenshot" src="Android/fastlane/metadata/android/en-US/images/phoneScreenshots/5_en-US.png" style="width: 18%" />
+        -->
 
         ## Building
 
         This project is both a stand-alone Swift Package Manager module,
-        as well as an Xcode project that builds and transpiles the project
-        into a Kotlin Gradle project for Android using the Skip plugin.
+        as well as an Xcode project that builds and translates the project
+        into a Kotlin Gradle project for Android using the skipstone plugin.
 
         Building the module requires that Skip be installed using
         [Homebrew](https://brew.sh) with `brew install skiptools/skip/skip`.
 
-        This will also install the necessary transpiler prerequisites:
+        This will also install the necessary Skip prerequisites:
         Kotlin, Gradle, and the Android build tools.
 
-        Installation prerequisites can be confirmed by running `skip checkup`.
+        Installation prerequisites can be confirmed by running
+        `skip checkup`. The project can be validated with `skip verify`.
+
+        ## Running
+
+        Xcode and Android Studio must be downloaded and installed in order to
+        run the app in the iOS simulator / Android emulator.
+        An Android emulator must already be running, which can be launched from
+        Android Studio's Device Manager.
+
+        The project can be opened and run in Xcode from
+        `Project.xcworkspace`, which also enabled parallel
+        development of any Skip libary dependencies.
+
+        To run both the Swift and Kotlin apps simultaneously,
+        launch the "\(primaryModuleName) App" target from Xcode.
+        A build phases runs the "Launch Android APK" script that
+        will deploy the Skip app to a running Android emulator or connected device.
+        Logging output for the iOS app can be viewed in the Xcode console, and in
+        Android Studio's logcat tab for the transpiled Kotlin app, or
+        using `adb logcat` from a terminal.
 
         ## Testing
 
@@ -1443,20 +1485,6 @@ struct TestData : Codable, Hashable {
 
         Parity testing can be performed with `skip test`,
         which will output a table of the test results for both platforms.
-
-        ## Running
-
-        Xcode and Android Studio must be downloaded and installed in order to
-        run the app in the iOS simulator / Android emulator.
-        An Android emulator must already be running, which can be launched from
-        Android Studio's Device Manager.
-
-        To run both the Swift and Kotlin apps simultaneously,
-        launch the \(primaryModuleName) target from Xcode.
-        A build phases runs the "Launch Android APK" script that
-        will deploy the transpiled app a running Android emulator or connected device.
-        Logging output for the iOS app can be viewed in the Xcode console, and in
-        Android Studio's logcat tab for the transpiled Kotlin app.
 
         """
 

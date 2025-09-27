@@ -1045,7 +1045,12 @@ extension ToolOptionsCommand {
     }
 
     var swiftPMConfigFolder: URL {
+        #if os(macOS)
         homeDir.appendingPathComponent("Library/org.swift.swiftpm", isDirectory: true)
+        #else
+        // TODO: also check for ~/.config/swiftpm/swift-sdks/ and /root/.swiftpm/swift-sdks/?
+        homeDir.appendingPathComponent(".swiftpm/org.swift.swiftpm", isDirectory: true)
+        #endif
     }
 }
 
