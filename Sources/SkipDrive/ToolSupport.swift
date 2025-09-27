@@ -8,6 +8,8 @@ import FoundationXML
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
+#elseif canImport(Musl)
+import Musl
 #else
 #error("Unsupported platform")
 #endif
