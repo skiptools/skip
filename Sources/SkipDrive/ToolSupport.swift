@@ -519,9 +519,6 @@ public final class Process {
     public enum Error: Swift.Error, Sendable {
         /// The program requested to be executed cannot be found on the existing search paths, or is not executable.
         case missingExecutableProgram(program: String)
-
-        /// The current OS does not support the workingDirectory API.
-        case workingDirectoryNotSupported
     }
 
     public enum OutputRedirection {
@@ -977,22 +974,7 @@ public final class Process {
         defer { posix_spawn_file_actions_destroy(&fileActions) }
 
         if let workingDirectory = workingDirectory?.path {
-#if canImport(Darwin) && !targetEnvironment(macCatalyst)
-            // The only way to set a workingDirectory is using an availability-gated initializer, so we don't need
-            // to handle the case where the posix_spawn_file_actions_addchdir_np method is unavailable. This check only
-            // exists here to make the compiler happy.
-            if #available(macOS 10.15, *) {
-                posix_spawn_file_actions_addchdir_np(&fileActions, workingDirectory)
-            }
-#elseif os(Linux)
-            //guard SPM_posix_spawn_file_actions_addchdir_np_supported() else {
-                //throw Process.Error.workingDirectoryNotSupported
-            //}
-
             posix_spawn_file_actions_addchdir_np(&fileActions, workingDirectory)
-#else
-            throw Process.Error.workingDirectoryNotSupported
-#endif
         }
 
         var stdinPipe: [Int32] = [-1, -1]
@@ -1778,8 +1760,6 @@ extension Process.Error: CustomStringConvertible {
         switch self {
         case .missingExecutableProgram(let program):
             return "could not find executable for '\(program)'"
-        case .workingDirectoryNotSupported:
-            return "workingDirectory is not supported in this platform"
         }
     }
 }
