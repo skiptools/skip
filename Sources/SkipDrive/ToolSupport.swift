@@ -989,7 +989,7 @@ public final class Process {
                 //throw Process.Error.workingDirectoryNotSupported
             //}
 
-            //SPM_posix_spawn_file_actions_addchdir_np(&fileActions, workingDirectory)
+            posix_spawn_file_actions_addchdir_np(&fileActions, workingDirectory)
 #else
             throw Process.Error.workingDirectoryNotSupported
 #endif
