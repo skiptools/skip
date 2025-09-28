@@ -258,7 +258,11 @@ extension ToolOptionsCommand where Self : StreamingCommand {
                 return (result: result, message: MessageBlock(status: .fail, msg))
             }
         }
-        return try await run(with: out, msg, ["zip", "-\(compressionLevel)", "--symlinks", "-r", zipFile.path, folder.lastPathComponent], in: folder.deletingLastPathComponent(), resultHandler: returnFileSize)
+
+        // Linux/Musl doesn't support the `in workingDirectory` argument, and zip has no flag to set the root folder, so we need to do this shell operation like in:
+        // https://github.com/swiftlang/swift-package-manager/blob/e1183984b08c76480406e134a6ec116888cf2e67/Sources/Basics/Archiver/ZipArchiver.swift#L138
+        return try await run(with: out, msg, ["/bin/sh", "-c", "cd '\(folder.deletingLastPathComponent().path)' && zip -\(compressionLevel) --symlinks -r '\(zipFile.path)' '\(folder.lastPathComponent)'"], resultHandler: returnFileSize)
+        //return try await run(with: out, msg, ["zip", "-\(compressionLevel)", "--symlinks", "-r", zipFile.path, folder.lastPathComponent], in: folder.deletingLastPathComponent(), resultHandler: returnFileSize)
     }
 
     func createIPA(configuration: BuildConfiguration, schemeName: String?, primaryModuleName: String, sdk: String = "iphoneos", cfgSuffix: String, projectURL: URL, out: MessageQueue, prefix re: String, xcodeProjectURL: URL, ipaURL ipaOutputURL: URL? = nil, xcarchiveURL: URL? = nil, teamID: String? = nil, verifyFile: Bool = true, returnHashes: Bool) async throws -> [URL : String?] {
