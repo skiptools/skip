@@ -48,6 +48,10 @@ class SkipCommandTests : XCTestCase {
     }
 
     func testSkipDevices() async throws {
+        #if os(Linux)
+        throw XCTSkip("test not yet working on Linux")
+        #endif
+
         let devices = try await skip("devices", "-jA").out.parseJSONArray()
         XCTAssertGreaterThanOrEqual(devices.count, 0)
     }
@@ -58,6 +62,10 @@ class SkipCommandTests : XCTestCase {
     }
 
     func testSkipCreate() async throws {
+        #if os(Linux)
+        throw XCTSkip("test not yet working on Linux")
+        #endif
+
         let tempDir = try mktmp()
         let projectName = "hello-skip"
         let dir = tempDir + "/" + projectName + "/"
@@ -211,6 +219,10 @@ class SkipCommandTests : XCTestCase {
     }
 
     func testSkipIcon() async throws {
+        #if os(Linux)
+        throw XCTSkip("test not yet working on Linux")
+        #endif
+
         let tempDir = try mktmp()
         let name = "demo-app"
         let dir = tempDir + "/" + name + "/"
@@ -714,6 +726,10 @@ class SkipCommandTests : XCTestCase {
     }
 
     func testSkipFair() async throws {
+        #if os(Linux)
+        throw XCTSkip("test not yet working on Linux")
+        #endif
+
         let tempDir = try mktmp()
         let projectName = "hello-skip"
         let dir = tempDir + "/" + projectName + "/"
@@ -884,6 +900,10 @@ class SkipCommandTests : XCTestCase {
     }
 
     func testSkipInit() async throws {
+        #if os(Linux)
+        throw XCTSkip("test not yet working on Linux")
+        #endif
+
         let tempDir = try mktmp()
         let name = "cool-lib"
         let dir = tempDir + "/" + name + "/"
@@ -976,6 +996,10 @@ class SkipCommandTests : XCTestCase {
     }
 
     func testSkipInitGit() async throws {
+        #if os(Linux)
+        throw XCTSkip("test not yet working on Linux")
+        #endif
+
         let tempDir = try mktmp()
         let name = "neat-lib"
         let dir = tempDir + "/" + name + "/"
@@ -1023,6 +1047,10 @@ class SkipCommandTests : XCTestCase {
     }
 
     func testSkipExportFramework() async throws {
+        #if os(Linux)
+        throw XCTSkip("test not yet working on Linux")
+        #endif
+
         let tempDir = try mktmp()
         let name = "demo-framework"
         let dir = tempDir + "/" + name + "/"
@@ -1040,6 +1068,10 @@ class SkipCommandTests : XCTestCase {
     }
 
     func testSkipExportApp() async throws {
+        #if os(Linux)
+        throw XCTSkip("test not yet working on Linux")
+        #endif
+
         let tempDir = try mktmp()
         let name = "demo-app"
         let dir = tempDir + "/" + name + "/"

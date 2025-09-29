@@ -82,9 +82,6 @@ jobs:
         run: swift build
 
       - name: Test Skip
-        # TODO: fix tests on Linux
-        if: ${{ startsWith(matrix.os, 'macos-') }}
         working-directory: skip
         run: swift test
-
 
