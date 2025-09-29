@@ -39,7 +39,7 @@ jobs:
           key: homebrew-packages
 
       - name: Install Skip
-        run: brew install skiptools/skip/skip || (brew update && brew install skiptools/skip/skip)
+        uses: skiptools/actions/setup-skip@v1
 
       - name: Skip Checkup
         run: skip checkup
