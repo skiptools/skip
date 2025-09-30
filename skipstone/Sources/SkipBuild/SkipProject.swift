@@ -1153,7 +1153,7 @@ struct TestData : Codable, Hashable {
                 let testSkipModuleFile = testDir.appending(path: "XCSkipTests.swift")
                 try """
                 \(sourceHeader)import Foundation
-                #if os(macOS) // Skip transpiled tests only run on macOS targets
+                #if os(macOS) || os(Linux) // Skip transpiled tests only run on supported hosts
                 import SkipTest
 
                 /// This test case will run the transpiled tests for the Skip module.
