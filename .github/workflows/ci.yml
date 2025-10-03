@@ -16,14 +16,16 @@ jobs:
           # fails with error redefinition of module 'ELFKitC'
           #- os: 'macos-15'
           #  xcode: '16.4'
-          - os: 'macos-15'
-            xcode: '26.0'
+          - os: 'macos-14'
+          #  xcode: '16.4'
+          #- os: 'macos-15'
+          #  xcode: '26.0'
           - os: 'macos-26'
-            xcode: '26'
+          #  xcode: '26'
           - os: 'ubuntu-24.04'
     runs-on: ${{ matrix.os }}
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
+    #env:
+    #  DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
     steps:
       - uses: gradle/actions/setup-gradle@v4
         with:
