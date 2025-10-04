@@ -13,15 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # fails with error redefinition of module 'ELFKitC'
-          #- os: 'macos-15'
-          #  xcode: '16.4'
-          - os: 'macos-14'
-          #  xcode: '16.4'
-          #- os: 'macos-15'
-          #  xcode: '26.0'
+          - os: 'macos-15'
           - os: 'macos-26'
-          #  xcode: '26'
           - os: 'ubuntu-24.04'
     runs-on: ${{ matrix.os }}
     #env:
