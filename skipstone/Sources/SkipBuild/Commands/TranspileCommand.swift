@@ -1320,10 +1320,12 @@ extension FileManager {
             #if os(macOS)
             do {
                 // make sure it is writeable, since trashItem will fail if it is not
-                try localFileSystem.chmod(.userWritable, path: fileURL.absolutePath)
+                try? localFileSystem.chmod(.userWritable, path: fileURL.absolutePath)
 
                 // trash it on macOS so the user can recover it from the trash
                 try FileManager.default.trashItem(at: fileURL, resultingItemURL: nil)
+
+                return
             } catch {
                 // tolerate failures and fall back to removing the item
             }

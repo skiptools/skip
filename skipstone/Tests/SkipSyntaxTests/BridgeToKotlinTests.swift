@@ -979,6 +979,30 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    // https://github.com/skiptools/skip/issues/519
+    func TODOtestVoidClosureMainActorVar() async throws {
+        try await check(swiftBridge: """
+        public var c: @MainActor () -> Void = { }
+        """, kotlin: """
+        var c: () -> Unit
+            get() = Swift_c()
+            set(newValue) {
+                Swift_c_set(newValue)
+            }
+        private external fun Swift_c(): () -> Unit
+        private external fun Swift_c_set(value: () -> Unit)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1c")
+        public func BridgeKt_Swift_c(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
+            return SwiftClosure0.javaObject(for: c, options: [])!
+        }
+        @_cdecl("Java_BridgeKt_Swift_1c_1set")
+        public func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
+            c = SwiftClosure0.closure(forJavaObject: value, options: [])! as @MainActor () -> Void
+        }
+        """, transformers: transformers)
+    }
+
     func testAnyVar() async throws {
         try await check(swiftBridge: """
         public var a: Any = 1
@@ -1297,6 +1321,25 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_BridgeKt_Swift_1f_10")
         public func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaObjectPointer) -> JavaObjectPointer? {
             let p_0_swift = SwiftClosure1.closure(forJavaObject: p_0, options: [])! as (Int) -> Void
+            let f_return_swift = f(c: p_0_swift)
+            return f_return_swift.toJavaObject(options: [])
+        }
+        """, transformers: transformers)
+    }
+
+    // https://github.com/skiptools/skip/issues/519
+    func TODOtestMainActorClosureFunction() async throws {
+        try await check(swiftBridge: """
+        public func f(c: @MainActor (Int) -> Void) -> Int? {
+            return nil
+        }
+        """, kotlin: """
+        fun f(c: (Int) -> Unit): Int? = Swift_f_0(c)
+        private external fun Swift_f_0(c: (Int) -> Unit): Int?
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1f_10")
+        public func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaObjectPointer) -> JavaObjectPointer? {
+            let p_0_swift = SwiftClosure1.closure(forJavaObject: p_0, options: [])! as @MainActor (Int) -> Void
             let f_return_swift = f(c: p_0_swift)
             return f_return_swift.toJavaObject(options: [])
         }

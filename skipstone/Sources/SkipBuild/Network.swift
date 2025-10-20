@@ -150,7 +150,7 @@ extension URLResponse {
     public struct InvalidHTTPCode : Error, LocalizedError {
         public let code: Int
 
-        public var failureReason: String? {
+        public var errorDescription: String? {
             "Invalid HTTP Response: \(code)"
         }
     }

@@ -1996,7 +1996,16 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
                     apiFlagsString += "(\(apiFlags.throwsType.descriptionUsing(keyPath)))"
                 }
             }
-            let attributesString = attributes?.contains(.escaping) == true ? "@escaping " : ""
+            var attributesString = ""
+
+            // FIXME: .mainActor doesn't seem to be set on closures that declare themselves as @MainActor
+            // https://github.com/skiptools/skip/issues/519
+            if attributes?.contains(.mainActor) == true {
+                attributesString += "@MainActor "
+            }
+            if attributes?.contains(.escaping) == true {
+                attributesString += "@escaping "
+            }
             return "\(attributesString)(\(parameters.map { $0.descriptionUsing(keyPath) }.joined(separator: ", ")))\(apiFlagsString) -> \(returnType[keyPath: keyPath])"
         case .int:
             return "Int"
