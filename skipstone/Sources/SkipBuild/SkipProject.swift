@@ -3188,7 +3188,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
                 ALWAYS_SEARCH_USER_PATHS = NO;
                 ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
                 COPY_PHASE_STRIP = NO;
-                DEBUG_INFORMATION_FORMAT = dwarf;
+                DEBUG_INFORMATION_FORMAT = dwarf-with-dsym;
                 ENABLE_NS_ASSERTIONS = NO;
                 ENABLE_STRICT_OBJC_MSGSEND = YES;
                 ENABLE_USER_SCRIPT_SANDBOXING = NO;

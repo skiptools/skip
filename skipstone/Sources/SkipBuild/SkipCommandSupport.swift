@@ -8,7 +8,7 @@ typealias ProcessResult = Void
 /// An async stream of standard out + err data resulting from process execution
 public typealias AsyncLineOutput = AsyncThrowingStream<(line: String, err: Bool), Swift.Error>
 
-extension ToolOptionsCommand {
+extension ToolOptionsCommand where Self : StreamingCommand {
     /// Executes `adb` with the current default arguments and the additional args and returns an async stream of the lines from the combined standard err and standard out.
     func launchTool(_ toolName: String, in workingDirectory: URL? = nil, arguments: [String], env: [String: String] = [:], includeStdErr: Bool = true, onExit: @escaping (ProcessResult) throws -> () = { _ in }) async throws -> AsyncLineOutput {
         #if DEBUG
@@ -24,7 +24,14 @@ extension ToolOptionsCommand {
         for (key, value) in env {
             penv[key] = value
         }
-        return Process.streamLines(command: [try toolOptions.toolPath(for: toolName)] + arguments, environment: penv, workingDirectory: workingDirectory, includeStdErr: includeStdErr, onExit: onExit)
+
+        let cmd = [try toolOptions.toolPath(for: toolName)] + arguments
+
+        if outputOptions.verbose {
+            msg(.note, "launching tool: \(env.keys.sorted().map { $0 + "=\"" + env[$0, default: ""] + "\"" }.joined(separator: " ")) \((cmd).joined(separator: " "))")
+        }
+
+        return Process.streamLines(command: cmd, environment: penv, workingDirectory: workingDirectory, includeStdErr: includeStdErr, onExit: onExit)
         #endif
     }
 }

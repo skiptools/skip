@@ -95,7 +95,8 @@ struct AndroidSDKListCommand: SkipCommand, StreamingCommand, OutputOptionsComman
         let swiftSDKListOutput = try await launchTool("swift", arguments: ["sdk", "list"], includeStdErr: false)
         for try await sdkLine in swiftSDKListOutput {
             let info = SwiftSDKLineOutput(name: sdkLine.line)
-            if info.name.contains("-android-") {
+            // handle both old ("swift-6.2-RELEASE-android-0.1.artifactbundle") and new ("swift-DEVELOPMENT-SNAPSHOT-2025-10-16-a_android.artifactbundle") patterns
+            if info.name.contains("android") {
                 await out.yield(info)
             }
         }
@@ -606,7 +607,7 @@ fileprivate extension AndroidOperationCommand {
 
         let sdks = try dirs(at: localSDKsPath)
             .filter({ $0.pathExtension == "artifactbundle" })
-            .filter({ $0.lastPathComponent.hasPrefix("swift-\(toolchainOptions.swiftVersion ?? "")") && $0.lastPathComponent.contains("-android-") })
+            .filter({ $0.lastPathComponent.hasPrefix("swift-\(toolchainOptions.swiftVersion ?? "")") && $0.lastPathComponent.contains("android") })
             // permit non-RELEASE tags if it is specified explicitly, like:
             // skip android test --swift-version 6.2-DEVELOPMENT-SNAPSHOT-2025-05-07-a
             //.filter({ toolchainOptions.swiftVersion != nil || $0.lastPathComponent.contains("RELEASE-android") })
