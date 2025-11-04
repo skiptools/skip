@@ -47,7 +47,7 @@ jobs:
           . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
           hash -r
 
-          SWIFT_VERSION=6.2
+          SWIFT_VERSION=6.2.1
           swiftly install --use ${SWIFT_VERSION}
 
           curl -fsSL -o swift-static-linux-sdk.tar.gz https://download.swift.org/swift-${SWIFT_VERSION}-release/static-sdk/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz 
