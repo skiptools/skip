@@ -68,6 +68,12 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Export project sources", valueName: "source"))
     var exportProject: Bool = true
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Export iOS .ipa"))
+    var ios: Bool = true
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Export Android .apk"))
+    var android: Bool = true
+
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Output folders to variant sub-folders", valueName: "nest"))
     var nested: Bool = false
 
@@ -165,7 +171,7 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
 
             let projectLayout = try AppProjectLayout(moduleName: appModuleName, root: projectURL, check: validateLayoutURL)
 
-            do { // greate iOS .ipa
+            if self.ios { // create iOS .ipa
                 for variant in variants {
                     let outputFolder = !nested ? outputFolderAbsolute : outputFolderAbsolute.appending(components: [variant.rawValue, "ipa"])
                     try fs.createDirectory(outputFolder, recursive: true)
@@ -181,38 +187,40 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
                 }
             }
 
-            var gradleArgs: [String] = []
-            gradleArgs += ["--project-dir", androidFolderAbsolute.pathString]
-            gradleArgs += ["--console=plain"]
+            if self.android {
+                var gradleArgs: [String] = []
+                gradleArgs += ["--project-dir", androidFolderAbsolute.pathString]
+                gradleArgs += ["--console=plain"]
 
-            try await run(with: out, "Assemble Android app \(appModuleName)", ["gradle", assembleAction] + gradleArgs, environment: env)
-            try await exportAndroidArtifact(type: "apk")
+                try await run(with: out, "Assemble Android app \(appModuleName)", ["gradle", assembleAction] + gradleArgs, environment: env)
+                try await exportAndroidArtifact(type: "apk")
 
-            try await run(with: out, "Bundle Android app \(appModuleName)", ["gradle", bundleAction] + gradleArgs, environment: env)
-            try await exportAndroidArtifact(type: "bundle")
+                try await run(with: out, "Bundle Android app \(appModuleName)", ["gradle", bundleAction] + gradleArgs, environment: env)
+                try await exportAndroidArtifact(type: "bundle")
 
-            func exportAndroidArtifact(type: String) async throws {
-                for variant in variants {
-                    let outputFolder = !nested ? outputFolderAbsolute : outputFolderAbsolute.appending(components: [variant.rawValue, type])
-                    try fs.createDirectory(outputFolder, recursive: true)
+                func exportAndroidArtifact(type: String) async throws {
+                    for variant in variants {
+                        let outputFolder = !nested ? outputFolderAbsolute : outputFolderAbsolute.appending(components: [variant.rawValue, type])
+                        try fs.createDirectory(outputFolder, recursive: true)
 
-                    let ext = type == "bundle" ? "aab" : type
-                    // when the user has set up signing in their build.gradle.kts it will not be called "unsigned"
-                    let names = variant == .release ? ["app-release.\(ext)", "app-release-unsigned.\(ext)"] : ["app-debug.\(ext)"]
+                        let ext = type == "bundle" ? "aab" : type
+                        // when the user has set up signing in their build.gradle.kts it will not be called "unsigned"
+                        let names = variant == .release ? ["app-release.\(ext)", "app-release-unsigned.\(ext)"] : ["app-debug.\(ext)"]
 
-                    let variantSuffix = /* variant == .release ? "" : */ "-\(variant)"
-                    let outputName = "\(appModuleName)\(variantSuffix).\(ext)"
-                    let outputPath = outputFolder.appending(component: outputName)
+                        let variantSuffix = /* variant == .release ? "" : */ "-\(variant)"
+                        let outputName = "\(appModuleName)\(variantSuffix).\(ext)"
+                        let outputPath = outputFolder.appending(component: outputName)
 
-                    let buildOutputFolder = buildFolderAbsolute.appending(components: ["Android", "app", "outputs", type, variant.rawValue])
-                    await outputOptions.monitor(with: out, "Export \(outputName)") { _ in
-                        try? fs.removeFileTree(outputPath) // copy will fail if it already exists
-                        // try each of the names, to handle signed and unsigned artifacts
-                        for name in names {
-                            try? fs.copy(from: buildOutputFolder.appending(component: name), to: outputPath)
+                        let buildOutputFolder = buildFolderAbsolute.appending(components: ["Android", "app", "outputs", type, variant.rawValue])
+                        await outputOptions.monitor(with: out, "Export \(outputName)") { _ in
+                            try? fs.removeFileTree(outputPath) // copy will fail if it already exists
+                            // try each of the names, to handle signed and unsigned artifacts
+                            for name in names {
+                                try? fs.copy(from: buildOutputFolder.appending(component: name), to: outputPath)
+                            }
+                            createdURLs.append(outputPath.asURL)
+                            return try outputPath.asURL.fileSizeString
                         }
-                        createdURLs.append(outputPath.asURL)
-                        return try outputPath.asURL.fileSizeString
                     }
                 }
             }
