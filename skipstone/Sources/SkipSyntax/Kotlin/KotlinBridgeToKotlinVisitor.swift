@@ -1902,6 +1902,13 @@ private extension KotlinClassDeclaration {
     }
 }
 
+private extension TypeSignature {
+    /// Non-Sendable parameters that will be passed through to `assumeMainActorUnchecked` that need to be wrapped in an `UncheckedSendableBox`
+    var shouldWrapForMainActorIsolation: Bool {
+        self == .javaObjectPointer || self == .javaString || self.isOptional
+    }
+}
+
 private extension KotlinVariableDeclaration {
     func isMainActorIsolated(in classDeclaration: KotlinClassDeclaration?) -> Bool {
         return SkipSyntax.isMainActorIsolated(in: classDeclaration, attributes: attributes, modifiers: modifiers, isAsync: apiFlags.options.contains(.async))
@@ -1909,7 +1916,7 @@ private extension KotlinVariableDeclaration {
 
     func appendMainActorIsolated(_ swift: inout [String], _ indentation: Indentation = 0, in classDeclaration: KotlinClassDeclaration?, parameter: TypeSignature.Parameter? = nil, isReturn: Bool = false, block: (inout [String], Indentation) -> Void) {
         let locals: [String]
-        if let parameter, let label = parameter.label, parameter.type == .javaObjectPointer || parameter.type == .javaString {
+        if let parameter, let label = parameter.label, parameter.type.shouldWrapForMainActorIsolation {
             locals = [label]
         } else {
             locals = []
@@ -1924,7 +1931,7 @@ private extension KotlinFunctionDeclaration {
     }
 
     func appendMainActorIsolated(_ swift: inout [String], _ indentation: Indentation = 0, in classDeclaration: KotlinClassDeclaration?, parameters: [TypeSignature.Parameter] = [], isReturn: Bool = false, block: (inout [String], Indentation) -> Void) {
-        let locals = parameters.filter { $0.label != nil && ($0.type == .javaObjectPointer || $0.type == .javaString) }.map { $0.label! }
+        let locals = parameters.filter { $0.label != nil && $0.type.shouldWrapForMainActorIsolation }.map { $0.label! }
         SkipSyntax.appendMainActorIsolated(&swift, indentation, in: classDeclaration, locals: locals, attributes: attributes, modifiers: modifiers, isThrows: apiFlags.throwsType != .none, isAsync: apiFlags.options.contains(.async), isReturn: isReturn, block: block)
     }
 }
