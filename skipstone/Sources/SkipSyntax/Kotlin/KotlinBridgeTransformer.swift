@@ -792,6 +792,8 @@ extension TypeSignature {
         switch jni {
         case "Lkotlin/ByteArray;":
             return "[B"
+        case "Lkotlin/collections/Collection;":
+            return "Ljava/util/Collection;"
         case "Lkotlin/collections/Map;":
             return "Ljava/util/Map;"
         case "Lkotlin/collections/List;":
@@ -800,6 +802,20 @@ extension TypeSignature {
             return "Ljava/util/Set;"
         case "Lkotlin/Throwable;":
             return "Ljava/lang/Throwable;"
+        case "Lkotlin/Error;":
+            return "Ljava/lang/Error;"
+        case "Lkotlin/Exception;":
+            return "Ljava/lang/Exception;"
+        case "Lkotlin/RuntimeException;":
+            return "Ljava/lang/RuntimeException;"
+        case "Lkotlin/Comparable;":
+            return "Ljava/lang/Comparable;"
+        case "Lkotlin/CharSequence;":
+            return "Ljava/lang/CharSequence;"
+        case "Lkotlin/Number;":
+            return "Ljava/lang/Number;"
+        case "Lkotlin/Cloneable;":
+            return "Ljava/lang/Cloneable;"
         default:
             return jni
         }
