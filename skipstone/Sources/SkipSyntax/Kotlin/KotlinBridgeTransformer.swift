@@ -798,6 +798,8 @@ extension TypeSignature {
             return "Ljava/util/List;"
         case "Lkotlin/collections/Set;":
             return "Ljava/util/Set;"
+        case "Lkotlin/Throwable;":
+            return "Ljava/lang/Throwable;"
         default:
             return jni
         }
