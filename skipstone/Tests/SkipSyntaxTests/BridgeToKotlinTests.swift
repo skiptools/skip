@@ -980,7 +980,7 @@ final class BridgeToKotlinTests: XCTestCase {
     }
 
     // https://github.com/skiptools/skip/issues/519
-    func TODOtestVoidClosureMainActorVar() async throws {
+    func testVoidClosureMainActorVar() async throws {
         try await check(swiftBridge: """
         public var c: @MainActor () -> Void = { }
         """, kotlin: """

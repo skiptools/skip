@@ -1998,9 +1998,7 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
             var attributesString = ""
 
-            // FIXME: .mainActor doesn't seem to be set on closures that declare themselves as @MainActor
-            // https://github.com/skiptools/skip/issues/519
-            if attributes?.contains(.mainActor) == true {
+            if apiFlags.options.contains(.mainActor) == true {
                 attributesString += "@MainActor "
             }
             if attributes?.contains(.escaping) == true {
