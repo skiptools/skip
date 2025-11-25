@@ -402,8 +402,9 @@ extension TypeSignature {
     /// Return code that converts the given value of this type to its `@_cdecl` function form.
     func convertToCDecl(value: String, strategy: Bridgable.Strategy, options: KotlinBridgeOptions) -> String {
         switch self.asOptional(false) {
-        case .function(let parameters, _, _, _):
-            let converted = "SwiftClosure\(parameters.count).javaObject(for: \(value), options: \(options.jconvertibleOptions))"
+        case .function(let parameters, _, let apiFlags, _):
+            let closurePrefix = apiFlags.options.contains(.async) ? "SwiftAsyncClosure" : "SwiftClosure"
+            let converted = "\(closurePrefix)\(parameters.count).javaObject(for: \(value), options: \(options.jconvertibleOptions))"
             return isOptional ? converted : converted + "!"
         case .int:
             if isOptional {
@@ -467,7 +468,8 @@ extension TypeSignature {
 
         switch self.asOptional(false) {
         case .function(let parameters, let signature, let apiFlags, var attributes):
-            let converted = "SwiftClosure\(parameters.count).closure(forJavaObject: \(value), options: \(options.jconvertibleOptions))"
+            let closurePrefix = apiFlags.options.contains(.async) ? "SwiftAsyncClosure" : "SwiftClosure"
+            let converted = "\(closurePrefix)\(parameters.count).closure(forJavaObject: \(value), options: \(options.jconvertibleOptions))"
             if let filtered = attributes?.attributes.filter({ $0.kind != .escaping }) {
                 attributes = Attributes(attributes: filtered)
             }
@@ -543,8 +545,9 @@ extension TypeSignature {
     /// Return code that converts the given value of this type to its Java form.
     func convertToJava(value: String, strategy: Bridgable.Strategy, optionsString: String) -> String {
         switch self.asOptional(false) {
-        case .function(let parameters, _, _, _):
-            let converted = "SwiftClosure\(parameters.count).javaObject(for: \(value), options: \(optionsString))"
+        case .function(let parameters, _, let apiFlags, _):
+            let closurePrefix = apiFlags.options.contains(.async) ? "SwiftAsyncClosure" : "SwiftClosure"
+            let converted = "\(closurePrefix)\(parameters.count).javaObject(for: \(value), options: \(optionsString))"
             return isOptional ? converted : converted + "!"
         case .int:
             return isOptional ? value : "Int32(\(value))"
