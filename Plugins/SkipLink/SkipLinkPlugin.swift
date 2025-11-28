@@ -1,4 +1,5 @@
 // Copyright 2024–2025 Skip
+// Licensed under the Open Software License version 3.0
 import Foundation
 import PackagePlugin
 

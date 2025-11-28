@@ -1,4 +1,5 @@
 // Copyright 2023–2025 Skip
+// Licensed under the Open Software License version 3.0
 import XCTest
 @testable import SkipTest
 import SkipDrive
