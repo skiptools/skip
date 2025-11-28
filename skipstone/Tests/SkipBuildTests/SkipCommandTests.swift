@@ -229,7 +229,7 @@ final class SkipCommandTests: XCTestCase {
         let (projectURL, projectTree) = try await skipInit(projectName: "free-project", free: true, zero: false, mode: [.transpiledModel], tests: true, moduleNames: "FreeModule")
         XCTAssertEqual(projectTree ?? "", """
         .
-        ├─ LICENSE.LGPL
+        ├─ LICENSE.txt
         ├─ Package.swift
         ├─ README.md
         ├─ Sources
@@ -254,13 +254,13 @@ final class SkipCommandTests: XCTestCase {
 
         let XCSkipTests = try load("Tests/FreeModuleTests/XCSkipTests.swift")
         XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
-        XCTAssertTrue(XCSkipTests.hasPrefix(SourceLicense.lgplLinkingException.sourceHeader), "bad source license in: \(XCSkipTests)")
+        XCTAssertTrue(XCSkipTests.hasPrefix(SourceLicense.osl.sourceHeader), "bad source license in: \(XCSkipTests)")
 
         let FreeModuleTests = try load("Tests/FreeModuleTests/FreeModuleTests.swift")
-        XCTAssertTrue(FreeModuleTests.hasPrefix(SourceLicense.lgplLinkingException.sourceHeader), "bad source license in: \(FreeModuleTests)")
+        XCTAssertTrue(FreeModuleTests.hasPrefix(SourceLicense.osl.sourceHeader), "bad source license in: \(FreeModuleTests)")
 
         let FreeModule = try load("Sources/FreeModule/FreeModule.swift")
-        XCTAssertTrue(FreeModule.hasPrefix(SourceLicense.lgplLinkingException.sourceHeader), "bad source license in: \(FreeModule)")
+        XCTAssertTrue(FreeModule.hasPrefix(SourceLicense.osl.sourceHeader), "bad source license in: \(FreeModule)")
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
@@ -331,7 +331,7 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ Info.plist
         │  └─ Sources
         │     └─ Main.swift
-        ├─ LICENSE.GPL
+        ├─ LICENSE.txt
         ├─ Package.swift
         ├─ Project.xcworkspace
         │  └─ contents.xcworkspacedata
@@ -428,7 +428,7 @@ final class SkipCommandTests: XCTestCase {
         │        │  ├─ title.txt
         │        │  └─ version_whats_new.txt
         │        └─ rating.json
-        ├─ LICENSE.GPL
+        ├─ LICENSE.txt
         ├─ Package.swift
         ├─ Project.xcworkspace
         │  └─ contents.xcworkspacedata
@@ -544,7 +544,7 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ Info.plist
         │  └─ Sources
         │     └─ Main.swift
-        ├─ LICENSE.GPL
+        ├─ LICENSE.txt
         ├─ Package.swift
         ├─ Project.xcworkspace
         │  └─ contents.xcworkspacedata
@@ -1346,7 +1346,7 @@ final class SkipCommandTests: XCTestCase {
         │        │  ├─ title.txt
         │        │  └─ version_whats_new.txt
         │        └─ rating.json
-        ├─ LICENSE.GPL
+        ├─ LICENSE.txt
         ├─ Package.swift
         ├─ Project.xcworkspace
         │  └─ contents.xcworkspacedata
