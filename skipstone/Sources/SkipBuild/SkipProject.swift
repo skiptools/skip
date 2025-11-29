@@ -3719,8 +3719,8 @@ let useLGPLException = false
 
 enum SourceLicense: Equatable, CaseIterable {
     case osl
-    case lgpl
-    case lgplLinkingException
+    case lgpl3
+    case lgpl3LinkingException
     case gpl2
     case gpl3
 
@@ -3728,9 +3728,9 @@ enum SourceLicense: Equatable, CaseIterable {
         if SourceLicense.allCases.first == .osl {
             return .osl
         } else if app {
-            return .gpl2
+            return .gpl3
         } else {
-            return .lgplLinkingException
+            return .lgpl3LinkingException
         }
     }
 
@@ -3742,9 +3742,9 @@ enum SourceLicense: Equatable, CaseIterable {
         switch self {
         case .osl:
             return ("Open Software License 3.0", "OSL-3.0") // https://spdx.org/licenses/OSL-3.0.html
-        case .lgpl:
+        case .lgpl3:
             return ("GNU Lesser General Public License v3.0 only", "LGPL-3.0-only") // https://spdx.org/licenses/LGPL-3.0-only.html
-        case .lgplLinkingException:
+        case .lgpl3LinkingException:
             return ("LGPL-3.0 Linking Exception", "LGPL-3.0-only WITH LGPL-3.0-linking-exception") // https://spdx.org/licenses/LGPL-3.0-linking-exception.html
         case .gpl2:
             return ("GNU General Public License v2.0 or later", "GPL-2.0-or-later") // https://spdx.org/licenses/GPL-2.0-or-later.html
@@ -3756,8 +3756,8 @@ enum SourceLicense: Equatable, CaseIterable {
     var licenseContents: String {
         switch self {
         case .osl: return licenseOSLContents
-        case .lgpl: return licenseLGPLContents
-        case .lgplLinkingException: return licenseLGPLLinkingExceptionContents
+        case .lgpl3: return licenseLGPLContents
+        case .lgpl3LinkingException: return licenseLGPLLinkingExceptionContents
         case .gpl2: return licenseGPL2Contents
         case .gpl3: return licenseGPL3Contents
         }
