@@ -1413,12 +1413,9 @@ struct TestData : Codable, Hashable {
                 
                 This software is licensed under the
                 [GNU Lesser General Public License v3.0](https://spdx.org/licenses/LGPL-3.0-only.html),
-                with the following
-                [linking exception](https://spdx.org/licenses/LGPL-3.0-linking-exception.html)
-                to clarify that distribution to restricted environments (e.g., app stores) is permitted:
-                
-                \("> " + licenseLGPLLinkingExceptionContents.split(separator: "\n").joined(separator: "\n> "))
-                
+                with a [linking exception](https://spdx.org/licenses/LGPL-3.0-linking-exception.html)
+                to clarify that distribution to restricted environments (e.g., app stores) is permitted.
+
                 """
             }
         }
@@ -3718,13 +3715,14 @@ internal fun PresentationRootView(context: ComposeContext) {
 let useLGPLException = false
 
 enum SourceLicense: Equatable, CaseIterable {
-    case osl
     case lgpl3
     case lgpl3LinkingException
     case gpl2
     case gpl3
+    case osl
 
     static func defaultLicense(app: Bool) -> SourceLicense {
+        // if we ever want to switch the default license to OSL, move it to the first entry of the enumeration
         if SourceLicense.allCases.first == .osl {
             return .osl
         } else if app {
@@ -3740,8 +3738,6 @@ enum SourceLicense: Equatable, CaseIterable {
 
     var spdx: (name: String, identifier: String) {
         switch self {
-        case .osl:
-            return ("Open Software License 3.0", "OSL-3.0") // https://spdx.org/licenses/OSL-3.0.html
         case .lgpl3:
             return ("GNU Lesser General Public License v3.0 only", "LGPL-3.0-only") // https://spdx.org/licenses/LGPL-3.0-only.html
         case .lgpl3LinkingException:
@@ -3750,16 +3746,18 @@ enum SourceLicense: Equatable, CaseIterable {
             return ("GNU General Public License v2.0 or later", "GPL-2.0-or-later") // https://spdx.org/licenses/GPL-2.0-or-later.html
         case .gpl3:
             return ("GNU General Public License v3.0 or later", "GPL-3.0-or-later") // https://spdx.org/licenses/GPL-3.0-or-later.html
+        case .osl:
+            return ("Open Software License 3.0", "OSL-3.0") // https://spdx.org/licenses/OSL-3.0.html
         }
     }
 
     var licenseContents: String {
         switch self {
-        case .osl: return licenseOSLContents
-        case .lgpl3: return licenseLGPLContents
-        case .lgpl3LinkingException: return licenseLGPLLinkingExceptionContents
+        case .lgpl3: return licenseLGPL3Contents
+        case .lgpl3LinkingException: return licenseLGPL3LinkingExceptionContents
         case .gpl2: return licenseGPL2Contents
         case .gpl3: return licenseGPL3Contents
+        case .osl: return licenseOSLContents
         }
     }
 }
@@ -3941,7 +3939,7 @@ comply with its license review and certification process.
 
 """
 
-let licenseLGPLContents = """
+let licenseLGPL3Contents = """
                    GNU LESSER GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 
@@ -4110,7 +4108,7 @@ Library.
 
 """
 
-let licenseLGPLLinkingExceptionContents = """
+let licenseLGPL3LinkingExceptionContents = """
 This software is licensed under the LGPL3, included below.
 
 As a special exception to the GNU Lesser General Public License version 3

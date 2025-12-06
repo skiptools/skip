@@ -254,13 +254,13 @@ final class SkipCommandTests: XCTestCase {
 
         let XCSkipTests = try load("Tests/FreeModuleTests/XCSkipTests.swift")
         XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
-        XCTAssertTrue(XCSkipTests.hasPrefix(SourceLicense.osl.sourceHeader), "bad source license in: \(XCSkipTests)")
+        XCTAssertTrue(XCSkipTests.hasPrefix(SourceLicense.lgpl3LinkingException.sourceHeader), "bad source license in: \(XCSkipTests)")
 
         let FreeModuleTests = try load("Tests/FreeModuleTests/FreeModuleTests.swift")
-        XCTAssertTrue(FreeModuleTests.hasPrefix(SourceLicense.osl.sourceHeader), "bad source license in: \(FreeModuleTests)")
+        XCTAssertTrue(FreeModuleTests.hasPrefix(SourceLicense.lgpl3LinkingException.sourceHeader), "bad source license in: \(FreeModuleTests)")
 
         let FreeModule = try load("Sources/FreeModule/FreeModule.swift")
-        XCTAssertTrue(FreeModule.hasPrefix(SourceLicense.osl.sourceHeader), "bad source license in: \(FreeModule)")
+        XCTAssertTrue(FreeModule.hasPrefix(SourceLicense.lgpl3LinkingException.sourceHeader), "bad source license in: \(FreeModule)")
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
