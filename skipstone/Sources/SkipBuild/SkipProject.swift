@@ -1518,9 +1518,9 @@ struct TestData : Codable, Hashable {
         try (app ? appREADME : libREADME).write(to: readmeURL, atomically: false, encoding: .utf8)
 
         if options.free == true {
-            try SourceLicense.defaultLicense(app: app)
-                .licenseContents
-                .write(to: projectFolderURL.appending(path: "LICENSE.txt"), atomically: false, encoding: .utf8)
+            let license = SourceLicense.defaultLicense(app: app)
+            try license.licenseContents
+                .write(to: projectFolderURL.appending(path: license.licenseFilename), atomically: false, encoding: .utf8)
         }
 
         // create the .gitignore file; https://github.com/orgs/skiptools/discussions/208#discussioncomment-10505250
@@ -3749,6 +3749,17 @@ enum SourceLicense: Equatable, CaseIterable {
         case .osl:
             return ("Open Software License 3.0", "OSL-3.0") // https://spdx.org/licenses/OSL-3.0.html
         }
+    }
+
+    var licenseFilename: String {
+        return "LICENSE.txt"
+        //switch self {
+        //case .lgpl3: return "LICENSE.LGPL"
+        //case .lgpl3LinkingException: return "LICENSE.LGPL"
+        //case .gpl2: return "LICENSE.GPL"
+        //case .gpl3: return "LICENSE.GPL"
+        //case .osl: return "LICENSE.txt"
+        //}
     }
 
     var licenseContents: String {
