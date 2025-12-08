@@ -94,6 +94,9 @@ struct CreateOptions : ParsableArguments {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether native model should use kotlincompat", valueName: "kotlincompat"))
     var kotlincompat: Bool = false
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether transpiled model should br bridged", valueName: "bridged"))
+    var bridged: Bool = false
+
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create test modules", valueName: "tests"))
     var moduleTests: Bool? = nil
 

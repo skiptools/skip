@@ -293,6 +293,92 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
+    func testLibInitBridgedCommand() async throws {
+        let (projectURL, projectTree) = try await skipInit(projectName: "free-project", zero: false, bridged: true, mode: [.transpiledModel], tests: true, moduleNames: "BridgedModule")
+        XCTAssertEqual(projectTree ?? "", """
+        .
+        ├─ Package.swift
+        ├─ README.md
+        ├─ Sources
+        │  └─ BridgedModule
+        │     ├─ BridgedModule.swift
+        │     ├─ Resources
+        │     │  └─ Localizable.xcstrings
+        │     └─ Skip
+        │        └─ skip.yml
+        └─ Tests
+           └─ BridgedModuleTests
+              ├─ BridgedModuleTests.swift
+              ├─ Resources
+              │  └─ TestData.json
+              ├─ Skip
+              │  └─ skip.yml
+              └─ XCSkipTests.swift
+
+        """)
+
+        let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
+
+        let XCSkipTests = try load("Tests/BridgedModuleTests/XCSkipTests.swift")
+        XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
+
+        //let BridgedModuleTests = try load("Tests/BridgedModuleTests/BridgedModuleTests.swift")
+
+        let BridgedModule = try load("Sources/BridgedModule/BridgedModule.swift")
+        XCTAssertEqual(BridgedModule, """
+        #if !SKIP_BRIDGE
+        import Foundation
+
+        public class BridgedModuleModule {
+        }
+
+        #endif
+
+        """)
+
+        let PackageSwift = try load("Package.swift")
+        XCTAssertEqual(PackageSwift, """
+        // swift-tools-version: 6.0
+        // This is a Skip (https://skip.tools) package.
+        import PackageDescription
+
+        let package = Package(
+            name: "free-project",
+            defaultLocalization: "en",
+            platforms: [.iOS(.v17), .macOS(.v14)],
+            products: [
+                .library(name: "BridgedModule", type: .dynamic, targets: ["BridgedModule"]),
+            ],
+            dependencies: [
+                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
+                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
+            ],
+            targets: [
+                .target(name: "BridgedModule", dependencies: [
+                    .product(name: "SkipFoundation", package: "skip-foundation")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .testTarget(name: "BridgedModuleTests", dependencies: [
+                    "BridgedModule",
+                    .product(name: "SkipTest", package: "skip")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+            ]
+        )
+
+        if Context.environment["SKIP_BRIDGE"] ?? "0" != "0" {
+            package.dependencies += [.package(url: "https://source.skip.tools/skip-bridge.git", "0.0.0"..<"2.0.0")]
+            package.targets.forEach({ target in
+                target.dependencies += [.product(name: "SkipBridge", package: "skip-bridge")]
+            })
+            // all library types must be dynamic to support bridging
+            package.products = package.products.map({ product in
+                guard let libraryProduct = product as? Product.Library else { return product }
+                return .library(name: libraryProduct.name, type: .dynamic, targets: libraryProduct.targets)
+            })
+        }
+
+        """)
+    }
+
     func testLibInitAppDefaults() async throws {
         let projectName = "cool-app"
         let moduleName = "APPNAME"
@@ -682,7 +768,7 @@ final class SkipCommandTests: XCTestCase {
         #      contents:
         #        - 'implementation("androidx.compose.runtime:runtime")'
 
-        # this is a natively-compiled SkipFuse module
+        # this is a natively-compiled Skip Fuse module
         skip:
           mode: 'native'
           bridging: true
@@ -770,7 +856,7 @@ final class SkipCommandTests: XCTestCase {
         #      contents:
         #        - 'implementation("androidx.compose.runtime:runtime")'
 
-        # this is a natively-compiled SkipFuse module
+        # this is a natively-compiled Skip Fuse module
         skip:
           mode: 'native'
           bridging:
@@ -888,12 +974,17 @@ final class SkipCommandTests: XCTestCase {
         let AppSkipYML = try load("Sources/AppModule/Skip/skip.yml")
         XCTAssertEqual(AppSkipYML, """
         # Configuration file for https://skip.tools project
-        # this is a transpiled SkipLite module
+        #
+        # Kotlin dependencies and Gradle build options for this module can be configured here
+        #build:
+        #  contents:
+        #    - block: 'dependencies'
+        #      contents:
+        #        - 'implementation("androidx.compose.runtime:runtime")'
+
+        # this is a transpiled Skip Lite module
         skip:
           mode: 'transpiled'
-
-        build:
-          contents:
 
         """)
 
@@ -908,7 +999,7 @@ final class SkipCommandTests: XCTestCase {
         #      contents:
         #        - 'implementation("androidx.compose.runtime:runtime")'
 
-        # this is a natively-compiled SkipFuse module
+        # this is a natively-compiled Skip Fuse module
         skip:
           mode: 'native'
           bridging: true
@@ -1079,7 +1170,7 @@ final class SkipCommandTests: XCTestCase {
         #      contents:
         #        - 'implementation("androidx.compose.runtime:runtime")'
 
-        # this is a natively-compiled SkipFuse module
+        # this is a natively-compiled Skip Fuse module
         skip:
           mode: 'native'
 
@@ -1096,7 +1187,7 @@ final class SkipCommandTests: XCTestCase {
         #      contents:
         #        - 'implementation("androidx.compose.runtime:runtime")'
 
-        # this is a natively-compiled SkipFuse module
+        # this is a natively-compiled Skip Fuse module
         skip:
           mode: 'native'
 
@@ -1249,7 +1340,7 @@ final class SkipCommandTests: XCTestCase {
         #      contents:
         #        - 'implementation("androidx.compose.runtime:runtime")'
 
-        # this is a natively-compiled SkipFuse module
+        # this is a natively-compiled Skip Fuse module
         skip:
           mode: 'native'
 
@@ -1851,7 +1942,7 @@ final class SkipCommandTests: XCTestCase {
     /// Default arguments for `skip init` tests
     let initTestArgs = ["-jA", "--no-build", "--no-test", "--show-tree"]
 
-    func skipInit(projectName: String, documented: Bool = false, free: Bool? = nil, zero: Bool? = nil, appfair: Bool? = nil, mode: [ProjectMode], kotlincompat: Bool = false, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, swiftVersion: String? = nil, resourcePath: String? = "Resources", backgroundColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
+    func skipInit(projectName: String, documented: Bool = false, free: Bool? = nil, zero: Bool? = nil, bridged: Bool? = nil, appfair: Bool? = nil, mode: [ProjectMode], kotlincompat: Bool = false, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, swiftVersion: String? = nil, resourcePath: String? = "Resources", backgroundColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["init"] + initTestArgs
@@ -1869,6 +1960,12 @@ final class SkipCommandTests: XCTestCase {
             cmd += ["--zero"]
         } else if zero == false {
             cmd += ["--no-zero"]
+        }
+
+        if bridged == true {
+            cmd += ["--bridged"]
+        } else if zero == false {
+            cmd += ["--no-bridged"]
         }
 
         // conventional Skip apps

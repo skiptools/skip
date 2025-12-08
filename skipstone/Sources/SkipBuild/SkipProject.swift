@@ -11,9 +11,31 @@ struct AppVerifyError : LocalizedError {
 
 enum ModuleMode {
     case transpiled
+    case transpiledBridged
     case native
     case nativeBridged
     case kotlincompat
+
+    var isNative: Bool {
+        switch self {
+        case .transpiled: return false
+        case .transpiledBridged: return false
+        case .native: return true
+        case .nativeBridged: return true
+        case .kotlincompat: return true
+        }
+    }
+
+    var isBridged: Bool {
+        switch self {
+        case .transpiled: return false
+        case .transpiledBridged: return true
+        case .native: return false
+        case .nativeBridged: return true
+        case .kotlincompat: return true
+        }
+    }
+
 }
 
 struct ProjectOptionValues {
@@ -161,7 +183,14 @@ class FrameworkProjectLayout {
         let sourcesURL = try projectFolderURL.append(path: "Sources", create: true)
 
         // a free app is GPL, a free library is LGPL
-        let sourceHeader = options.free ? (SourceLicense.defaultLicense(app: app).sourceHeader + "\n\n") : ""
+        var sourceHeader = options.free ? (SourceLicense.defaultLicense(app: app).sourceHeader + "\n\n") : ""
+        let testSourceHeader = sourceHeader
+        var sourceFooter = ""
+        if moduleMode == .transpiledBridged {
+            // bridged code needs to be wrapped in a check for SKIP_BRIDGE
+            sourceHeader += "#if !SKIP_BRIDGE\n"
+            sourceFooter += "\n#endif\n"
+        }
 
         // the part of a target parameter that will only include skip when zero is not set
         //let skipCondition = options.zero ? ", condition: skip" : "" // we don't use the condition parameter of target because it excludes
@@ -217,7 +246,7 @@ class FrameworkProjectLayout {
             // the model module is the second in the chain
             let isModelModule = app == true && moduleIndex == modules.startIndex + 1
             // a native module is either the second module for an app project, or any module for a non-app --native project
-            let native = moduleMode != .transpiled
+            let native = moduleMode.isNative
             let isNativeAppModule = isAppModule && nativeMode.contains(.nativeApp)
             let isNativeModule = native && (isModelModule || !app || isNativeAppModule)
             // we output the model when it is the second module, or when there is only a single top-level app module
@@ -252,10 +281,10 @@ class FrameworkProjectLayout {
                 """
 
                 var skipYamlModule = skipYamlGeneric
-                if isNativeModule {
+                if isNativeModule && !(isAppModule && !isNativeAppModule) {
                     skipYamlModule += """
 
-                    # this is a natively-compiled SkipFuse module
+                    # this is a natively-compiled Skip Fuse module
                     skip:
                       mode: 'native'
 
@@ -274,22 +303,24 @@ class FrameworkProjectLayout {
 
                         """
                     }
+                } else {
+                    skipYamlModule += """
+
+                    # this is a transpiled Skip Lite module
+                    skip:
+                      mode: 'transpiled'
+
+                    """
+
+                    if moduleMode == .transpiledBridged {
+                        skipYamlModule += """
+                          bridging: true
+
+                        """
+                    }
                 }
 
-                let skipYamlAppTranspiled = """
-                # Configuration file for https://skip.tools project
-                # this is a transpiled SkipLite module
-                skip:
-                  mode: 'transpiled'
-
-                build:
-                  contents:
-
-                """
-
-                // transpiled app modules ignore native specifications
-                let moduleYaml = isAppModule && !isNativeAppModule ? skipYamlAppTranspiled : skipYamlModule
-                try moduleYaml.write(to: sourceSkipYamlFile, atomically: false, encoding: .utf8)
+                try skipYamlModule.write(to: sourceSkipYamlFile, atomically: false, encoding: .utf8)
             }
 
             let viewModelInAppModule = modules.count <= 1
@@ -438,7 +469,7 @@ public class \(moduleName)Module {
 
                 moduleCode += """
 }
-
+\(sourceFooter)
 """
 
                 try moduleCode.write(to: moduleSwiftFile, atomically: false, encoding: .utf8)
@@ -1029,7 +1060,7 @@ public class \(moduleName)Module {
                 let rfolder = isNativeModule ? nil : resourceFolder
 
                 var testCaseCode = """
-\(sourceHeader)import XCTest
+\(testSourceHeader)import XCTest
 import OSLog
 import Foundation
 
@@ -1180,6 +1211,7 @@ struct TestData : Codable, Hashable {
                 let isRobolectric = isJava && !isAndroid
                 /// True if the system's `Int` type is 32-bit.
                 let is32BitInteger = Int64(Int.max) == Int64(Int32.max)
+                \(sourceFooter)
 
                 """.write(to: testSkipModuleFile, atomically: false, encoding: .utf8)
 
@@ -1341,7 +1373,7 @@ struct TestData : Codable, Hashable {
 
         let dependencies = "    dependencies: [\n        " + packageDependencies.joined(separator: ",\n        ") + "\n    ]"
 
-        let packageSource = """
+        var packageSource = """
         \(packageHeader)
         let package = Package(
             name: "\(projectName)",
@@ -1353,6 +1385,23 @@ struct TestData : Codable, Hashable {
         )
 
         """
+        if moduleMode == .transpiledBridged {
+            packageSource += """
+
+            if Context.environment["SKIP_BRIDGE"] ?? "0" != "0" {
+                package.dependencies += [.package(url: "https://source.skip.tools/skip-bridge.git", "0.0.0"..<"2.0.0")]
+                package.targets.forEach({ target in
+                    target.dependencies += [.product(name: "SkipBridge", package: "skip-bridge")]
+                })
+                // all library types must be dynamic to support bridging
+                package.products = package.products.map({ product in
+                    guard let libraryProduct = product as? Product.Library else { return product }
+                    return .library(name: libraryProduct.name, type: .dynamic, targets: libraryProduct.targets)
+                })
+            }
+
+            """
+        }
 
         let packageSwiftURL = projectFolderURL.appending(path: "Package.swift")
         try packageSource.write(to: packageSwiftURL, atomically: false, encoding: .utf8)
@@ -3733,15 +3782,15 @@ enum SourceLicense: Equatable, CaseIterable {
     }
 
     var sourceHeader: String {
-        return "// SPDX-License-Identifier: \(self.spdx.identifier)"
+        return "// Licensed under the \(self.spdx.name)\n// SPDX-License-Identifier: \(self.spdx.identifier)"
     }
 
     var spdx: (name: String, identifier: String) {
         switch self {
         case .lgpl3:
-            return ("GNU Lesser General Public License v3.0 only", "LGPL-3.0-only") // https://spdx.org/licenses/LGPL-3.0-only.html
+            return ("GNU Lesser General Public License v3.0", "LGPL-3.0-only") // https://spdx.org/licenses/LGPL-3.0-only.html
         case .lgpl3LinkingException:
-            return ("LGPL-3.0 Linking Exception", "LGPL-3.0-only WITH LGPL-3.0-linking-exception") // https://spdx.org/licenses/LGPL-3.0-linking-exception.html
+            return ("GNU General Public License v3.0 with Linking Exception", "LGPL-3.0-only WITH LGPL-3.0-linking-exception") // https://spdx.org/licenses/LGPL-3.0-linking-exception.html
         case .gpl2:
             return ("GNU General Public License v2.0 or later", "GPL-2.0-or-later") // https://spdx.org/licenses/GPL-2.0-or-later.html
         case .gpl3:

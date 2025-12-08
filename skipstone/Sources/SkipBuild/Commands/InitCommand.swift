@@ -134,7 +134,7 @@ This command will create a conventional Skip app or library project.
     }
 
     var moduleMode: ModuleMode {
-        isNative && createOptions.kotlincompat ? ModuleMode.kotlincompat : isNative ? (nativeApp ? .native : .nativeBridged) : .transpiled
+        isNative && createOptions.kotlincompat ? ModuleMode.kotlincompat : isNative ? (nativeApp ? .native : .nativeBridged) : (createOptions.bridged ? .transpiledBridged : .transpiled)
     }
 
     func runInit(with out: MessageQueue) async throws {
