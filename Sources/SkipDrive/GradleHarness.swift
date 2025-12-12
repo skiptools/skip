@@ -132,6 +132,22 @@ extension GradleHarness {
         }
     }
 
+    /// Check for a swift-looking error, and if encountered, resolve any symbolic links that might have been reported, in order to accommodate Android native builds where the package exists in a derived symbloc-linked location
+    /// Otherwise, when selecting errors in the Xcode issue navigator, it will select the correct file, but it will not highlight the line
+    func resolveSymlinksInXcodeIssueOutput(_ line: String) -> String {
+        if swiftBuildIssuePattern.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) != nil {
+            if let origPath = line.split(separator: ":").first {
+                let resolvedPath = URL(fileURLWithPath: String(origPath)).resolvingSymlinksInPath().path
+                if resolvedPath != origPath {
+                    // substitute the symbolic path with the resolved path
+                    return resolvedPath + line.dropFirst(origPath.count)
+                }
+            }
+        }
+        return line
+    }
+
+
     /// The default implementation of output scanning will match lines against the Gradle error/warning patten,
     /// and then output them as Xcode-formatted error/warning patterns.
     ///
@@ -336,10 +352,10 @@ extension GradleHarness {
 
         var lines: [String] = []
         for try await pout in output {
-            let line = pout.line
+            let line = resolveSymlinksInXcodeIssueOutput(pout.line)
             print(line)
 
-            // check for errors and report them to the IDE with a 1-line buffer
+            // check for Gradle errors and report them to the IDE with a 1-line buffer
             scanGradleOutput(line1: lines.last ?? line, line2: line)
             lines.append(line)
         }
@@ -378,7 +394,6 @@ public struct AppLaunchError : LocalizedError {
 
 // /DerivedData/Skip-Everything/SourcePackages/plugins/skipapp-weather.output/WeatherAppUI/skipstone/WeatherAppUI/src/main/AndroidManifest.xml:18:13-69 Error:
 
-
 /// Gradle-formatted lines start with "e:" or "w:", and the line:column specifer seems to sometimes trail with a colon and other times not
 let gradleIssuePattern = try! NSRegularExpression(pattern: #"^([we]): file://(.*):([0-9]+):([0-9]+)[:]* +(.*)$"#)
 let gradleFailurePattern = try! NSRegularExpression(pattern: #"^/(.*):([0-9]+):([0-9]+)-([0-9]+) (Error|Warning):$"#)
@@ -386,6 +401,9 @@ let gradleFailurePattern = try! NSRegularExpression(pattern: #"^/(.*):([0-9]+):(
 // e.g.: com.xyz.SomeException: Some message
 let exceptionPattern = try! NSRegularExpression(pattern: #"^([a-zA-Z.]*)Exception: +(.*)$"#)
 
+// The error pattern output of swift build, matched by Xcode's issue parsing to provide line matching and error reporting
+// e.g.: [filepath]:[linenumber]:[columnumber]: [error | warning | note]: [message]
+let swiftBuildIssuePattern = try! NSRegularExpression(pattern: #"^/(.*?):([0-9]+):([0-9]+): (warning|error|note): (.*)$"#)
 
 extension NSRegularExpression {
     func matches(in string: String, options: MatchingOptions = []) -> [NSTextCheckingResult] {
