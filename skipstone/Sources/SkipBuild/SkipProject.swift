@@ -2997,7 +2997,7 @@ elif [ "${SKIP_ACTION}" = "none" ]; then
 else
   SKIP_ACTION="${SKIP_ACTION:-launch}"
 fi
-PATH=${BUILD_ROOT}/Debug:${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin
+PATH=${BUILD_ROOT}/Release:${BUILD_ROOT}/Debug:${BUILD_ROOT}/../../SourcePackages/artifacts/skip/skip/skip.artifactbundle/macos:${PATH}:${HOMEBREW_PREFIX:-/opt/homebrew}/bin
 echo "note: running gradle build with: $(which skip) gradle -p ${PWD}/../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}"
 skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
 
