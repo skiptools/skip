@@ -3589,17 +3589,24 @@ import skip.ui.*
 
 import android.Manifest
 import android.app.Application
-import androidx.activity.enableEdgeToEdge
+import android.graphics.Color as AndroidColor
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.SystemBarStyle
+import androidx.activity.ComponentActivity
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.MaterialTheme
 import androidx.core.app.ActivityCompat
 
 internal val logger: SkipLogger = SkipLogger(subsystem = "\(appModulePackage)", category = "\(appModuleName)")
@@ -3709,9 +3716,31 @@ open class MainActivity: AppCompatActivity {
 }
 
 @Composable
+internal fun SyncSystemBarsWithTheme() {
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+
+    val transparent = AndroidColor.TRANSPARENT
+    val style = if (dark) {
+        SystemBarStyle.dark(transparent)
+    } else {
+        SystemBarStyle.light(transparent, transparent)
+    }
+
+    val activity = LocalContext.current as? ComponentActivity
+    DisposableEffect(style) {
+        activity?.enableEdgeToEdge(
+            statusBarStyle = style,
+            navigationBarStyle = style
+        )
+        onDispose { }
+    }
+}
+
+@Composable
 internal fun PresentationRootView(context: ComposeContext) {
     val colorScheme = if (isSystemInDarkTheme()) ColorScheme.dark else ColorScheme.light
     PresentationRoot(defaultColorScheme = colorScheme, context = context) { ctx ->
+        SyncSystemBarsWithTheme()
         val contentContext = ctx.content()
         Box(modifier = ctx.modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             AppRootView().Compose(context = contentContext)
