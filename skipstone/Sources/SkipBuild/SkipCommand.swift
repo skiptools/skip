@@ -33,6 +33,23 @@ extension SkipCommand {
         }
         return self
     }
+
+    /// Retries the given block with an exponential backoff in between attempts.
+    func retry<T>(count retryCount: Int = 5, block: () async throws -> T) async throws -> T {
+        for retry in 1...retryCount {
+            do {
+                return try await block()
+            } catch {
+                if retry == retryCount {
+                    throw error
+                }
+                // exponential backoff before retrying
+                try await Task.sleep(nanoseconds: UInt64(2 + (retry * retry)) * 1_000_000_000)
+            }
+        }
+
+        fatalError("retry count exceeded without throwing an error")
+    }
 }
 
 
