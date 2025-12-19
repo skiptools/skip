@@ -983,7 +983,7 @@ enum AndroidArchArgument: String, ExpressibleByArgument, CaseIterable {
         case .current:
             return ProcessInfo.isARM ? [.aarch64] : [.x86_64]
         case .default:
-            return [.aarch64, .x86_64]
+            return [.aarch64, .x86_64, .armv7]
         case .all:
             return [.aarch64, .x86_64, .armv7]
         case .aarch64:

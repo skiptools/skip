@@ -2434,6 +2434,16 @@ typealias AppType = NSApplication
     func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
         AppDelegate.shared.onLowMemory()
     }
+
+    // support for SkipNotify.fetchNotificationToken()
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(name: NSNotification.Name("didRegisterForRemoteNotificationsWithDeviceToken"), object: application, userInfo: ["deviceToken": deviceToken])
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error) {
+        NotificationCenter.default.post(name: NSNotification.Name("didFailToRegisterForRemoteNotificationsWithError"), object: application, userInfo: ["error": error])
+    }
     #elseif canImport(AppKit)
     func applicationWillFinishLaunching(_ notification: Notification) {
         AppDelegate.shared.onInit()
