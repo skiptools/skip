@@ -966,7 +966,7 @@ extension ProcessInfo {
         guard service != .zero else { return nil }
         return (IORegistryEntryCreateCFProperty(service, kIOPlatformUUIDKey as CFString, kCFAllocatorDefault, .zero).takeRetainedValue() as? String)
         #elseif os(Linux)
-        return (try? String(contentsOfFile: "/etc/machine-id")) ?? (try? String(contentsOfFile: "/var/lib/dbus/machine-id"))
+        return ((try? String(contentsOfFile: "/etc/machine-id")) ?? (try? String(contentsOfFile: "/var/lib/dbus/machine-id")))?.trimmingCharacters(in: .whitespacesAndNewlines)
         #elseif os(Windows)
         // TODO: Windows registry key `MachineGuid`
         return nil
