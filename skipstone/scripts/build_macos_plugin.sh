@@ -4,7 +4,7 @@ PRODUCT=${PRODUCT:-"SkipRunner"}
 SKIPCMD=skip
 ARTIFACT=${SKIPCMD}
 ARTIFACTBUNDLE="${ARTIFACT}.artifactbundle"
-PLUGIN_ZIP="${ARTIFACT}.zip"
+PLUGIN_ZIP="${ARTIFACT}-macos.zip"
 ARTIFACT_BUILD_DIR=.build/artifactbundle-macos
 
 # now make the final release build for both architectures
@@ -18,6 +18,33 @@ mkdir -p ${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}/macos
 cp -av .build/apple/Products/${CONFIGURATION}/${PRODUCT} ${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}/macos/${SKIPCMD}
 
 cd ${ARTIFACT_BUILD_DIR}
+
+TOOLNAME="skip"
+BINDIR="${ARTIFACTBUNDLE}"/bin
+mkdir -p "${BINDIR}"
+
+# make a shell script that launches the right binary
+# note: logic duplicated in build_macos_plugin.sh and build_linux_plugin.sh
+cat > ${BINDIR}/${TOOLNAME} << "EOF"
+#!/bin/bash
+# This scipt invokes the tool named after the script
+# in the appropriate OS and architecture sub-folder
+set -e
+SCRIPTPATH="$(realpath "${BASH_SOURCE[0]}")"
+TOOLNAME="$(basename "${SCRIPTPATH}")"
+TOOLPATH="$(dirname "${SCRIPTPATH}")"
+OS="$(uname -s)"
+if [ "${OS}" = "Darwin" ]; then
+    PROGRAM="${TOOLPATH}"/../macos/"${TOOLNAME}"
+    xattr -c "${PROGRAM}"
+else
+    ARCH="$(uname -m)"
+    PROGRAM="${TOOLPATH}"/../"${ARCH}"-swift-linux-musl/"${TOOLNAME}"
+fi
+"${PROGRAM}" "${@}"
+EOF
+chmod +x ${BINDIR}/${TOOLNAME}
+
 cat > ${ARTIFACTBUNDLE}/info.json << EOF
 {
     "schemaVersion": "1.0",

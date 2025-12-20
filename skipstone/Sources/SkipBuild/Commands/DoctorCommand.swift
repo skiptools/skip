@@ -126,6 +126,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
             try await checkRosetta()
         }
         try await checkVersion(title: "Swift version", cmd: ["swift", "-version"], min: Version("5.9.0"), pattern: "Swift version ([0-9.]+)")
+        try await checkVersion(title: "Swiftly version", cmd: ["swiftly", "--version"], min: Version("1.0.0"), pattern: "([0-9.]+)")
         if checkNative {
             try await checkVersion(title: "Swift Android SDK version", cmd: [skipcmd, "android", "toolchain", "version"], min: Version("6.1.0"), pattern: "Swift Package Manager - Swift ([0-9.]+)", hint: " (install with: skip android sdk install)")
         }

@@ -38,7 +38,7 @@ SKIPCMD=skip
 # name the artifact the same as the tool
 ARTIFACT=${SKIPCMD}
 ARTIFACTBUNDLE="${ARTIFACT}.artifactbundle"
-PLUGIN_MACOS_ZIP="${ARTIFACT}.zip"
+PLUGIN_MACOS_ZIP="${ARTIFACT}-macos.zip"
 PLUGIN_LINUX_ZIP="${ARTIFACT}-linux.zip"
 
 GITDATE="$(git log -1 --format=%ad --date=iso-strict)"
@@ -177,9 +177,9 @@ cd ${SKIPBREWDIR}
 git pull || true
 
 sed -I '' "s;version \".*\";version \"${SKIP_VERSION}\";g" Casks/skip.rb
-sed -I '' "s;sha256 \".*\";sha256 \"${PLUGIN_MACOS_CHECKSUM}\";g" Casks/skip.rb
-# from when they were distributed separately
-#sed -I '' "s;sha256 \".*\";sha256 \"${SKIPCMD_CHECKSUM}\";g" Casks/skip.rb
+# TODO: restore checksum in skip.rb
+#sed -I '' "s;sha256 \".*\";sha256 \"${PLUGIN_MACOS_CHECKSUM}\";g" Casks/skip.rb
+#sed -I '' "s;sha256 \".*\";sha256 \"${PLUGIN_LINUX_CHECKSUM}\";g" Casks/skip.rb
 
 git add Casks/skip.rb
 git commit -m "Release ${SKIP_VERSION}" 
