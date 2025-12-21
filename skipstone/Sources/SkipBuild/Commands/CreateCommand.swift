@@ -7,7 +7,7 @@ import FoundationNetworking
 #endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct CreateCommand: StreamingCommand, ToolOptionsCommand, CreateOptionsCommand {
+struct CreateCommand: StreamingCommand, ToolchainOptionsCommand, CreateOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "create",
         abstract: "Create a new Skip project interactively",
@@ -21,6 +21,9 @@ Create a new project by following a series of interactive prompts.
 
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
+
+    @OptionGroup(title: "Toolchain Options")
+    var toolchainOptions: ToolchainOptions
 
     @OptionGroup(title: "Create Options")
     var createOptions: CreateOptions
@@ -231,7 +234,7 @@ Create a new project by following a series of interactive prompts.
 
         // auto-install the Android SDK if we are selecting a native project
         if installNativeSDK {
-            try await installAndroidSDK(version: AndroidSDKInstallCommand.defaultAndroidSDKVersion, reinstall: false, with: out)
+            try await installAndroidSDK(version: AndroidSDKInstallCommand.defaultAndroidSDKVersion, ndkVersion: AndroidSDKInstallCommand.defaultAndroidNDKVersion, reinstall: false, selfTest: false, with: out)
         }
 
         let dir = URL(fileURLWithPath: self.createOptions.dir ?? projectName, isDirectory: true)

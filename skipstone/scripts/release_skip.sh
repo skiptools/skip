@@ -131,7 +131,8 @@ sed -I '' 's;.binaryTarget(name: "'${ARTIFACT}'", url:.*'${PLUGIN_MACOS_ZIP}'.*)
 ARTIFACT_LINUX_URL="https://source.skip.tools/skip/releases/download/${SKIP_VERSION}/${PLUGIN_LINUX_ZIP}"
 sed -I '' 's;.binaryTarget(name: "'${ARTIFACT}'", url:.*'${PLUGIN_LINUX_ZIP}'.*);.binaryTarget(name: "'${ARTIFACT}'", url: "'${ARTIFACT_LINUX_URL}'", checksum: "'${PLUGIN_LINUX_CHECKSUM}'");g' ${SKIPPKG}
 
-sed -I '' 's;.package(url: "https://.*/skipstone.git", from: ".*");.package(url: "https://source.skip.tools/skipstone.git", exact: "'${SKIP_VERSION}'");g' ${SKIPPKG}
+# package(url: "https://source.skip.tools/skipstone.git", exact: "1.6.12")
+sed -I '' 's;.package(url: "https://.*/skipstone.git", exact: ".*");.package(url: "https://source.skip.tools/skipstone.git", exact: "'${SKIP_VERSION}'");g' ${SKIPPKG}
 
 sed -I '' 's;.package(url: "https://.*/skip.git", from: ".*");.package(url: "https://source.skip.tools/skip.git", from: "'${SKIP_VERSION}'");g' "README.md"
 
@@ -177,9 +178,13 @@ cd ${SKIPBREWDIR}
 git pull || true
 
 sed -I '' "s;version \".*\";version \"${SKIP_VERSION}\";g" Casks/skip.rb
-# TODO: restore checksum in skip.rb
-#sed -I '' "s;sha256 \".*\";sha256 \"${PLUGIN_MACOS_CHECKSUM}\";g" Casks/skip.rb
-#sed -I '' "s;sha256 \".*\";sha256 \"${PLUGIN_LINUX_CHECKSUM}\";g" Casks/skip.rb
+
+# Update SHA-256 checksums in the Cask for each platform
+sed -I '' "s; arm:[[:space:]]*\"[A-Za-z0-9]\{64\}\"; arm:          \"${PLUGIN_MACOS_CHECKSUM}\";g" Casks/skip.rb
+sed -I '' "s; x86_64:[[:space:]]*\"[A-Za-z0-9]\{64\}\"; x86_64:       \"${PLUGIN_MACOS_CHECKSUM}\";g" Casks/skip.rb
+
+sed -I '' "s; arm64_linux:[[:space:]]*\"[A-Za-z0-9]\{64\}\"; arm64_linux:  \"${PLUGIN_LINUX_CHECKSUM}\";g" Casks/skip.rb
+sed -I '' "s; x86_64_linux:[[:space:]]*\"[A-Za-z0-9]\{64\}\"; x86_64_linux: \"${PLUGIN_LINUX_CHECKSUM}\";g" Casks/skip.rb
 
 git add Casks/skip.rb
 git commit -m "Release ${SKIP_VERSION}" 

@@ -39,24 +39,125 @@ struct AndroidSDKCommand: AsyncParsableCommand {
         ])
 }
 
+extension ToolchainOptionsCommand {
+    /// Returns the root path to the Swift SDKs folder
+    var localSDKsRootPath: URL {
+        (toolchainOptions.swiftSDKHome ?? ProcessInfo.processInfo.environment["SWIFT_SDK_HOME"]).flatMap(URL.init(fileURLWithPath:)) ?? swiftPMConfigFolder.appendingPathComponent("swift-sdks", isDirectory: true)
+    }
+
+    var androidNDKDownloadRoot: URL {
+        URL(string: ProcessInfo.processInfo.environment["SKIP_ANDROID_NDK_DOWNLOAD_ROOT"] ?? "https://dl.google.com/android/repository")!
+    }
+}
+
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-extension ToolOptionsCommand where Self : StreamingCommand {
-    func installAndroidSDK(version: String, reinstall: Bool, with out: MessageQueue) async throws {
+extension ToolchainOptionsCommand where Self : StreamingCommand {
+    func installAndroidSDK(sdkName: String = "android", version: String, ndkVersion: String, reinstall: Bool, selfTest: Bool, with out: MessageQueue) async throws {
+        if version.hasPrefix("5.") || version.hasPrefix("6.0") || version.hasPrefix("6.1") || version.hasPrefix("6.2") || version.hasPrefix("nightly-6.2") {
+            try await installAndroidSDKLegacy(version: version, reinstall: reinstall, with: out)
+        } else {
+            // something like "swift-DEVELOPMENT-SNAPSHOT-2025-12-19-a" is resolved directly
+
+            let resolveSDKMsg = "Resolve SDK version \(version)"
+            let sdks = await outputOptions.monitor(with: out, resolveSDKMsg, resultHandler: { result in
+                if let sdks = try? result?.get(), let sdk = sdks.first {
+                    return (result, MessageBlock(status: .pass, "\(resolveSDKMsg): \(sdk.version)"))
+                } else {
+                    return (result, MessageBlock(status: .fail, "\(resolveSDKMsg): none found"))
+                }
+            }, monitorAction: { _ in
+                try await SwiftSDKOpenAPI.fetchAndroidSDKs(versionName: version)
+            })
+
+            guard let matchingSDK = try sdks.get().first else {
+                throw AndroidError(errorDescription: "No Android SDK matching version \(version) could be found")
+            }
+
+            // Install the Host toolchain matching the version
+            try await run(with: out, "Install Host Toolchain", ["swiftly", "install", "--assume-yes", matchingSDK.version])
+
+            // Remove any pre-existing toolchain matching the version (permitting failure, in case it does not exist)
+            let androidSDKName = matchingSDK.version + "_android"
+            try await run(with: out, "Check Android SDK", ["swiftly", "run", "swift", "sdk", "remove", androidSDKName, "+\(matchingSDK.version)"], permitFailure: true)
+
+            // Install the Android SDK
+            try await run(with: out, "Install Android SDK", ["swiftly", "run", "swift", "sdk", "install", matchingSDK.downloadURL.absoluteString, "--checksum", matchingSDK.checksum, "+\(matchingSDK.version)"])
+
+            // Install path will be like swift-6.3-DEVELOPMENT-SNAPSHOT-2025-12-18-a_android.artifactbundle
+            let artifactInstallPath = self.localSDKsRootPath.appending(component: androidSDKName).appendingPathExtension("artifactbundle")
+
+            let swiftAndroidRoot = artifactInstallPath.appending(component: "swift-android")
+
+            let ndkInstallScript = swiftAndroidRoot.appending(component: "scripts/setup-android-sdk.sh")
+            if ndkInstallScript.isExecutableFile != true {
+                throw AndroidError(errorDescription: "Android SDK setup script was not found at \(ndkInstallScript.path)")
+            }
+
+            // Download and unpack NDK
+            let ndkFolder = try await downloadAndroidNDK(ndkVersion: ndkVersion, targetPath: swiftAndroidRoot, with: out)
+
+            // Run link script for NDK
+            try await run(with: out, "Link Swift Android SDK and NDK", [ndkInstallScript.path], additionalEnvironment: ["ANDROID_NDK_HOME": ndkFolder.path])
+
+            // TODO: create example project and run Android build
+        }
+    }
+
+    /// Downloads and unpacks the Android NDK to the specific directory and returns the `ANDROID_NDK_HOME` path.
+    ///
+    /// https://dl.google.com/android/repository/android-ndk-r27d-darwin.zip
+    /// https://dl.google.com/android/repository/android-ndk-r27d-linux.zip
+    func downloadAndroidNDK(ndkVersion: String, targetPath: URL, with out: MessageQueue) async throws -> URL {
+        #if os(macOS)
+        let ndkOS = "darwin"
+        #else
+        let ndkOS = "linux"
+        #endif
+        let ndkURL = androidNDKDownloadRoot.appending(path: "android-ndk-\(ndkVersion)-\(ndkOS).zip")
+
+        let downloadNDKMsg = "Download NDK \(ndkVersion)"
+        let (downloadPath, _) = try await outputOptions.monitor(with: out, downloadNDKMsg, resultHandler: Self.timingResultHandler(message: downloadNDKMsg, permitFailure: false)) { _ in
+            try await URLSession.shared.download(from: ndkURL)
+        }.get()
+
+        try await run(with: out, "Unpack \(ndkURL.lastPathComponent)", ["unzip", "-o", "-d", targetPath.path, downloadPath.path])
+
+        let ndkUnpackFolder = targetPath.appending(component: "android-ndk-\(ndkVersion)")
+        if ndkUnpackFolder.isDirectoryFile == false {
+            throw AndroidError(errorDescription: "Expected NDK unpack folder not found: \(ndkUnpackFolder.path)")
+        }
+
+        return ndkUnpackFolder
+    }
+
+    /// The older way to install the Anroid SDK, using Homebrew Casks in https://github.com/skiptools/homebrew-skip/tree/main/Casks
+    func installAndroidSDKLegacy(version: String, reinstall: Bool, with out: MessageQueue) async throws {
         try await run(with: out, "Install Swift Android SDK", ["brew", reinstall ? "reinstall" : "install", "skiptools/skip/swift-android-toolchain@\(version)"], additionalEnvironment: ["HOMEBREW_AUTO_UPDATE_SECS": "0"])
     }
 }
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct AndroidSDKInstallCommand: MessageCommand, ToolOptionsCommand {
+struct AndroidSDKInstallCommand: MessageCommand, ToolchainOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "install",
         abstract: "Install the native Swift Android SDK",
+        usage: """
+        # Installs the default version of the Android SDK
+        skip android sdk install
+
+        # Installs the latest nightly for 6.3
+        skip android sdk install --version nightly-6.3
+        """,
         shouldDisplay: true)
 
-    static let defaultAndroidSDKVersion = "6.2"
+    static let defaultAndroidSDKVersion = "6.2" // TODO: 6.3
+    static let defaultAndroidNDKVersion = "r27d"
 
     @Option(help: ArgumentHelp("Version of the Swift Android SDK to install", valueName: "version"))
     var version: String = Self.defaultAndroidSDKVersion
+
+    @Option(help: ArgumentHelp("Version of the Android NDK to link to the toolchain", valueName: "ndk"))
+    var ndkVersion: String = Self.defaultAndroidNDKVersion
 
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
@@ -64,17 +165,25 @@ struct AndroidSDKInstallCommand: MessageCommand, ToolOptionsCommand {
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
 
+    @OptionGroup(title: "Toolchain Options")
+    var toolchainOptions: ToolchainOptions
+
     @Flag(help: ArgumentHelp("Reinstall the Android SDK"))
     var reinstall: Bool = false
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Verify Android SDK installation"))
+    var verify: Bool = true
+
     func performCommand(with out: MessageQueue) async throws {
-        try await installAndroidSDK(version: version, reinstall: reinstall, with: out)
+        await withLogStream(title: "Install Swift Android SDK \(version)", with: out) {
+            try await installAndroidSDK(version: version, ndkVersion: ndkVersion, reinstall: reinstall, selfTest: verify, with: out)
+        }
     }
 }
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 struct AndroidSDKListCommand: SkipCommand, StreamingCommand, OutputOptionsCommand, ToolOptionsCommand {
-    typealias Output = SwiftSDKLineOutput
+    typealias Output = SwiftSDKOutput
 
     static var configuration = CommandConfiguration(
         commandName: "list",
@@ -87,14 +196,38 @@ struct AndroidSDKListCommand: SkipCommand, StreamingCommand, OutputOptionsComman
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
+    @Flag(help: ArgumentHelp("List remote SDKs that can be installed"))
+    var remote: Bool = false
+
+    @Flag(help: ArgumentHelp("Include development SDKs in remote list"))
+    var devel: Bool = false
+
+    @Option(help: ArgumentHelp("The name of the remote SDK to list", visibility: .hidden))
+    var sdkName: String = "android"
+
     func performCommand(with out: MessageQueue) async throws {
-        try await listAndroidSDKs(with: out)
+        if remote {
+            var androidSDKs = try await SwiftSDKOpenAPI.fetchSDKs(sdkName: sdkName)
+            if devel {
+                // FIXME: we would need an OpenAPI endpoint to query the active develoment branches…
+                for develVersion in ["6.3", "main"] {
+                    if let develSDKs = try? await SwiftSDKOpenAPI.fetchSDKs(sdkName: sdkName, forDevelVersion: develVersion) {
+                        androidSDKs += develSDKs
+                    }
+                }
+            }
+            for sdk in androidSDKs {
+                await out.yield(SwiftSDKOutput(name: sdk.version))
+            }
+        } else {
+            try await listAndroidSDKs(with: out)
+        }
     }
 
     func listAndroidSDKs(with out: MessageQueue) async throws {
         let swiftSDKListOutput = try await launchTool("swift", arguments: ["sdk", "list"], includeStdErr: false)
         for try await sdkLine in swiftSDKListOutput {
-            let info = SwiftSDKLineOutput(name: sdkLine.line)
+            let info = SwiftSDKOutput(name: sdkLine.line)
             // handle both old ("swift-6.2-RELEASE-android-0.1.artifactbundle") and new ("swift-DEVELOPMENT-SNAPSHOT-2025-10-16-a_android.artifactbundle") patterns
             if info.name.contains("android") {
                 await out.yield(info)
@@ -102,7 +235,7 @@ struct AndroidSDKListCommand: SkipCommand, StreamingCommand, OutputOptionsComman
         }
     }
 
-    struct SwiftSDKLineOutput : MessageEncodable, Decodable {
+    struct SwiftSDKOutput : MessageEncodable, Decodable {
         let name: String
 
         /// Returns the message for the output with optional ANSI coloring
@@ -146,10 +279,13 @@ struct AndroidToolchainVersionCommand: AndroidOperationCommand {
     }
 }
 
-@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-protocol AndroidOperationCommand : MessageCommand, ToolOptionsCommand {
+protocol ToolchainOptionsCommand : ToolOptionsCommand {
     /// This command's toolchain options
     var toolchainOptions: ToolchainOptions { get }
+}
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+protocol AndroidOperationCommand : MessageCommand, ToolchainOptionsCommand {
 
     /// The arguments to the command to be executed
     var args: [String] { get }
@@ -597,7 +733,7 @@ fileprivate extension AndroidOperationCommand {
         let apiLevel = toolchainOptions.androidAPILevel
 
         // look for swift-sdks like: ~/Library/org.swift.swiftpm/swift-sdks/swift-6.0.2-RELEASE-android-24-0.1.artifactbundle
-        let localSDKsPath = (toolchainOptions.swiftSDKHome ?? ProcessInfo.processInfo.environment["SWIFT_SDK_HOME"]).flatMap(URL.init(fileURLWithPath:)) ?? swiftPMConfigFolder.appendingPathComponent("swift-sdks", isDirectory: true)
+        let localSDKsPath = self.localSDKsRootPath
 
         let installAdvice = "Install the Swift Android SDK using `skip android sdk install`."
 
@@ -625,7 +761,6 @@ fileprivate extension AndroidOperationCommand {
         //let sdkName = sdkPath.deletingPathExtension().lastPathComponent // e.g. "swift-6.0.2-RELEASE-android-24-0.1"
         let swiftSDKVersion = sdkPath.lastPathComponent.split(separator: "-").dropFirst().first?.description ?? "latest" // e.g.: 6.0.2
         let sdkName = arch.tripleKey(api: apiLevel, sdkVersion: swiftSDKVersion)
-        let toolchainPath = try swiftToolchainFolder(sdkVersion: swiftSDKVersion)
         let infoPath = sdkPath.appendingPathComponent("info.json", isDirectory: false)
         let sdkInfo = try JSONDecoder().decode(SDKInfo.self, from: Data(contentsOf: infoPath))
 
@@ -707,6 +842,7 @@ fileprivate extension AndroidOperationCommand {
             throw CrossCompilerError(errorDescription: "The Swift Android SDK dynamic library path for \(sdkName) did not exist at: \(libPathDynamic.path)")
         }
 
+        let toolchainPath = try swiftToolchainFolder(sdkVersion: swiftSDKVersion)
         return ToolchainPaths(toolchainPath: toolchainPath, swiftSDKVersion: swiftSDKVersion, destinationURL: nil, sdkName: sdkName, libPathDynamic: libPathDynamic, libPathStatic: libPathStatic, libSysrootArch: libSysrootArch)
     }
 
@@ -717,13 +853,12 @@ fileprivate extension AndroidOperationCommand {
             let toolchainOverride = ProcessInfo.processInfo.environment["SWIFT_TOOLCHAIN_DIR"].flatMap(URL.init(fileURLWithPath:))
 
             #if os(Linux)
-            // TODO: should we also check for swiftly home at ~/.local/share/swiftly/toolchains/6.2.0 ?
             // note the difference in naming between ~/.swiftpm/toolchains/swift-6.2-RELEASE-ubuntu24.04 and ~/.local/share/swiftly/toolchains/6.2.0
-            let toolchains1 = homeDir.appendingPathComponent("/.config/swiftpm/toolchains", isDirectory: true)
-            let toolchains2 = homeDir.appendingPathComponent("/.swiftpm/toolchains", isDirectory: true)
+            let toolchains1 = homeDir.appendingPathComponent(".config/swiftpm/toolchains", isDirectory: true)
+            let toolchains2 = homeDir.appendingPathComponent(".swiftpm/toolchains", isDirectory: true)
             #else
             let toolchains1 = URL(fileURLWithPath: "/Library/Developer/Toolchains", isDirectory: true)
-            let toolchains2 = homeDir.appendingPathComponent("/Library/Developer/Toolchains", isDirectory: true)
+            let toolchains2 = homeDir.appendingPathComponent("Library/Developer/Toolchains", isDirectory: true)
             #endif
 
             let toolchainDirs = toolchainOverride != nil ? [toolchainOverride!] : [toolchains1, toolchains2]
@@ -737,7 +872,22 @@ fileprivate extension AndroidOperationCommand {
             toolchains = toolchains.filter({ $0.lastPathComponent.hasPrefix("swift-\(swiftVersion)") })
 
             guard let toolchain = toolchains.last else {
-                throw CrossCompilerError(errorDescription: "No Swift Toolchain matching version \(swiftVersion) were found in: \(toolchainDirs.map(\.path))")
+                #if os(Linux)
+                let swiftlyToolchainDir = homeDir.appendingPathComponent(".local/share/swiftly/toolchains", isDirectory: true)
+
+                // On Linux, we also try to match swiftly-installed toolchains
+                // ~/.local/share/swiftly/toolchains/6.2.0
+                // ~/.local/share/swiftly/toolchains/main-snapshot-2025-12-19
+                if isDir(swiftlyToolchainDir) {
+                    let swiftlyMatch = sdkVersion.replacing("DEVELOPMENT", with: "main-snapshot")
+                    let swiftlyToolchains = try dirs(in: [swiftlyToolchainDir])
+                    if let swiftlyToolchain = swiftlyToolchains.filter({ $0.lastPathComponent.hasPrefix(swiftlyMatch) }).last {
+                        return swiftlyToolchain.path
+                    }
+                }
+                #endif
+
+                throw CrossCompilerError(errorDescription: "No Swift Toolchain matching version \(swiftVersion) for SDK version \(sdkVersion) were found in: \(toolchainDirs.map(\.path))")
             }
 
             return toolchain.path
@@ -1192,6 +1342,118 @@ private struct SerializedDestinationV1: Codable {
         case extraCCFlags = "extra-cc-flags"
         case extraSwiftCFlags = "extra-swiftc-flags"
         case extraCPPFlags = "extra-cpp-flags"
+    }
+}
+
+struct SwiftSDKOpenAPI {
+    static let endpointRoot = URL(string: ProcessInfo.processInfo.environment["SKIP_SWIFT_API_ENDPOINT_ROOT"] ?? "https://www.swift.org/api/v1")!
+    static let downloadEndpointRoot = URL(string: ProcessInfo.processInfo.environment["SKIP_SWIFT_API_DOWNLOAD_ROOT"] ?? "https://download.swift.org")!
+
+    /// e.g., https://www.swift.org/api/v1/install/releases.json
+    static let releasesEndpoint = endpointRoot.appending(components: "install", "releases.json")
+
+    /// e.g., https://www.swift.org/api/v1/install/dev/6.3/android-sdk.json
+    static func devSnapshotEndpoint(sdkName: String, forVersion version: String) -> URL {
+        endpointRoot.appending(components: "install", "dev", version, sdkName + "-sdk.json")
+    }
+
+    static func fetchAndroidSDKs(sdkName: String = "android", versionName toolchainVersion: String) async throws -> [SwiftSDKDownloadable] {
+        let sdks: [SwiftSDKDownloadable]
+        if toolchainVersion.hasPrefix("nightly-") {
+            let develVersion = toolchainVersion.split(separator: "-").last?.description ?? toolchainVersion
+            do {
+                sdks = try await SwiftSDKOpenAPI.fetchSDKs(sdkName: sdkName, forDevelVersion: develVersion)
+            } catch let error as URLResponse.HTTPURLResponseError {
+                if error.code == 404 {
+                    throw AndroidError(errorDescription: "No Android SDK for version \(toolchainVersion) is available: \(error.localizedDescription)")
+                } else {
+                    throw error
+                }
+            }
+        } else if toolchainVersion.contains("-DEVELOPMENT-SNAPSHOT-") {
+            // snapshots are explicit references to individual builds:
+            // e.g., swift-DEVELOPMENT-SNAPSHOT-2025-12-19-a
+            // e.g., swift-6.3-DEVELOPMENT-SNAPSHOT-2025-12-18-a
+            // we still need to grab it from the API, since it contains the checksum and exact download URL
+            let develVersion = toolchainVersion.hasPrefix("swift-DEVELOPMENT-SNAPSHOT-") ? "main" : toolchainVersion.split(separator: "-").dropFirst().first?.description ?? toolchainVersion
+            sdks = try await SwiftSDKOpenAPI.fetchSDKs(sdkName: sdkName, forDevelVersion: develVersion)
+                .filter({ $0.version == toolchainVersion })
+        } else {
+            // expects a release like 6.3.1
+            sdks = try await SwiftSDKOpenAPI.fetchSDKs(sdkName: sdkName)
+                .filter({ $0.version == toolchainVersion })
+        }
+
+        return sdks
+    }
+
+    static func fetchSDKs(sdkName: String, forDevelVersion develVersion: String? = nil, retryCount: Int = 5) async throws -> [SwiftSDKDownloadable] {
+        let sdkPlatform = "\(sdkName)-sdk"
+        if let develVersion = develVersion {
+            let swiftBranch = develVersion == "main" ? "development" : "swift-\(develVersion)-branch"
+
+            let develSDKs = try await Array<DevelSDK>(fromJSON: URLSession.shared.fetch(request: URLRequest(url: Self.devSnapshotEndpoint(sdkName: sdkName, forVersion: develVersion)), retryCount: retryCount).0, dateDecodingStrategy: .iso8601)
+            return develSDKs.map { develSDK in
+                // e.g.: https://download.swift.org/development/android-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-12-17-a/swift-DEVELOPMENT-SNAPSHOT-2025-12-17-a_android.artifactbundle.tar.gz
+                // e.g.: https://download.swift.org/swift-6.2-branch/wasm-sdk/swift-6.2-DEVELOPMENT-SNAPSHOT-2025-12-03-a/swift-6.2-DEVELOPMENT-SNAPSHOT-2025-12-03-a_wasm.artifactbundle.tar.gz
+                let downloadURL = downloadEndpointRoot.appending(components: swiftBranch, sdkPlatform, develSDK.dir, develSDK.download)
+                // the "dir" property is the closest thing we have to a unique version name (e.g., "swift-6.3-DEVELOPMENT-SNAPSHOT-2025-12-18-a")
+                return SwiftSDKDownloadable(version: develSDK.dir, name: develSDK.name, checksum: develSDK.checksum, downloadURL: downloadURL)
+            }
+        } else {
+            let releases = try await Array<SwiftReleases>(fromJSON: URLSession.shared.fetch(request: URLRequest(url: Self.releasesEndpoint), retryCount: retryCount).0, dateDecodingStrategy: .iso8601)
+            return releases.compactMap { release in
+                guard let sdk = release.platforms.first(where: { $0.platform == sdkPlatform}) else {
+                    return nil
+                }
+                guard let checksum = sdk.checksum else {
+                    return nil
+                }
+                // now create a SDKAPI from the release and SDK:
+                // e.g.: https://download.swift.org/swift-6.2.3-release/static-sdk/swift-6.2.3-RELEASE/swift-6.2.3-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz
+                // e.g.: https://download.swift.org/swift-6.2.3-release/wasm-sdk/swift-6.2.3-RELEASE/swift-6.2.3-RELEASE_wasm.artifactbundle.tar.gz
+                // unlike the development endpoints which have a useful "dir" and "download" property, we have to guess based on convention
+                let sdkPath = sdkName == "static" ? "static-linux-0.0.1" : sdkName // special-case legacy static linux name
+                let downloadPath = "\(release.tag)_\(sdkPath).artifactbundle.tar.gz"
+                let downloadURL = downloadEndpointRoot.appending(components: release.tag.lowercased(), sdkPlatform, release.tag, downloadPath)
+                return SwiftSDKDownloadable(version: release.name, name: sdk.name, checksum: checksum, downloadURL: downloadURL)
+            }
+        }
+    }
+
+    /// A location for a particular Swift SDK
+    struct SwiftSDKDownloadable: Equatable {
+        var version: String // 6.2.3, swift-6.3-DEVELOPMENT-SNAPSHOT-2025-12-18-a
+        var name: String // Static SDK
+        var checksum: String // f30ec724d824ef43b5546e02ca06a8682dafab4b26a99fbb0e858c347e507a2c
+        var downloadURL: URL
+    }
+
+    private struct SwiftReleases: Decodable {
+        var name: String // 6.2.3
+        var tag: String // swift-6.2.3-RELEASE
+        var date: String? // 2025-12-12
+        var xcode: String? // Xcode 26.2
+        var xcode_release: Bool?
+        var xcode_toolchain: Bool?
+
+        var platforms: [SwiftReleasePlatform]
+
+        struct SwiftReleasePlatform: Decodable {
+            var name: String // Static SDK
+            var platform: String // static-sdk
+            var checksum: String? // f30ec724d824ef43b5546e02ca06a8682dafab4b26a99fbb0e858c347e507a2c
+            var archs: [String]? // ["x86_64","arm64"]
+        }
+    }
+
+    private struct DevelSDK: Decodable {
+        var name: String // Swift Android SDK Development Snapshot
+        var dir: String // swift-6.3-DEVELOPMENT-SNAPSHOT-2025-12-18-a
+        var download: String // swift-6.3-DEVELOPMENT-SNAPSHOT-2025-12-18-a_android.artifactbundle.tar.gz
+        var download_signature: String? // swift-6.3-DEVELOPMENT-SNAPSHOT-2025-12-18-a_android.artifactbundle.tar.gz.sig
+        var date: String // 2025-12-18 10:10:00 -0600 (note: not a proper ISO-8601 timestamp, so cannot use Date)
+        var checksum: String // 0e6d657377dd1b67c5f779a72a3234ce06b8fb3ba63d1b122197e0df5f0966b4
     }
 }
 

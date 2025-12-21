@@ -33,23 +33,6 @@ extension SkipCommand {
         }
         return self
     }
-
-    /// Retries the given block with an exponential backoff in between attempts.
-    func retry<T>(count retryCount: Int = 5, block: () async throws -> T) async throws -> T {
-        for retry in 1...retryCount {
-            do {
-                return try await block()
-            } catch {
-                if retry == retryCount {
-                    throw error
-                }
-                // exponential backoff before retrying
-                try await Task.sleep(nanoseconds: UInt64(2 + (retry * retry)) * 1_000_000_000)
-            }
-        }
-
-        fatalError("retry count exceeded without throwing an error")
-    }
 }
 
 
@@ -550,8 +533,9 @@ extension StreamingCommand {
     /// - Parameters:
     ///   - out: the message queue for outputting messages and statuses
     ///   - operation: the operation to execute
-    func withLogStream(with out: MessageQueue, operation: () async throws -> ()) async {
+    func withLogStream(title: String? = nil, with out: MessageQueue, operation: () async throws -> ()) async {
         let cmdname = Self.configuration.commandName ?? "cmd"
+        let title = title ?? "Skip \(skipVersion) \(cmdname)"
         let startTime = Date.now
 
         let dateFormatter = ISO8601DateFormatter()
@@ -570,8 +554,6 @@ extension StreamingCommand {
         } catch {
             await out.yield(MessageBlock(status: .fail, error.localizedDescription))
         }
-
-        let title = "Skip \(skipVersion) \(cmdname)"
         let messages = await out.elements
 
         if messages.isEmpty {
@@ -1068,7 +1050,8 @@ extension ToolOptionsCommand {
         // there are a couple of "standard" locations for the swift package manager configuration
         let cfg1 = homeDir.appendingPathComponent(".config/swiftpm", isDirectory: true)
         let cfg2 = homeDir.appendingPathComponent(".swiftpm/org.swift.swiftpm", isDirectory: true)
-        return [cfg1, cfg2].first(where: { FileManager.default.fileExists(atPath: $0.path) }) ?? cfg1
+        let cfg3 = homeDir.appendingPathComponent(".swiftpm", isDirectory: true)
+        return [cfg1, cfg2, cfg3].first(where: { FileManager.default.fileExists(atPath: $0.path) }) ?? cfg1
         #endif
     }
 }

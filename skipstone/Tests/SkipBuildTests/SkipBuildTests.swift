@@ -104,4 +104,27 @@ final class SkipBuildTests: XCTestCase {
         XCTAssertEqual("skip-model", pmod.dependencies.first?.repositoryName)
         XCTAssertEqual("SkipModel", pmod.dependencies.first?.moduleName)
     }
+
+    func testParseSwiftToolchainAPI() async throws {
+        let staticLinuxSDKs = try await SwiftSDKOpenAPI.fetchSDKs(sdkName: "static")
+        let staticDownloadURL = "https://download.swift.org/swift-6.2.3-release/static-sdk/swift-6.2.3-RELEASE/swift-6.2.3-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz"
+        XCTAssertTrue(staticLinuxSDKs.contains(where: { $0.downloadURL.absoluteString == staticDownloadURL }), "missing expected path in: \(staticLinuxSDKs)")
+
+        let wasmSDKs = try await SwiftSDKOpenAPI.fetchSDKs(sdkName: "wasm")
+        let wasmDownloadURL = "https://download.swift.org/swift-6.2.3-release/wasm-sdk/swift-6.2.3-RELEASE/swift-6.2.3-RELEASE_wasm.artifactbundle.tar.gz"
+        XCTAssertTrue(wasmSDKs.contains(where: { $0.downloadURL.absoluteString == wasmDownloadURL }), "missing expected path in: \(wasmSDKs)")
+
+        let wasmDevSDKs = try await SwiftSDKOpenAPI.fetchSDKs(sdkName: "wasm", forDevelVersion: "6.2")
+        let wasmDevDownloadURL = "https://download.swift.org/swift-6.2-branch/wasm-sdk/swift-6.2-DEVELOPMENT-SNAPSHOT-2025-12-03-a/swift-6.2-DEVELOPMENT-SNAPSHOT-2025-12-03-a_wasm.artifactbundle.tar.gz"
+        XCTAssertTrue(wasmDevSDKs.contains(where: { $0.downloadURL.absoluteString == wasmDevDownloadURL }), "missing expected path in: \(wasmDevSDKs)")
+
+        let androidDevelopmentDownloadURL = "https://download.swift.org/development/android-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-12-17-a/swift-DEVELOPMENT-SNAPSHOT-2025-12-17-a_android.artifactbundle.tar.gz"
+        let androidDevSDKs = try await SwiftSDKOpenAPI.fetchSDKs(sdkName: "android", forDevelVersion: "main")
+        XCTAssertTrue(androidDevSDKs.contains(where: { $0.downloadURL.absoluteString == androidDevelopmentDownloadURL }), "missing expected path in: \(androidDevSDKs)")
+
+        let androidDev63DownloadURL = "https://download.swift.org/swift-6.3-branch/android-sdk/swift-6.3-DEVELOPMENT-SNAPSHOT-2025-12-18-a/swift-6.3-DEVELOPMENT-SNAPSHOT-2025-12-18-a_android.artifactbundle.tar.gz"
+        let androidDev63SDKs = try await SwiftSDKOpenAPI.fetchSDKs(sdkName: "android", forDevelVersion: "6.3")
+        XCTAssertTrue(androidDev63SDKs.contains(where: { $0.downloadURL.absoluteString == androidDev63DownloadURL }), "missing expected path in: \(androidDev63SDKs)")
+    }
 }
+

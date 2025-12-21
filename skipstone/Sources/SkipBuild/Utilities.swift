@@ -1,5 +1,30 @@
 import Foundation
 
+/// Retries the given block with an exponential backoff in between attempts.
+///
+/// The default `backoff` block will retry the `block` 5 times with an exponential backoff (1, 4, 9, 16, and 25 seconds).
+///
+/// - Parameters:
+///   - backoff: a block taking an error failure and the retry index, and returns either a `TimeInterval` for the next backoff or `nil` if the error should be thrown
+///   - block: the block to retry
+/// - Throws: the final error that is throws after the `backoff` block returns `nil`
+/// - Returns: the result of a successfull executed block
+func retry<T>(backoff: (Error, Int) -> TimeInterval? = { _, retryIndex in retryIndex >= 5 ? nil : TimeInterval(retryIndex * retryIndex) }, block: () async throws -> T) async throws -> T {
+    var retryCount = 0
+    while true {
+        retryCount += 1
+        do {
+            return try await block()
+        } catch {
+            guard let backoff = backoff(error, retryCount) else {
+                throw error
+            }
+            // exponential backoff before retrying
+            try await Task.sleep(nanoseconds: UInt64(backoff * 1_000_000_000))
+        }
+    }
+}
+
 extension Collection {
     /// Returns the substring of the given string, safely handling index bounds
     public func slice(_ i1: Int, _ i2: Int? = nil) -> SubSequence {

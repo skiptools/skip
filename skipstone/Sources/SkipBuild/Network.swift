@@ -1,6 +1,91 @@
+import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
-import Foundation
+#endif
+
+extension URLSession {
+
+    /// Fetches the given request asynchronously, optionally validating that the response code is within the given range of HTTP codes and retrying on error a set number of times.
+    func fetch(request: URLRequest, validate codes: IndexSet? = IndexSet(200..<300), retryCount: Int = 1) async throws -> (data: Data, response: URLResponse) {
+        return try await retry(backoff: { error, retryIndex in
+            if retryIndex >= 5 { return  nil }
+            if let invalidCodeError = error as? URLResponse.HTTPURLResponseError {
+                // e.g., 404 errors fail immediately, but 503 Service Unavailable will retry
+                if !(500..<600).contains(invalidCodeError.code) { return nil }
+
+                // check for Retry-After header (https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Retry-After)
+                if let retryAfter = invalidCodeError.response.value(forHTTPHeaderField: "Retry-After") {
+                    if let retryAfterSeconds = Int(retryAfter) {
+                        return TimeInterval(retryAfterSeconds)
+                    } else {
+                        // TODO: can also be a Date: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Date
+                    }
+                }
+            }
+            return TimeInterval(retryIndex * retryIndex)
+        }) {
+            #if canImport(FoundationNetworking)
+            return try await fetchRequest(request: request, validate: codes)
+            #else
+            let (data, response) = try await self.data(for: request)
+            let validResponse = try response.validating(codes: codes)
+            return (data, validResponse)
+            #endif
+        }
+    }
+}
+
+extension URLResponse {
+    private static let gmtDateFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "EEEE, dd LLL yyyy HH:mm:ss zzz"
+        return fmt
+    }()
+
+    /// Returns the last modified date for this response
+    public var lastModifiedDate: Date? {
+        guard let headers = (self as? HTTPURLResponse)?.allHeaderFields else {
+            return nil
+        }
+        guard let modDate = headers["Last-Modified"] as? String else {
+            return nil
+        }
+        return Self.gmtDateFormatter.date(from: modDate)
+    }
+
+    /// Attempts to validate the status code in the given range and throws an error if they fail.
+    func validating(codes: IndexSet?) throws -> Self {
+        guard let codes = codes else {
+            return self // no validation
+        }
+
+        guard let httpResponse = self as? HTTPURLResponse else {
+            // loading from the file system doesn't expose codes
+            return self // throw URLError(.badServerResponse)
+        }
+
+        if !codes.contains(httpResponse.statusCode) {
+            throw HTTPURLResponseError(response: httpResponse)
+        }
+
+        return self // the response is valid
+    }
+
+    public struct HTTPURLResponseError: Error, LocalizedError {
+        public let response: HTTPURLResponse
+
+        public var code: Int {
+            response.statusCode
+        }
+
+        public var errorDescription: String? {
+            "Invalid HTTP Response: \(code)"
+        }
+    }
+
+}
+
+#if canImport(FoundationNetworking)
 
 // Non-Darwin (e.g., Linux) do not yet support async URLSession functions, so we re-create them here
 // https://github.com/apple/swift-corelibs-foundation/issues/3205
@@ -16,18 +101,13 @@ extension URLSession {
         try await data(for: URLRequest(url: url), delegate: delegate)
     }
 
-    public func download(from request: URLRequest, delegate: URLSessionTaskDelegate? = nil) async throws -> (URL, URLResponse) {
+    // REMOVEME: this seems to now be present in Linux…
+    public func downloadObsolete(from request: URLRequest, delegate: URLSessionTaskDelegate? = nil) async throws -> (URL, URLResponse) {
         try await downloadRequest(for: request)
     }
 
-    public func download(from url: URL, delegate: URLSessionTaskDelegate? = nil) async throws -> (URL, URLResponse) {
-        try await download(from: URLRequest(url: url), delegate: delegate)
-    }
-
-
-    /// Fetches the given request asynchronously, optionally validating that the response code is within the given range of HTTP codes.
-    internal func fetch(request: URLRequest, validate codes: IndexSet? = IndexSet(200..<300)) async throws -> (data: Data, response: URLResponse) {
-        return try await fetchRequest(request: request, validate: codes)
+    public func downloadObsolete(from url: URL, delegate: URLSessionTaskDelegate? = nil) async throws -> (URL, URLResponse) {
+        try await downloadObsolete(from: URLRequest(url: url), delegate: delegate)
     }
 
     private func fetchRequest(request: URLRequest, validate codes: IndexSet?) async throws -> (data: Data, response: URLResponse) {
@@ -108,53 +188,6 @@ extension URLSession {
             return completionHandler(url, response, error)
         }
     }
-
-}
-
-extension URLResponse {
-    private static let gmtDateFormatter: DateFormatter = {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "EEEE, dd LLL yyyy HH:mm:ss zzz"
-        return fmt
-    }()
-
-    /// Returns the last modified date for this response
-    public var lastModifiedDate: Date? {
-        guard let headers = (self as? HTTPURLResponse)?.allHeaderFields else {
-            return nil
-        }
-        guard let modDate = headers["Last-Modified"] as? String else {
-            return nil
-        }
-        return Self.gmtDateFormatter.date(from: modDate)
-    }
-
-    /// Attempts to validate the status code in the given range and throws an error if they fail.
-    func validating(codes: IndexSet?) throws -> Self {
-        guard let codes = codes else {
-            return self // no validation
-        }
-
-        guard let httpResponse = self as? HTTPURLResponse else {
-            // loading from the file system doesn't expose codes
-            return self // throw URLError(.badServerResponse)
-        }
-
-        if !codes.contains(httpResponse.statusCode) {
-            throw InvalidHTTPCode(code: httpResponse.statusCode)
-        }
-
-        return self // the response is valid
-    }
-
-    public struct InvalidHTTPCode : Error, LocalizedError {
-        public let code: Int
-
-        public var errorDescription: String? {
-            "Invalid HTTP Response: \(code)"
-        }
-    }
-
 }
 
 extension URL {

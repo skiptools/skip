@@ -257,9 +257,10 @@ extension StreamingCommand {
         }
     }
 
-    static func timingResultHandler<T>(message: String, time: Date = .now) -> (_ result: Result<T, Error>?) -> (result: Result<T, Error>?, message: MessageBlock?) {
+    /// A simple result handler that just reports the amount of time the operation tool
+    static func timingResultHandler<T>(message: String, time: Date = .now, permitFailure: Bool) -> (_ result: Result<T, Error>?) -> (result: Result<T, Error>?, message: MessageBlock?) {
         return { result in
-            (result, MessageBlock(status: result?.messageStatusAny, message + " (\(time.timingSecondsSinceNow))"))
+            (result, MessageBlock(status: permitFailure ? .pass : result?.messageStatusAny, message + " (\(time.timingSecondsSinceNow))"))
         }
     }
 
@@ -273,10 +274,10 @@ extension StreamingCommand {
 
     /// Executes a tool with the given arguments and prefix message, waits for the result while showing a progress animation,
     /// and then processes the result and outputs the given message block.
-    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ commandArgs: [String], environment: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, additionalEnvironment: [String: String] = [:], in workingDirectory: URL? = nil, watch: Bool = true, resultHandler finalResultHandler: MessageResultHandler<ProcessOutput>? = nil) async throws -> Result<ProcessOutput, Error> {
+    @discardableResult func run(with messenger: MessageQueue, _ message: String, _ commandArgs: [String], environment: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, additionalEnvironment: [String: String] = [:], in workingDirectory: URL? = nil, watch: Bool = true, permitFailure: Bool = false, resultHandler finalResultHandler: MessageResultHandler<ProcessOutput>? = nil) async throws -> Result<ProcessOutput, Error> {
 
         // default to a result handler that outputs the duration of the operation
-        let resultHandler = finalResultHandler ?? Self.timingResultHandler(message: message)
+        let resultHandler = finalResultHandler ?? Self.timingResultHandler(message: message, permitFailure: permitFailure)
 
         var cmd = commandArgs.first ?? ""
         // attempt to resolve the tool command if it is not prefixed with a slash
@@ -359,7 +360,7 @@ extension StreamingCommand {
             addBuffer(err: true)(nil)
             addBuffer(err: false)(nil)
 
-            let output = ProcessOutput(exitCode: code, stdout: String(bytes: outBufferComplete, encoding: .utf8) ?? "", stderr: String(bytes: errBufferComplete, encoding: .utf8) ?? "")
+            let output = ProcessOutput(exitCode: permitFailure ? 0 : code, stdout: String(bytes: outBufferComplete, encoding: .utf8) ?? "", stderr: String(bytes: errBufferComplete, encoding: .utf8) ?? "")
             try output.throwOnFailure()
             return output
         }

@@ -92,7 +92,7 @@ skip icon should be run in the root folder of a conventional Skip app project th
     }
 
     func performCommand(with out: MessageQueue) async {
-        await withLogStream(with: out) {
+        await withLogStream(title: "Create icon", with: out) {
             try await runCreateIcon(with: out)
         }
     }

@@ -22,12 +22,12 @@ jobs:
     steps:
       # checkout both skipstone.git and skip.git for the linked SkipDrive
       - name: Checkout skipstone.git
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: skipstone
 
       - name: Checkout skip.git
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: skiptools/skip
           path: skip

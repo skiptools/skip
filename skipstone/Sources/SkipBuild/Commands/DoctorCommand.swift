@@ -94,7 +94,6 @@ extension ToolOptionsCommand where Self : StreamingCommand {
 
         /// check for stale Intel Homebrew installations of tools (java, etc.) on ARM (https://github.com/skiptools/skip/issues/97)
         func checkRosetta() async throws {
-
             let arch = ProcessInfo.isARM ? "ARM" : "Intel"
 
             func checkResult(_ result: Result<ProcessOutput, Error>?) -> (result: Result<ProcessOutput, Error>?, message: MessageBlock?) {

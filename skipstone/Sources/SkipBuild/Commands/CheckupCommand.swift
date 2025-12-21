@@ -57,11 +57,17 @@ This command performs a full system checkup to ensure that Skip can create and b
     /// The native mode to use for checkup, which can be a combination of native app and native model.
     var nativeMode: NativeMode {
         var mode: NativeMode = []
-        if self.native || self.nativeApp {
+        if self.nativeApp {
             mode.insert(.nativeApp)
         }
-        if self.native || self.nativeModel {
+        if self.nativeModel {
             mode.insert(.nativeModel)
+        }
+        if self.native {
+            mode.insert(.nativeModel)
+            #if !os(Linux) // Linux does not yet supporting building native apps
+            mode.insert(.nativeApp)
+            #endif
         }
         return mode
     }
