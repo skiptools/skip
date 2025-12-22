@@ -11,7 +11,7 @@ jobs:
     runs-on: macos-15
     steps:
       - name: Checkout skipstone
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: skiptools/skipstone
           path: skipstone
@@ -19,7 +19,7 @@ jobs:
           token: ${{ secrets.REPO_ACCESS_TOKEN }}
 
       - name: Checkout skip
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: skiptools/skip
           path: skip
@@ -30,7 +30,7 @@ jobs:
           ref: ${{ github.ref }}
 
       - name: Checkout homebrew-skip
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: skiptools/homebrew-skip
           path: homebrew-skip
