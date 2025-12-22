@@ -847,7 +847,6 @@ fileprivate extension AndroidOperationCommand {
     }
 
     func swiftToolchainFolder(sdkVersion: String) throws -> URL {
-
         // work out which toolchain to use by matching it to the Swift Android SDK
         let toolchain = try toolchainOptions.toolchain ?? {
             let toolchainOverride = ProcessInfo.processInfo.environment["SWIFT_TOOLCHAIN_DIR"].flatMap(URL.init(fileURLWithPath:))
@@ -864,7 +863,9 @@ fileprivate extension AndroidOperationCommand {
             let toolchainDirs = toolchainOverride != nil ? [toolchainOverride!] : [toolchains1, toolchains2]
 
             if toolchainDirs.filter({ isDir($0) }).isEmpty {
+                #if !os(Linux) // we will check swiftlyToolchainDir if these are empty
                 throw CrossCompilerError(errorDescription: "The Swift toolchains folder could not be located at: \(toolchainDirs.map(\.path))")
+                #endif
             }
 
             var toolchains = try dirs(in: toolchainDirs) // .filter({ $0.pathExtension == "xctoolchain" }) // Linux does not have an .xctoolchain suffix; maybe check the contents of the folder?
