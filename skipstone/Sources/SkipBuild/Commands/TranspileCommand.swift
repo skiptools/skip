@@ -539,7 +539,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             // not a stable or well-documented format, and would require a lot of other metadata about the package;
             // so instead we tack on some code to the Package.swift file that we output
             //
-            // We pass dependencies is inout to bypass Swift 6+ requiring that it be @MainActor.
+            // We pass dependencies as an inout parameter to bypass Swift 6+ requiring that it be @MainActor.
             var packageAddendum = """
 
             /// Convert remote dependencies into their locally-cached versions.

@@ -359,6 +359,10 @@ fileprivate extension AndroidOperationCommand {
             // So we manually clear the SDKROOT environment variable in case it is set.
             env["SDKROOT"] = nil
 
+            // Clear ANDROID_NDK_ROOT to work around Android cross-compilation build failures
+            // https://github.com/finagolfin/swift-android-sdk/issues/207
+            env["ANDROID_NDK_ROOT"] = nil
+
             // We also need to clear out any environment variables that may change between runs (like LLBUILD_BUILD_ID='4288622949' LLBUILD_LANE_ID='9' LLBUILD_TASK_ID='31650009000f'), since those will prevent incremental builds from happening and force a complete rebuild each time
             if env["XCODE_VERSION_MAJOR"] != nil {
                 let permittedEnvironment: Set<String> = [
