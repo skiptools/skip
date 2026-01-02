@@ -4,7 +4,7 @@
 # https://www.swift.org/download/#releases
 #
 # and install Linux Static SDK toolchain with:
-# swift sdk install https://download.swift.org/swift-6.2.1-release/static-sdk/swift-6.2.1-RELEASE/swift-6.2.1-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz --checksum 08e1939a504e499ec871b36826569173103e4562769e12b9b8c2a50f098374ad
+# swift sdk install https://download.swift.org/swift-6.2.3-release/static-sdk/swift-6.2.3-RELEASE/swift-6.2.3-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz --checksum f30ec724d824ef43b5546e02ca06a8682dafab4b26a99fbb0e858c347e507a2c
 #
 # SkipKey can be built and uploaded with:
 #
@@ -18,16 +18,14 @@ ARTIFACTBUNDLE="${ARTIFACT}.artifactbundle"
 PLUGIN_ZIP="${ARTIFACT}-linux.zip"
 ARTIFACT_BUILD_DIR=.build/artifactbundle-linux
 
-#SWIFT_VERSION="6.0.3"
-SWIFT_VERSION=${SWIFT_VERSION:-"6.2.1"}
+SWIFT_VERSION=${SWIFT_VERSION:-"6.2.3"}
 
-SWIFT_TOOLCHAIN=${SWIFT_TOOLCHAIN:-"${HOME}/Library/Developer/Toolchains/swift-${SWIFT_VERSION}-RELEASE.xctoolchain/usr"}
-
+swiftly install "${SWIFT_VERSION}"
 
 mv -vf "${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}" "${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}.bk.$(date +%s)" || true
 
 for SDK in "x86_64-swift-linux-musl" "aarch64-swift-linux-musl"; do
-    ${SWIFT_TOOLCHAIN}/bin/swift build --swift-sdk "${SDK}" --configuration "${CONFIGURATION}" --product "${PRODUCT}"
+    swiftly run swift build --swift-sdk "${SDK}" --configuration "${CONFIGURATION}" --product "${PRODUCT}" "+${SWIFT_VERSION}"
     if [[ "${PRODUCT}" == "SkipRunner" ]]; then
         mkdir -p "${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}/${SDK}"
         cp -av .build/${SDK}/${CONFIGURATION}/${PRODUCT} ${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}/${SDK}/${SKIPCMD}
