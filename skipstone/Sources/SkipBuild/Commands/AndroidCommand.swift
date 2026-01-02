@@ -855,21 +855,22 @@ fileprivate extension AndroidOperationCommand {
         let toolchain = try toolchainOptions.toolchain ?? {
             let toolchainOverride = ProcessInfo.processInfo.environment["SWIFT_TOOLCHAIN_DIR"].flatMap(URL.init(fileURLWithPath:))
 
+            var defaultToolchains: [URL] = []
             #if os(Linux)
             // note the difference in naming between ~/.swiftpm/toolchains/swift-6.2-RELEASE-ubuntu24.04 and ~/.local/share/swiftly/toolchains/6.2.0
-            let toolchains1 = homeDir.appendingPathComponent(".config/swiftpm/toolchains", isDirectory: true)
-            let toolchains2 = homeDir.appendingPathComponent(".swiftpm/toolchains", isDirectory: true)
+            defaultToolchains.append(homeDir.appendingPathComponent(".config/swiftpm/toolchains", isDirectory: true))
+            defaultToolchains.append(homeDir.appendingPathComponent(".swiftpm/toolchains", isDirectory: true))
+            let swiftlyToolchainDir = homeDir.appendingPathComponent(".local/share/swiftly/toolchains", isDirectory: true)
+            defaultToolchains.append(swiftlyToolchainDir)
             #else
-            let toolchains1 = URL(fileURLWithPath: "/Library/Developer/Toolchains", isDirectory: true)
-            let toolchains2 = homeDir.appendingPathComponent("Library/Developer/Toolchains", isDirectory: true)
+            defaultToolchains.append(URL(fileURLWithPath: "/Library/Developer/Toolchains", isDirectory: true))
+            defaultToolchains.append(homeDir.appendingPathComponent("Library/Developer/Toolchains", isDirectory: true))
             #endif
 
-            let toolchainDirs = toolchainOverride != nil ? [toolchainOverride!] : [toolchains1, toolchains2]
+            let toolchainDirs = toolchainOverride != nil ? [toolchainOverride!] : defaultToolchains.filter({ isDir($0) })
 
-            if toolchainDirs.filter({ isDir($0) }).isEmpty {
-                #if !os(Linux) // we will check swiftlyToolchainDir if these are empty
+            if toolchainDirs.isEmpty {
                 throw CrossCompilerError(errorDescription: "The Swift toolchains folder could not be located at: \(toolchainDirs.map(\.path))")
-                #endif
             }
 
             var toolchains = try dirs(in: toolchainDirs) // .filter({ $0.pathExtension == "xctoolchain" }) // Linux does not have an .xctoolchain suffix; maybe check the contents of the folder?
@@ -878,8 +879,6 @@ fileprivate extension AndroidOperationCommand {
 
             guard let toolchain = toolchains.last else {
                 #if os(Linux)
-                let swiftlyToolchainDir = homeDir.appendingPathComponent(".local/share/swiftly/toolchains", isDirectory: true)
-
                 // On Linux, we also try to match swiftly-installed toolchains
                 // ~/.local/share/swiftly/toolchains/6.2.0
                 // ~/.local/share/swiftly/toolchains/main-snapshot-2025-12-19
