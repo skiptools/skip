@@ -38,6 +38,7 @@ jobs:
       - name: Install Dependencies
         run: |
           brew install tree swiftly
+          swiftly init --assume-yes --no-modify-profile --skip-install
 
       - name: Setup Static Linux SDK
         run: |
