@@ -37,17 +37,11 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          brew install tree
+          brew install tree swiftly
 
       - name: Setup Static Linux SDK
         run: |
-          curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg
-          installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
-          ~/.swiftly/bin/swiftly init --quiet-shell-followup
-          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
-          hash -r
-
-          SWIFT_VERSION=6.2.1
+          SWIFT_VERSION=6.2.3
           swiftly install --use ${SWIFT_VERSION}
 
           curl -fsSL -o swift-static-linux-sdk.tar.gz https://download.swift.org/swift-${SWIFT_VERSION}-release/static-sdk/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz 
