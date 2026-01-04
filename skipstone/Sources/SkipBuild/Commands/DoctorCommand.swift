@@ -165,7 +165,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         // Manually try to parse the Android Studio version; tolerate failures
         await outputOptions.monitor(with: out, "Skip license", resultHandler: { result in
             do {
-                guard let (license, trialExpiraton, _, _) = try result?.get() else {
+                guard let (_, license, trialExpiraton, _, _) = try result?.get() else {
                     return (result, MessageBlock(status: .fail, "Skip license: none found"))
                 }
 

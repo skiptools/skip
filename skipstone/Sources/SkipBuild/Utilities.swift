@@ -239,3 +239,41 @@ extension NSRegularExpression {
     }
 }
 
+extension String {
+    @inlinable func hexEncodedString() -> String {
+        (data(using: .utf8) ?? Data()).hexEncodedString()
+    }
+}
+
+extension Data {
+    /// Create a data instance from a hex string
+    @inlinable init?(hexString: String) {
+        var hex = hexString
+        // If the hex string has an odd number of characters, pad it with a leading zero
+        if hex.count % 2 != 0 {
+            hex = "0" + hex
+        }
+        // Create an array of bytes from the hex string
+        var bytes = [UInt8]()
+
+        for i in stride(from: 0, to: hex.count, by: 2) {
+            let start = hex.index(hex.startIndex, offsetBy: i)
+            let end = hex.index(start, offsetBy: 2, limitedBy: hex.endIndex) ?? hex.endIndex
+            let hexByte = hex[start..<end]
+            if let byte = UInt8(hexByte, radix: 16) {
+                bytes.append(byte)
+            } else {
+                return nil
+            }
+        }
+
+        self = Data(bytes)
+    }
+}
+
+extension Sequence where Element == UInt8 {
+    /// Encodes a `Data` or `Array<UInt8>` as a hex string
+    @inlinable func hexEncodedString() -> String {
+        map { String(format: "%02hhx", $0) }.joined()
+    }
+}

@@ -15,7 +15,6 @@ let package = Package(
         .library(name: "SkipSyntax", targets: ["SkipSyntax"]),
         .library(name: "SkipBuild", targets: ["SkipBuild"]),
         .executable(name: "SkipRunner", targets: ["SkipRunner"]),
-        .executable(name: "SkipKey", targets: ["SkipKey"]),
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "602.0.0"),
@@ -55,8 +54,5 @@ let package = Package(
         .testTarget(name: "SkipBuildTests", dependencies: ["SkipBuild"]),
         .executableTarget(name: "SkipRunner", dependencies: ["SkipBuild"]),
         .testTarget(name: "SkipRunnerTests", dependencies: ["SkipBuild"]),
-
-        .executableTarget(name: "SkipKey", dependencies: ["SkipBuild"]),
-        .testTarget(name: "SkipKeyTests", dependencies: ["SkipBuild"]),
     ]
 )
