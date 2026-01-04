@@ -1,5 +1,4 @@
-// Copyright 2023–2025 Skip
-// Licensed under the Open Software License version 3.0
+// Copyright 2023–2026 Skip
 #if !canImport(SkipBuild)
 #error("Should only import SkipBuild for SKIPLOCAL")
 #else

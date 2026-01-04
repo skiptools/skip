@@ -1,5 +1,4 @@
-// Copyright 2023–2025 Skip
-// Licensed under the Open Software License version 3.0
+// Copyright 2023–2026 Skip
 #if !SKIP
 import Foundation
 #if canImport(FoundationXML)
@@ -515,7 +514,7 @@ extension Range where Bound == Version {
 /// Process allows spawning new subprocesses and working with them.
 ///
 /// Note: This class is thread safe.
-public final class Process {
+@preconcurrency public final class Process {
     /// Errors when attempting to invoke a process
     public enum Error: Swift.Error, Sendable {
         /// The program requested to be executed cannot be found on the existing search paths, or is not executable.
@@ -827,7 +826,7 @@ public final class Process {
     /// stdin. If needed, the stream can be closed using the close() API. Otherwise, the stream will be closed
     /// automatically.
     @discardableResult
-    public func launch() throws -> WritableByteStream {
+    @preconcurrency public func launch() throws -> WritableByteStream {
         precondition(arguments.count > 0 && !arguments[0].isEmpty, "Need at least one argument to launch the process.")
 
         self.launchedLock.withLock {

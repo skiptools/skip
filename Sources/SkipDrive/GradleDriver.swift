@@ -1,5 +1,4 @@
-// Copyright 2023–2025 Skip
-// Licensed under the Open Software License version 3.0
+// Copyright 2023–2026 Skip
 #if !SKIP
 import Foundation
 #if canImport(FoundationNetworking)
