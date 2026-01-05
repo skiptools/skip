@@ -994,7 +994,7 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1c")
         public func BridgeKt_Swift_c(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
-            return SwiftClosure0.javaObject(for: c, options: [])!
+            return SwiftClosure0.javaObject(forMainActor: c, options: [])!
         }
         @_cdecl("Java_BridgeKt_Swift_1c_1set")
         public func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {

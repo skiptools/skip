@@ -404,7 +404,8 @@ extension TypeSignature {
         switch self.asOptional(false) {
         case .function(let parameters, _, let apiFlags, _):
             let closurePrefix = apiFlags.options.contains(.async) ? "SwiftAsyncClosure" : "SwiftClosure"
-            let converted = "\(closurePrefix)\(parameters.count).javaObject(for: \(value), options: \(options.jconvertibleOptions))"
+            let valueLabel = apiFlags.options.contains(.mainActor) && !apiFlags.options.contains(.async) ? "forMainActor" : "for"
+            let converted = "\(closurePrefix)\(parameters.count).javaObject(\(valueLabel): \(value), options: \(options.jconvertibleOptions))"
             return isOptional ? converted : converted + "!"
         case .int:
             if isOptional {
@@ -547,7 +548,8 @@ extension TypeSignature {
         switch self.asOptional(false) {
         case .function(let parameters, _, let apiFlags, _):
             let closurePrefix = apiFlags.options.contains(.async) ? "SwiftAsyncClosure" : "SwiftClosure"
-            let converted = "\(closurePrefix)\(parameters.count).javaObject(for: \(value), options: \(optionsString))"
+            let valueLabel = apiFlags.options.contains(.mainActor) && !apiFlags.options.contains(.async) ? "forMainActor" : "for"
+            let converted = "\(closurePrefix)\(parameters.count).javaObject(\(valueLabel): \(value), options: \(optionsString))"
             return isOptional ? converted : converted + "!"
         case .int:
             return isOptional ? value : "Int32(\(value))"
