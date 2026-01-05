@@ -152,7 +152,7 @@ final class KotlinBridgeToKotlinVisitor {
         guard let bridgable = variableDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator) else {
             return false
         }
-        variableDeclaration.extras = nil
+        variableDeclaration.extras = Self.bridgeExtras(variableDeclaration.extras)
         // If this is a let constant with a supported literal value, we'll re-declare rather than bridge it
         guard !isSupportedConstant(variableDeclaration, type: bridgable.type) else {
             return false
@@ -383,7 +383,7 @@ final class KotlinBridgeToKotlinVisitor {
             bridgable = functionBridgable
         }
         updateDeclaration(functionDeclaration, with: bridgable)
-        functionDeclaration.extras = nil
+        functionDeclaration.extras = Self.bridgeExtras(functionDeclaration.extras)
 
         let (bodyCodeBlock, externalStatements) = addDefinitions(for: functionDeclaration, bridgable: bridgable, in: classDeclaration, isBridgedSubclass: isBridgedSubclass, inExtensionOf: interfaceDeclaration, isMutableStructCopyConstructor: isMutableStructCopyConstructor, uniquifier: uniquifier)
         functionDeclaration.body = bodyCodeBlock
@@ -701,7 +701,7 @@ final class KotlinBridgeToKotlinVisitor {
     }
 
     private func updateEqualsDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration) {
-        functionDeclaration.extras = nil
+        functionDeclaration.extras = Self.bridgeExtras(functionDeclaration.extras)
         let classWithAnyGenerics = classDeclaration.signature.withGenerics(of: .any)
         let bodySourceCode: [String]
         if functionDeclaration.isKotlinEqualImplementation {
@@ -785,7 +785,7 @@ final class KotlinBridgeToKotlinVisitor {
     }
 
     private func updateHashDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration) {
-        functionDeclaration.extras = nil
+        functionDeclaration.extras = Self.bridgeExtras(functionDeclaration.extras)
         let bodySourceCode: [String]
         if functionDeclaration.isKotlinHashImplementation {
             // hashCode()
@@ -850,7 +850,7 @@ final class KotlinBridgeToKotlinVisitor {
     }
 
     private func updateLessThanDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration) {
-        functionDeclaration.extras = nil
+        functionDeclaration.extras = Self.bridgeExtras(functionDeclaration.extras)
         functionDeclaration.body = KotlinCodeBlock(statements: [
             "return Swift_islessthan(lhs, rhs)"
         ].map { KotlinRawStatement(sourceCode: $0) })
@@ -893,7 +893,7 @@ final class KotlinBridgeToKotlinVisitor {
         }
         let extensions = codebaseInfo.typeInfos(forNamed: interfaceDeclaration.signature).filter { $0.declarationType == .extensionDeclaration }
 
-        interfaceDeclaration.extras = nil
+        interfaceDeclaration.extras = Self.bridgeExtras(interfaceDeclaration.extras)
         interfaceDeclaration.inherits = interfaceDeclaration.inherits.compactMap {
             if $0.isNamed("Comparable") {
                 return $0
@@ -1037,7 +1037,7 @@ final class KotlinBridgeToKotlinVisitor {
         }
 
         classDeclaration.inherits = mappedInherits
-        classDeclaration.extras = nil
+        classDeclaration.extras = Self.bridgeExtras(classDeclaration.extras)
         if clearSuperclassCall {
             classDeclaration.superclassCall = nil
         }
@@ -1346,6 +1346,17 @@ final class KotlinBridgeToKotlinVisitor {
         }
         cdeclFunctions += additionalCDeclFunctions
         return true
+    }
+
+    private static func bridgeExtras(_ extras: StatementExtras?) -> StatementExtras? {
+        guard let extras else {
+            return nil
+        }
+        // We currently only carry over .nowarn so that bridged types can suppress warnings
+        guard extras.directives.contains(.nowarn) else {
+            return nil
+        }
+        return StatementExtras(directives: [.nowarn], leadingTrivia: [], trailingTrivia: [])
     }
 
     private func typeErasedPeerSwift(for classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], functionDeclarations: [(KotlinFunctionDeclaration, uniquifier: Int?)], stateVariables: [(String, Attributes, Modifiers)], visibility: Modifiers.Visibility) -> SwiftDefinition {
