@@ -606,10 +606,19 @@ public enum GradleDriverError : Error, LocalizedError {
 }
 
 extension ProcessInfo {
-    /// The root path for Homebrew on this macOS
+    /// The root path for Homebrew on this host
     public static let homebrewRoot: String = {
-        ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"]
-            ?? (ProcessInfo.isARM ? "/opt/homebrew" : "/usr/local")
+        if let envroot = ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"] {
+            return envroot
+        }
+
+        // “The script installs Homebrew to its default, supported, best prefix (/opt/homebrew for Apple Silicon, /usr/local for macOS Intel and /home/linuxbrew/.linuxbrew for Linux)” — https://docs.brew.sh/Installation
+        #if os(macOS) || os(macCatalyst)
+        return ProcessInfo.isARM ? "/opt/homebrew" : "/usr/local"
+        #else
+        // Linux
+        return "/home/linuxbrew/.linuxbrew"
+        #endif
     }()
 
     /// The current process environment along with the default paths to various tools set
