@@ -49,9 +49,14 @@ jobs:
       - run: skip init --transpiled-app --appid=xyz.skip.Demo demo-app DemoApp DemoModule
       - run: skip init --transpiled-app --appfair demo-appfair DemoFairApp
 
-      # native model and app init
+      # setup Android SDK and emulator
       - run: skip android sdk install --version ${{ matrix.android-sdk }} --verbose
+      - run: skip android emulator create --name demo
 
+      # need to enable KVM for accel to work
+      #- run: skip android emulator launch --background --name demo -- -no-accel -gpu swiftshader_indirect -no-window
+
+      # native model and app init
       - run: skip checkup --verbose --native
 
       - run: skip checkup --verbose --native-model
