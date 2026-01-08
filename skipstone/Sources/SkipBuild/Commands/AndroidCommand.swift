@@ -1054,6 +1054,9 @@ struct AndroidEmulatorCreateCommand: MessageCommand {
         android emulator install --package 'system-images;android-31;default;arm64-v8a'
         
         """,
+        discussion: """
+        This command acts as a frontend to the Android SDK tools sdkmanager, avdmanager, and emulator. Run with the --verbose argument to observe the exact commands that it executes.
+        """,
         shouldDisplay: true,
         aliases: ["init"])
 
@@ -1142,6 +1145,20 @@ struct AndroidEmulatorLaunchCommand: MessageCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "launch",
         abstract: "Launch an Android emulator",
+        usage: """
+        # Launches the most recently created or used emulator
+        skip android emulator launch
+
+        # Launches an emulator with a certain name
+        skip android emulator launch --name emulator-34-medium_phone
+
+        """,
+        discussion: """
+        This command acts as a frontend to the Android SDK emulator command.
+        Install new emulators with: skip android emulator create
+        List installed emulators with: skip android emulator list
+        Run with the --verbose argument to observe the exact commands that it executes.
+        """,
         shouldDisplay: true,
         aliases: ["run"])
 
@@ -1153,6 +1170,9 @@ struct AndroidEmulatorLaunchCommand: MessageCommand, ToolOptionsCommand {
 
     @Option(name: [.customShort("n"), .long], help: ArgumentHelp("Android emulator name", valueName: "name"))
     var name: String? = nil
+
+    @Option(help: ArgumentHelp("Logcat filter (see https://developer.android.com/tools/logcat)", valueName: "filter"))
+    var logcat: String = "*:D"
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Background the emulator process once it is launched"))
     var background: Bool = false
@@ -1181,6 +1201,11 @@ struct AndroidEmulatorLaunchCommand: MessageCommand, ToolOptionsCommand {
             // arguments to run without a window
             emulatorArgs += ["-no-window", "-no-boot-anim"]
         }
+
+        if !logcat.isEmpty {
+            emulatorArgs += ["-logcat", logcat]
+        }
+
         emulatorArgs += args
 
         let output = try await launchTool("emulator", arguments: emulatorArgs) {
