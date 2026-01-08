@@ -29,11 +29,6 @@ struct NativeMode : OptionSet {
     init(rawValue: Int) {
         self.rawValue = rawValue
     }
-
-    var swiftVersion: String {
-        //isEmpty ? "5.9" : "6.0"
-        "6.0"
-    }
 }
 
 
@@ -65,7 +60,10 @@ struct CreateOptions : ParsableArguments {
     var resourcePath: String = "Resources"
 
     @Option(help: ArgumentHelp("Swift version for project"))
-    var swiftVersion: String = "6.0"
+    var swiftVersion: String = defaultSwiftPackageVersion
+
+    /// The defaut Package.swift version to create when initializing a project
+    static let defaultSwiftPackageVersion = "6.1"
 
     @Option(help: ArgumentHelp("Minimum iOS version to target"))
     var iosMinVersion: Double = 17.0

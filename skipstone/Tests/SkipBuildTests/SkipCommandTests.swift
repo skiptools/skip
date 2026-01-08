@@ -48,13 +48,9 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 6.0
+        // swift-tools-version: 6.1
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
-
-        // Set SKIP_ZERO=1 to build without Skip libraries
-        let zero = Context.environment["SKIP_ZERO"] != nil
-        let skipstone = !zero ? [Target.PluginUsage.plugin(name: "skipstone", package: "skip")] : []
 
         let package = Package(
             name: "zero-project",
@@ -68,13 +64,47 @@ final class SkipCommandTests: XCTestCase {
                 .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
-                .target(name: "SomeModule", dependencies: (zero ? [] : [
+                .target(name: "SomeModule", dependencies: [
                     .product(name: "SkipFoundation", package: "skip-foundation")
-                ]), resources: [.process("Resources")], plugins: skipstone),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .testTarget(name: "SomeModuleTests", dependencies: [
-                    "SomeModule"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
+                    "SomeModule",
+                    .product(name: "SkipTest", package: "skip")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
+
+        // Setting the SKIP_ZERO=1 environment will strip out the Skip plugin and all Skip dependencies
+        if Context.environment["SKIP_ZERO"] ?? "0" != "0" {
+            package.targets.forEach { target in
+                // remove the Skip plugin
+                target.plugins?.removeAll(where: {
+                    if case .plugin(let name, _) = $0 {
+                        return name == "skipstone"
+                    } else {
+                        return false
+                    }
+                })
+
+                // remove the Skip target dependencies
+                target.dependencies.removeAll(where: { dependency in
+                    if case .productItem(_, let package, _, _) = dependency {
+                        return package == "skip" || package?.hasPrefix("skip-") == true
+                    } else {
+                        return false
+                    }
+                })
+            }
+
+            // remove the Skip package dependencies
+            package.dependencies.removeAll(where: { dependency in
+                if case .sourceControl(_, let url, _) = dependency.kind {
+                    return url.hasPrefix("https://source.skip.tools/")
+                } else {
+                    return false
+                }
+            })
+        }
 
         """)
     }
@@ -99,7 +129,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 6.0
+        // swift-tools-version: 6.1
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -196,7 +226,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 6.0
+        // swift-tools-version: 6.1
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -264,7 +294,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 6.0
+        // swift-tools-version: 6.1
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -338,7 +368,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 6.0
+        // swift-tools-version: 6.1
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -777,7 +807,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 6.0
+        // swift-tools-version: 6.1
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -867,7 +897,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 6.0
+        // swift-tools-version: 6.1
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -1046,7 +1076,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 6.0
+        // swift-tools-version: 6.1
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -1233,7 +1263,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 6.0
+        // swift-tools-version: 6.1
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -1272,7 +1302,7 @@ final class SkipCommandTests: XCTestCase {
 
     /// A single-module native app
     func testLibInitAppNativeAppCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, mode: [.nativeApp], tests: nil, fastlane: false, appid: "some.cool.app", swiftVersion: "6.0", moduleNames: "AppModule")
+        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, mode: [.nativeApp], tests: nil, fastlane: false, appid: "some.cool.app", swiftVersion: "6.2", moduleNames: "AppModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -1348,7 +1378,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 6.0
+        // swift-tools-version: 6.2
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -1481,7 +1511,7 @@ final class SkipCommandTests: XCTestCase {
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 6.0
+        // swift-tools-version: 6.1
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -1620,13 +1650,9 @@ final class SkipCommandTests: XCTestCase {
         XCTAssertTrue(AndroidManifest.contains("android.intent.category.LAUNCHER"))
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 6.0
+        // swift-tools-version: 6.1
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
-
-        // Set SKIP_ZERO=1 to build without Skip libraries
-        let zero = Context.environment["SKIP_ZERO"] != nil
-        let skipstone = !zero ? [Target.PluginUsage.plugin(name: "skipstone", package: "skip")] : []
 
         let package = Package(
             name: "cool-app",
@@ -1645,26 +1671,62 @@ final class SkipCommandTests: XCTestCase {
             ],
             targets: [
                 .target(name: "TopModule", dependencies: [
-                    "MiddleModule"
-                ] + (zero ? [] : [
+                    "MiddleModule",
                     .product(name: "SkipUI", package: "skip-ui")
-                ]), resources: [.process("Resources")], plugins: skipstone),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .testTarget(name: "TopModuleTests", dependencies: [
-                    "TopModule"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
+                    "TopModule",
+                    .product(name: "SkipTest", package: "skip")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .target(name: "MiddleModule", dependencies: [
-                    "BottomModule"
-                ] + (zero ? [] : [
+                    "BottomModule",
                     .product(name: "SkipModel", package: "skip-model")
-                ]), resources: [.process("Resources")], plugins: skipstone),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .testTarget(name: "MiddleModuleTests", dependencies: [
-                    "MiddleModule"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
-                .target(name: "BottomModule", dependencies: (zero ? [] : [
+                    "MiddleModule",
+                    .product(name: "SkipTest", package: "skip")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
+                .target(name: "BottomModule", dependencies: [
                     .product(name: "SkipFoundation", package: "skip-foundation")
-                ]), resources: [.process("Resources")], plugins: skipstone),
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
                 .testTarget(name: "BottomModuleTests", dependencies: [
-                    "BottomModule"] + (zero ? [] : [.product(name: "SkipTest", package: "skip")]), resources: [.process("Resources")], plugins: skipstone),
+                    "BottomModule",
+                    .product(name: "SkipTest", package: "skip")
+                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
             ]
         )
+
+        // Setting the SKIP_ZERO=1 environment will strip out the Skip plugin and all Skip dependencies
+        if Context.environment["SKIP_ZERO"] ?? "0" != "0" {
+            package.targets.forEach { target in
+                // remove the Skip plugin
+                target.plugins?.removeAll(where: {
+                    if case .plugin(let name, _) = $0 {
+                        return name == "skipstone"
+                    } else {
+                        return false
+                    }
+                })
+
+                // remove the Skip target dependencies
+                target.dependencies.removeAll(where: { dependency in
+                    if case .productItem(_, let package, _, _) = dependency {
+                        return package == "skip" || package?.hasPrefix("skip-") == true
+                    } else {
+                        return false
+                    }
+                })
+            }
+
+            // remove the Skip package dependencies
+            package.dependencies.removeAll(where: { dependency in
+                if case .sourceControl(_, let url, _) = dependency.kind {
+                    return url.hasPrefix("https://source.skip.tools/")
+                } else {
+                    return false
+                }
+            })
+        }
 
         """)
     }
@@ -1751,7 +1813,7 @@ final class SkipCommandTests: XCTestCase {
         XCTAssertTrue(AndroidManifest.contains("android.intent.category.LAUNCHER"))
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 6.0
+        // swift-tools-version: 6.1
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
@@ -1887,7 +1949,7 @@ final class SkipCommandTests: XCTestCase {
         XCTAssertTrue(AndroidManifest.contains("android.intent.category.LAUNCHER"))
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 6.0
+        // swift-tools-version: 6.1
         // This is a Skip (https://skip.tools) package.
         import PackageDescription
 
