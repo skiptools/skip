@@ -8,7 +8,7 @@ typealias ProcessResult = Void
 /// An async stream of standard out + err data resulting from process execution
 public typealias AsyncLineOutput = AsyncThrowingStream<(line: String, err: Bool), Swift.Error>
 
-extension ToolOptionsCommand where Self : StreamingCommand {
+extension ToolOptionsCommand where Self: StreamingCommand {
     /// Executes `adb` with the current default arguments and the additional args and returns an async stream of the lines from the combined standard err and standard out.
     func launchTool(_ toolName: String, in workingDirectory: URL? = nil, arguments: [String], env: [String: String] = [:], includeStdErr: Bool = true, onExit: @escaping (ProcessResult) throws -> () = { _ in }) async throws -> AsyncLineOutput {
         #if DEBUG

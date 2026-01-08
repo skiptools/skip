@@ -23,6 +23,7 @@ struct AndroidCommand: AsyncParsableCommand {
             AndroidRunCommand.self,
             AndroidTestCommand.self,
             AndroidSDKCommand.self,
+            AndroidEmulatorCommand.self,
             AndroidToolchainCommand.self,
         ])
 }
@@ -1023,6 +1024,237 @@ struct AndroidTestCommand: AndroidOperationCommand {
         try await runSwiftPM(cleanup: cleanup, commandEnvironment: env, defaultArch: .current, remoteFolder: remoteFolder, copy: copy, testingLibrary: testingLibrary, with: out)
     }
 }
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct AndroidEmulatorCommand: AsyncParsableCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "emulator",
+        abstract: "Manage Android emulators",
+        shouldDisplay: androidCommandEnabled,
+        subcommands: [
+            AndroidEmulatorCreateCommand.self,
+            AndroidEmulatorListCommand.self,
+            AndroidEmulatorLaunchCommand.self,
+        ])
+}
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct AndroidEmulatorCreateCommand: MessageCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "create",
+        abstract: "Install and create an Android emulator image",
+        usage: """
+        # Creates the default Android emulator (API 34)
+        skip android emulator create
+
+        # Creates a custom Android emulator
+        skip android emulator create --name 'pixel_7_api_36' --device-profile pixel_7 --android-api-level 36 --system-image google_apis_playstore_ps16k
+
+        # Installs a specific emulator package
+        android emulator install --package 'system-images;android-31;default;arm64-v8a'
+        
+        """,
+        shouldDisplay: true,
+        aliases: ["init"])
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    @Option(help: ArgumentHelp("Android API emulator level", valueName: "level"))
+    var androidAPILevel: Int = 34
+
+    @Option(help: ArgumentHelp("Android emulator device profile", valueName: "profile"))
+    var deviceProfile: String = "medium_phone" // "pixel_7"
+
+    @Option(name: [.customShort("n"), .long], help: ArgumentHelp("Android emulator name", valueName: "name"))
+    var name: String? = nil
+
+    @Option(help: ArgumentHelp("The full package name of the emulator to install", valueName: "package"))
+    var package: String? = nil
+
+    @Option(help: ArgumentHelp("Android emulator APIs", valueName: "image"))
+    var systemImage: String = "google_apis" // "default"
+
+    @Option(help: ArgumentHelp("Android emulator architecture", valueName: "arch"))
+    var arch: String = Self.defaultArch
+
+    static let defaultArch: String = {
+        #if arch(arm64)
+        "arm64-v8a"
+        #elseif arch(x86_64)
+        "x86_64"
+        #elseif arch(i386)
+        "x86"
+        #elseif arch(arm)
+        "armeabi-v7a"
+        #else
+        fatalError("Unknown processor architecture")
+        #endif
+    }()
+
+    func performCommand(with out: MessageQueue) async throws {
+        func sdkmanagerInstall(_ package: String) async throws {
+            try await run(with: out, "Install \(package)", ["sdkmanager", "--verbose", "--install", package])
+        }
+
+        await withLogStream(title: "Create Android emulator", with: out) {
+            try await run(with: out, "Configure Android SDK Manager", ["sh", "-c", "yes | sdkmanager --licenses"])
+
+            try await sdkmanagerInstall("platform-tools")
+            try await sdkmanagerInstall("emulator")
+
+            let emulatorSpec = self.package ?? "system-images;android-\(androidAPILevel);\(systemImage);\(arch)"
+
+            let emulatorSpecParts = emulatorSpec.split(separator: ";")
+            let androidPlatform = emulatorSpecParts.dropFirst().first ?? "android-\(androidAPILevel)"
+            let actualAPILevel = androidPlatform.split(separator: "-").last.flatMap({ Int($0) }) ?? self.androidAPILevel
+
+            try await sdkmanagerInstall("platforms;\(androidPlatform)")
+
+            try await sdkmanagerInstall(emulatorSpec)
+
+            var defaultName = "emulator-\(actualAPILevel)"
+            //if let deviceProfile {
+                defaultName += "-\(deviceProfile.lowercased().replacing(" ", with: "-"))"
+            //}
+            let emulatorName = name ?? defaultName
+
+            var createCommand = ["avdmanager", "create", "avd", "--force", "-n", emulatorName, "--package", emulatorSpec]
+            //if let deviceProfile {
+                createCommand += ["--device", deviceProfile]
+            //}
+
+            // need to pipe through "no" to decline "Do you wish to create a custom hardware profile? [no]"
+            try await run(with: out, "Create emulator: \(emulatorName)", createCommand)
+
+            // save the emulatorName as the default for `skip android emulator launch`
+            UserDefaults.standard.set(emulatorName, forKey: lastEmulatorNameDefault)
+        }
+    }
+}
+
+/// The UserDefaults key that remembers the last name of the emulator thay was created
+private let lastEmulatorNameDefault = "skipAndroidEmulatorLaunch"
+
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct AndroidEmulatorLaunchCommand: MessageCommand, ToolOptionsCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "launch",
+        abstract: "Launch an Android emulator",
+        shouldDisplay: true,
+        aliases: ["run"])
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    @OptionGroup(title: "Tool Options")
+    var toolOptions: ToolOptions
+
+    @Option(name: [.customShort("n"), .long], help: ArgumentHelp("Android emulator name", valueName: "name"))
+    var name: String? = nil
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Background the emulator process once it is launched"))
+    var background: Bool = false
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Run in headless mode"))
+    var headless: Bool = ProcessInfo.processInfo.environment["CI"] ?? "0" != "0"
+
+    /// Any arguments that are not recognized are passed through to the underlying swift build command
+    @Argument(parsing: .remaining, help: ArgumentHelp("Emulator arguments"))
+    var args: [String] = []
+
+    func performCommand(with out: MessageQueue) async throws {
+        // ADB itself doesn't ever exit with a non-zero exit code (https://issuetracker.google.com/issues/36908392?pli=1)
+        // So we need to parse the output for known error patterns and translate them into Xcode-aware messages
+        #if !canImport(SkipDriveExternal)
+        throw SkipDriveError(errorDescription: "SkipDrive not linked")
+        #else
+        var exitCode: SkipDriveExternal.ProcessResult.ExitStatus? = nil
+        //~/Library/Android/sdk/emulator/emulator -avd emulator-34-pixel_7
+
+        let emulatorName = name ?? UserDefaults.standard.string(forKey: lastEmulatorNameDefault) ?? "unknown"
+        UserDefaults.standard.set(emulatorName, forKey: lastEmulatorNameDefault)
+
+        var emulatorArgs = ["@\(emulatorName)", "-no-metrics"]
+        if self.headless {
+            // arguments to run without a window
+            emulatorArgs += ["-no-window", "-no-boot-anim"]
+        }
+        emulatorArgs += args
+
+        let output = try await launchTool("emulator", arguments: emulatorArgs) {
+            exitCode = $0.exitStatus
+        }
+
+        for try await line in output {
+            await out.write(status: nil, line.line)
+
+            // scan for lines like:
+            // INFO         | Boot completed in 23779 ms
+            // INFO         | Successfully loaded snapshot 'default_boot' using 414 ms
+            if self.background && line.line.hasPrefix("INFO") &&
+                (line.line.contains("| Boot completed in ")
+                 /*|| line.line.contains("| Successfully loaded snapshot ")*/
+                ) {
+
+                await out.write(status: .pass, "Launch complete - moving process to background (run `adb logcat` to view logs and `adb emu kill` to stop emulator)")
+                break
+            }
+        }
+
+        guard let exitCode = (exitCode ?? (self.background ? .terminated(code: 0) : nil)), case .terminated(0) = exitCode else {
+            throw EmulatorLaunchError(errorDescription: "emulator launch error: \(String(describing: exitCode))")
+        }
+
+        #endif
+    }
+
+    public struct EmulatorLaunchError : LocalizedError {
+        public var errorDescription: String?
+    }
+}
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct AndroidEmulatorListCommand: MessageCommand, ToolOptionsCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "list",
+        abstract: "List installed Android emulators",
+        shouldDisplay: true)
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    @OptionGroup(title: "Tool Options")
+    var toolOptions: ToolOptions
+
+    func performCommand(with out: MessageQueue) async throws {
+        try await listAndroidEmulators(with: out)
+    }
+
+    func listAndroidEmulators(with out: MessageQueue) async throws {
+        //~/Library/Android/sdk/emulator/emulator -list-avds
+
+        var exitCode: SkipDriveExternal.ProcessResult.ExitStatus? = nil
+        let output = try await launchTool("emulator", arguments: ["-list-avds"]) {
+            exitCode = $0.exitStatus
+        }
+
+        for try await line in output {
+            await out.write(status: nil, line.line)
+        }
+
+        guard let exitCode = exitCode, case .terminated(0) = exitCode else {
+            throw EmulatorListError(errorDescription: "Error listing active emulators: \(String(describing: exitCode))")
+        }
+    }
+
+    public struct EmulatorListError : LocalizedError {
+        public var errorDescription: String?
+    }
+
+}
+
 
 struct ToolchainOptions: ParsableArguments {
     @Option(help: ArgumentHelp("Swift version to use", valueName: "v"))

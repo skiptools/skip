@@ -880,7 +880,7 @@ extension ProjectCommand {
 }
 
 /// A `ToolOptionsCommand` holds options that can be used to control the paths of commonly-used tools
-protocol ToolOptionsCommand : OutputOptionsCommand {
+protocol ToolOptionsCommand: OutputOptionsCommand {
     /// This command's tool options
     var toolOptions: ToolOptions { get set }
 }
@@ -1035,7 +1035,7 @@ struct ToolOptions: ParsableArguments {
             case "xcodebuild": return self.xcodebuild ?? ProcessInfo.processInfo.environment["SKIP_XCODEBUILD_PATH"]
             case "gradle": return self.gradle ?? ProcessInfo.processInfo.environment["SKIP_GRADLE_PATH"]
             case "adb": return self.adb ?? ProcessInfo.processInfo.environment["SKIP_ADB_PATH"]
-            case "emulator": return self.emulator ?? ProcessInfo.processInfo.environment["SKIP_EMULATOR_PATH"]
+            case "emulator": return self.emulator ?? ProcessInfo.processInfo.environment["SKIP_EMULATOR_PATH"] ?? self.emulatorBinary
             case "java": return ProcessInfo.processInfo.environment["JAVA_HOME"]?.appending("/bin/java") ?? ProcessInfo.defaultJavaHome.appending("/bin/java")
             default: return nil
             }
@@ -1045,6 +1045,21 @@ struct ToolOptions: ParsableArguments {
         }
         return try URL.findCommandInPath(toolName: tool, withAdditionalPaths: ProcessInfo.isARM ? ["/opt/homebrew/bin"] : ["/usr/local/bin"]).path
     }
+
+    /// Returns the path to the emulator binary
+    var emulatorBinary: String {
+        // on Linux for Homebrew: /home/linuxbrew/.linuxbrew/share/android-commandlinetools/emulator/emulator
+        // on macOS for Homebrew: /opt/homebrew/share/android-commandlinetools/emulator/emulator
+        // on macOS: ~/Library/Android/sdk/emulator/emulator
+        var emulatorBinary = ProcessInfo.homebrewRoot + "/share/android-commandlinetools/emulator/emulator"
+        // check whether it exists, and if not, fallback to ~/Library/Android/sdk/emulator/emulator or path
+        if !FileManager.default.isExecutableFile(atPath: emulatorBinary) {
+            // TODO: search around for, e.g., Android Studio's version
+            emulatorBinary = "emulator" // fallback to checking PATH
+        }
+        return emulatorBinary
+    }
+
 }
 
 public struct ToolLaunchError : LocalizedError {

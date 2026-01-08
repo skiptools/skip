@@ -225,8 +225,11 @@ Create a new project by following a series of interactive prompts.
             installNativeSDK = prompt("Install the Swift Android SDK?", defaultValue: true)
         }
 
+        #if os(macOS)
         let openXcode = prompt("Open the \(isApp ? "Xcode" : "Swift") project after initialization?", defaultValue: true)
-
+        #else
+        let openXcode = false // TODO: maybe prompt to open in another editor like vscode?
+        #endif
 
         let modules = try moduleNames.map {
             try PackageModule(parse: $0)

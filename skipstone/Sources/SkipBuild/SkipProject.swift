@@ -193,8 +193,7 @@ class FrameworkProjectLayout {
         }
 
         // the part of a target parameter that will only include skip when zero is not set
-        //let skipCondition = options.zero ? ", condition: skip" : "" // we don't use the condition parameter of target because it excludes
-        let skipPluginArray = options.zero ? "skipstone" : #"[.plugin(name: "skipstone", package: "skip")]"#
+        let skipPluginArray = #"[.plugin(name: "skipstone", package: "skip")]"#
 
         var products = """
             products: [
@@ -219,18 +218,8 @@ class FrameworkProjectLayout {
 
         packageHeader += """
         // This is a Skip (https://skip.tools) package.
-
-        """
-
-        packageHeader += """
         import PackageDescription
-        \(options.zero ? """
 
-        // Set SKIP_ZERO=1 to build without Skip libraries
-        let zero = Context.environment["SKIP_ZERO"] != nil
-        let skipstone = !zero ? [Target.PluginUsage.plugin(name: "skipstone", package: "skip")] : []
-
-        """ : "")
         """
 
         var packageDependencies: [String] = [
@@ -1329,18 +1318,14 @@ struct TestData : Codable, Hashable {
                 }
             }
 
-            // if we are using the SKIP_ZERO conditional, then split up the dependencies and only include the skip dependencies conditionally
             let bracket = { $0.isEmpty ? "[]" : "[\n            " + $0 + "\n        ]" }
             let interModuleDep = moduleDeps.joined(separator: ",\n            ")
             let skipModuleDep = skipModuleDeps.joined(separator: ",\n            ")
-            let zeroSkipModuleCondition = options.zero && !skipModuleDeps.isEmpty ? "(zero ? [] : " + bracket(skipModuleDep) + ")" : bracket(skipModuleDep)
 
             let moduleDep = !interModuleDep.isEmpty && !skipModuleDep.isEmpty
-                ? (!options.zero
-                   ? bracket(interModuleDep + ",\n            " + skipModuleDep)
-                   : bracket(interModuleDep) + " + " + zeroSkipModuleCondition)
+                ? (bracket(interModuleDep + ",\n            " + skipModuleDep))
                 : !skipModuleDep.isEmpty
-                    ? (options.zero ? zeroSkipModuleCondition : bracket(skipModuleDep))
+                    ? (bracket(skipModuleDep))
                 : bracket(interModuleDep)
 
             let pluginSuffix = isDependentNativeModule ? "" : ", plugins: \(skipPluginArray)"
@@ -1352,9 +1337,7 @@ struct TestData : Codable, Hashable {
 
             if createTestModule {
                 let skipTestProduct = #".product(name: "SkipTest", package: "skip")"#
-                let skipTestDependency = options.zero
-                    ? "] + (zero ? [] : [\(skipTestProduct)])"
-                    : ",\n            \(skipTestProduct)\n        ]"
+                let skipTestDependency = ",\n            \(skipTestProduct)\n        ]"
 
                 targets += """
                         .testTarget(name: "\(moduleName)Tests", dependencies: [
@@ -1397,6 +1380,44 @@ struct TestData : Codable, Hashable {
                 package.products = package.products.map({ product in
                     guard let libraryProduct = product as? Product.Library else { return product }
                     return .library(name: libraryProduct.name, type: .dynamic, targets: libraryProduct.targets)
+                })
+            }
+
+            """
+        }
+
+        if options.zero {
+            packageSource += """
+
+            // Setting the SKIP_ZERO=1 environment will strip out the Skip plugin and all Skip dependencies
+            if Context.environment["SKIP_ZERO"] ?? "0" != "0" {
+                package.targets.forEach { target in
+                    // remove the Skip plugin
+                    target.plugins?.removeAll(where: {
+                        if case .plugin(let name, _) = $0 {
+                            return name == "skipstone"
+                        } else {
+                            return false
+                        }
+                    })
+
+                    // remove the Skip target dependencies
+                    target.dependencies.removeAll(where: { dependency in
+                        if case .productItem(_, let package, _, _) = dependency {
+                            return package == "skip" || package?.hasPrefix("skip-") == true
+                        } else {
+                            return false
+                        }
+                    })
+                }
+
+                // remove the Skip package dependencies
+                package.dependencies.removeAll(where: { dependency in
+                    if case .sourceControl(_, let url, _) = dependency.kind {
+                        return url.hasPrefix("https://source.skip.tools/")
+                    } else {
+                        return false
+                    }
                 })
             }
 
