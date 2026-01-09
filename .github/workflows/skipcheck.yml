@@ -55,8 +55,7 @@ jobs:
       - run: skip android sdk install --version ${{ matrix.android-sdk }} --verbose
       - run: skip android emulator create --name demo
 
-      # need to enable KVM for accel to work
-      #- run: skip android emulator launch --background --name demo -- -no-accel -gpu swiftshader_indirect -no-window
+      - run: skip android emulator launch --background --name demo
 
       # native model and app init
       - run: skip checkup --verbose --native
