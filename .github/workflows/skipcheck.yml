@@ -40,6 +40,8 @@ jobs:
 
       - name: Install Skip
         uses: skiptools/actions/setup-skip@v1
+        with:
+          verbose: true
 
       - name: Skip Checkup
         run: skip checkup
