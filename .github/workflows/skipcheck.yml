@@ -13,17 +13,17 @@ jobs:
       matrix:
         include:
           - android-sdk: '6.1'
-            xcode: '16.4'
             os: 'macos-14'
+            #xcode: '16.4'
           - android-sdk: '6.2'
-            xcode: '26'
             os: 'macos-15'
+            #xcode: '26'
           - android-sdk: '6.2'
-            xcode: '26'
             os: 'macos-26'
+            #xcode: '26'
     runs-on: ${{ matrix.os }}
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
+    #env:
+    #  DEVELOPER_DIR: /Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
     steps:
       # larger projects sometimes yield: Unhandled exception. System.IO.IOException: No space left on device : '/Users/runner/runners/…
       - name: Free Disk Space
