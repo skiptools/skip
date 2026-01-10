@@ -43,6 +43,11 @@ jobs:
 
       - run: skip android emulator create --name demo --verbose
 
+      - mv -v ${HOMEBREW_PREFIX}/share/android-commandlinetools/system-images ${ANDROID_SDK_ROOT}/
+
+      # TODO:
+      #- run: skip android emulator create --name demo --verbose -- --sdk_root=${ANDROID_SDK_HOME}/
+
       #- run: brew install tree
       #- run: tree /Users/runner/Library/Android/sdk/system-images/
       #- run: tree ${ANDROID_HOME}
@@ -51,7 +56,8 @@ jobs:
       # /opt/homebrew/share/android-commandlinetools/system-images/android-34/google_apis/arm64-v8a
       # instead of:
       # /Users/runner/Library/Android/sdk/system-images/android-34/google_apis/arm64-v8a/
-      - run: ANDROID_SDK_ROOT=${HOMEBREW_PREFIX}/share/android-commandlinetools/ skip android emulator launch --background --name demo --verbose
+      #- run: ANDROID_SDK_ROOT=${HOMEBREW_PREFIX}/share/android-commandlinetools/ skip android emulator launch --background --name demo --verbose
+      - run: skip android emulator launch --background --name demo --verbose
 
       - name: Skip Checkup
         run: skip checkup
