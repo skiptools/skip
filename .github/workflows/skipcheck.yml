@@ -41,22 +41,6 @@ jobs:
         with:
           verbose: true
 
-      # TODO: use the correct location for emulator install
-      #- run: skip android emulator create --name demo --verbose -- --sdk_root=${ANDROID_SDK_HOME}/
-
-      - run: skip android emulator create --name demo --verbose
-
-      # installs in the wrong place:
-      # /opt/homebrew/share/android-commandlinetools/system-images/android-34/google_apis/arm64-v8a
-      # instead of:
-      # /Users/runner/Library/Android/sdk/system-images/android-34/google_apis/arm64-v8a/
-      - run: ln -vs ${HOMEBREW_PREFIX:-$(brew --prefix)}/share/android-commandlinetools/system-images ${ANDROID_SDK_ROOT}/system-images
-
-      # cannot run on ARM macOS: HVF error: HV_UNSUPPORTED
-      - name: Launch emulator
-        if: ${{ env.RUNNER_ARCH != 'ARM64' }}
-        run: skip android emulator launch --background --name demo --verbose
-
       - name: Skip Checkup
         run: skip checkup
       #- run: skip checkup --verbose --double-check
@@ -81,3 +65,20 @@ jobs:
       - run: skip init --native-app --native-model --appid=xyz.skip.Demo demo-app-native-model DemoApp DemoModel
       - run: skip export --project demo-app-native-model --arch x86_64 --arch aarch64 --arch armv7
 
+      # TODO: use the correct location for emulator install
+      #- run: skip android emulator create --name demo --verbose -- --sdk_root=${ANDROID_SDK_HOME}/
+
+      - run: skip android emulator create --name demo --verbose
+
+      # installs in the wrong place:
+      # /opt/homebrew/share/android-commandlinetools/system-images/android-34/google_apis/arm64-v8a
+      # instead of:
+      # /Users/runner/Library/Android/sdk/system-images/android-34/google_apis/arm64-v8a/
+      - run: ln -vs ${HOMEBREW_PREFIX:-$(brew --prefix)}/share/android-commandlinetools/system-images ${ANDROID_SDK_ROOT}/system-images
+
+      # cannot run on ARM macOS: HVF error: HV_UNSUPPORTED
+      - name: Launch emulator
+        # TODO: need to update background log message detection in skip android emulator launch
+        if: false
+        #if: runner.arch != 'ARM64'
+        run: skip android emulator launch --background --name demo --verbose
