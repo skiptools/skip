@@ -43,7 +43,8 @@ jobs:
 
       - run: skip android emulator create --name demo --verbose
 
-      - mv -v ${HOMEBREW_PREFIX}/share/android-commandlinetools/system-images ${ANDROID_SDK_ROOT}/
+      # installs in the wrong place
+      - run: mv -v ${HOMEBREW_PREFIX}/share/android-commandlinetools/system-images ${ANDROID_SDK_ROOT}/
 
       # TODO:
       #- run: skip android emulator create --name demo --verbose -- --sdk_root=${ANDROID_SDK_HOME}/
