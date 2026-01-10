@@ -43,6 +43,14 @@ jobs:
         with:
           verbose: true
 
+      - run: skip android emulator create --name demo --verbose
+
+      - run: brew install tree
+      #- run: tree /Users/runner/Library/Android/sdk/system-images/
+      - run: tree ${ANDROID_HOME}
+
+      - run: skip android emulator launch --background --name demo --verbose
+
       - name: Skip Checkup
         run: skip checkup
       #- run: skip checkup --verbose --double-check
@@ -53,12 +61,6 @@ jobs:
 
       # setup Android SDK and emulator
       - run: skip android sdk install --version ${{ matrix.android-sdk }} --verbose
-      - run: skip android emulator create --name demo --verbose
-
-      - run: brew install tree
-      - run: tree /Users/runner/Library/Android/sdk/system-images/
-
-      - run: skip android emulator launch --background --name demo --verbose
 
       # native model and app init
       - run: skip checkup --verbose --native
