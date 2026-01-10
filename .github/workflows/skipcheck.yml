@@ -12,8 +12,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - android-sdk: '6.1'
-            os: 'macos-14'
+          #- android-sdk: '6.1'
+            #os: 'macos-14'
             #xcode: '16.4'
           - android-sdk: '6.2'
             os: 'macos-15'
@@ -55,7 +55,10 @@ jobs:
       - run: skip android sdk install --version ${{ matrix.android-sdk }} --verbose
       - run: skip android emulator create --name demo
 
-      - run: skip android emulator launch --background --name demo
+      - run: brew install tree
+      - run: tree /Users/runner/Library/Android/sdk/system-images/
+
+      - run: skip android emulator launch --background --name demo --verbose
 
       # native model and app init
       - run: skip checkup --verbose --native
