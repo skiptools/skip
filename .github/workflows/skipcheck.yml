@@ -41,24 +41,21 @@ jobs:
         with:
           verbose: true
 
-      - run: skip android emulator create --name demo --verbose
-
-      # installs in the wrong place
-      - run: mv -v ${HOMEBREW_PREFIX}/share/android-commandlinetools/system-images ${ANDROID_SDK_ROOT}/
-
-      # TODO:
+      # TODO: use the correct location for emulator install
       #- run: skip android emulator create --name demo --verbose -- --sdk_root=${ANDROID_SDK_HOME}/
 
-      #- run: brew install tree
-      #- run: tree /Users/runner/Library/Android/sdk/system-images/
-      #- run: tree ${ANDROID_HOME}
+      - run: skip android emulator create --name demo --verbose
 
-      # need to override ANDROID_SDK_HOME so it searches in:
+      # installs in the wrong place:
       # /opt/homebrew/share/android-commandlinetools/system-images/android-34/google_apis/arm64-v8a
       # instead of:
       # /Users/runner/Library/Android/sdk/system-images/android-34/google_apis/arm64-v8a/
-      #- run: ANDROID_SDK_ROOT=${HOMEBREW_PREFIX}/share/android-commandlinetools/ skip android emulator launch --background --name demo --verbose
-      - run: skip android emulator launch --background --name demo --verbose
+      - run: ln -vs ${HOMEBREW_PREFIX:-$(brew --prefix)}/share/android-commandlinetools/system-images ${ANDROID_SDK_ROOT}/system-images
+
+      # cannot run on ARM macOS: HVF error: HV_UNSUPPORTED
+      - name: Launch emulator
+        if: ${{ env.RUNNER_ARCH != 'ARM64' }}
+        run: skip android emulator launch --background --name demo --verbose
 
       - name: Skip Checkup
         run: skip checkup
