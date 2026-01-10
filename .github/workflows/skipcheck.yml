@@ -53,7 +53,7 @@ jobs:
 
       # setup Android SDK and emulator
       - run: skip android sdk install --version ${{ matrix.android-sdk }} --verbose
-      - run: skip android emulator create --name demo
+      - run: skip android emulator create --name demo --verbose
 
       - run: brew install tree
       - run: tree /Users/runner/Library/Android/sdk/system-images/
