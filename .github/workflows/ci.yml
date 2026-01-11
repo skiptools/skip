@@ -7,6 +7,11 @@ on:
     - cron: '0 0,4,8,12,16,18 * * *'
   workflow_dispatch:
   pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   skip-ci:
     strategy:
