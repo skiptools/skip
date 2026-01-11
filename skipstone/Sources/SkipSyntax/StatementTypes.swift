@@ -1008,7 +1008,8 @@ final class ExtensionDeclaration: TypeDeclaration {
             return []
         }
         var context = context
-        context.memberOf = (.extensionDeclaration, modifiers, [])
+        let decodeFlags: DecodeFlags = attributes.isBridgeMembers ? [.bridgeMembers] : []
+        context.memberOf = (.extensionDeclaration, modifiers, decodeFlags)
 
         let (inherits, inheritsMessages) = extensionDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: nil, where: extensionDecl.genericWhereClause, in: syntaxTree)
@@ -1533,7 +1534,8 @@ class TypeDeclaration: Statement {
             return nil
         }
         var context = context
-        context.memberOf = (.classDeclaration, modifiers, [])
+        let decodeFlags: DecodeFlags = attributes.isBridgeMembers ? [.bridgeMembers] : []
+        context.memberOf = (.classDeclaration, modifiers, decodeFlags)
 
         let (inherits, inheritsMessages) = classDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let (generics, genericsMessages) = Generics.for(syntax: classDecl.genericParameterClause, where: classDecl.genericWhereClause, in: syntaxTree)
@@ -1561,6 +1563,9 @@ class TypeDeclaration: Statement {
                 return nil
             }
         }
+        if attributes.isBridgeMembers {
+            decodeFlags.insert(.bridgeMembers)
+        }
         var context = context
         context.memberOf = (.structDeclaration, modifiers, decodeFlags)
 
@@ -1580,7 +1585,8 @@ class TypeDeclaration: Statement {
             return nil
         }
         var context = context
-        context.memberOf = (.protocolDeclaration, modifiers, [])
+        let decodeFlags: DecodeFlags = attributes.isBridgeMembers ? [.bridgeMembers] : []
+        context.memberOf = (.protocolDeclaration, modifiers, decodeFlags)
 
         let name = protocolDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = protocolDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
@@ -1611,6 +1617,9 @@ class TypeDeclaration: Statement {
                 return nil
             }
         }
+        if attributes.isBridgeMembers {
+            decodeFlags.insert(.bridgeMembers)
+        }
         var context = context
         context.memberOf = (.enumDeclaration, modifiers, decodeFlags)
 
@@ -1630,7 +1639,8 @@ class TypeDeclaration: Statement {
             return nil
         }
         var context = context
-        context.memberOf = (.actorDeclaration, modifiers, [])
+        let decodeFlags: DecodeFlags = attributes.isBridgeMembers ? [.bridgeMembers] : []
+        context.memberOf = (.actorDeclaration, modifiers, decodeFlags)
 
         let name = actorDecl.name.text.removingBacktickEscaping
         let (inherits, inheritsMessages) = actorDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])

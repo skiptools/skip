@@ -48,7 +48,13 @@ class Statement: SyntaxNode {
         } else {
             effectiveVisibility = visibility
         }
-        return isBridging(attributes: attributes, visibility: effectiveVisibility, autoBridge: syntaxTree.autoBridge) ? .api : .none
+        let bridgeMemberVisibility: Modifiers.Visibility?
+        if let memberOf = context.memberOf, memberOf.flags.contains(.bridgeMembers) {
+            bridgeMemberVisibility = memberOf.modifiers.visibility
+        } else {
+            bridgeMemberVisibility = nil
+        }
+        return isBridging(attributes: attributes, visibility: effectiveVisibility, bridgeMemberVisibility: bridgeMemberVisibility, autoBridge: syntaxTree.autoBridge) ? .api : .none
     }
 }
 

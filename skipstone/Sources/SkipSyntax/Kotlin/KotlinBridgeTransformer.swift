@@ -47,7 +47,7 @@ public final class KotlinBridgeTransformer: KotlinTransformer {
         syntaxTree.root.visit { node in
             if let typeDeclaration = node as? TypeDeclaration, typeDeclaration.type != .extensionDeclaration {
                 let isNativeIfSkipBlock = isBridgeFile && typeDeclaration.isInIfSkipBlock()
-                if isBridging(attributes: typeDeclaration.attributes, visibility: typeDeclaration.modifiers.visibility, autoBridge: isNativeIfSkipBlock ? .internal : syntaxTree.autoBridge) {
+                if isBridging(attributes: typeDeclaration.attributes, visibility: typeDeclaration.modifiers.visibility, bridgeMemberVisibility: nil, autoBridge: isNativeIfSkipBlock ? .internal : syntaxTree.autoBridge) {
                     if isBridgeFile && !isNativeIfSkipBlock {
                         typeDeclaration.attributes.attributes.append(.bridgeToKotlin)
                     } else {
@@ -57,7 +57,7 @@ public final class KotlinBridgeTransformer: KotlinTransformer {
                 return .recurse(nil)
             } else if let typealiasDeclaration = node as? TypealiasDeclaration {
                 let isNativeIfSkipBlock = isBridgeFile && typealiasDeclaration.isInIfSkipBlock()
-                if isBridging(attributes: typealiasDeclaration.attributes, visibility: typealiasDeclaration.modifiers.visibility, autoBridge: isNativeIfSkipBlock ? .internal : syntaxTree.autoBridge) {
+                if isBridging(attributes: typealiasDeclaration.attributes, visibility: typealiasDeclaration.modifiers.visibility, bridgeMemberVisibility: nil, autoBridge: isNativeIfSkipBlock ? .internal : syntaxTree.autoBridge) {
                     if isBridgeFile && !isNativeIfSkipBlock {
                         typealiasDeclaration.attributes.attributes.append(.bridgeToKotlin)
                     } else {
