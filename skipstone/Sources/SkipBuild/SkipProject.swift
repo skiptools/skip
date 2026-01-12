@@ -665,7 +665,7 @@ public class \(moduleName)Module {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : " favouri"
+            "value" : "お気に入り"
           }
         },
         "zh-Hans" : {

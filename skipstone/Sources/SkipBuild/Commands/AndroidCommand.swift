@@ -1218,11 +1218,11 @@ struct AndroidEmulatorLaunchCommand: MessageCommand, ToolOptionsCommand {
             // scan for lines like:
             // INFO         | Boot completed in 23779 ms
             // INFO         | Successfully loaded snapshot 'default_boot' using 414 ms
-            if self.background && line.line.hasPrefix("INFO") &&
-                (line.line.contains("| Boot completed in ")
-                 /*|| line.line.contains("| Successfully loaded snapshot ")*/
+            // 01-10 20:15:28.684     0     0 I ueventd : Coldboot took 0.096 seconds
+            if self.background && (
+                (line.line.hasPrefix("INFO") && line.line.contains("| Boot completed in ")) // emulator command output
+                || (line.line.contains("I ueventd : Coldboot took ")) // logcat output
                 ) {
-
                 await out.write(status: .pass, "Launch complete - moving process to background (run `adb logcat` to view logs and `adb emu kill` to stop emulator)")
                 break
             }
