@@ -5639,4 +5639,313 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_myModifierFunc_0_methodID = Java_SourceKt.getStaticMethodID(name: "myModifierFunc", sig: "(Lskip/ui/View;I)Lskip/ui/View;")!
         """, transformers: transformers)
     }
+
+    func testBridgeNonPublic() async throws {
+        try await check(swiftBridge: """
+        #if !SKIP_BRIDGE
+        // SKIP @bridge
+        var s = ""
+        #endif
+        """, kotlin: """
+        internal var s: String
+            get() = Swift_s()
+            set(newValue) {
+                Swift_s_set(newValue)
+            }
+        private external fun Swift_s(): String
+        private external fun Swift_s_set(value: String)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1s")
+        public func BridgeKt_Swift_s(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaString {
+            return s.toJavaObject(options: [])!
+        }
+        @_cdecl("Java_BridgeKt_Swift_1s_1set")
+        public func BridgeKt_Swift_s_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaString) {
+            s = String.fromJavaObject(value, options: [])
+        }
+        """, transformers: transformers)
+
+        try await check(swiftBridge: """
+        #if !SKIP_BRIDGE
+        // SKIP @bridge
+        func f() { }
+        #endif
+        """, kotlin: """
+        internal fun f(): Unit = Swift_f_0()
+        private external fun Swift_f_0()
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1f_10")
+        public func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) {
+            f()
+        }
+        """, transformers: transformers)
+
+        try await check(swiftBridge: """
+        #if !SKIP_BRIDGE
+        // SKIP @bridge
+        final class C {
+            // SKIP @bridge
+            var i = 0
+        }
+        #endif
+        """, kotlin: """
+        internal class C: skip.bridge.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.SwiftObjectPointer = skip.bridge.SwiftObjectNil
+
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
+
+            constructor() {
+                Swift_peer = Swift_constructor()
+            }
+            private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer
+
+            override fun Swift_peer(): skip.bridge.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_peer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            internal var i: Int
+                get() = Swift_i(Swift_peer)
+                set(newValue) {
+                    Swift_i_set(Swift_peer, newValue)
+                }
+            private external fun Swift_i(Swift_peer: skip.bridge.SwiftObjectPointer): Int
+            private external fun Swift_i_set(Swift_peer: skip.bridge.SwiftObjectPointer, value: Int)
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+        }
+        """, swiftBridgeSupport: """
+        extension C: BridgedToKotlin, BridgedFinalClass {
+            nonisolated private static let Java_class = try! JClass(name: "C")
+            nonisolated static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                return ptr.pointee()!
+            }
+            nonisolated func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            nonisolated private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+        }
+        @_cdecl("Java_C_Swift_1constructor")
+        public func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
+            let f_return_swift = C()
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_C_Swift_1release")
+        public func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: C.self)
+        }
+        @_cdecl("Java_C_Swift_1i")
+        public func C_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> Int32 {
+            let peer_swift: C = Swift_peer.pointee()!
+            return Int32(peer_swift.i)
+        }
+        @_cdecl("Java_C_Swift_1i_1set")
+        public func C_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: Int32) {
+            let peer_swift: C = Swift_peer.pointee()!
+            peer_swift.i = Int(value)
+        }
+        @_cdecl("Java_C_Swift_1projectionImpl")
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
+    func testBridgeMembers() async throws {
+        try await check(swiftBridge: """
+        #if !SKIP_BRIDGE
+        // SKIP @bridgeMembers
+        final class C {
+            var i = 0
+            private var x = 1
+        }
+        #endif
+        """, kotlin: """
+        internal class C: skip.bridge.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.SwiftObjectPointer = skip.bridge.SwiftObjectNil
+
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
+
+            constructor() {
+                Swift_peer = Swift_constructor()
+            }
+            private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer
+
+            override fun Swift_peer(): skip.bridge.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_peer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            internal var i: Int
+                get() = Swift_i(Swift_peer)
+                set(newValue) {
+                    Swift_i_set(Swift_peer, newValue)
+                }
+            private external fun Swift_i(Swift_peer: skip.bridge.SwiftObjectPointer): Int
+            private external fun Swift_i_set(Swift_peer: skip.bridge.SwiftObjectPointer, value: Int)
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+        }
+        """, swiftBridgeSupport: """
+        extension C: BridgedToKotlin, BridgedFinalClass {
+            nonisolated private static let Java_class = try! JClass(name: "C")
+            nonisolated static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                return ptr.pointee()!
+            }
+            nonisolated func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            nonisolated private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+        }
+        @_cdecl("Java_C_Swift_1constructor")
+        public func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
+            let f_return_swift = C()
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_C_Swift_1release")
+        public func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: C.self)
+        }
+        @_cdecl("Java_C_Swift_1i")
+        public func C_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> Int32 {
+            let peer_swift: C = Swift_peer.pointee()!
+            return Int32(peer_swift.i)
+        }
+        @_cdecl("Java_C_Swift_1i_1set")
+        public func C_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: Int32) {
+            let peer_swift: C = Swift_peer.pointee()!
+            peer_swift.i = Int(value)
+        }
+        @_cdecl("Java_C_Swift_1projectionImpl")
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
+    func testExtensionBridgeMembers() async throws {
+        try await check(swiftBridge: """
+        #if !SKIP_BRIDGE
+        // SKIP @bridge
+        final class C {
+            var s = ""
+        }
+        // SKIP @bridgeMembers
+        extension C {
+            var i = 1
+        }
+        #endif
+        """, kotlin: """
+        internal class C: skip.bridge.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.SwiftObjectPointer = skip.bridge.SwiftObjectNil
+
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
+
+            constructor() {
+                Swift_peer = Swift_constructor()
+            }
+            private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer
+
+            override fun Swift_peer(): skip.bridge.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_peer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            internal open var i: Int
+                get() = Swift_i(Swift_peer)
+                set(newValue) {
+                    Swift_i_set(Swift_peer, newValue)
+                }
+            private external fun Swift_i(Swift_peer: skip.bridge.SwiftObjectPointer): Int
+            private external fun Swift_i_set(Swift_peer: skip.bridge.SwiftObjectPointer, value: Int)
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+        }
+        """, swiftBridgeSupport: """
+        extension C: BridgedToKotlin, BridgedFinalClass {
+            nonisolated private static let Java_class = try! JClass(name: "C")
+            nonisolated static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                return ptr.pointee()!
+            }
+            nonisolated func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            nonisolated private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+        }
+        @_cdecl("Java_C_Swift_1constructor")
+        public func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
+            let f_return_swift = C()
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_C_Swift_1release")
+        public func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: C.self)
+        }
+        @_cdecl("Java_C_Swift_1i")
+        public func C_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> Int32 {
+            let peer_swift: C = Swift_peer.pointee()!
+            return Int32(peer_swift.i)
+        }
+        @_cdecl("Java_C_Swift_1i_1set")
+        public func C_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: Int32) {
+            let peer_swift: C = Swift_peer.pointee()!
+            peer_swift.i = Int(value)
+        }
+        @_cdecl("Java_C_Swift_1projectionImpl")
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
 }

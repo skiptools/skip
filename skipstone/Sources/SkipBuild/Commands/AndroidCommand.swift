@@ -1260,6 +1260,7 @@ struct AndroidEmulatorListCommand: MessageCommand, ToolOptionsCommand {
     func listAndroidEmulators(with out: MessageQueue) async throws {
         //~/Library/Android/sdk/emulator/emulator -list-avds
 
+        #if canImport(SkipDriveExternal)
         var exitCode: SkipDriveExternal.ProcessResult.ExitStatus? = nil
         let output = try await launchTool("emulator", arguments: ["-list-avds"]) {
             exitCode = $0.exitStatus
@@ -1272,6 +1273,9 @@ struct AndroidEmulatorListCommand: MessageCommand, ToolOptionsCommand {
         guard let exitCode = exitCode, case .terminated(0) = exitCode else {
             throw EmulatorListError(errorDescription: "Error listing active emulators: \(String(describing: exitCode))")
         }
+        #else
+        throw EmulatorListError(errorDescription: "Error listing active emulators: SkipDriveExternal not available")
+        #endif
     }
 
     public struct EmulatorListError : LocalizedError {

@@ -224,7 +224,12 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
 
     /// Convenience to check whether this member is marked to bridge.
     var isBridge: Bool {
-        return contains(directive: "bridge") || contains(.bridge)
+        return contains(directive: "bridge") || contains(directive: "bridgeMembers") || contains(.bridge)
+    }
+
+    /// Convenience to check whether this member is marked to bridge.
+    var isBridgeMembers: Bool {
+        return contains(directive: "bridgeMembers")
     }
 
     /// Convenience to check whether this member is marked to ignore bridging.

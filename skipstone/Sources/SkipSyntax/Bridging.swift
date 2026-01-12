@@ -11,14 +11,17 @@ public enum AutoBridge: Int {
 }
 
 /// Whether a declaration is briging.
-func isBridging(attributes: Attributes, visibility: Modifiers.Visibility, autoBridge: AutoBridge) -> Bool {
+func isBridging(attributes: Attributes, visibility: Modifiers.Visibility, bridgeMemberVisibility: Modifiers.Visibility?, autoBridge: AutoBridge) -> Bool {
     guard !attributes.isBridge else {
         return true
     }
-    guard autoBridge != .none && autoBridge != .default else {
+    guard !attributes.isNoBridge && !attributes.contains(.unavailable) else {
         return false
     }
-    guard !attributes.isNoBridge && !attributes.contains(.unavailable) else {
+    if let bridgeMemberVisibility, visibility >= .public || visibility >= bridgeMemberVisibility {
+        return true
+    }
+    guard autoBridge != .none && autoBridge != .default else {
         return false
     }
     return visibility >= .public || (autoBridge == .internal && visibility > .fileprivate)

@@ -55,6 +55,8 @@ struct DecodeContext {
 struct DecodeFlags: OptionSet {
     /// Decoding for SwiftUI state only
     static let swiftUIState = DecodeFlags(rawValue: 1 << 0)
+    /// Bridge members
+    static let bridgeMembers = DecodeFlags(rawValue: 1 << 1)
 
     let rawValue: Int
 
