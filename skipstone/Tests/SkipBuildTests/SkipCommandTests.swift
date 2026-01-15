@@ -1302,7 +1302,7 @@ final class SkipCommandTests: XCTestCase {
 
     /// A single-module native app
     func testLibInitAppNativeAppCommand() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, mode: [.nativeApp], tests: nil, fastlane: false, appid: "some.cool.app", swiftVersion: "6.2", moduleNames: "AppModule")
+        let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: false, mode: [.nativeApp], tests: nil, fastlane: false, appid: "some.cool.app", swiftPackageVersion: "6.2", moduleNames: "AppModule")
         XCTAssertEqual(projectTree ?? "", """
         .
         ├─ Android
@@ -2004,7 +2004,7 @@ final class SkipCommandTests: XCTestCase {
     /// Default arguments for `skip init` tests
     let initTestArgs = ["-jA", "--no-build", "--no-test", "--show-tree"]
 
-    func skipInit(projectName: String, documented: Bool = false, free: Bool? = nil, zero: Bool? = nil, bridged: Bool? = nil, appfair: Bool? = nil, mode: [ProjectMode], kotlincompat: Bool = false, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, swiftVersion: String? = nil, resourcePath: String? = "Resources", backgroundColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
+    func skipInit(projectName: String, documented: Bool = false, free: Bool? = nil, zero: Bool? = nil, bridged: Bool? = nil, appfair: Bool? = nil, mode: [ProjectMode], kotlincompat: Bool = false, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, swiftPackageVersion: String? = nil, resourcePath: String? = "Resources", backgroundColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["init"] + initTestArgs
@@ -2060,8 +2060,8 @@ final class SkipCommandTests: XCTestCase {
             cmd += ["--no-module-tests"]
         }
 
-        if let swiftVersion {
-            cmd += ["--swift-version", swiftVersion]
+        if let swiftPackageVersion {
+            cmd += ["--swift-package-version", swiftPackageVersion]
         }
 
         if fastlane == true {
