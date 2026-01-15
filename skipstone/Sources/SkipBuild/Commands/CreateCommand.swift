@@ -126,8 +126,8 @@ Create a new project by following a series of interactive prompts.
         }
 
         enum ProjectModeOption : PromptOption, CaseIterable {
-            case lite
             case fuse
+            case lite
 
             var name: String {
                 switch self {
@@ -203,8 +203,8 @@ Create a new project by following a series of interactive prompts.
             }
         }
 
-        let freeProject = prompt("Create a free open-source project?", defaultValue: createOptions.free)
-        let appFairProject = !freeProject ? false : prompt("Create an App Fair Project?", defaultValue: createOptions.appfair)
+        let freeProject = prompt("Create a free open-source \(isApp ? "app" : "library")?", defaultValue: createOptions.free)
+        let appFairProject = !isApp || !freeProject ? false : prompt("Create an App Fair Project?", defaultValue: createOptions.appfair)
 
         let gitRepo = prompt("Initialize git repository for the project?", defaultValue: createOptions.gitRepo)
 
