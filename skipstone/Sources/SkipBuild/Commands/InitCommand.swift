@@ -159,7 +159,7 @@ This command will create a conventional Skip app or library project.
             resourceFolder: createOptions.resourcePath,
             dir: dir,
             verify: buildOptions.verify,
-            configuration: createOptions.configuration,
+            configuration: .debug,
             build: buildOptions.build,
             test: buildOptions.test,
             returnHashes: false,

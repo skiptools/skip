@@ -42,8 +42,8 @@ struct CreateOptions : ParsableArguments {
     @Option(name: [.customShort("d"), .long], help: ArgumentHelp("Base folder for project creation", valueName: "directory"))
     var dir: String?
 
-    @Option(name: [.customShort("c"), .long], help: ArgumentHelp("Configuration debug/release", valueName: "c"))
-    var configuration: BuildConfiguration = .debug
+//    @Option(name: [.customShort("c"), .long], help: ArgumentHelp("Configuration debug/release", valueName: "c"))
+//    var configuration: BuildConfiguration = .debug
 
     // Template options: Hidden because they are not yet supported
 
@@ -60,7 +60,7 @@ struct CreateOptions : ParsableArguments {
     var resourcePath: String = "Resources"
 
     @Option(help: ArgumentHelp("Swift version for project"))
-    var swiftVersion: String = defaultSwiftPackageVersion
+    var swiftPackageVersion: String = defaultSwiftPackageVersion
 
     /// The defaut Package.swift version to create when initializing a project
     static let defaultSwiftPackageVersion = "6.1"
@@ -144,7 +144,7 @@ struct CreateOptions : ParsableArguments {
     }
 
     func projectOptionValues(projectName: String) -> ProjectOptionValues {
-        ProjectOptionValues(projectName: projectName, swiftVersion: self.swiftVersion, iOSMinVersion: self.iosMinVersion, macOSMinVersion: self.macosMinVersion, chain: self.chain, gitRepo: self.gitRepo, appfair: self.appfair, free: self.free || self.appfair, zero: self.zero, github: self.github, fastlane: self.fastlane)
+        ProjectOptionValues(projectName: projectName, swiftPackageVersion: self.swiftPackageVersion, iOSMinVersion: self.iosMinVersion, macOSMinVersion: self.macosMinVersion, chain: self.chain, gitRepo: self.gitRepo, appfair: self.appfair, free: self.free || self.appfair, zero: self.zero, github: self.github, fastlane: self.fastlane)
     }
 }
 

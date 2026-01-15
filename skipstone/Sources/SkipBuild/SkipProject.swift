@@ -40,7 +40,7 @@ enum ModuleMode {
 
 struct ProjectOptionValues {
     var projectName: String
-    var swiftVersion: String
+    var swiftPackageVersion: String
     var iOSMinVersion: Double
     var macOSMinVersion: Double?
     var chain: Bool
@@ -212,7 +212,7 @@ class FrameworkProjectLayout {
         let skipPackageVersion = skipVersion
 #endif
         var packageHeader = """
-        // swift-tools-version: \(options.swiftVersion)
+        // swift-tools-version: \(options.swiftPackageVersion)
 
         """
 
@@ -1935,7 +1935,7 @@ ANDROID_PACKAGE_NAME = \(appModulePackage)
         let skipEnvBaseName = "Skip.env"
         let skipEnvFileName = "../\(skipEnvBaseName)"
 
-        let swiftVersionMajor = options.swiftVersion.split(separator: ".").first ?? "6"
+        let swiftVersionMajor = options.swiftPackageVersion.split(separator: ".").first ?? "6"
 
         // create the top-level ModuleName.xcconfig which is the source or truth for the iOS and Android builds
         let configContents = """
