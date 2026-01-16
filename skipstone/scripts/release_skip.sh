@@ -151,7 +151,7 @@ cd ${RELSTAGING}
 
 # need to wait a bit for the tag to show up
 sleep 5
-gh release -R github.com/skiptools/skip create --generate-notes "${SKIP_VERSION}" *.zip
+gh release -R github.com/skiptools/skip create --verify-tag --generate-notes "${SKIP_VERSION}" *.zip
 cd '-'
 
 echo "Waiting to download to become available…"
@@ -172,6 +172,9 @@ git add "${SKIPSTONE_VERSION_PATH}"
 git commit --allow-empty --allow-empty-message -m "Release ${SKIP_VERSION}"
 git tag "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
 git push --follow-tags
+# need to wait a bit for the tag to show up
+sleep 5
+gh release -R github.com/skiptools/skipstone create --verify-tag --generate-notes "${SKIP_VERSION}"
 
 # update the homebrew cask with the updated skip command
 cd ${SKIPBREWDIR}
