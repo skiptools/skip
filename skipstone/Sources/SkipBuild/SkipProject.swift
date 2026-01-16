@@ -1927,6 +1927,9 @@ CURRENT_PROJECT_VERSION = 1
 // The package name for the Android entry point, referenced by the AndroidManifest.xml
 ANDROID_PACKAGE_NAME = \(appModulePackage)
 
+// If your Android appId is different from the iOS Bundle Identifer, specify it here
+// ANDROID_APPLICATION_ID = \(appid)
+
 """
 
         try skipEnvContents.write(to: appProject.skipEnv, atomically: false, encoding: .utf8)
@@ -2247,7 +2250,7 @@ end
 
 require('dotenv')
 Dotenv.load '../../Skip.env'
-app_identifier(ENV['PRODUCT_BUNDLE_IDENTIFIER'])
+app_identifier(ENV['ANDROID_APPLICATION_ID'] || ENV['PRODUCT_BUNDLE_IDENTIFIER'])
 
 # apple_id("my@email")
 
@@ -3559,7 +3562,7 @@ extension FrameworkProjectLayout {
                 minSdk = libs.versions.android.sdk.min.get().toInt()
                 targetSdk = libs.versions.android.sdk.compile.get().toInt()
                 // skip.tools.skip-build-plugin will automatically use Skip.env properties for:
-                // applicationId = PRODUCT_BUNDLE_IDENTIFIER
+                // applicationId = ANDROID_APPLICATION_ID ?? PRODUCT_BUNDLE_IDENTIFIER
                 // versionCode = CURRENT_PROJECT_VERSION
                 // versionName = MARKETING_VERSION
             }

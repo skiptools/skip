@@ -287,7 +287,7 @@ class SkipBuildPlugin @Inject constructor(private val os: ExecOperations) : Plug
             val appName = env.skipEnv("PRODUCT_NAME")
             val packageName = env.skipEnv("ANDROID_PACKAGE_NAME")
             val appModule = packageName + ":" + appName
-            val applicationId = env.skipEnv("PRODUCT_BUNDLE_IDENTIFIER").replace("-", "_")
+            val applicationId = env.skipEnv("ANDROID_APPLICATION_ID") ?: env.skipEnv("PRODUCT_BUNDLE_IDENTIFIER").replace("-", "_")
             val activity = applicationId + "/" + packageName + ".MainActivity"
             dependencies.add("implementation", appModule)
 
