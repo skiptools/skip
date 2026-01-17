@@ -19,13 +19,22 @@ PLUGIN_ZIP="${ARTIFACT}-linux.zip"
 ARTIFACT_BUILD_DIR=.build/artifactbundle-linux
 
 SWIFT_VERSION=${SWIFT_VERSION:-"6.2.3"}
+USE_SWIFTLY=1
 
-swiftly install "${SWIFT_VERSION}"
+if [[ "${USE_SWIFTLY}" == "1" ]]; then
+    swiftly install "${SWIFT_VERSION}"
+fi
 
 mv -vf "${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}" "${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}.bk.$(date +%s)" || true
 
 for SDK in "x86_64-swift-linux-musl" "aarch64-swift-linux-musl"; do
-    swiftly run swift build --swift-sdk "${SDK}" --configuration "${CONFIGURATION}" --product "${PRODUCT}" "+${SWIFT_VERSION}"
+    if [[ "${USE_SWIFTLY}" == "1" ]]; then
+        swiftly run swift build --swift-sdk "${SDK}" --configuration "${CONFIGURATION}" --product "${PRODUCT}" "+${SWIFT_VERSION}"
+    else
+        # if swiftly is disabled, just build with the current `swift` version
+        swift build --swift-sdk "${SDK}" --configuration "${CONFIGURATION}" --product "${PRODUCT}"
+    fi
+
     if [[ "${PRODUCT}" == "SkipRunner" ]]; then
         mkdir -p "${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}/${SDK}"
         cp -av .build/${SDK}/${CONFIGURATION}/${PRODUCT} ${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}/${SDK}/${SKIPCMD}

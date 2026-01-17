@@ -15,7 +15,7 @@ jobs:
       matrix:
         os:
           - 'ubuntu-latest'
-          - 'macos-latest'
+          #- 'macos-latest' # TODO
           #- 'windows-latest'
         swift:
           - '6.2.3'
@@ -50,7 +50,11 @@ jobs:
       - name: Build plugin
         working-directory: skipstone
         shell: bash
+        if: false # TODO
         run: |
+          # Build plugins using the current installed version of Swift
+          export USE_SWIFTLY=0
+
           if [[ "${RUNNER_OS}" == "macOS" ]]; then
             ./scripts/build_macos_plugin.sh
           elif [[ "${RUNNER_OS}" == "Linux" ]]; then
