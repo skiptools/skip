@@ -9,7 +9,7 @@ as well as the Homebrew Cask via
 The exact same binary is used by both the Xcode/SwiftPM `skipstone` build plugin
 as well as the command-line tool installed via Homebrew's `brew install skiptools/skip/skip`
 
-> [!CAUTION]
+> [!NOTE]
 > This repository, https://github.com/skiptools/skipstone.git, vends the `skip` tool,
 > whereas the https://github.com/skiptools/skip.git repository vends the `skipstone` plugin.
 > The names are the reverse of what you might expect.
@@ -156,21 +156,24 @@ are checked out in peer folders:
 > [!NOTE]
 > You must have write and release permissions for each of these repositories in order to be able to create a release.
 
+The release script will build the tool for both macOS and cross-compile it for Linux. So you will need the [`swiftly`](https://www.swift.org/install/macos/swiftly/) tool installed as well as the [static Linux SDK](https://www.swift.org/documentation/articles/static-linux-getting-started.html).
+
 > [!TIP]
 > To do a dry run of a release without trying to push or tag any changes, run `DRY_RUN=1 ./scripts/release_skip.sh`
 
 The release script will do the following:
 
 1. Bump the `skipVersion` in [`Sources/SkipSyntax/Version.swift`](Sources/SkipSyntax/Version.swift). By default this will bump the patch version, but running `SEMVER_BUMP='minor' ./scripts/release_skip.sh` will instead bump the minor version.
-1. Build the universal macOS artifactbundle `skip-macos.zip` with [`scripts/build_macos_plugin.sh`](scripts/build_macos_plugin.sh).
-1. Build the static Linux (MUSL) artifactbundle `skip-linux.zip` with [`scripts/build_linux_plugin.sh`](scripts/build_linux_plugin.sh).
-1. Update the bundle URLs and checksums in the Skip plugin's [`Package.swift`](https://github.com/skiptools/skip/blob/main/Package.swift).
-1. Update the binary URLs and checksums for the Homebrew Cask's [`skip.rb`](https://github.com/skiptools/homebrew-skip/blob/main/Casks/skip.rb).
+1. Build the universal macOS artifactbundle `skip-macos.zip` with [`scripts/build_macos_plugin.sh`](scripts/build_macos_plugin.sh)
+1. Build the static Linux (MUSL) artifactbundle `skip-linux.zip` with [`scripts/build_linux_plugin.sh`](scripts/build_linux_plugin.sh)
+1. Update the bundle URLs and checksums in the Skip plugin's [`Package.swift`](https://github.com/skiptools/skip/blob/main/Package.swift)
+1. Update the binary URLs and checksums for the Homebrew Cask's [`skip.rb`](https://github.com/skiptools/homebrew-skip/blob/main/Casks/skip.rb)
 1. Commit, tag, and push each of `skipstone.git`, `skip.git`, and `homebrew-skip.git`
 1. Create GitHub releases for each of [`skipstone.git`](https://github.com/skiptools/skipstone/releases) and [`skip.git`](https://github.com/skiptools/skip/releases)
-1. Try to upgrade Skip on the local machine with `brew upgrade skiptools/skip/skip`
+1. Upgrade Skip on the local machine with `brew upgrade skiptools/skip/skip`
 1. Run `skip welcome`
 
+As a post-release step, it is a good idea to make sure that `skip checkup --native` works on the local machine.
 
 ## Contributing
 
