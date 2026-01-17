@@ -199,11 +199,11 @@ Create a new project by following a series of interactive prompts.
         if !isApp {
             createTests = prompt("Create test cases", defaultValue: createTests ?? true)
             if skipMode == .fuse {
-                moduleMode = prompt("Enable Kotlin compatibility for native module", defaultValue: createOptions.kotlincompat) ? .kotlincompat : .native
+                moduleMode = prompt("Enable Kotlin compatibility for native module", defaultValue: createOptions.kotlincompat) ? .kotlincompat : .nativeBridged
             }
         }
 
-        let freeProject = prompt("Create a free open-source \(isApp ? "app" : "library")?", defaultValue: createOptions.free)
+        let freeProject = prompt("Create an open-source \(isApp ? "app" : "library")?", defaultValue: createOptions.free)
         let appFairProject = !isApp || !freeProject ? false : prompt("Create an App Fair Project?", defaultValue: createOptions.appfair)
 
         let gitRepo = prompt("Initialize git repository for the project?", defaultValue: createOptions.gitRepo)
