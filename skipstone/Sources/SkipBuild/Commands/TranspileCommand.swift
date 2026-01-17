@@ -315,8 +315,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let skipFolderPathContents = try FileManager.default.enumeratedURLs(of: skipFolderPath.asURL)
             .filter({ (try? $0.resourceValues(forKeys: [.isRegularFileKey]))?.isRegularFile == true })
 
-        // validate licenses in all the Skip source files, as well as any custom Kotlin files in the Skip folder
-        let sourcehashes = try await createSourceHashes(validateLicense: ["swift", "kt", "java"], isNativeModule: isNativeModule, sourceURLs: sourceURLs + skipFolderPathContents)
+        let sourcehashes = try await loadSourceHashes(from: sourceURLs + skipFolderPathContents)
 
         // touch the build marker with the most recent file time from the complete build list
         // if we were to touch it afresh every time, the plugin would be re-executed every time
@@ -1250,6 +1249,34 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         return transformers
     }
 
+    func loadSourceHashes(from allSourceURLs: [URL]) async throws -> [URL: String] {
+        #if SKIP_LICENSE_CHECK
+        // validate licenses in all the Skip source files, as well as any custom Kotlin files in the Skip folder
+        let sourcehashes = try await createSourceHashes(validateLicense: ["swift", "kt", "java"], sourceURLs: allSourceURLs)
+        #else
+        // take a snapshot of all the source hashes for each of the URLs so we know when anything has changes
+        // TODO: this doesn't need to be a full SHA256 hash, it can be something faster (or maybe even just a snapshot of the file's size and last modified date…)
+        let sourcehashes = try await withThrowingTaskGroup(of: (URL, String).self) { group in
+            for url in allSourceURLs {
+                group.addTask {
+                    let data = try Data(contentsOf: url, options: .mappedIfSafe)
+                    return (url, data.SHA256Hash())
+                }
+            }
+
+            var results = [URL: String]()
+            results.reserveCapacity(allSourceURLs.count)
+
+            for try await (url, sha256) in group {
+                results[url] = sha256
+            }
+
+            return results
+        }
+        #endif
+
+        return sourcehashes
+    }
 }
 
 struct TranspileCommandOptions: ParsableArguments {

@@ -146,7 +146,10 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         // we no longer require that Android Studio be installed with the advent of `skip android emulator create`
         //await checkAndroidStudioVersion(with: out)
         #endif
+
+        #if SKIP_LICENSE_CHECK
         await checkSkipLicense(with: out)
+        #endif
     }
 
     func checkXcodeCommandLineTools(with out: MessageQueue) async {
@@ -166,6 +169,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         #endif
     }
 
+    #if SKIP_LICENSE_CHECK
     func checkSkipLicense(with out: MessageQueue) async {
         // Manually try to parse the Android Studio version; tolerate failures
         await outputOptions.monitor(with: out, "Skip license", resultHandler: { result in
@@ -188,6 +192,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
             try loadSkipLicense()
         })
     }
+    #endif
 
     func checkAndroidStudioVersion(with out: MessageQueue) async {
         #if os(macOS) // on macOS, check for Android Studio

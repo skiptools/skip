@@ -1117,6 +1117,22 @@ struct BuildOptions: ParsableArguments {
     var verify: Bool = false
 }
 
+#if !SKIP_LICENSE_CHECK
+struct LicenseCommand: AsyncParsableCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "license",
+        abstract: "License management (obsolete)",
+        discussion: """
+        Legacy license management command that is no longer used.
+        """,
+        shouldDisplay: false)
+
+    func run() async throws {
+        fatalError("The skip license command is no longer used")
+    }
+}
+#endif
+
 struct ProjectTemplate : Codable {
     let id: String
     let url: URL
