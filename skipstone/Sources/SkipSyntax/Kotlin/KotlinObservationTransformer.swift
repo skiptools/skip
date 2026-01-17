@@ -1,3 +1,7 @@
+// Copyright (c) 2023 - 2026 Skip
+// Licensed under the GNU Affero General Public License v3.0
+// SPDX-License-Identifier: AGPL-3.0-only
+
 /// Adapts `@Observable` and `ObservableObject` types for use in Combine and SwiftUI.
 final class KotlinObservationTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {

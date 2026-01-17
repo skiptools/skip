@@ -1,3 +1,7 @@
+// Copyright (c) 2023 - 2026 Skip
+// Licensed under the GNU Affero General Public License v3.0
+// SPDX-License-Identifier: AGPL-3.0-only
+
 /// Perform synthesis and fixups related to `Equatable`, `Hashable`, `Comparable`, etc implementations.
 ///
 ///   1. Synthesize `equals` and `hashCode` members in cases where the Swift compiler synthesizes `Equatable` and `Hashable`.

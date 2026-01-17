@@ -1,3 +1,7 @@
+// Copyright (c) 2023 - 2026 Skip
+// Licensed under the GNU Affero General Public License v3.0
+// SPDX-License-Identifier: AGPL-3.0-only
+
 /// A plugin used to translate a specific facet of Swift code to Kotlin.
 ///
 /// The transformer lifetime is tied to that of the entire transpilation process. This means that a given transformer instance may be applied to multiple syntax trees.

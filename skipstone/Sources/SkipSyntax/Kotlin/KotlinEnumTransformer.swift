@@ -1,3 +1,7 @@
+// Copyright (c) 2023 - 2026 Skip
+// Licensed under the GNU Affero General Public License v3.0
+// SPDX-License-Identifier: AGPL-3.0-only
+
 /// Handle enum constructors and `CaseIterable` synthesis.
 final class KotlinEnumTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {

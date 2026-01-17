@@ -1,3 +1,7 @@
+// Copyright (c) 2023 - 2026 Skip
+// Licensed under the GNU Affero General Public License v3.0
+// SPDX-License-Identifier: AGPL-3.0-only
+
 /// Give warnings for common API that we know we do not support in Kotlin.
 public final class KotlinUnavailableAPI: UnavailableAPI {
     public override init() {

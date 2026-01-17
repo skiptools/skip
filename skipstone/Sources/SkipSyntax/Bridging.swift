@@ -1,3 +1,7 @@
+// Copyright (c) 2023 - 2026 Skip
+// Licensed under the GNU Affero General Public License v3.0
+// SPDX-License-Identifier: AGPL-3.0-only
+
 /// Determines what API is bridged without being explicitly annotated.
 public enum AutoBridge: Int {
     /// Bridge only API with bridge attribute.

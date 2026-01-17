@@ -1,3 +1,7 @@
+// Copyright (c) 2023 - 2026 Skip
+// Licensed under the GNU Affero General Public License v3.0
+// SPDX-License-Identifier: AGPL-3.0-only
+
 /// Generate compiled Swift to Kotlin bridging code.
 ///
 /// - Warning: This visitor assumes that the given syntax tree only contains bridged API.

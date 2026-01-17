@@ -3,21 +3,22 @@ name: Continuous Integration
 on:
   push:
     branches: [main]
-    tags: "[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
   pull_request:
 
 jobs:
-  #ci-skiphub:
-    #if: github.event_name != 'pull_request'
-    #uses: skiptools/skiphub/.github/workflows/ci.yml@main
-
-  ci-linux:
-    #runs-on: ubuntu-18.4
-    #runs-on: ubuntu-20.04
-    #runs-on: ubuntu-22.04
-    runs-on: ubuntu-latest
+  ci:
     timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'ubuntu-latest'
+          - 'macos-latest'
+          #- 'windows-latest'
+        swift:
+          - '6.2.3'
 
     steps:
       # checkout both skipstone.git and skip.git for the linked SkipDrive
@@ -32,19 +33,9 @@ jobs:
           repository: skiptools/skip
           path: skip
 
-      - name: Setup
-        run: |
-          # convert "refs/tags/1.0.0" to "1.0.0"
-          # and "refs/heads/main" to "main"
-          TAG=${GITHUB_REF#refs/*/}
-          # the version if it matches the semantic tag pattern, otherwise "dev"
-          echo "RELTAG=${TAG:-'dev'}" >> $GITHUB_ENV
-
-          echo "COMMIT_DATE=$(git log -1 --format=%ad --date=iso-strict ${TAG})" >> $GITHUB_ENV
-
-      #- uses: swift-actions/setup-swift@next
-      #  with:
-      #    swift-version: "6.1.2"
+      - uses: swift-actions/setup-swift@v3
+        with:
+          swift-version: ${{ matrix.swift }}
 
       - name: Get swift version
         run: swift --version
@@ -55,28 +46,4 @@ jobs:
       - name: Swift Test (Debug)
         working-directory: skipstone
         run: KOTLINC=kotlinc swift test -v -c debug --parallel
-
-      - name: "Release"
-        # disabled due to "HTTP 403: Resource not accessible by integration"
-        # what we should do is add the file to the public release created at
-        # https://github.com/skiptools/skip/releases
-        # using a token with perimission to add to that repo
-        if: false
-        #if: startsWith(github.ref, 'refs/tags/')
-        working-directory: skipstone
-        env: 
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          echo "Creating release: ${RELTAG}"
-          gh release create "${RELTAG}" -t "Release ${RELTAG}" --generate-notes .build/dist/*.*
-
-      - name: "Upload Build Artifacts"
-        # TODO: hand off to macBuild, which will publish the linux plugin
-        # alongside the macOS one (once swift supports plugins on Linux)
-        # This is currently disabled because it uses up our storage limit
-        if: false
-        #if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@v4
-        with: 
-          path: skipstone/.build/dist
 

@@ -1,3 +1,7 @@
+// Copyright (c) 2023 - 2026 Skip
+// Licensed under the GNU Affero General Public License v3.0
+// SPDX-License-Identifier: AGPL-3.0-only
+
 /// Generate code to support `Bundle` and `Bundle.module` if it is needed within the module.
 public final class KotlinBundleTransformer: KotlinTransformer {
     public static let supportFileName = "Bundle_Support.swift"

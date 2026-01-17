@@ -1,3 +1,7 @@
+// Copyright (c) 2023 - 2026 Skip
+// Licensed under the GNU Affero General Public License v3.0
+// SPDX-License-Identifier: AGPL-3.0-only
+
 /// Map output ranges to source ranges.
 ///
 /// Note that a `Decodable` version of this structure exists as `SkipUnit.SourceMap`.

@@ -1,3 +1,7 @@
+// Copyright (c) 2023 - 2026 Skip
+// Licensed under the GNU Affero General Public License v3.0
+// SPDX-License-Identifier: AGPL-3.0-only
+
 /// Types of transpiler output.
 public enum OutputType : Encodable { // Encodable for use in Transpilation
     /// Transpilation of source Swift.

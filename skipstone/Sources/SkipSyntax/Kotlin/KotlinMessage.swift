@@ -1,3 +1,7 @@
+// Copyright (c) 2023 - 2026 Skip
+// Licensed under the GNU Affero General Public License v3.0
+// SPDX-License-Identifier: AGPL-3.0-only
+
 extension Message {
     static func kotlinUntranslatable(_ syntaxNode: SyntaxNode, source: Source) -> Message {
         let messageString = "Skip cannot translate this statement to Kotlin [\(syntaxNode.nodeName)]"

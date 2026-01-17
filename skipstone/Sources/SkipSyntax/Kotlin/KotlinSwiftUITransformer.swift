@@ -1,3 +1,7 @@
+// Copyright (c) 2023 - 2026 Skip
+// Licensed under the GNU Affero General Public License v3.0
+// SPDX-License-Identifier: AGPL-3.0-only
+
 /// Translate SwiftUI to syntactically correct Kotlin.
 ///
 /// We rely on our UI libraries to provide the implementation of the SwiftUI-like API that this translation will result in.

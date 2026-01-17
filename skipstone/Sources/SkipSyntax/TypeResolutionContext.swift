@@ -1,3 +1,7 @@
+// Copyright (c) 2023 - 2026 Skip
+// Licensed under the GNU Affero General Public License v3.0
+// SPDX-License-Identifier: AGPL-3.0-only
+
 /// Resolve missing type information such as typealiases, module-qualified type names, and missing generic parameters.
 struct TypeResolutionContext {
     private let codebaseInfo: CodebaseInfo.Context?

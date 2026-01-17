@@ -1,3 +1,7 @@
+// Copyright (c) 2023 - 2026 Skip
+// Licensed under the GNU Affero General Public License v3.0
+// SPDX-License-Identifier: AGPL-3.0-only
+
 /// Update variables declared in `if`, `guard`, and `when` statements to prevent shadowing locals and each other.
 ///
 /// - Seealso: ``KotlinIf``, ``KotlinWhen``
