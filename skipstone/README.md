@@ -1087,6 +1087,8 @@ OPTIONS:
 
 ```
 
-
 ## License
+
+Distributed under the GNU Affero General Public License v3.0 License.
+See [`LICENSE.txt`](LICENSE.txt) for more information.
 
