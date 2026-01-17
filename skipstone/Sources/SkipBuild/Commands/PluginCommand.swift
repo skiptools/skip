@@ -482,7 +482,7 @@ class SkipSettingsPlugin : Plugin<Settings> {
 }
 
 // Look up the expected property in the Skip.env file
-private fun Properties.skipEnv(key: String, optional: Boolean = false) : String {
+private fun Properties.skipEnv(key: String, optional: Boolean = false) : String? {
     val value = getProperty(key, System.getProperty("SKIP_${key}"))
     if (value == null && optional == false) {
         throw GradleException("Required key ${key} is not set in top-level ${skipEnvFilename} file or system property SKIP_${key}")
