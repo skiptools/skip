@@ -287,7 +287,7 @@ class SkipBuildPlugin @Inject constructor(private val os: ExecOperations) : Plug
             val appName = env.skipEnv("PRODUCT_NAME")
             val packageName = env.skipEnv("ANDROID_PACKAGE_NAME")
             val appModule = packageName + ":" + appName
-            val applicationId = env.skipEnv("ANDROID_APPLICATION_ID", optional = true) ?: env.skipEnv("PRODUCT_BUNDLE_IDENTIFIER").replace("-", "_")
+            val applicationId = env.getProperty("ANDROID_APPLICATION_ID") ?: env.skipEnv("PRODUCT_BUNDLE_IDENTIFIER").replace("-", "_")
             val activity = applicationId + "/" + packageName + ".MainActivity"
             dependencies.add("implementation", appModule)
 
@@ -482,9 +482,9 @@ class SkipSettingsPlugin : Plugin<Settings> {
 }
 
 // Look up the expected property in the Skip.env file
-private fun Properties.skipEnv(key: String, optional: Boolean = false) : String? {
+private fun Properties.skipEnv(key: String) : String {
     val value = getProperty(key, System.getProperty("SKIP_${key}"))
-    if (value == null && optional == false) {
+    if (value == null) {
         throw GradleException("Required key ${key} is not set in top-level ${skipEnvFilename} file or system property SKIP_${key}")
     }
     return value
