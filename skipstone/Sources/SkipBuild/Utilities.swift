@@ -281,3 +281,185 @@ extension Sequence where Element == UInt8 {
         map { String(format: "%02hhx", $0) }.joined()
     }
 }
+
+/// A sequence that both `Data` and `String.UTF8View` conform to.
+extension Data {
+    func SHA256HashData() -> [UInt8] {
+        SHA256(Array(self)).calculateHash()
+    }
+
+    func SHA256Hash() -> String {
+        SHA256HashData().compactMap { String(format: "%02x", $0) }.joined()
+    }
+}
+
+extension URL {
+    /// Calculates the hash from a file URL and returns the SHA256 hash.
+    func SHA256Hash() throws -> String {
+        try Data(contentsOf: self).SHA256Hash()
+    }
+}
+
+/// Internal SHA256 implementation
+private final class SHA256 {
+    static let h: Array<UInt64> = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]
+    static let k: Array<UInt64> = [0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+                0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+                0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+                0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+                0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+                0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+                0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+                0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2]
+
+    let message: Array<UInt8>
+
+    init(_ message: Array<UInt8>) {
+        self.message = message
+    }
+
+    func calculateHash() -> Array<UInt8> {
+        func rotateRight(_ value: UInt32, by: UInt32) -> UInt32 {
+            (value >> by) | (value << (32 - by))
+        }
+
+        func arrayOfBytes(value: Int, length: Int) -> Array<UInt8> {
+            withUnsafeBytes(of: value.bigEndian) { Array($0.prefix(length)) }
+        }
+
+        var buffer = bitPadding(to: self.message, blockSize: 64, allowance: 64 / 8)
+
+        // hash values
+        var hh = Array<UInt32>()
+        Self.h.forEach {(h) -> () in
+            hh.append(UInt32(h))
+        }
+
+        // append message length, in a 64-bit big-endian integer. So now the message length is a multiple of 512 bits.
+        buffer += arrayOfBytes(value: message.count * 8, length: 64 / 8)
+
+        // Process the message in successive 512-bit chunks:
+        let chunkSizeBytes = 512 / 8 // 64
+        for chunk in BytesSequence(chunkSize: chunkSizeBytes, data: buffer) {
+            // break chunk into sixteen 32-bit words M[j], 0 ≤ j ≤ 15, big-endian
+            // Extend the sixteen 32-bit words into sixty-four 32-bit words:
+            var M = Array<UInt32>(repeating: 0, count: Self.k.count)
+            for x in 0..<M.count {
+                switch x {
+                case 0...15:
+                    let start = chunk.startIndex + (x * MemoryLayout<UInt32>.size)
+                    let end = start + MemoryLayout<UInt32>.size
+                    let le = chunk[start..<end].toUInt32Array()[0]
+                    M[x] = le.bigEndian
+                    break
+                default:
+                    let s0 = rotateRight(M[x-15], by: 7) ^ rotateRight(M[x-15], by: 18) ^ (M[x-15] >> 3)
+                    let s1 = rotateRight(M[x-2], by: 17) ^ rotateRight(M[x-2], by: 19) ^ (M[x-2] >> 10)
+                    M[x] = M[x-16] &+ s0 &+ M[x-7] &+ s1
+                    break
+                }
+            }
+
+            var A = hh[0]
+            var B = hh[1]
+            var C = hh[2]
+            var D = hh[3]
+            var E = hh[4]
+            var F = hh[5]
+            var G = hh[6]
+            var H = hh[7]
+
+            // main loop
+            for j in 0..<Self.k.count {
+                let s0 = rotateRight(A, by: 2) ^ rotateRight(A, by: 13) ^ rotateRight(A, by: 22)
+                let maj = (A & B) ^ (A & C) ^ (B & C)
+                let t2 = s0 &+ maj
+                let s1 = rotateRight(E, by: 6) ^ rotateRight(E, by: 11) ^ rotateRight(E, by: 25)
+                let ch = (E & F) ^ ((~E) & G)
+                let t1 = H &+ s1 &+ ch &+ UInt32(Self.k[j]) &+ M[j]
+
+                H = G
+                G = F
+                F = E
+                E = D &+ t1
+                D = C
+                C = B
+                B = A
+                A = t1 &+ t2
+            }
+
+            hh[0] = (hh[0] &+ A)
+            hh[1] = (hh[1] &+ B)
+            hh[2] = (hh[2] &+ C)
+            hh[3] = (hh[3] &+ D)
+            hh[4] = (hh[4] &+ E)
+            hh[5] = (hh[5] &+ F)
+            hh[6] = (hh[6] &+ G)
+            hh[7] = (hh[7] &+ H)
+        }
+
+        // produce the final hash value (big-endian) as a 160 bit number:
+        var result = Array<UInt8>()
+        result.reserveCapacity(hh.count / 4)
+        ArraySlice(hh).forEach {
+            let item = $0.bigEndian
+            let toAppend: [UInt8] = [UInt8(item & 0xff), UInt8((item >> 8) & 0xff), UInt8((item >> 16) & 0xff), UInt8((item >> 24) & 0xff)]
+            result += toAppend
+        }
+        return result
+    }
+
+    private func bitPadding(to data: Array<UInt8>, blockSize: Int, allowance: Int = 0) -> Array<UInt8> {
+        var tmp = data
+
+        // Step 1. Append Padding Bits
+        tmp.append(0x80) // append one bit (UInt8 with one bit) to message
+
+        // append "0" bit until message length in bits ≡ 448 (mod 512)
+        var msgLength = tmp.count
+        var counter = 0
+
+        while msgLength % blockSize != (blockSize - allowance) {
+            counter += 1
+            msgLength += 1
+        }
+
+        tmp += Array<UInt8>(repeating: 0, count: counter)
+        return tmp
+    }
+}
+
+private extension Collection where Self.Iterator.Element == UInt8, Self.Index == Int {
+    func toUInt32Array() -> Array<UInt32> {
+        var result = Array<UInt32>()
+        result.reserveCapacity(16)
+        for idx in stride(from: self.startIndex, to: self.endIndex, by: MemoryLayout<UInt32>.size) {
+            var val: UInt32 = 0
+            val |= self.count > 3 ? UInt32(self[idx.advanced(by: 3)]) << 24 : 0
+            val |= self.count > 2 ? UInt32(self[idx.advanced(by: 2)]) << 16 : 0
+            val |= self.count > 1 ? UInt32(self[idx.advanced(by: 1)]) << 8  : 0
+            val |= !self.isEmpty ? UInt32(self[idx]) : 0
+            result.append(val)
+        }
+
+        return result
+    }
+}
+
+private struct BytesSequence<D: RandomAccessCollection>: Sequence where D.Iterator.Element == UInt8, D.Index == Int {
+    let chunkSize: Int
+    let data: D
+
+    func makeIterator() -> AnyIterator<D.SubSequence> {
+        var offset = data.startIndex
+        return AnyIterator {
+            let end = Swift.min(self.chunkSize, self.data.count - offset)
+            let result = self.data[offset..<offset + end]
+            offset = offset.advanced(by: result.count)
+            if !result.isEmpty {
+                return result
+            }
+            return nil
+        }
+    }
+}
