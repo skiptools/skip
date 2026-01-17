@@ -47,3 +47,20 @@ jobs:
         working-directory: skipstone
         run: KOTLINC=kotlinc swift test -v -c debug --parallel
 
+      - name: Build plugin
+        working-directory: skipstone
+        shell: bash
+        run: |
+          if [[ "${RUNNER_OS}" == "macOS" ]]; then
+            ./scripts/build_macos_plugin.sh
+          elif [[ "${RUNNER_OS}" == "Linux" ]]; then
+            # install the static linux SDK for MUSL cross-compilation
+            curl -fsSL -o 'swift-static-linux-sdk.tar.gz' 'https://download.swift.org/swift-${{ matrix.swift }}-release/static-sdk/swift-${{ matrix.swift }}-RELEASE/swift-${{ matrix.swift }}-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz'
+            swift sdk install 'swift-static-linux-sdk.tar.gz'
+
+            ./scripts/build_linux_plugin.sh
+          else
+            echo "::error::Unsupported platform: ${{ matrix.os }}"
+            exit 1
+          fi
+
