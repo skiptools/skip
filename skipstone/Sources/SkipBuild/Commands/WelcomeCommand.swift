@@ -48,7 +48,7 @@ struct WelcomeCommand: SkipCommand, SingleStreamingCommand {
             Run "skip checkup" to perform a full system evaluation.
             Run "skip create" to start a new project.
 
-            Visit https://skip.tools for documentation, samples, and FAQs.
+            Visit https://skip.dev for documentation, samples, and FAQs.
 
             Happy Skipping!
             """
@@ -56,10 +56,7 @@ struct WelcomeCommand: SkipCommand, SingleStreamingCommand {
     }
 
     func executeCommand() async throws -> WelcomeInfo? {
-        if !firstRun || OutputOptions.isFirstRun == true {
-            return WelcomeInfo()
-        } else {
-            return nil
-        }
+        OutputOptions.checkFirstRun()
+        return WelcomeInfo()
     }
 }

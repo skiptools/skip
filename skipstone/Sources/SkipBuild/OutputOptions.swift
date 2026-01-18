@@ -94,7 +94,7 @@ public struct OutputOptions: ParsableArguments {
     }
 
     public init() {
-        let _ = Self.isFirstRun
+        Self.checkFirstRun()
     }
 
     internal final class OutputHandler : Decodable {
@@ -554,10 +554,8 @@ extension OutputOptions {
         checkFirstRun()
     }
 
-
-    static var isFirstRun: Bool = checkFirstRun()
-
-    @discardableResult static func checkFirstRun() -> Bool {
+    static func checkFirstRun() {
+        #if SKIP_LICENSE_CHECK
         let cfg = home(".skiptools")
 
         let firstRun = FileManager.default.fileExists(atPath: cfg) == false
@@ -572,27 +570,7 @@ extension OutputOptions {
             SKIPKEY: 
             """.write(toFile: env, atomically: false, encoding: .utf8)
         }
-
-        #if false // not currently used
-        let yml = cfg + "/skip.yml"
-        if !FileManager.default.fileExists(atPath: yml) {
-            try? """
-# This file contains the configuration properties for Skip in the YAML format
-# See https://skip.tools/docs for the structure of the configuration file
-
-# The environment that will be set when Skip launches other tools
-environment:
-    # set ANDROID_SERIAL to override the default Android launch device/emulator
-    # use `adb devices` to list the available device identifiers
-    #ANDROID_SERIAL: emulator-5554
-    #ANDROID_SERIAL: 19091FDF600BAY
-
-"""
-                .write(toFile: yml, atomically: false, encoding: .utf8)
-        }
         #endif
-
-        return firstRun
     }
 }
 

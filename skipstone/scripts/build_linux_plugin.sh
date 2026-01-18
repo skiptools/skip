@@ -19,7 +19,7 @@ PLUGIN_ZIP="${ARTIFACT}-linux.zip"
 ARTIFACT_BUILD_DIR=.build/artifactbundle-linux
 
 SWIFT_VERSION=${SWIFT_VERSION:-"6.2.3"}
-USE_SWIFTLY=1
+USE_SWIFTLY=${USE_SWIFTLY:-"1"}
 
 if [[ "${USE_SWIFTLY}" == "1" ]]; then
     swiftly install "${SWIFT_VERSION}"
