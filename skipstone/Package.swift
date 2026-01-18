@@ -1,16 +1,10 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 5.10
 import PackageDescription
 
 let package = Package(
     name: "skipstone",
     defaultLocalization: "en",
-    platforms: [
-        .iOS(.v16),
-        .macOS(.v13),
-        .tvOS(.v16),
-        .watchOS(.v9),
-        .macCatalyst(.v16),
-    ],
+    platforms: [.macOS(.v14)],
     products: [
         .library(name: "SkipSyntax", targets: ["SkipSyntax"]),
         .library(name: "SkipBuild", targets: ["SkipBuild"]),
@@ -19,8 +13,8 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "602.0.0"),
         .package(url: "https://github.com/swiftlang/swift-tools-support-core.git", from: "0.7.3"),
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.6.1"),
-        .package(url: "https://github.com/marcprux/universal.git", from: "5.2.2"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.7.0"),
+        .package(url: "https://github.com/marcprux/universal.git", from: "5.3.0"),
         .package(url: "https://github.com/marcprux/ELFKit.git", from: "0.2.1"),
     ],
     targets: [

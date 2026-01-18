@@ -1128,7 +1128,7 @@ struct LicenseCommand: AsyncParsableCommand {
         shouldDisplay: false)
 
     func run() async throws {
-        fatalError("The skip license command is no longer used")
+        print("The skip license command is no longer used")
     }
 }
 #endif
