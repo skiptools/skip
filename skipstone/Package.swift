@@ -47,14 +47,3 @@ let package = Package(
         .testTarget(name: "SkipRunnerTests", dependencies: ["SkipBuild"]),
     ]
 )
-
-let SKIP_LICENSE_CHECK = (Context.environment["SKIP_LICENSE_CHECK"] ?? "1") == "1"
-
-if SKIP_LICENSE_CHECK {
-    let skipBuild = package.targets.first(where: { $0.name == "SkipBuild"})!
-    package.dependencies += [.package(url: "https://github.com/apple/swift-crypto.git", from: "3.15.1")]
-    skipBuild.dependencies += [.product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.linux]))]
-    package.targets.forEach({ target in
-        target.swiftSettings = (target.swiftSettings ?? []) + [.define("SKIP_LICENSE_CHECK")]
-    })
-}

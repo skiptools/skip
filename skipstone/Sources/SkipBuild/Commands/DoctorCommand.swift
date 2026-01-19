@@ -146,10 +146,6 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         // we no longer require that Android Studio be installed with the advent of `skip android emulator create`
         //await checkAndroidStudioVersion(with: out)
         #endif
-
-        #if SKIP_LICENSE_CHECK
-        await checkSkipLicense(with: out)
-        #endif
     }
 
     func checkXcodeCommandLineTools(with out: MessageQueue) async {
@@ -168,31 +164,6 @@ extension ToolOptionsCommand where Self : StreamingCommand {
 
         #endif
     }
-
-    #if SKIP_LICENSE_CHECK
-    func checkSkipLicense(with out: MessageQueue) async {
-        // Manually try to parse the Android Studio version; tolerate failures
-        await outputOptions.monitor(with: out, "Skip license", resultHandler: { result in
-            do {
-                guard let (_, license, trialExpiraton, _, _) = try result?.get() else {
-                    return (result, MessageBlock(status: .fail, "Skip license: none found"))
-                }
-
-                let exp = license?.expiration ?? trialExpiraton
-                let daysLeft = Int(ceil(exp.timeIntervalSince(Date.now) / (24 * 60 * 60)))
-                let expires = daysLeft > licenseWarnDays ? "good through" : daysLeft > 0 ? "expires" : "expired"
-                let status: MessageBlock.Status = daysLeft < 0 ? .fail : daysLeft < licenseWarnDays ? .warn : .pass
-                let fmt = { DateFormatter.localizedString(from: $0, dateStyle: .medium, timeStyle: .none) }
-                let ltype = license == nil ? "trial" : license?.licenseType?.rawValue ?? "legacy"
-                return (result, MessageBlock(status: status, "Skip license: \(ltype) \(expires) \(fmt(exp))"))
-            } catch {
-                return (result, MessageBlock(status: .fail, "Skip license error: \(error.localizedDescription)"))
-            }
-        }, monitorAction: { _ in
-            try loadSkipLicense()
-        })
-    }
-    #endif
 
     func checkAndroidStudioVersion(with out: MessageQueue) async {
         #if os(macOS) // on macOS, check for Android Studio

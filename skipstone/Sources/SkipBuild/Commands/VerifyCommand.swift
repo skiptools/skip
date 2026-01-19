@@ -136,20 +136,6 @@ extension ToolOptionsCommand where Self : StreamingCommand {
             } else if licenseTXT.isReadableFile == true {
                 await checkFileContents(licenseTXT, message: "Verify free software license", trailingContents: [licenseGPL2Contents, licenseGPL3Contents, licenseLGPL3Contents, licenseOSLContents])
             }
-
-            #if SKIP_LICENSE_CHECK
-            if await checkFolder(sourcesDir) {
-                await checkFile(sourcesDir, with: out, title: "Verify source file license headers") { title, url in
-                    let srcFiles = try FileManager.default.enumeratedURLs(of: url)
-                    let (unlicensedSources, _) = try SourceValidator.scanSources(from: srcFiles, in: ["swift"])
-                    if unlicensedSources.isEmpty {
-                        return CheckStatus(status: .pass, message: "Verify source file license headers (\(srcFiles.count))")
-                    } else {
-                        return CheckStatus(status: .fail, message: "Invalid license headers in: \(unlicensedSources.map(\.relativePath).joined(separator: ", "))")
-                    }
-                }
-            }
-            #endif
         }
 
         let androidDir = URL(fileURLWithPath: "Android", isDirectory: true, relativeTo: projectFolderURL)
