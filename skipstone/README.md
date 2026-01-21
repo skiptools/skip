@@ -53,7 +53,7 @@ Tapped 1 cask (15 files, 417KB).
   ▄▄▄▄▄█ ██    ▄  ██  ██   █    
  █▄▄▄▄▄▄▄██▄▄▄█ █▄██▄▄██▄▄▄█    
 
-Welcome to Skip 1.6.36!
+Welcome to Skip 1.7.0!
 
 Run "skip checkup" to perform a full system evaluation.
 Run "skip create" to start a new project.
@@ -127,12 +127,12 @@ running gradle build with: /Users/marc/Library/Developer/Xcode/DerivedData/Skip-
 
 For framework projects (e.g., when building or running tests), the indication that it is
 using the local build will come from the plugin log message for the target. The indication
-that it is a local debug build will be that there is an asterisk ("*") agfter the
+that it is a local debug build will be that there is an asterisk ("*") after the
 Skip version number at the beginning of the skipstone plugin output, like so:
 
 ```console
 Showing All Messages
-Skip 1.6.36*: skipstone plugin to: /Users/marc/Library/Developer/Xcode/DerivedData/Skip-Everything-aqywrhrzhkbvfseiqgxuufbdwdft/Build/Intermediates.noindex/BuildToolPluginIntermediates/skip-lib.output/SkipLib/skipstone/SkipLib/src/main at 11:23:18
+Skip 1.7.0*: skipstone plugin to: /Users/marc/Library/Developer/Xcode/DerivedData/Skip-Everything-aqywrhrzhkbvfseiqgxuufbdwdft/Build/Intermediates.noindex/BuildToolPluginIntermediates/skip-lib.output/SkipLib/skipstone/SkipLib/src/main at 11:23:18
 ```
 
 > [!CAUTION]
