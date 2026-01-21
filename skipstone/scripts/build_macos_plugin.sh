@@ -63,7 +63,6 @@ cat > ${ARTIFACTBUNDLE}/info.json << EOF
 }
 EOF
 
-tree "${ARTIFACTBUNDLE}"
 du -skh "${ARTIFACTBUNDLE}"
 
 # sync file times to git date for build reproducability
