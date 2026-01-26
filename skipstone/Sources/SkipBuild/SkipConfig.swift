@@ -18,6 +18,9 @@ struct SkipConfig : Codable {
 
     /// The native toolchain info
     var toolchain: SkipToolchain?
+
+    /// Custom gradle.properties key-value pairs
+    var gradleProperties: [String: String]?
 }
 
 struct TranspilationConfig : Codable {

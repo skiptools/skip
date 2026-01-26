@@ -707,9 +707,37 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             }
 
             func generateGradleProperties() throws {
-                // TODO: assemble these from skip.yml settings
                 let gradlePropertiesPath = moduleRootPath.parentDirectory.appending(component: "gradle.properties")
-                let gradePropertiesContents = FrameworkProjectLayout.defaultGradleProperties()
+                
+                let defaultPropertiesString = FrameworkProjectLayout.defaultGradleProperties()
+                var properties: [String: String] = [:]
+                
+                for line in defaultPropertiesString.components(separatedBy: .newlines) {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    if trimmed.isEmpty || trimmed.hasPrefix("#") {
+                        continue
+                    }
+                    let parts = trimmed.split(separator: "=", maxSplits: 1)
+                    if parts.count == 2 {
+                        let key = String(parts[0]).trimmingCharacters(in: .whitespaces)
+                        let value = String(parts[1]).trimmingCharacters(in: .whitespaces)
+                        properties[key] = value
+                    }
+                }
+                
+                // Merge with custom properties from skip.yml (custom properties override defaults)
+                if let customProperties = skipConfig.gradleProperties {
+                    for (key, value) in customProperties {
+                        properties[key] = value
+                    }
+                }
+                
+                var gradePropertiesContents = ""
+                for (key, value) in properties.sorted(by: { $0.key < $1.key }) {
+                    gradePropertiesContents += "\(key)=\(value)\n"
+                }
+                gradePropertiesContents += "\n"
+                
                 try writeChanges(tag: "gradle config", to: gradlePropertiesPath, contents: gradePropertiesContents.utf8Data, readOnly: true)
             }
         }
