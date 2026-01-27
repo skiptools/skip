@@ -8,8 +8,8 @@ body:
 
         If you are looking for support, please check out our documentation:
 
-          - https://skip.tools/docs
-          - https://skip.tools/docs/faq
+          - https://skip.dev/docs
+          - https://skip.dev/docs/faq
 
         If you have found a bug or if our documentation doesn't have an answer
         to what you're looking for, then fill out the template below.
@@ -18,7 +18,7 @@ body:
       value: |
         Before filling the form fields, please consider the following:
         - Ensure that you have searched the [existing issues](https://github.com/search?q=org%3Askiptools&type=issues)
-        - Read the [guide to finding help](https://skip.tools/docs/help/)
+        - Read the [guide to finding help](https://skip.dev/docs/help/)
   - type: textarea
     attributes:
       label: Steps to reproduce

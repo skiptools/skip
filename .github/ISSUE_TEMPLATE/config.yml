@@ -3,3 +3,6 @@ contact_links:
   - name: I want help writing my application
     url: https://github.com/orgs/skiptools/discussions/new?category=q-a
     about: Ask your questions about how to achieve a particular effect in Skip or get help with using a particular API.
+  - name: I need to read the Frequently Asked Questions
+    url: https://skip.dev/docs/faq/
+    about: Check the documentation to see if there is already a solution for common problems and answers to common questions.
