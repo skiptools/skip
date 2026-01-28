@@ -1183,9 +1183,8 @@ final class SkipCommandTests: XCTestCase {
               ├─ ModelModuleTests.swift
               ├─ Resources
               │  └─ TestData.json
-              ├─ Skip
-              │  └─ skip.yml
-              └─ XCSkipTests.swift
+              └─ Skip
+                 └─ skip.yml
 
         """)
 
