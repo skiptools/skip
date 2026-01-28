@@ -66,7 +66,7 @@ TOOLPATH="$(dirname "${SCRIPTPATH}")"
 OS="$(uname -s)"
 if [ "${OS}" = "Darwin" ]; then
     PROGRAM="${TOOLPATH}"/../macos/"${TOOLNAME}"
-    xattr -c "${PROGRAM}"
+    /usr/bin/xattr -c "${PROGRAM}"
 else
     ARCH="$(uname -m)"
     PROGRAM="${TOOLPATH}"/../"${ARCH}"-swift-linux-musl/"${TOOLNAME}"
