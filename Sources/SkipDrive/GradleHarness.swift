@@ -375,7 +375,7 @@ extension GradleHarness {
             } catch {
                 // shouldn't fail
             }
-            throw AppLaunchError(errorDescription: "\(logPrefix)error: The gradle command failed. Review the log for details and consult https://skip.tools/docs/faq for common solutions. Command: gradle \(arguments.joined(separator: " "))")
+            throw AppLaunchError(errorDescription: "\(logPrefix)error: The gradle command failed. Review the log for details and consult https://skip.dev/docs/faq for common solutions. Command: gradle \(arguments.joined(separator: " "))")
         }
     }
 

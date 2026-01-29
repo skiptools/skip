@@ -127,7 +127,7 @@ public struct GradleDriver {
         if let module = module {
             let moduleURL = URL(fileURLWithPath: module, isDirectory: true, relativeTo: workingDirectory)
             if !FileManager.default.fileExists(atPath: moduleURL.path) {
-                throw GradleDriverError("The expected gradle folder did not exist, which may mean the Skip transpiler is not enabled or encountered errors. Try running `skip doctor` to diagnose and re-building the project. See https://skip.tools/docs/. Missing path: \(moduleURL.path)")
+                throw GradleDriverError("The expected gradle folder did not exist, which may mean the Skip transpiler is not enabled or encountered errors. Try running `skip doctor` to diagnose and re-building the project. See https://skip.dev/docs/. Missing path: \(moduleURL.path)")
             }
             // rather than the top-level "build" folder, we place the module in per-module .build/ sub-folder in order to enable concurrent testing as well as placing generated files in a typically-gitignored
             let buildDir = "\(buildFolder)/\(module)"

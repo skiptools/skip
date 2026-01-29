@@ -145,7 +145,7 @@ extension XCGradleHarness where Self : XCTestCase {
                             // TODO: output test summary and/or a log file and have the xcode error link to the file so the user can see a summary of the failed tests
                             throw GradleDriverError("The gradle action \(actions) failed with \(failedTests.count) test \(failedTests.count == 1 ? "failure" : "failures"). Review the logs for individual test case results. Failed tests: \(failedTests.joined(separator: ", "))")
                         } else {
-                            throw GradleDriverError("gradle \(actions.first?.description ?? "") failed, which may indicate a build error or a test failure. Examine the log tab for more details. See https://skip.tools/docs")
+                            throw GradleDriverError("gradle \(actions.first?.description ?? "") failed, which may indicate a build error or a test failure. Examine the log tab for more details. See https://skip.dev/docs")
                         }
                     }
                 default:
