@@ -1731,7 +1731,7 @@ final class SkipCommandTests: XCTestCase {
             })
         }
 
- s       """)
+        """)
     }
 
     func testLibInitApp5ModuleNoZeroCommand() async throws {

@@ -1286,7 +1286,7 @@ struct TestData : Codable, Hashable {
             var skipModuleDeps: [String] = []
             for modDep in modDeps {
                 if let repoName = modDep.repositoryName {
-                    let repoURL = modDep.organizationName != nil ? "https://github.com/\(modDep.organizationName!)" : "https://source.skip.dev"
+                    let repoURL = modDep.organizationName != nil ? "https://github.com/\(modDep.organizationName!)" : "https://source.skip.tools"
                     var packDep = ".package(url: \"\(repoURL)/\(repoName).git\", "
 
                     var depVersion = modDep.repositoryVersion ?? "1.0.0" // "1.2.3"..<"1.2.6"
