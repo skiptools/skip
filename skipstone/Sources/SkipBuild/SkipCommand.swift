@@ -414,7 +414,7 @@ extension StreamingCommand {
                     msg += " \(errors > 0 ? "and" : "with") \(warnings) warning\(warnings == 1 ? "" : "s")"
                 }
                 if errors > 0 || warnings > 0 {
-                    msg += "\nSee \(outputOptions.term.yellow("https://skip.tools/docs/faq")) and \(outputOptions.term.yellow("https://community.skip.tools")) for help"
+                    msg += "\nSee \(outputOptions.term.yellow("https://skip.dev/docs/faq")) and \(outputOptions.term.yellow("https://forums.skip.dev")) for help"
                     msg += "\nSee output log for error details: \(logPath)"
                 }
             } else {

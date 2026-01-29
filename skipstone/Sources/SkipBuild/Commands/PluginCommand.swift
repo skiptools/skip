@@ -251,7 +251,7 @@ class SkipBuildPlugin @Inject constructor(private val os: ExecOperations) : Plug
         // https://android-developers.googleblog.com/2024/04/jetpack-compose-compiler-moving-to-kotlin-repository.html
         if (!project.plugins.hasPlugin("org.jetbrains.kotlin.plugin.compose")) {
             // project.plugins.apply("org.jetbrains.kotlin.plugin.compose") // doesn't work: "Plugin with id 'org.jetbrains.kotlin.plugin.compose' not found"
-            error("Manual upgrade required for Android/app/build.gradle.kts: add line to plugins block: alias(libs.plugins.kotlin.compose) Details: https://skip.tools/docs/kotlin2-migration/", path = buildFilePath, line = findLine(startingWith = "plugins {", path = buildFilePath) ?: 0)
+            error("Manual upgrade required for Android/app/build.gradle.kts: add line to plugins block: alias(libs.plugins.kotlin.compose) Details: https://skip.dev/docs/kotlin2-migration/", path = buildFilePath, line = findLine(startingWith = "plugins {", path = buildFilePath) ?: 0)
             validationFailures += 1
         }
 
@@ -266,12 +266,12 @@ class SkipBuildPlugin @Inject constructor(private val os: ExecOperations) : Plug
 
         val kotlinCompilerExtensionVersionLine = findLine(startingWith = "kotlinCompilerExtensionVersion =", path = buildFilePath)
         if (kotlinCompilerExtensionVersionLine != null) {
-            error("Manual upgrade required for Android/app/build.gradle.kts: remove the line kotlinCompilerExtensionVersion = … Details: https://skip.tools/docs/kotlin2-migration/", path = buildFilePath, line = kotlinCompilerExtensionVersionLine)
+            error("Manual upgrade required for Android/app/build.gradle.kts: remove the line kotlinCompilerExtensionVersion = … Details: https://skip.dev/docs/kotlin2-migration/", path = buildFilePath, line = kotlinCompilerExtensionVersionLine)
             validationFailures += 1
         }
 
         if (findLine(startingWith = "jvmTarget = ", path = buildFilePath) == null) {
-            error("Manual upgrade required for Android/app/build.gradle.kts: android block should contain a kotlin compilerOptions block with the line: jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.jvm.get().toString()) Details: https://skip.tools/docs/kotlin2-migration/", path = buildFilePath)
+            error("Manual upgrade required for Android/app/build.gradle.kts: android block should contain a kotlin compilerOptions block with the line: jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.jvm.get().toString()) Details: https://skip.dev/docs/kotlin2-migration/", path = buildFilePath)
             validationFailures += 1
         }
 
@@ -445,7 +445,7 @@ class SkipSettingsPlugin : Plugin<Settings> {
 
             //warn("checking skipOutputs: ${skipOutputs}")
             if (!skipOutputs.exists()) {
-                error("The expected plugin output folder did not exist at ${skipOutputs}. This may mean that the Skip project was not transpiled successfully, or that the skipstone transpiler plugin is not enabled for the project. Check the gradle log for details and see https://skip.tools/docs/faq/ for troubleshooting.")
+                error("The expected plugin output folder did not exist at ${skipOutputs}. This may mean that the Skip project was not transpiled successfully, or that the skipstone transpiler plugin is not enabled for the project. Check the gradle log for details and see https://skip.dev/docs/faq/ for troubleshooting.")
             }
 
             // look in each of the output folders and return the first one for which the ModuleName/skipstone/ folder exists.
@@ -458,7 +458,7 @@ class SkipSettingsPlugin : Plugin<Settings> {
             }
 
             if (projectBaseDir == null) {
-                error("Could not locate transpiled module for ${swiftModuleName} in ${skipOutputs}. This may mean that the Skip project was not transpiled successfully. Check the gradle log for details and see https://skip.tools/docs/faq/ for troubleshooting.")
+                error("Could not locate transpiled module for ${swiftModuleName} in ${skipOutputs}. This may mean that the Skip project was not transpiled successfully. Check the gradle log for details and see https://skip.dev/docs/faq/ for troubleshooting.")
             } else {
                 var projectDir = projectBaseDir
                     .resolve(swiftModuleName)
@@ -471,7 +471,7 @@ class SkipSettingsPlugin : Plugin<Settings> {
                         .resolve("skipstone")
                 }
                 if (!projectDir.exists()) {
-                    error("The folder at ${projectDir} does not exist. This may mean that the Skip project was not transpiled successfully, or the name of the project module is not unique in the packages that were created. Check the gradle log for details and see https://skip.tools/docs/faq/ for troubleshooting.")
+                    error("The folder at ${projectDir} does not exist. This may mean that the Skip project was not transpiled successfully, or the name of the project module is not unique in the packages that were created. Check the gradle log for details and see https://skip.dev/docs/faq/ for troubleshooting.")
                 }
 
                 // apply the settings directly to get the dependencies, which provides the "libs" versionCatalog

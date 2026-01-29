@@ -63,7 +63,7 @@ struct ADBCommand: MessageCommand, ToolOptionsCommand {
     func scanADBOutput(line: String) -> String? {
         func err(_ msg: String) -> String {
             // Xcode will report "error:" strings as an error; insert a file prefix to add a link
-            return "error: skip adb error: \(msg) (troubleshoot at https://skip.tools/docs)"
+            return "error: skip adb error: \(msg) (troubleshoot at https://skip.dev/docs)"
         }
 
         switch line {

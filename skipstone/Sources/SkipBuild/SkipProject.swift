@@ -1286,7 +1286,7 @@ struct TestData : Codable, Hashable {
             var skipModuleDeps: [String] = []
             for modDep in modDeps {
                 if let repoName = modDep.repositoryName {
-                    let repoURL = modDep.organizationName != nil ? "https://github.com/\(modDep.organizationName!)" : "https://source.skip.tools"
+                    let repoURL = modDep.organizationName != nil ? "https://github.com/\(modDep.organizationName!)" : "https://source.skip.dev"
                     var packDep = ".package(url: \"\(repoURL)/\(repoName).git\", "
 
                     var depVersion = modDep.repositoryVersion ?? "1.0.0" // "1.2.3"..<"1.2.6"
@@ -1422,7 +1422,7 @@ struct TestData : Codable, Hashable {
                 // remove the Skip package dependencies
                 package.dependencies.removeAll(where: { dependency in
                     if case .sourceControl(_, let url, _) = dependency.kind {
-                        return url.hasPrefix("https://source.skip.tools/")
+                        return url.hasPrefix("https://source.skip.dev/") || url.hasPrefix("https://source.skip.tools/")
                     } else {
                         return false
                     }
@@ -2026,7 +2026,7 @@ CODE_SIGN_ENTITLEMENTS = Entitlements.plist
 # enabled for the repository that will automatically publish
 # releases to the Apple App Store and/or Google Play Store.
 #
-# See the documentation at https://skip.tools/docs for more details.
+# See the documentation at https://skip.dev/docs for more details.
 name: \(projectName)
 on:
   push:
@@ -2569,7 +2569,7 @@ let logger: Logger = Logger(subsystem: "\(appid)", category: "\(primaryModuleNam
         let secondImport = options.appfair == true ? "\nimport AppFairUI" : ""
         let thirdImport = secondModule.flatMap({ "\nimport \($0.moduleName)" }) ?? ""
         let appOrg = appid.split(separator: ".").last?.description ?? appid
-        let appLink = options.appfair == true ? "https://github.com/\(appOrg)/\(appOrg)" : "https://skip.tools"
+        let appLink = options.appfair == true ? "https://github.com/\(appOrg)/\(appOrg)" : "https://skip.dev"
         let settingsFormView = options.appfair == true ? "AppFairSettings" : "Form"
         let demoSettingsCode = options.appfair == true ? "" : """
 
@@ -3592,7 +3592,7 @@ extension FrameworkProjectLayout {
             }
 
             // default signing configuration tries to load from keystore.properties
-            // see: https://skip.tools/docs/deployment/#export-signing
+            // see: https://skip.dev/docs/deployment/#export-signing
             signingConfigs {
                 val keystorePropertiesFile = file("keystore.properties")
                 create("release") {
