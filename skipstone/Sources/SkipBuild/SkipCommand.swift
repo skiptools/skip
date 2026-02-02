@@ -85,11 +85,9 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
             AndroidCommand.self,
             ExportCommand.self,
             DevicesCommand.self,
-            RunCommand.self,
             TestCommand.self,
 
             // Hidden commands used by the plugin
-            HostIDCommand.self,
             InfoCommand.self,
             SkippyCommand.self,
             TranspileCommand.self,
@@ -788,24 +786,6 @@ extension ProcessInfo {
         }
 
         return env
-    }
-
-        /// The unique host identifier as returned from `IOPlatformExpertDevice` on Darwin and the contents of "/etc/machine-id" on Linux
-    public var hostIdentifier: String? {
-        #if canImport(IOKit)
-        let matchingDict = IOServiceMatching("IOPlatformExpertDevice")
-        let service = IOServiceGetMatchingService(kIOMainPortDefault, matchingDict)
-        defer { IOObjectRelease(service) }
-        guard service != .zero else { return nil }
-        return (IORegistryEntryCreateCFProperty(service, kIOPlatformUUIDKey as CFString, kCFAllocatorDefault, .zero).takeRetainedValue() as? String)
-        #elseif os(Linux)
-        return ((try? String(contentsOfFile: "/etc/machine-id")) ?? (try? String(contentsOfFile: "/var/lib/dbus/machine-id")))?.trimmingCharacters(in: .whitespacesAndNewlines)
-        #elseif os(Windows)
-        // TODO: Windows registry key `MachineGuid`
-        return nil
-        #else
-        return nil // unsupported platform
-        #endif
     }
 
     /// Get the list of all running process IDs, which we check against the contents of a `.skiplock` file
