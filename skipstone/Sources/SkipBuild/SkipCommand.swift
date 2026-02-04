@@ -673,7 +673,15 @@ extension StreamingCommand {
     fileprivate func writeMessage(_ message: Message, output: String? = nil, terminator: String = "\n") {
         if !outputOptions.emitJSON || outputOptions.messagePlain {
             if let messageString = message.message(term: .plain) {
-                outputOptions.streams.writeStream(error: !outputOptions.messageErrout, output: output, messageString, terminator: terminator)
+                // Route info/trace messages to stdout, warnings/errors to stderr
+                // (unless messageErrout forces all messages to stdout)
+                let useStderr: Bool
+                if outputOptions.messageErrout {
+                    useStderr = false
+                } else {
+                    useStderr = message.kind == .warning || message.kind == .error
+                }
+                outputOptions.streams.writeStream(error: useStderr, output: output, messageString, terminator: terminator)
             }
         } else {
             yield(message: message)
@@ -697,7 +705,7 @@ extension StreamingCommand {
         return ValidationError(try message())
     }
 
-    /// Output the given message to standard error
+    /// Output the given message (info/trace to stdout, warnings/errors to stderr)
     func msg(_ kind: Message.Kind = .note, _ message: @autoclosure () throws -> String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) rethrows {
         if outputOptions.quiet == true {
             return
