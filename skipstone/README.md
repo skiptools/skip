@@ -95,6 +95,8 @@ This will download and install the `skip` tool itself, as well as the `gradle` a
 
 ## Local Skip Development
 
+Run `./scripts/skip` to build and run the Skip CLI tool from source. (It runs `swift run SkipRunner`, passing in a `$SKIP_COMMAND_OVERRIDE` environment variable.)
+
 In order to iterate on local changes to the `skipstone` binary that the Skip plugin uses,
 create an Xcode workspace that includes a local checkout of 
 [`skipstone.git`](https://github.com/skiptools/skipstone.git)
