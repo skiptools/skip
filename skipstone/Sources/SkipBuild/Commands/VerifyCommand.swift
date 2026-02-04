@@ -122,7 +122,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
 
         //let project = try FrameworkProjectLayout(root: projectFolderURL)
 
-        let sourcesDir = URL(fileURLWithPath: "Sources", isDirectory: true, relativeTo: projectFolderURL)
+        //let sourcesDir = URL(fileURLWithPath: "Sources", isDirectory: true, relativeTo: projectFolderURL)
 
         let licenseGPL = URL(fileURLWithPath: "LICENSE.GPL", isDirectory: false, relativeTo: projectFolderURL)
         let licenseLGPL = URL(fileURLWithPath: "LICENSE.LGPL", isDirectory: false, relativeTo: projectFolderURL)
