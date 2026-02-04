@@ -142,6 +142,21 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         try await checkVersion(title: "Gradle version", cmd: ["gradle", "-version"], min: Version("8.6.0"), pattern: "Gradle ([0-9.]+)", hint: " (install with: brew install gradle)")
         try await checkVersion(title: "Java version", cmd: ["java", "-version"], min: Version("17.0.0"), pattern: "version \"([0-9._]+)\"", hint: ProcessInfo.processInfo.environment["JAVA_HOME"] == nil ? nil : " (check JAVA_HOME environment: \(ProcessInfo.processInfo.environment["JAVA_HOME"] ?? "unset"))") // we don't necessarily need java in the path (which it doesn't seem to be by default with Homebrew)
         try await checkVersion(title: "Android Debug Bridge version", cmd: ["adb", "version"], min: Version("1.0.40"), pattern: "version ([0-9.]+)")
+        if let androidHome = ProcessInfo.androidHome {
+            let exists = FileManager.default.fileExists(atPath: androidHome)
+            if !exists {
+                if ProcessInfo.processInfo.environment["ANDROID_HOME"] == nil {
+                    await out.yield(MessageBlock(status: .fail, "Android SDK version: Not found. $ANDROID_HOME is not set and default SDK location does not exist: \(androidHome) (install from https://developer.android.com/studio)"))
+                } else {
+                    await out.yield(MessageBlock(status: .fail, "Android SDK version: Not found. $ANDROID_HOME is set to \(androidHome) but the directory does not exist"))
+                }
+            } else {
+                let sdkAdbPath = "\(androidHome)/platform-tools/adb"
+                try await checkVersion(title: "Android SDK version", cmd: [sdkAdbPath, "--version"], min: Version("29.0.0"), pattern: "Version ([0-9.]+)", hint: " (install from https://developer.android.com/studio)")
+            }
+        } else {
+            await out.yield(MessageBlock(status: .fail, "Android SDK version: Not found. $ANDROID_HOME is not set (install from https://developer.android.com/studio)"))
+        }
         #if os(macOS)
         // we no longer require that Android Studio be installed with the advent of `skip android emulator create`
         //await checkAndroidStudioVersion(with: out)

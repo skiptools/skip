@@ -771,18 +771,29 @@ extension ProcessInfo {
         #endif
     }()
 
+    public static let androidHome: String? = {
+        if let e = ProcessInfo.processInfo.environment["ANDROID_HOME"], !e.isEmpty {
+            return e
+        }
+        #if os(macOS)
+        return ("~/Library/Android/sdk" as NSString).expandingTildeInPath
+        #elseif os(Windows)
+        return ("~/AppData/Local/Android/Sdk" as NSString).expandingTildeInPath
+        #elseif os(Linux)
+        return ("~/Android/Sdk" as NSString).expandingTildeInPath
+        #else
+        return nil
+        #endif
+    }()
+
     /// The current process environment along with the default paths to various tools set
     public var environmentWithDefaultToolPaths: [String: String] {
         var env = self.environment
         let ANDROID_HOME = "ANDROID_HOME"
         if (env[ANDROID_HOME] ?? "").isEmpty {
-            #if os(macOS)
-            env[ANDROID_HOME] = ("~/Library/Android/sdk" as NSString).expandingTildeInPath
-            #elseif os(Windows)
-            env[ANDROID_HOME] = ("~/AppData/Local/Android/Sdk" as NSString).expandingTildeInPath
-            #elseif os(Linux)
-            env[ANDROID_HOME] = ("~/Android/Sdk" as NSString).expandingTildeInPath
-            #endif
+            if let androidHome = ProcessInfo.androidHome {
+                env[ANDROID_HOME] = androidHome
+            }
         }
 
         return env
