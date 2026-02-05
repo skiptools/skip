@@ -27,7 +27,7 @@ mkdir -p "${BINDIR}"
 # note: logic duplicated in build_macos_plugin.sh and build_linux_plugin.sh
 cat > ${BINDIR}/${TOOLNAME} << "EOF"
 #!/bin/bash
-# This scipt invokes the tool named after the script
+# This script invokes the tool named after the script
 # in the appropriate OS and architecture sub-folder
 set -e
 SCRIPTPATH="$(realpath "${BASH_SOURCE[0]}")"
