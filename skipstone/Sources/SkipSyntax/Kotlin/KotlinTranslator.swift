@@ -10,6 +10,9 @@ public final class KotlinTranslator {
     private(set) var codebaseInfo: CodebaseInfo.Context?
     private(set) var packageName: String?
 
+    /// Module name to custom package name overrides, populated from skip.yml config and dependent module exports.
+    public static var packageNameOverrides: [String: String] = [:]
+
     public init(syntaxTree: SyntaxTree) {
         self.syntaxTree = syntaxTree
     }
@@ -19,8 +22,18 @@ public final class KotlinTranslator {
     ///   - moduleName: The module name to convert.
     /// - Returns: The dot-separated package name.
     public static func packageName(forModule moduleName: String, withDefaultPackageSuffix: String? = "module", trimTests: Bool = true) -> String {
+        // Check for custom package name override
+        if let override = packageNameOverrides[moduleName] {
+            return override
+        }
+
         // Map from e.g. Foundation to SkipFoundation
         let moduleName = CodebaseInfo.moduleNameMap[moduleName]?.first ?? moduleName
+
+        // Check the mapped module name as well
+        if let override = packageNameOverrides[moduleName] {
+            return override
+        }
 
         // Turn into package name
         var lastLower = false

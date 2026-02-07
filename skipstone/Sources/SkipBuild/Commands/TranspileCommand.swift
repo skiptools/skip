@@ -370,7 +370,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             try fs.createSymbolicLink(addOutputFile(androidTestOutputFolder), pointingAt: outputFolderPath, relative: true)
         }
 
-        let packageName = KotlinTranslator.packageName(forModule: primaryModuleName)
+        let packageName = baseSkipConfig.skip?.package ?? KotlinTranslator.packageName(forModule: primaryModuleName)
 
         let transformers: [KotlinTransformer] = try createTransformers(for: baseSkipConfig, with: configMap)
 
@@ -1269,10 +1269,6 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         if let root = config.skip?.dynamicroot {
             transformers.append(KotlinDynamicObjectTransformer(root: root))
         }
-
-        //if let packageName = config.skip?.package {
-            // TODO: throw error("implement package/module map plugin")
-        //}
 
         return transformers
     }

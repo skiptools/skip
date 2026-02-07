@@ -1389,6 +1389,7 @@ public final class CodebaseInfo {
 
     public final class ModuleExport: Codable {
         public let moduleName: String?
+        public let packageName: String?
 
         // Default visibility for testing
         var rootTypes: [TypeInfo] = []
@@ -1402,11 +1403,19 @@ public final class CodebaseInfo {
         private var isPrepared = false
 
         private enum CodingKeys: String, CodingKey {
-            case moduleName = "m", rootTypes = "t", rootTypealiases = "a", rootVariables = "v", rootFunctions = "f", rootExtensions = "e", sourceFileTable = "stable"
+            case moduleName = "m"
+            case packageName = "p"
+            case rootTypes = "t"
+            case rootTypealiases = "a"
+            case rootVariables = "v"
+            case rootFunctions = "f"
+            case rootExtensions = "e"
+            case sourceFileTable = "stable"
         }
 
         public init(of codebaseInfo: CodebaseInfo) {
             self.moduleName = codebaseInfo.moduleName
+            self.packageName = codebaseInfo.kotlin?.packageName
 
             // We want to always produce the same encoded output for the same input, because new output from one module might be a signal
             // that modules depending on it have to re-transpile. Sort for stability. API within a file will always have been added in the

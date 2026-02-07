@@ -375,13 +375,10 @@ fileprivate extension AndroidOperationCommand {
                 ]
                 env = env.filter({ (key, value) in
                     permittedEnvironment.contains(key)
-                    && !key.hasPrefix("SKIP_")
-                    && !key.hasPrefix("ANDROID_") // "ANDROID_HOME", "ANDROID_NDK_HOME", "ANDROID_NDK_ROOT", "ANDROID_NDK", "ANDROID_SERIAL"
+                    || key.hasPrefix("SKIP_") // "SKIP_COMMAND_OVERRIDE"
+                    || key.hasPrefix("ANDROID_") // "ANDROID_HOME", "ANDROID_NDK_HOME", "ANDROID_NDK_ROOT", "ANDROID_NDK", "ANDROID_SERIAL"
                 })
             }
-
-            // manually disable the skipstone plugin from being run again in the derived build; we don't need to transpile and bridge the code a second time, we only need to build the native libraries with the Android toolchain
-            //env["SKIP_PLUGIN_DISABLED"] = "1"
 
             let swiftCmd = toolchainBin.appendingPathComponent("swift", isDirectory: false).path
             if !FileManager.default.fileExists(atPath: swiftCmd) {

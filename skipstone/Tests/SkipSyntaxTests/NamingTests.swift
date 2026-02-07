@@ -236,11 +236,46 @@ final class NamingTests: XCTestCase {
         """)
     }
 
-    private func codebaseInfo(moduleName: String, swift: String) throws -> CodebaseInfo {
+    func testCustomPackageNaming() throws {
+        KotlinTranslator.packageNameOverrides = ["MyLib": "com.example.mylib"]
+        defer { KotlinTranslator.packageNameOverrides = [:] }
+
+        // Override should be used
+        XCTAssertEqual("com.example.mylib", KotlinTranslator.packageName(forModule: "MyLib"))
+        // Non-overridden modules should still use the algorithmic name
+        XCTAssertEqual("other.module", KotlinTranslator.packageName(forModule: "OtherModule"))
+    }
+
+    func testCustomPackageNameDependentModule() async throws {
+        let moduleOne = try CodebaseInfo.ModuleExport(of: codebaseInfo(moduleName: "ModuleOne", packageName: "com.custom.one", swift: """
+        public class A {
+            public func f() -> Swift.Int {
+                return 0
+            }
+        }
+        """))
+
+        try await check(dependentModules: [moduleOne], swift: """
+        import ModuleOne
+
+        func f(obj: ModuleOne.A) -> Int {
+            return obj.f()
+        }
+        """, kotlin: """
+        import com.custom.one.*
+
+        internal fun f(obj: com.custom.one.A): Int = obj.f()
+        """)
+    }
+
+    private func codebaseInfo(moduleName: String, packageName: String? = nil, swift: String) throws -> CodebaseInfo {
         let srcFile = try tmpFile(named: "Source_\(moduleName).swift", contents: swift)
         let source = Source(file: Source.FilePath(path: srcFile.path), content: swift)
         let syntaxTree = SyntaxTree(source: source)
         let codebaseInfo = CodebaseInfo(moduleName: moduleName)
+        if let packageName {
+            codebaseInfo.kotlin = KotlinCodebaseInfo(packageName: packageName)
+        }
         codebaseInfo.gather(from: syntaxTree)
         codebaseInfo.prepareForUse()
         return codebaseInfo

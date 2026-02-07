@@ -400,6 +400,17 @@ public final class KotlinCodebaseInfo: CodebaseInfoLanguageAdditions, CodebaseIn
     }
 
     func prepareForUse(codebaseInfo: CodebaseInfo) {
+        // Populate package name overrides from the current module and dependent modules
+        KotlinTranslator.packageNameOverrides = [:]
+        if let currentPackage = packageName, let currentModule = codebaseInfo.moduleName {
+            KotlinTranslator.packageNameOverrides[currentModule] = currentPackage
+        }
+        for moduleExport in codebaseInfo.dependentModules {
+            if let moduleName = moduleExport.moduleName, let customPackage = moduleExport.packageName {
+                KotlinTranslator.packageNameOverrides[moduleName] = customPackage
+            }
+        }
+
         for moduleExport in codebaseInfo.dependentModules {
             // SkipLib conflicts are special cased so that we don't constantly add additional unused imports for Array, etc.
             // See KotlinIdentifier, KotlinTypeSignature

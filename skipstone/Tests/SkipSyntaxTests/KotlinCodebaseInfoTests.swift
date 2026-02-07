@@ -63,6 +63,41 @@ final class KotlinCodebaseInfoTests: XCTestCase {
         XCTAssertEqual(true, context.isKotlinUnconstrainedInterfaceMember(name: "baseProtocolVar", parameters: nil, isStatic: false, in: .named("TestsProtocolImpl", [])))
         XCTAssertEqual(true, context.isKotlinUnconstrainedInterfaceMember(name: "baseProtocolFunc", parameters: functionParameters, isStatic: false, in: .named("TestsProtocolImpl", [])))
     }
+
+    func testPackageNameOverrides() throws {
+        defer { KotlinTranslator.packageNameOverrides = [:] }
+
+        // Set up a dependent module with a custom package name
+        let depSwift = "public class DepClass { }"
+        let depFile = try tmpFile(named: "Source_DepModule.swift", contents: depSwift)
+        let depSource = Source(file: Source.FilePath(path: depFile.path), content: depSwift)
+        let depTree = SyntaxTree(source: depSource)
+        let depInfo = CodebaseInfo(moduleName: "DepModule")
+        depInfo.kotlin = KotlinCodebaseInfo(packageName: "com.example.dep")
+        depInfo.gather(from: depTree)
+        depInfo.prepareForUse()
+        let depExport = CodebaseInfo.ModuleExport(of: depInfo)
+
+        // Verify the export captured the custom package name
+        XCTAssertEqual("com.example.dep", depExport.packageName)
+
+        // Set up the main module with a custom package name and the dependent module
+        let codebaseInfo = CodebaseInfo(moduleName: "MainModule")
+        codebaseInfo.kotlin = KotlinCodebaseInfo(packageName: "com.example.main")
+        codebaseInfo.dependentModules = [depExport]
+        codebaseInfo.prepareForUse()
+
+        // Verify overrides are populated for both current and dependent modules
+        XCTAssertEqual("com.example.main", KotlinTranslator.packageNameOverrides["MainModule"])
+        XCTAssertEqual("com.example.dep", KotlinTranslator.packageNameOverrides["DepModule"])
+
+        // Verify packageName(forModule:) uses overrides
+        XCTAssertEqual("com.example.main", KotlinTranslator.packageName(forModule: "MainModule"))
+        XCTAssertEqual("com.example.dep", KotlinTranslator.packageName(forModule: "DepModule"))
+
+        // Verify non-overridden modules still use algorithmic names
+        XCTAssertEqual("other.module", KotlinTranslator.packageName(forModule: "OtherModule"))
+    }
 }
 
 private let swift = """
