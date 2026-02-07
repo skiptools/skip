@@ -221,7 +221,7 @@ class FrameworkProjectLayout {
         """
 
         packageHeader += """
-        // This is a Skip (https://skip.tools) package.
+        // This is a Skip (https://skip.dev) package.
         import PackageDescription
 
         """
@@ -262,7 +262,7 @@ class FrameworkProjectLayout {
                 let sourceSkipYamlFile = sourceSkipDir.appending(path: "skip.yml")
 
                 let skipYamlGeneric = """
-                # Configuration file for https://skip.tools project
+                # Configuration file for Skip (https://skip.dev) project
                 #
                 # Kotlin dependencies and Gradle build options for this module can be configured here
                 #build:
@@ -680,31 +680,31 @@ public class \(moduleName)Module {
         }
       }
     },
-    "Hello [%@](https://skip.tools)!" : {
+    "Hello [%@](https://skip.dev)!" : {
       "comment" : "Welcome tab contents",
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "¡Hola [%@](https://skip.tools)!"
+            "value" : "¡Hola [%@](https://skip.dev)!"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bonjour [%@](https://skip.tools)!"
+            "value" : "Bonjour [%@](https://skip.dev)!"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "こんにちは [%@](https://skip.tools)"
+            "value" : "こんにちは [%@](https://skip.dev)"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你好 [%@](https://skip.tools)"
+            "value" : "你好 [%@](https://skip.dev)"
           }
         }
       }
@@ -825,31 +825,31 @@ public class \(moduleName)Module {
         }
       }
     },
-    "Powered by [Skip](https://skip.tools)" : {
+    "Powered by [Skip](https://skip.dev)" : {
       "comment" : "Link markdown text for the Powered by… label",
       "localizations" : {
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Impulsado por [Skip](https://skip.tools)"
+            "value" : "Impulsado por [Skip](https://skip.dev)"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fonctionnalités offertes par [Skip](https://skip.tools)"
+            "value" : "Fonctionnalités offertes par [Skip](https://skip.dev)"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "[Skip](https://skip.tools) を使って動かしています"
+            "value" : "[Skip](https://skip.dev) を使って動かしています"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "由[Skip](https://skip.tools)提供支持"
+            "value" : "由[Skip](https://skip.dev)提供支持"
           }
         }
       }
@@ -1213,13 +1213,13 @@ struct TestData : Codable, Hashable {
                 }
 
                 let skipYamlAppTests = """
-                # Configuration file for https://skip.tools project
+                # Configuration file for Skip (https://skip.dev) project
                 #build:
                 #  contents:
                 """
 
                 let skipYamlModuleTests = """
-                # Configuration file for https://skip.tools project
+                # Configuration file for Skip (https://skip.dev) project
                 #build:
                 #  contents:
                 """
@@ -1449,14 +1449,14 @@ struct TestData : Codable, Hashable {
         var libREADME = """
         # \(primaryModuleName)
 
-        This is a \(options.free ? "free " : "")[Skip](https://skip.tools) Swift/Kotlin library project containing the following modules:
+        This is a \(options.free ? "free " : "")[Skip](https://skip.dev) Swift/Kotlin library project containing the following modules:
 
         \(modules.map(\.moduleName).joined(separator: "\n"))
 
         ## Building
 
         This project is a \(options.free ? "free " : "")Swift Package Manager module that uses the
-        [Skip](https://skip.tools) plugin to transpile Swift into Kotlin.
+        [Skip](https://skip.dev) plugin to transpile Swift into Kotlin.
 
         Building the module requires that Skip be installed using
         [Homebrew](https://brew.sh) with `brew install skiptools/skip/skip`.
@@ -1512,7 +1512,7 @@ struct TestData : Codable, Hashable {
         var appREADME = """
         # \(primaryModuleName)
 
-        This is a \(options.free ? "free and open-source " : "")[Skip](https://skip.tools) dual-platform app project\(options.appfair ? " distributed through the [App Fair](https://appfair.org)" : "").
+        This is a \(options.free ? "free and open-source " : "")[Skip](https://skip.dev) dual-platform app project\(options.appfair ? " distributed through the [App Fair](https://appfair.org)" : "").
 
         \(appStoreLinks)
         <!-- TODO: add iOS screenshots to fastlane metadata
@@ -1914,7 +1914,7 @@ class AppProjectLayout : FrameworkProjectLayout {
 
         // create the top-level Skip.env which is the source or truth for Xcode and Gradle
         let skipEnvContents = """
-// The configuration file for your Skip App (https://skip.tools).
+// The configuration file for your Skip App (https://skip.dev).
 // Properties specified here are shared between
 // Darwin/\(appModuleName).xcconfig and Android/settings.gradle.kts
 // and will be included in the app's metadata files
@@ -2579,7 +2579,7 @@ let logger: Logger = Logger(subsystem: "\(appid)", category: "\(primaryModuleNam
             }
             HStack {
                 PlatformHeartView()
-                Text("Powered by [Skip](https://skip.tools)")
+                Text("Powered by [Skip](https://skip.dev)")
             }
 """
 

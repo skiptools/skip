@@ -53,7 +53,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 6.1
-        // This is a Skip (https://skip.tools) package.
+        // This is a Skip (https://skip.dev) package.
         import PackageDescription
 
         let package = Package(
@@ -134,7 +134,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 6.1
-        // This is a Skip (https://skip.tools) package.
+        // This is a Skip (https://skip.dev) package.
         import PackageDescription
 
         let package = Package(
@@ -231,7 +231,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 6.1
-        // This is a Skip (https://skip.tools) package.
+        // This is a Skip (https://skip.dev) package.
         import PackageDescription
 
         let package = Package(
@@ -299,7 +299,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 6.1
-        // This is a Skip (https://skip.tools) package.
+        // This is a Skip (https://skip.dev) package.
         import PackageDescription
 
         let package = Package(
@@ -373,7 +373,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 6.1
-        // This is a Skip (https://skip.tools) package.
+        // This is a Skip (https://skip.dev) package.
         import PackageDescription
 
         let package = Package(
@@ -793,7 +793,7 @@ final class SkipCommandTests: XCTestCase {
 
         let SkipYML = try load("Sources/SomeModule/Skip/skip.yml")
         XCTAssertEqual(SkipYML, """
-        # Configuration file for https://skip.tools project
+        # Configuration file for Skip (https://skip.dev) project
         #
         # Kotlin dependencies and Gradle build options for this module can be configured here
         #build:
@@ -812,7 +812,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 6.1
-        // This is a Skip (https://skip.tools) package.
+        // This is a Skip (https://skip.dev) package.
         import PackageDescription
 
         let package = Package(
@@ -881,7 +881,7 @@ final class SkipCommandTests: XCTestCase {
 
         let SkipYML = try load("Sources/SomeModule/Skip/skip.yml")
         XCTAssertEqual(SkipYML, """
-        # Configuration file for https://skip.tools project
+        # Configuration file for Skip (https://skip.dev) project
         #
         # Kotlin dependencies and Gradle build options for this module can be configured here
         #build:
@@ -902,7 +902,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 6.1
-        // This is a Skip (https://skip.tools) package.
+        // This is a Skip (https://skip.dev) package.
         import PackageDescription
 
         let package = Package(
@@ -1007,7 +1007,7 @@ final class SkipCommandTests: XCTestCase {
 
         let AppSkipYML = try load("Sources/AppModule/Skip/skip.yml")
         XCTAssertEqual(AppSkipYML, """
-        # Configuration file for https://skip.tools project
+        # Configuration file for Skip (https://skip.dev) project
         #
         # Kotlin dependencies and Gradle build options for this module can be configured here
         #build:
@@ -1024,7 +1024,7 @@ final class SkipCommandTests: XCTestCase {
 
         let ModelSkipYML = try load("Sources/ModelModule/Skip/skip.yml")
         XCTAssertEqual(ModelSkipYML, """
-        # Configuration file for https://skip.tools project
+        # Configuration file for Skip (https://skip.dev) project
         #
         # Kotlin dependencies and Gradle build options for this module can be configured here
         #build:
@@ -1081,7 +1081,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 6.1
-        // This is a Skip (https://skip.tools) package.
+        // This is a Skip (https://skip.dev) package.
         import PackageDescription
 
         let package = Package(
@@ -1194,7 +1194,7 @@ final class SkipCommandTests: XCTestCase {
 
         let AppSkipYML = try load("Sources/AppModule/Skip/skip.yml")
         XCTAssertEqual(AppSkipYML, """
-        # Configuration file for https://skip.tools project
+        # Configuration file for Skip (https://skip.dev) project
         #
         # Kotlin dependencies and Gradle build options for this module can be configured here
         #build:
@@ -1211,7 +1211,7 @@ final class SkipCommandTests: XCTestCase {
 
         let SkipYML = try load("Sources/ModelModule/Skip/skip.yml")
         XCTAssertEqual(SkipYML, """
-        # Configuration file for https://skip.tools project
+        # Configuration file for Skip (https://skip.dev) project
         #
         # Kotlin dependencies and Gradle build options for this module can be configured here
         #build:
@@ -1267,7 +1267,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 6.1
-        // This is a Skip (https://skip.tools) package.
+        // This is a Skip (https://skip.dev) package.
         import PackageDescription
 
         let package = Package(
@@ -1364,7 +1364,7 @@ final class SkipCommandTests: XCTestCase {
 
         let SkipYML = try load("Sources/AppModule/Skip/skip.yml")
         XCTAssertEqual(SkipYML, """
-        # Configuration file for https://skip.tools project
+        # Configuration file for Skip (https://skip.dev) project
         #
         # Kotlin dependencies and Gradle build options for this module can be configured here
         #build:
@@ -1382,7 +1382,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 6.2
-        // This is a Skip (https://skip.tools) package.
+        // This is a Skip (https://skip.dev) package.
         import PackageDescription
 
         let package = Package(
@@ -1515,7 +1515,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 6.1
-        // This is a Skip (https://skip.tools) package.
+        // This is a Skip (https://skip.dev) package.
         import PackageDescription
 
         let package = Package(
@@ -1654,7 +1654,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 6.1
-        // This is a Skip (https://skip.tools) package.
+        // This is a Skip (https://skip.dev) package.
         import PackageDescription
 
         let package = Package(
@@ -1817,7 +1817,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 6.1
-        // This is a Skip (https://skip.tools) package.
+        // This is a Skip (https://skip.dev) package.
         import PackageDescription
 
         let package = Package(
@@ -1953,7 +1953,7 @@ final class SkipCommandTests: XCTestCase {
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 6.1
-        // This is a Skip (https://skip.tools) package.
+        // This is a Skip (https://skip.dev) package.
         import PackageDescription
 
         let package = Package(
