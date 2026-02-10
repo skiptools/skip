@@ -956,6 +956,9 @@ final class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APIC
         if let number128Init = number128InitFunction(expression: expression, arguments: karguments) {
             return number128Init
         }
+        if let boolToggle = boolToggleToAssignment(expression: expression, translator: translator) {
+            return boolToggle
+        }
 
         let kfunction = translator.translateExpression(expression.function)
         // E.g. [Int](), [String: Int]()
@@ -1032,6 +1035,20 @@ final class KotlinFunctionCall: KotlinExpression, KotlinMainActorTargeting, APIC
         kexpression.inferredType = expression.inferredType.resolvingSelf(in: expression)
         kexpression.apiMatch = expression.apiMatch
         return kexpression
+    }
+
+    private static func boolToggleToAssignment(expression: FunctionCall, translator: KotlinTranslator) -> KotlinExpression? {
+        guard expression.arguments.isEmpty,
+              let memberAccess = expression.function as? MemberAccess,
+              memberAccess.member == "toggle",
+              memberAccess.baseType == .bool,
+              let base = memberAccess.base else {
+            return nil
+        }
+        let klhs = translator.translateExpression(base)
+        let krhsTarget = translator.translateExpression(base)
+        let krhs = KotlinPrefixOperator(operatorSymbol: "!", target: krhsTarget, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)
+        return KotlinBinaryOperator(op: Operator.with(symbol: "="), lhs: klhs, rhs: krhs, sourceFile: expression.sourceFile, sourceRange: expression.sourceRange)
     }
 
     private static func isFunction(expression: FunctionCall, named: String, moduleName: String) -> Bool {

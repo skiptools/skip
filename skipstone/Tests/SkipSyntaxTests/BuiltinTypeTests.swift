@@ -670,4 +670,18 @@ final class BuiltinTypeTests: XCTestCase {
             get() = 4.0
         """)
     }
+
+    func testBoolToggle() async throws {
+        try await check(swift: """
+        {
+            var flag: Bool = true
+            flag.toggle()
+        }
+        """, kotlin: """
+        { ->
+            var flag: Boolean = true
+            flag = !flag
+        }
+        """)
+    }
 }
