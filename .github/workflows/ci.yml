@@ -42,6 +42,7 @@ jobs:
           repository: skiptools/skipstone
           path: skipstone
           ref: main
+          submodules: true
           token: ${{ secrets.REPO_ACCESS_TOKEN }}
 
       - name: Checkout skip
