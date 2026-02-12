@@ -1037,7 +1037,13 @@ struct ToolOptions: ParsableArguments {
             case "swift": return self.swift ?? ProcessInfo.processInfo.environment["SKIP_SWIFT_PATH"]
             case "xcodebuild": return self.xcodebuild ?? ProcessInfo.processInfo.environment["SKIP_XCODEBUILD_PATH"]
             case "gradle": return self.gradle ?? ProcessInfo.processInfo.environment["SKIP_GRADLE_PATH"]
-            case "adb": return self.adb ?? ProcessInfo.processInfo.environment["SKIP_ADB_PATH"]
+            case "adb":
+                if let adb = self.adb ?? ProcessInfo.processInfo.environment["SKIP_ADB_PATH"] { return adb }
+                if let androidHome = ProcessInfo.androidHome,
+                   FileManager.default.fileExists(atPath: "\(androidHome)/platform-tools/adb") {
+                    return "\(androidHome)/platform-tools/adb"
+                    }
+                return nil
             case "emulator": return self.emulator ?? ProcessInfo.processInfo.environment["SKIP_EMULATOR_PATH"] ?? self.emulatorBinary
             case "java": return ProcessInfo.processInfo.environment["JAVA_HOME"]?.appending("/bin/java") ?? ProcessInfo.defaultJavaHome.appending("/bin/java")
             default: return nil
