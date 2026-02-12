@@ -21,17 +21,11 @@ jobs:
           - '6.2.3'
 
     steps:
-      # checkout both skipstone.git and skip.git for the linked SkipDrive
       - name: Checkout skipstone.git
         uses: actions/checkout@v6
         with:
-          path: skipstone
-
-      - name: Checkout skip.git
-        uses: actions/checkout@v6
-        with:
-          repository: skiptools/skip
-          path: skip
+          # skip.git submodule needed for SkipDriveExternal
+          submodules: true
 
       - uses: swift-actions/setup-swift@v3
         with:
@@ -44,11 +38,9 @@ jobs:
         run: which kotlinc
 
       - name: Swift Test (Debug)
-        working-directory: skipstone
         run: KOTLINC=kotlinc swift test -v -c debug --parallel
 
       - name: Build plugin
-        working-directory: skipstone
         shell: bash
         run: |
           # Build plugins using the current installed version of Swift
