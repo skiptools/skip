@@ -323,6 +323,7 @@ class SkipBuildPlugin @Inject constructor(private val os: ExecOperations) : Plug
                     commandLine = listOf(
                         "adb".withExecutableExtension(),
                         "devices")
+                    environment = getEnvWithAndroidSdk()
                     standardOutput = devicesOut
                 }
 
@@ -351,7 +352,6 @@ class SkipBuildPlugin @Inject constructor(private val os: ExecOperations) : Plug
                 return devices
             }
 
-            @Suppress("DEPRECATION")
             task("checkDevices") {
                 doFirst {
                     val devices = invokeADBDevices()
@@ -363,7 +363,6 @@ class SkipBuildPlugin @Inject constructor(private val os: ExecOperations) : Plug
 
             // add the "launchDebug" and "launchRelease" commands
             listOf("Debug", "Release").forEach { buildType ->
-                @Suppress("DEPRECATION")
                 task("launch" + buildType) {
                     dependsOn("checkDevices") // check the devices before install to report when there are no devices
                     dependsOn("install" + buildType) // built-in install task
@@ -393,6 +392,7 @@ class SkipBuildPlugin @Inject constructor(private val os: ExecOperations) : Plug
                                 "-n",
                                 activity
                                 )
+                                environment = getEnvWithAndroidSdk()
                             }
                         }
                     }
@@ -500,6 +500,40 @@ private fun String.withExecutableExtension() : String {
     } else {
         return this
     }
+}
+
+// Define Android SDK paths for different platforms
+private fun getAndroidSdkPath(): String? {
+    val userHome = System.getProperty("user.home")
+    val osName = System.getProperty("os.name").lowercase()
+    return when {
+        osName.contains("mac") || osName.contains("darwin") -> 
+            "${userHome}${File.separator}Library${File.separator}Android${File.separator}sdk"
+        osName.contains("windows") -> 
+            "${userHome}${File.separator}AppData${File.separator}Local${File.separator}Android${File.separator}Sdk"
+        osName.contains("linux") -> 
+            "${userHome}${File.separator}Android${File.separator}Sdk"
+        else -> null
+    }
+}
+
+// Get current PATH and add Android SDK tools
+private fun getEnvWithAndroidSdk(): Map<String, String> {
+    val currentEnv = System.getenv().toMutableMap()
+    // Check if ANDROID_HOME is already set
+    val androidSdkPath = currentEnv["ANDROID_HOME"] ?: getAndroidSdkPath()
+
+    if (androidSdkPath != null) {
+        val platformTools = "${androidSdkPath}${File.separator}platform-tools"
+        val tools = "${androidSdkPath}${File.separator}tools"
+        val toolsBin = "${tools}${File.separator}bin"
+        
+        val currentPath = currentEnv["PATH"] ?: ""
+        currentEnv["PATH"] = "${toolsBin}${File.pathSeparator}${currentPath}"
+        currentEnv["ANDROID_HOME"] = androidSdkPath
+    }
+
+    return currentEnv
 }
 
 // Parse the Skip.env key-value pairs, which is expected to be in the parent of the settings.gradle.kts
