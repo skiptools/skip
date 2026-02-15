@@ -321,7 +321,7 @@ class SkipBuildPlugin @Inject constructor(private val os: ExecOperations) : Plug
                 val devicesOut = ByteArrayOutputStream()
                 os.exec {
                     commandLine = listOf(
-                        "adb".withExecutableExtension(),
+                        adbPath(),
                         "devices")
                     environment = getEnvWithAndroidSdk()
                     standardOutput = devicesOut
@@ -379,7 +379,7 @@ class SkipBuildPlugin @Inject constructor(private val os: ExecOperations) : Plug
                             //warn("launching app ${activity} on device: ${device.serialNumber}")
                             os.exec {
                                 commandLine = listOf(
-                                "adb".withExecutableExtension(),
+                                adbPath(),
                                 "-s",
                                 device.serialNumber,
                                 "shell",
@@ -494,11 +494,13 @@ private fun Properties.skipEnv(key: String) : String {
     return value
 }
 
-private fun String.withExecutableExtension() : String {
+private fun adbPath() : String {
+    val androidSdkPath = System.getenv()["ANDROID_HOME"] ?: getAndroidSdkPath()
+    val adbPath = "${androidSdkPath}${File.separator}platform-tools${File.separator}adb"
     if (org.gradle.internal.os.OperatingSystem.current().isWindows) {
-        return this + ".exe"
+        return adbPath + ".exe"
     } else {
-        return this
+        return adbPath
     }
 }
 
@@ -524,12 +526,12 @@ private fun getEnvWithAndroidSdk(): Map<String, String> {
     val androidSdkPath = currentEnv["ANDROID_HOME"] ?: getAndroidSdkPath()
 
     if (androidSdkPath != null) {
-        val platformTools = "${androidSdkPath}${File.separator}platform-tools"
+        val platformTools = "${androidSdkPath}${File.separator}platform-tools" // adb, systrace, etc.
         val tools = "${androidSdkPath}${File.separator}tools"
-        val toolsBin = "${tools}${File.separator}bin"
-        
+        val toolsBin = "${tools}${File.separator}bin" // sdkmanager, avdmanager, etc.
+
         val currentPath = currentEnv["PATH"] ?: ""
-        currentEnv["PATH"] = "${toolsBin}${File.pathSeparator}${currentPath}"
+        currentEnv["PATH"] = "${platformTools}${File.pathSeparator}${toolsBin}${File.pathSeparator}${currentPath}"
         currentEnv["ANDROID_HOME"] = androidSdkPath
     }
 

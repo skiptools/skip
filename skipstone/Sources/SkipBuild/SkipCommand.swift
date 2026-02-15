@@ -804,6 +804,14 @@ extension ProcessInfo {
             }
         }
 
+        // also add tool paths for the various Android tools in case they are not already in the PATH
+        if var path = env["PATH"] {
+            if let androidHome = ProcessInfo.androidHome {
+                path += ":\(androidHome)/platform-tools:\(androidHome)/tools/bin:\(androidHome)/emulator"
+            }
+            env["PATH"] = path
+        }
+
         return env
     }
 
@@ -1037,13 +1045,7 @@ struct ToolOptions: ParsableArguments {
             case "swift": return self.swift ?? ProcessInfo.processInfo.environment["SKIP_SWIFT_PATH"]
             case "xcodebuild": return self.xcodebuild ?? ProcessInfo.processInfo.environment["SKIP_XCODEBUILD_PATH"]
             case "gradle": return self.gradle ?? ProcessInfo.processInfo.environment["SKIP_GRADLE_PATH"]
-            case "adb":
-                if let adb = self.adb ?? ProcessInfo.processInfo.environment["SKIP_ADB_PATH"] { return adb }
-                if let androidHome = ProcessInfo.androidHome,
-                   FileManager.default.fileExists(atPath: "\(androidHome)/platform-tools/adb") {
-                    return "\(androidHome)/platform-tools/adb"
-                    }
-                return nil
+            case "adb": return self.adb ?? ProcessInfo.processInfo.environment["SKIP_ADB_PATH"]
             case "emulator": return self.emulator ?? ProcessInfo.processInfo.environment["SKIP_EMULATOR_PATH"] ?? self.emulatorBinary
             case "java": return ProcessInfo.processInfo.environment["JAVA_HOME"]?.appending("/bin/java") ?? ProcessInfo.defaultJavaHome.appending("/bin/java")
             default: return nil
@@ -1052,7 +1054,7 @@ struct ToolOptions: ParsableArguments {
         if let toolPath = customTool() {
             return toolPath
         }
-        return try URL.findCommandInPath(toolName: tool, withAdditionalPaths: ProcessInfo.isARM ? ["/opt/homebrew/bin"] : ["/usr/local/bin"]).path
+        return try URL.findCommandInPath(toolName: tool, withAdditionalPaths: [ProcessInfo.homebrewRoot + "/bin"]).path
     }
 
     /// Returns the path to the emulator binary
@@ -1078,7 +1080,7 @@ public struct ToolLaunchError : LocalizedError {
 extension URL {
     /// Locates the given tool in the user's path
     public static func findCommandInPath(toolName: String, withAdditionalPaths extraPATH: [String]) throws -> URL {
-        let env = ProcessInfo.processInfo.environment
+        let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths
         let path = env["PATH"] ?? ""
         let pathParts = path.split(separator: ":", omittingEmptySubsequences: true).map(String.init)
         for pathPart in pathParts + extraPATH {
