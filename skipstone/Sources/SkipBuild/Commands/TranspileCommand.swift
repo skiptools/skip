@@ -1035,8 +1035,13 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 .appending(component: "Resources")
 
             for resourceFile in resourceURLs.map(\.path).sorted() {
-                guard let resourceSourceURL = moduleNamePaths.compactMap({ (_, folder) in
-                    resourceFile.hasPrefix(folder) ? URL(fileURLWithPath: resourceFile.dropFirst(folder.count).trimmingCharacters(in: CharacterSet(charactersIn: "/")).description, relativeTo: URL(fileURLWithPath: folder, isDirectory: true)) : nil }).first else {
+                let resourceFileCanonical = (resourceFile as NSString).standardizingPath
+                guard let resourceSourceURL = moduleNamePaths.compactMap({ (_, folder) -> URL? in
+                    let folderCanonical = (folder as NSString).standardizingPath
+                    guard resourceFileCanonical.hasPrefix(folderCanonical) else { return nil }
+                    let relativePath = String(resourceFileCanonical.dropFirst(folderCanonical.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                    return URL(fileURLWithPath: relativePath, relativeTo: URL(fileURLWithPath: folderCanonical, isDirectory: true))
+                }).first else {
                     // skip over resources that are not contained within the Resources/ folder (such as files in the Skip/ folder, which contain metadata that should not be copied)
                     msg(.trace, "no module root parent for \(resourceFile)")
                     continue
