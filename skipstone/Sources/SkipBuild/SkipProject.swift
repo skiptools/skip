@@ -2321,9 +2321,19 @@ submission_information({
             // rating.json
             try """
 {
+  "advertising": false,
+  "ageAssurance": false,
+  "gambling": false,
+  "healthOrWellnessTopics": false,
+  "lootBox": false,
+  "messagingAndChat": false,
+  "parentalControls": false,
+  "unrestrictedWebAccess": false,
+  "userGeneratedContent": false,
   "alcoholTobaccoOrDrugUseOrReferences": "NONE",
   "contests": "NONE",
   "gamblingSimulated": "NONE",
+  "gunsOrOtherWeapons": "NONE",
   "horrorOrFearThemes": "NONE",
   "koreaAgeRatingOverride": "NONE",
   "matureOrSuggestiveThemes": "NONE",
@@ -2332,11 +2342,8 @@ submission_information({
   "sexualContentGraphicAndNudity": "NONE",
   "sexualContentOrNudity": "NONE",
   "violenceCartoonOrFantasy": "NONE",
-  "violenceRealisticProlongedGraphicOrSadistic": "NONE",
   "violenceRealistic": "NONE",
-  "gambling": false,
-  "lootBox": false,
-  "unrestrictedWebAccess": false
+  "violenceRealisticProlongedGraphicOrSadistic": "NONE"
 }
 
 """.write(to: appProject.darwinFastlaneMetadataFolder.appendingPathComponent("rating.json").createParentDirectory(), atomically: false, encoding: .utf8)
