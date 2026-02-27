@@ -22,7 +22,6 @@ jobs:
           path: skipstone
           ref: main
           submodules: true
-          token: ${{ secrets.REPO_ACCESS_TOKEN }}
 
       - name: Checkout skip
         uses: actions/checkout@v6
@@ -64,5 +63,4 @@ jobs:
         run: ./scripts/release_skip.sh
         env: 
           DRY_RUN: 1
-          #GH_TOKEN: ${{ github.token }}
 

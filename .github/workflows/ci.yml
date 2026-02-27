@@ -43,7 +43,6 @@ jobs:
           path: skipstone
           ref: main
           submodules: true
-          token: ${{ secrets.REPO_ACCESS_TOKEN }}
 
       - name: Checkout skip
         uses: actions/checkout@v6
