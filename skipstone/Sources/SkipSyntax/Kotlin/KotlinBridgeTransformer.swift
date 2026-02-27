@@ -293,6 +293,7 @@ extension String {
     var cdeclEscaped: String {
         self.compactMap { ch -> String in
             switch ch {
+            case ".": return "."
             case "_": return "_1"
             case "/": return "_"
             case ";": return "_2"
