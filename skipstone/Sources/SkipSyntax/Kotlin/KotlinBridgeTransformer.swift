@@ -284,10 +284,29 @@ extension String {
 
     /// Escape special characters for use in a `@_cdecl` declaration.
     ///
-    /// - Warning: Assumes this is an identifier string that does not contain illegal identifier characters like `;`
+    /// As documented at https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/design.html#resolving_native_method_names
+    /// - `_` → `_1`
+    /// - `.` and `/` → `_` (package/class separator)
+    /// - `;` → `_2`
+    /// - `[` → `_3`
+    /// - Non-ASCII → `_0XXXX` (UTF-16 hex)
     var cdeclEscaped: String {
-        // TODO: Unicode chars
-        return replacing("_", with: "_1").replacing("$", with: "_00024")
+        self.compactMap { ch -> String in
+            switch ch {
+            case "_": return "_1"
+            case "/": return "_"
+            case ";": return "_2"
+            case "[": return "_3"
+            default:
+                if ch.isASCII && (ch.isLetter || ch.isNumber) {
+                    return String(ch)
+                } else if let utf16 = ch.utf16.first {
+                    return "_0\(String(format: "%04x", utf16))"
+                } else {
+                    fatalError("Invalid JNI character: \(ch)")
+                }
+            }
+        }.joined()
     }
 
     /// Return this property name as the equivalent Java getter.
