@@ -635,6 +635,12 @@ extension ProcessInfo {
             #endif
         }
 
+        // also add tool paths for the various Android tools in case they are not already in the PATH
+        if var path = env["PATH"], let androidHome = env[ANDROID_HOME] {
+            path += ":\(androidHome)/platform-tools:\(androidHome)/tools/bin:\(androidHome)/emulator"
+            env["PATH"] = path
+        }
+
         let JAVA_HOME = "JAVA_HOME"
         if (env[JAVA_HOME] ?? "").isEmpty {
             #if os(macOS)
