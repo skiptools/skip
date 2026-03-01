@@ -224,7 +224,7 @@ extension TestCommand {
                 let (summaryTable, _, _) = createTestSummaryTable(columnLength: 1024, matchedCases, testNameComparison)
 
                 if !FileManager.default.fileExists(atPath: summaryFile) {
-                    FileManager.default.createFile(atPath: summaryFile, contents: nil, attributes: nil)
+                    _ = FileManager.default.createFile(atPath: summaryFile, contents: nil, attributes: nil)
                 }
 
                 if let handle = FileHandle(forWritingAtPath: summaryFile) {

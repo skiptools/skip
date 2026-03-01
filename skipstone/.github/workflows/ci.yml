@@ -1,4 +1,4 @@
-name: Continuous Integration
+name: skipstone CI
 
 on:
   push:
@@ -8,14 +8,16 @@ on:
 
 jobs:
   ci:
-    timeout-minutes: 30
+    timeout-minutes: 90
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os:
           - 'ubuntu-latest'
-          - 'macos-latest'
+          - 'macos-26'
+          - 'macos-15-intel'
+          #- 'macos-latest'
           #- 'windows-latest'
         swift:
           - '6.2.3'
@@ -27,35 +29,88 @@ jobs:
           # skip.git submodule needed for SkipDriveExternal
           submodules: true
 
-      - uses: swift-actions/setup-swift@v3
-        with:
-          swift-version: ${{ matrix.swift }}
+      - uses: Homebrew/actions/setup-homebrew@main
 
-      - name: Get swift version
-        run: swift --version
+      - name: "Install Host Toolchain prerequisites"
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -y install libcurl4-openssl-dev || (sudo apt-get update && sudo apt-get -y install libcurl4-openssl-dev)
 
-      - name: Check kotlinc
-        run: which kotlinc
+      - run: brew install swiftly
 
-      - name: Swift Test (Debug)
-        run: KOTLINC=kotlinc swift test -v -c debug --parallel
+      - run: swiftly init --skip-install --assume-yes --quiet-shell-followup
 
-      - name: Build plugin
+      - run: swiftly install --assume-yes --use ${{ matrix.swift }}
+
+      - run: swiftly run swift --version
+
+      - run: swift --version
+
+      - run: swift test --parallel
+
+      # Linux plugin requires the Static Linux SDK
+      - name: "Install SDK prerequisites"
+        if: runner.os == 'Linux'
+        run: |
+          curl -fsSL -o 'swift-static-linux-sdk.tar.gz' 'https://download.swift.org/swift-${{ matrix.swift }}-release/static-sdk/swift-${{ matrix.swift }}-RELEASE/swift-${{ matrix.swift }}-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz'
+          swift sdk install 'swift-static-linux-sdk.tar.gz'
+
+      - name: "Build plugin"
         shell: bash
         run: |
           # Build plugins using the current installed version of Swift
           export USE_SWIFTLY=0
+          # "macos" or "linux"
+          OSNAME=$(echo $RUNNER_OS | tr '[A-Z]' '[a-z]')
 
-          if [[ "${RUNNER_OS}" == "macOS" ]]; then
-            ./scripts/build_macos_plugin.sh
-          elif [[ "${RUNNER_OS}" == "Linux" ]]; then
-            # install the static linux SDK for MUSL cross-compilation
-            curl -fsSL -o 'swift-static-linux-sdk.tar.gz' 'https://download.swift.org/swift-${{ matrix.swift }}-release/static-sdk/swift-${{ matrix.swift }}-RELEASE/swift-${{ matrix.swift }}-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz'
-            swift sdk install 'swift-static-linux-sdk.tar.gz'
+          ./scripts/build_${OSNAME}_plugin.sh
 
-            ./scripts/build_linux_plugin.sh
-          else
-            echo "::error::Unsupported platform: ${{ matrix.os }}"
-            exit 1
-          fi
+          SKIP_BIN="${PWD}/.build/artifactbundle-${OSNAME}/skip.artifactbundle/bin"
+
+          # set the PATH to include the newly-built `skip` command
+          echo "${SKIP_BIN}" >> $GITHUB_PATH
+
+          # override skip plugin to use the locally built binary
+          echo "SKIP_COMMAND_OVERRIDE=${SKIP_BIN}/skip" >> $GITHUB_ENV
+
+          # workaround fail when ANDROID_NDK_ROOT is set
+          # see https://github.com/finagolfin/swift-android-sdk/issues/207
+          echo "ANDROID_NDK_ROOT=" >> $GITHUB_ENV
+
+      - run: which skip
+
+      - run: skip version
+
+      - run: skip android sdk install --version 'nightly-6.3'
+
+      - run: skip doctor
+
+      - run: skip checkup --native
+        if: runner.os != 'Linux'
+        working-directory: ${{ runner.temp }}
+
+      - run: skip android emulator create
+        if: false # TODO
+
+      - run: skip android emulator list
+        if: false # TODO
+
+      - run: skip android emulator launch --background
+        #if: runner.arch != 'ARM64'
+        if: false # TODO
+
+      - name: "Build and run test package"
+        #if: runner.arch != 'ARM64'
+        if: false # TODO
+        run: |
+          cd ${TMPDIR}
+          mkdir package-demo
+          cd package-demo
+          swift init --name "PackageDemo"
+          # test on host OS
+          swift test
+          # test using xcrunner binary
+          skip android test
+          # test using shared object file loaded from .apk
+          skip android test --apk
 
