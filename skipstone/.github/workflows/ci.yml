@@ -7,21 +7,17 @@ on:
   pull_request:
 
 jobs:
-  ci:
-    timeout-minutes: 90
+  build-plugin:
+    timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - 'ubuntu-latest'
-          - 'macos-26'
-          - 'macos-15-intel'
-          #- 'macos-latest'
-          #- 'windows-latest'
         swift:
           - '6.2.3'
-
+        os:
+          - 'ubuntu-latest'
+          - 'macos-latest'
     steps:
       - name: Checkout skipstone.git
         uses: actions/checkout@v6
@@ -29,6 +25,70 @@ jobs:
           # skip.git submodule needed for SkipDriveExternal
           submodules: true
 
+      - run: swift build
+
+      - run: swift test --parallel
+
+      # Building the Linux plugin requires the Static Linux SDK
+      - name: "Install Static Linux SDK"
+        if: runner.os == 'Linux'
+        run: |
+          curl -fsSL --retry 5 -o 'swift-static-linux-sdk.tar.gz' 'https://download.swift.org/swift-${{ matrix.swift }}-release/static-sdk/swift-${{ matrix.swift }}-RELEASE/swift-${{ matrix.swift }}-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz'
+          swift sdk install 'swift-static-linux-sdk.tar.gz'
+
+      - name: "Build ${{ runner.os }} plugin"
+        shell: bash
+        run: |
+          # Build plugins using the current installed version of Swift
+          export USE_SWIFTLY=0
+          # "macos" or "linux"
+          OSNAME=$(echo $RUNNER_OS | tr '[A-Z]' '[a-z]')
+
+          ./scripts/build_${OSNAME}_plugin.sh
+
+          BUILD_DIR="${PWD}/.build/artifactbundle-${OSNAME}"
+          SKIP_BIN="${BUILD_DIR}/skip.artifactbundle/bin"
+
+          # set the PATH to include the newly-built `skip` command
+          echo "${SKIP_BIN}" >> $GITHUB_PATH
+
+          # override skip plugin to use the locally built binary
+          echo "SKIP_COMMAND_OVERRIDE=${SKIP_BIN}/skip" >> $GITHUB_ENV
+
+          mkdir artifacts/
+          find "${BUILD_DIR}"
+          cp -av "${BUILD_DIR}"/*.zip artifacts/
+
+      - run: skip welcome
+
+      - name: "Upload Build Artifacts"
+        uses: actions/upload-artifact@v6
+        with:
+          name: skip-plugin-${{ runner.os }}
+          path: artifacts/
+
+  android-ci:
+    needs: build-plugin
+    timeout-minutes: 90
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'ubuntu-24.04'
+          - 'macos-15-intel'
+        swift:
+          - '6.2.3'
+        android-api:
+          - '28'
+          - '34'
+        android-arch:
+          - 'x86_64'
+        android-sdk:
+          - 'nightly-6.3'
+          - 'nightly-main'
+
+    steps:
       - uses: Homebrew/actions/setup-homebrew@main
 
       - name: "Install Host Toolchain prerequisites"
@@ -46,71 +106,142 @@ jobs:
 
       - run: swift --version
 
-      - run: swift test --parallel
+      - name: "Download skip plugin"
+        uses: actions/download-artifact@v6
+        with:
+          name: skip-plugin-${{ runner.os }}
+          path: skip-artifact
 
-      # Linux plugin requires the Static Linux SDK
-      - name: "Install SDK prerequisites"
-        if: runner.os == 'Linux'
-        run: |
-          curl -fsSL -o 'swift-static-linux-sdk.tar.gz' 'https://download.swift.org/swift-${{ matrix.swift }}-release/static-sdk/swift-${{ matrix.swift }}-RELEASE/swift-${{ matrix.swift }}-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz'
-          swift sdk install 'swift-static-linux-sdk.tar.gz'
-
-      - name: "Build plugin"
+      - name: "Install skip from artifact"
         shell: bash
         run: |
-          # Build plugins using the current installed version of Swift
-          export USE_SWIFTLY=0
-          # "macos" or "linux"
           OSNAME=$(echo $RUNNER_OS | tr '[A-Z]' '[a-z]')
-
-          ./scripts/build_${OSNAME}_plugin.sh
-
-          SKIP_BIN="${PWD}/.build/artifactbundle-${OSNAME}/skip.artifactbundle/bin"
-
-          # set the PATH to include the newly-built `skip` command
+          cd skip-artifact
+          unzip skip-${OSNAME}.zip
+          SKIP_BIN="${PWD}/skip.artifactbundle/bin"
+          find skip.artifactbundle -type f -name skip -exec chmod +x {} +
           echo "${SKIP_BIN}" >> $GITHUB_PATH
-
-          # override skip plugin to use the locally built binary
           echo "SKIP_COMMAND_OVERRIDE=${SKIP_BIN}/skip" >> $GITHUB_ENV
-
-          # workaround fail when ANDROID_NDK_ROOT is set
-          # see https://github.com/finagolfin/swift-android-sdk/issues/207
-          echo "ANDROID_NDK_ROOT=" >> $GITHUB_ENV
 
       - run: which skip
 
       - run: skip version
 
-      - run: skip android sdk install --version 'nightly-6.3'
+      - run: skip android sdk install --version '${{ matrix.android-sdk }}'
 
       - run: skip doctor
 
       - run: skip checkup --native
-        if: runner.os != 'Linux'
-        working-directory: ${{ runner.temp }}
+        #if: runner.os != 'Linux'
+        # FIXME: fails on macOS due to: error: Dependencies could not be resolved because root depends on 'skip' 1.7.4..<2.0.0.
+        if: false
 
-      - run: skip android emulator create
-        if: false # TODO
-
-      - run: skip android emulator list
-        if: false # TODO
-
-      - run: skip android emulator launch --background
-        #if: runner.arch != 'ARM64'
-        if: false # TODO
-
-      - name: "Build and run test package"
-        #if: runner.arch != 'ARM64'
-        if: false # TODO
+      - name: "Prepare emulator test script"
         run: |
-          cd ${TMPDIR}
+          cat > emulator-test-script.sh << EOF
+          #!/bin/sh -ex
+          cd "${{ runner.temp }}"
+
           mkdir package-demo
           cd package-demo
-          swift init --name "PackageDemo"
+
+          swift package init --name "PackageDemo"
           # test on host OS
           swift test
-          # test using xcrunner binary
-          skip android test
+
           # test using shared object file loaded from .apk
-          skip android test --apk
+          skip android test --apk --arch ${{ matrix.android-arch }}
+
+          # test using xcrunner binary
+          skip android test --arch ${{ matrix.android-arch }}
+
+          # now add a failing test to make sure it actually fails
+          echo '@Test func shouldFail() { #expect(1+1 == 3, "Test should fail") }' >> Tests/PackageDemoTests/PackageDemoTests.swift
+
+          swift build --build-tests
+          ! swift test
+          ! skip android test --apk --arch ${{ matrix.android-arch }}
+
+          cd -
+
+          # Build and test a traditional Skip Lite package
+
+          # Disabled on Linux:
+          # /home/runner/work/_temp/demo-lite-framework/Tests/DemoFrameworkTests/DemoFrameworkTests.swift:2:8: error: no such module 'OSLog'
+          if [[ "${{ runner.os }}" != "Linux" ]]; then
+            skip init --no-build --transpiled-model --module-tests demo-lite-framework DemoFramework
+            cd demo-lite-framework
+            ANDROID_SERIAL=emulator-5554 swift test
+            cd -
+          fi
+
+          # Build and test a traditional Skip Fuse package
+
+          # Disabled due to build error on Linux:
+          # /home/runner/work/_temp/demo-fuse-framework/.build/checkouts/skip-android-bridge/Sources/SkipAndroidBridge/AndroidBundle.swift:6:12: error: cannot inherit from class 'Bundle' (compiled with Swift 6.2.4) because it has overridable members that could not be loaded in Swift 5.10
+
+          if [[ "${{ runner.os }}" != "Linux" ]]; then
+            skip init --no-build --native-model --bridged --module-tests demo-fuse-framework DemoFramework
+            cd demo-fuse-framework
+            ANDROID_SERIAL=emulator-5554 swift test
+            cd -
+          fi
+
+          EOF
+
+          chmod +x emulator-test-script.sh
+
+      - name: "Create and Launch Emulator"
+        if: false # TODO: fix `skip android emulator` commands
+        #if: runner.arch != 'ARM64'
+        run: |
+          skip android emulator create
+          skip android emulator list
+          skip android emulator launch --background
+
+      - name: "Prepare Android emulator environment"
+        if: runner.os == 'Linux'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+          # need to free disk space or the emulator fails to launch sometimes
+          sudo rm -rf /Applications/Xcode_1[45]*.app /Applications/Xcode_16.[0123].app /opt/microsoft /opt/google /opt/az /usr/share/miniconda /usr/share/az* /usr/share/glade* /usr/local/share/chromium /usr/local/share/powershell /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/julia* /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+
+      - name: "Android AVD cache"
+        uses: actions/cache@v5
+        id: avd-cache
+        # Emulator hangs when stopping, correlated to when the image is fetched from the cache
+        # https://github.com/ReactiveCircus/android-emulator-runner/issues/385#issuecomment-2423660038
+        if: false
+        with:
+          key: avd-${{ matrix.os }}-api-${{ matrix.android-api }}-${{ matrix.android-arch }}
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+
+      - name: "Create AVD and generate snapshot for caching"
+        if: false
+        #if: runner.arch != 'ARM64' && steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          force-avd-creation: false
+          api-level: ${{ matrix.android-api }}
+          arch: ${{ matrix.android-arch }}
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: echo "Generated AVD snapshot for caching."
+
+      - name: "Test Swift Package on Android"
+        if: runner.arch != 'ARM64'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          force-avd-creation: false
+          emulator-boot-timeout: 300
+          api-level: ${{ matrix.android-api }}
+          arch: ${{ matrix.android-arch }}
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
+          disable-animations: true
+          script: ./emulator-test-script.sh
 

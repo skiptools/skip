@@ -756,7 +756,17 @@ extension ProcessInfo {
     }()
 
     /// The default `JAVA_HOME`
-    public static let defaultJavaHome: String = homebrewRoot + "/opt/java"
+    public static let javaHome: String? = {
+        if let e = ProcessInfo.processInfo.environment["JAVA_HOME"], !e.isEmpty {
+            return e
+        }
+        let paths = [
+            homebrewRoot + "/opt/java",
+            // TODO: other common JAVA_HOME on Linux and Windows
+        ]
+
+        return paths.first(where: { FileManager.default.fileExists(atPath: $0) })
+    }()
 
     /// True when the current architecture is ARM
     public static let isARM = {
@@ -802,6 +812,12 @@ extension ProcessInfo {
             if let androidHome = ProcessInfo.androidHome {
                 env[ANDROID_HOME] = androidHome
             }
+        }
+
+        let JAVA_HOME = "JAVA_HOME"
+        if (env[JAVA_HOME] ?? "").isEmpty {
+            let javaHome = ProcessInfo.javaHome
+            env[JAVA_HOME] = javaHome
         }
 
         // also add tool paths for the various Android tools in case they are not already in the PATH
@@ -1036,6 +1052,9 @@ struct ToolOptions: ParsableArguments {
     @Option(help: ArgumentHelp("Path to the Android SDK (ANDROID_HOME)", valueName: "path"))
     var androidHome: String? = nil
 
+    @Option(help: ArgumentHelp("Path to JAVA_HOME", valueName: "path"))
+    var javaHome: String? = nil
+
     /// Returns the path for the given tool, or throws an error if no executable tool was found.
     ///
     /// Note that some tools can be overridden by name
@@ -1047,7 +1066,8 @@ struct ToolOptions: ParsableArguments {
             case "gradle": return self.gradle ?? ProcessInfo.processInfo.environment["SKIP_GRADLE_PATH"]
             case "adb": return self.adb ?? ProcessInfo.processInfo.environment["SKIP_ADB_PATH"]
             case "emulator": return self.emulator ?? ProcessInfo.processInfo.environment["SKIP_EMULATOR_PATH"] ?? self.emulatorBinary
-            case "java": return ProcessInfo.processInfo.environment["JAVA_HOME"]?.appending("/bin/java") ?? ProcessInfo.defaultJavaHome.appending("/bin/java")
+            case "java": return (javaHome ?? ProcessInfo.javaHome)?.appending("/bin/java")
+            case "javac": return (javaHome ?? ProcessInfo.javaHome)?.appending("/bin/javac")
             default: return nil
             }
         }

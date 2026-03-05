@@ -341,7 +341,7 @@ extension AndroidOperationCommand {
         #endif
     }
 
-    func runToolchainCommand(_ tc: ToolchainPaths, executable: String?, testMode: TestingMode?, with out: MessageQueue) async throws -> (xxx: String?, env: [String: String]) {
+    func runToolchainCommand(_ tc: ToolchainPaths, executable: String?, testMode: TestingMode?, with out: MessageQueue) async throws -> (cmd: [String], env: [String: String]) {
         var env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths
         let toolchainLib = tc.toolchainPath.appendingPathComponent("usr/lib", isDirectory: true)
         let toolchainBin = tc.toolchainPath.appendingPathComponent("usr/bin", isDirectory: true)
@@ -457,10 +457,17 @@ extension AndroidOperationCommand {
             //xlinker += ["-T"]
         }
 
-        // produce a shared object instead of an executable when we are linking dybamic tests
+        // produce a shared object instead of an executable when we are linking dynamic tests
+        // this is diabled because we don't actually need it (the executable is loadable as a shared library anyway),
+        // and when building with macros we get an error
+        // (likely because the flags are being passed to the host compiler as well as the cross-compiler):
+        //
+        // `ld: unknown options: -shared -no-pie`
+        /*
         if testMode == .sharedObject {
             xlinker += ["-shared", "-no-pie"]
         }
+        */
 
         // always set the TARGET_OS_ANDROID environment and build constant, regardless of bridging
         env["TARGET_OS_ANDROID"] = "1"
@@ -486,7 +493,7 @@ extension AndroidOperationCommand {
 
         try await runCommand(command: cmd, env: env, with: out)
 
-        return (xxx: nil, env: env)
+        return (cmd: cmd, env: env)
     }
 
     // filter out some of the native Android libraries that are located in the same folder as the Swift libraries
@@ -1326,6 +1333,7 @@ public struct AndroidError : LocalizedError {
 /// Paths to Android SDK build tools needed for APK construction
 struct AndroidBuildTools {
     let aapt2: String
+    let d8: String
     let zipalign: String
     let apksigner: String
     let androidJar: String
@@ -1711,9 +1719,14 @@ struct SwiftSDKOpenAPI {
     }
 }
 
-fileprivate extension URL {
+extension URL {
     var homeDir: URL {
         FileManager.default.homeDirectoryForCurrentUser
+    }
+
+    /// Adds the given string to the end of the path, but before the extension. E.g., `foo.apk` -> `foo-suffix.apk`
+    func appendingToLastPathComponent(_ suffix: String) -> URL {
+        self.deletingLastPathComponent().appendingPathComponent(self.deletingPathExtension().lastPathComponent + suffix + "." + self.pathExtension)
     }
 }
 
