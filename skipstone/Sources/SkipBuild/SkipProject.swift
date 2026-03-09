@@ -262,7 +262,7 @@ class FrameworkProjectLayout {
                 let sourceSkipYamlFile = sourceSkipDir.appending(path: "skip.yml")
 
                 let skipYamlGeneric = """
-                # Configuration file for Skip (https://skip.dev) project
+                # Skip configuration for \(moduleName) module
                 #
                 # Kotlin dependencies and Gradle build options for this module can be configured here
                 #build:
@@ -1213,13 +1213,13 @@ struct TestData : Codable, Hashable {
                 }
 
                 let skipYamlAppTests = """
-                # Configuration file for Skip (https://skip.dev) project
+                # # Skip configuration for \(moduleName) module
                 #build:
                 #  contents:
                 """
 
                 let skipYamlModuleTests = """
-                # Configuration file for Skip (https://skip.dev) project
+                # # Skip configuration for \(moduleName) module
                 #build:
                 #  contents:
                 """

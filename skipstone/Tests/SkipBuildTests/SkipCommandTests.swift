@@ -793,7 +793,7 @@ final class SkipCommandTests: XCTestCase {
 
         let SkipYML = try load("Sources/SomeModule/Skip/skip.yml")
         XCTAssertEqual(SkipYML, """
-        # Configuration file for Skip (https://skip.dev) project
+        # Skip configuration for SomeModule module
         #
         # Kotlin dependencies and Gradle build options for this module can be configured here
         #build:
@@ -881,7 +881,7 @@ final class SkipCommandTests: XCTestCase {
 
         let SkipYML = try load("Sources/SomeModule/Skip/skip.yml")
         XCTAssertEqual(SkipYML, """
-        # Configuration file for Skip (https://skip.dev) project
+        # Skip configuration for SomeModule module
         #
         # Kotlin dependencies and Gradle build options for this module can be configured here
         #build:
@@ -1007,7 +1007,7 @@ final class SkipCommandTests: XCTestCase {
 
         let AppSkipYML = try load("Sources/AppModule/Skip/skip.yml")
         XCTAssertEqual(AppSkipYML, """
-        # Configuration file for Skip (https://skip.dev) project
+        # Skip configuration for AppModule module
         #
         # Kotlin dependencies and Gradle build options for this module can be configured here
         #build:
@@ -1024,7 +1024,7 @@ final class SkipCommandTests: XCTestCase {
 
         let ModelSkipYML = try load("Sources/ModelModule/Skip/skip.yml")
         XCTAssertEqual(ModelSkipYML, """
-        # Configuration file for Skip (https://skip.dev) project
+        # Skip configuration for ModelModule module
         #
         # Kotlin dependencies and Gradle build options for this module can be configured here
         #build:
@@ -1194,7 +1194,7 @@ final class SkipCommandTests: XCTestCase {
 
         let AppSkipYML = try load("Sources/AppModule/Skip/skip.yml")
         XCTAssertEqual(AppSkipYML, """
-        # Configuration file for Skip (https://skip.dev) project
+        # Skip configuration for AppModule module
         #
         # Kotlin dependencies and Gradle build options for this module can be configured here
         #build:
@@ -1211,7 +1211,7 @@ final class SkipCommandTests: XCTestCase {
 
         let SkipYML = try load("Sources/ModelModule/Skip/skip.yml")
         XCTAssertEqual(SkipYML, """
-        # Configuration file for Skip (https://skip.dev) project
+        # Skip configuration for ModelModule module
         #
         # Kotlin dependencies and Gradle build options for this module can be configured here
         #build:
@@ -1364,7 +1364,7 @@ final class SkipCommandTests: XCTestCase {
 
         let SkipYML = try load("Sources/AppModule/Skip/skip.yml")
         XCTAssertEqual(SkipYML, """
-        # Configuration file for Skip (https://skip.dev) project
+        # Skip configuration for AppModule module
         #
         # Kotlin dependencies and Gradle build options for this module can be configured here
         #build:
