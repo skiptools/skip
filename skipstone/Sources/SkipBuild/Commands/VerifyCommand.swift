@@ -119,9 +119,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
             moduleName = moduleName.dropLast(3).description
         }
 
-
         //let project = try FrameworkProjectLayout(root: projectFolderURL)
-
         //let sourcesDir = URL(fileURLWithPath: "Sources", isDirectory: true, relativeTo: projectFolderURL)
 
         let licenseGPL = URL(fileURLWithPath: "LICENSE.GPL", isDirectory: false, relativeTo: projectFolderURL)
@@ -130,11 +128,11 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         if flagOrFiles(free, licenseGPL, licenseLGPL) {
             // either GPL or LGPL license file must exist for it to pass the free test
             if licenseLGPL.isReadableFile == true {
-                await checkFileContents(licenseLGPL, message: "Verify free software license", trailingContents: [licenseLGPL3Contents])
+                await checkFileContents(licenseLGPL, message: "Verify free software license", trailingContents: [SourceLicense.lgpl3.licenseContents])
             } else if licenseGPL.isReadableFile == true {
-                await checkFileContents(licenseGPL, message: "Verify free software license", trailingContents: [licenseGPL2Contents, licenseGPL3Contents])
+                await checkFileContents(licenseGPL, message: "Verify free software license", trailingContents: [SourceLicense.gpl2.licenseContents, SourceLicense.gpl3.licenseContents])
             } else if licenseTXT.isReadableFile == true {
-                await checkFileContents(licenseTXT, message: "Verify free software license", trailingContents: [licenseGPL2Contents, licenseGPL3Contents, licenseLGPL3Contents, licenseOSLContents])
+                await checkFileContents(licenseTXT, message: "Verify free software license", trailingContents: [SourceLicense.gpl2.licenseContents, SourceLicense.gpl3.licenseContents, SourceLicense.lgpl3.licenseContents, SourceLicense.osl.licenseContents, SourceLicense.eupl.licenseContents])
             }
         }
 
