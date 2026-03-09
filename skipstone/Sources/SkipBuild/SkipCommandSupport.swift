@@ -38,6 +38,21 @@ extension ToolOptionsCommand where Self: StreamingCommand {
         return Process.streamLines(command: cmd, environment: penv, workingDirectory: workingDirectory, includeStdErr: includeStdErr, onExit: onExit)
         #endif
     }
+
+    /// Executes a tool with the given name and arguments, using `run` for progress reporting and log management.
+    /// Similar to `launchTool`, but uses `run` with its progress spinner and log management instead of returning an async stream.
+    @discardableResult func runTool(_ toolName: String, with messenger: MessageQueue, _ message: String, arguments: [String], env: [String: String] = [:], permitFailure: Bool = false, resultHandler finalResultHandler: MessageResultHandler<ProcessOutput>? = nil) async throws -> Result<ProcessOutput, Error> {
+        // transfer process environment along with the additional environment
+        var penv = ProcessInfo.processInfo.environmentWithDefaultToolPaths
+        for (key, value) in env {
+            penv[key] = value
+        }
+
+        let toolPath = try toolOptions.toolPath(for: toolName)
+        let cmdArgs = [toolPath] + arguments
+
+        return try await run(with: messenger, message, cmdArgs, environment: penv, permitFailure: permitFailure, resultHandler: finalResultHandler)
+    }
 }
 
 extension AsyncLineOutput {

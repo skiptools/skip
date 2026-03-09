@@ -26,10 +26,266 @@ struct AndroidCommand: AsyncParsableCommand {
             AndroidBuildCommand.self,
             AndroidRunCommand.self,
             AndroidTestCommand.self,
+            AndroidHomeCommand.self,
             AndroidSDKCommand.self,
             AndroidEmulatorCommand.self,
             AndroidToolchainCommand.self,
         ])
+}
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct AndroidHomeCommand: AsyncParsableCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "home",
+        abstract: "Install and manage the Android SDK in ANDROID_HOME",
+        shouldDisplay: androidCommandEnabled,
+        subcommands: [
+            AndroidHomeInstallCommand.self,
+        ])
+}
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct AndroidHomeInstallCommand: MessageCommand, ToolOptionsCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "install",
+        abstract: "Install Android SDK Command-line Tools, platform-tools, and emulator in ANDROID_HOME",
+        discussion: """
+        This command sets up the Android SDK in your ANDROID_HOME directory:
+        1. Creates the ANDROID_HOME directory if it doesn't exist
+        2. Installs cmdline-tools (if not present) using the bootstrap sdkmanager
+        3. Uses the installed sdkmanager to install platform-tools and emulator
+        
+        Run with the --verbose argument to observe the exact commands that it executes.
+        """,
+        shouldDisplay: true)
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    @OptionGroup(title: "Tool Options")
+    var toolOptions: ToolOptions
+
+    func performCommand(with out: MessageQueue) async throws {
+        let _ = try await ensureCmdlineTools(
+            command: self,
+            out: out
+        )
+    }
+}
+
+// MARK: - cmdline-tools Validation
+
+/// Error thrown when Java cannot be found
+struct JavaNotFoundError: LocalizedError {
+    let javaHome: String?
+
+    init(javaHome: String? = nil) {
+        self.javaHome = javaHome
+    }
+
+    var errorDescription: String? {
+        if let javaHome {
+            return "Java not found in JAVA_HOME: \(javaHome). run: brew install openjdk"
+        } else {
+            return "Java not found. run: brew install openjdk"
+        }
+    }
+}
+
+/// Error thrown when cmdline-tools cannot be found
+struct CmdlineToolsNotFoundError: LocalizedError {
+    var errorDescription: String? {
+        "Android SDK Command-line Tools not found. Install with: brew install android-commandlinetools"
+    }
+}
+
+/// Error thrown when cmdline-tools bootstrap installation fails
+struct CmdlineToolsBootstrapFailedError: LocalizedError {
+    var errorDescription: String? {
+        "Failed to install the Android SDK Command-line Tools in your ANDROID_HOME. This appears to be a bug in Skip. Try using Android Studio to install the Command-line Tools."
+    }
+}
+
+/// Result of cmdline-tools validation
+struct CmdlineToolsResult {
+    let sdkmanagerPath: String
+    let version: String
+    let wasBootstrapped: Bool
+}
+
+/// Error thrown when sdkmanager version is too old
+struct OutdatedSdkmanagerError: LocalizedError {
+    let version: String
+    let minimumVersion: String
+
+    var errorDescription: String? {
+        "Android SDK Command-line Tools version \(version) is too old. Minimum required version is \(minimumVersion)."
+    }
+}
+
+/// Checks sdkmanager version and validates it meets the minimum requirement
+/// - Parameters:
+///   - command: The message command to use for executing sdkmanager
+///   - sdkmanagerPath: Path to the sdkmanager binary
+///   - minimumVersion: Minimum required version string
+///   - out: MessageQueue to yield validation messages
+/// - Returns: The version string if it meets the minimum requirement
+/// - Throws: OutdatedSdkmanagerError if version is too old, or other errors if command fails
+private func checkSdkmanagerVersion(
+    command: some MessageCommand,
+    sdkmanagerPath: String,
+    minimumVersion: String,
+    out: MessageQueue
+) async throws -> String {
+    let result = try await command.run(
+        with: out,
+        "Check sdkmanager version",
+        [sdkmanagerPath, "--version"]
+    )
+    let output = try result.get()
+    let version = output.stdout.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+
+    // Check if version meets minimum requirement using semantic version comparison
+    if version.localizedStandardCompare(minimumVersion) == .orderedAscending {
+        await out.write(status: .fail, "Android command-line tools version \(version) is too old (minimum: \(minimumVersion))")
+        throw OutdatedSdkmanagerError(version: version, minimumVersion: minimumVersion)
+    }
+
+    await out.write(status: .pass, "Android command-line tools version \(version) (> \(minimumVersion))")
+    return version
+}
+
+/// Error thrown when emulator binary cannot be found
+struct EmulatorNotFoundError: LocalizedError {
+    let androidHome: String
+
+    var errorDescription: String? {
+        "Android Emulator not found at \(androidHome)/emulator/emulator. This appears to be a bug in Skip. Try installing the emulator with: \(androidHome)/cmdline-tools/latest/bin/sdkmanager emulator"
+    }
+}
+
+struct DefaultAndroidHomeUnknownError: LocalizedError {
+    var errorDescription: String? {
+        "You have not set an ANDROID_HOME environment variable, and you're not using macOS, Windows, or Linux. Set ANDROID_HOME to your Android SDK path."
+    }
+}
+
+/// Ensures Android SDK is fully set up in ANDROID_HOME, including cmdline-tools, platform-tools, and emulator.
+/// Bootstraps cmdline-tools if necessary, creates ANDROID_HOME if needed, and installs required SDK components.
+/// - Parameters:
+///   - command: The message command to use for executing sdkmanager
+///   - out: MessageQueue to yield validation messages
+/// - Returns: CmdlineToolsResult containing sdkmanager path and version
+/// - Throws: JavaNotFoundError if Java is not found, DefaultAndroidHomeUnknownError if ANDROID_HOME cannot be determined,
+///           CmdlineToolsNotFoundError if no sdkmanager can be found, or CmdlineToolsBootstrapFailedError if installation fails
+///
+/// Note: For testing, set `ProcessInfo.mockEnvironment` before calling this function.
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+func ensureCmdlineTools(
+    command: some MessageCommand & ToolOptionsCommand,
+    additionalComponents: [String] = [],
+    out: MessageQueue
+) async throws -> CmdlineToolsResult {
+    let fm = FileManager.default
+    let minimumVersion = "12.0"
+
+    // Step 1: Validate JAVA_HOME
+    guard let javaHome = ProcessInfo.javaHome else {
+        throw JavaNotFoundError()
+    }
+    guard fm.fileExists(atPath: javaHome) else {
+        throw JavaNotFoundError(javaHome: javaHome)
+    }
+    await out.write(status: .pass, "JAVA_HOME = \(javaHome)")
+
+    // Step 2: Get/validate ANDROID_HOME
+    guard let androidHome = ProcessInfo.androidHome else {
+        throw DefaultAndroidHomeUnknownError()
+    }
+
+    if fm.fileExists(atPath: androidHome) {
+        await out.write(status: .pass, "ANDROID_HOME = \(androidHome)")
+    } else {
+        // Create the ANDROID_HOME directory
+        try fm.createDirectory(atPath: androidHome, withIntermediateDirectories: true)
+        await out.write(status: .pass, "Created ANDROID_HOME at \(androidHome)")
+    }
+
+    let cmdlineToolsPath = "\(androidHome)/cmdline-tools/latest/bin/sdkmanager"
+    let isBootstrapping = !fm.isExecutableFile(atPath: cmdlineToolsPath)
+    if isBootstrapping {
+        let bootstrap: String
+        do {
+            bootstrap = try command.findToolPath(for: "sdkmanager")
+        } catch {
+            throw CmdlineToolsNotFoundError()
+        }
+
+        // Verify the bootstrap sdkmanager actually exists and is executable
+        guard FileManager.default.isExecutableFile(atPath: bootstrap) else {
+            throw CmdlineToolsNotFoundError()
+        }
+
+        await out.write(status: .pass, "Bootstrap SDK Manager = \(bootstrap)")
+
+        try await installSDKComponents(
+            command: command,
+            components: ["cmdline-tools;latest"],
+            out: out
+        )
+
+        if !fm.isExecutableFile(atPath: cmdlineToolsPath) {
+            throw CmdlineToolsBootstrapFailedError()
+        }
+    }
+
+    let version = try await checkSdkmanagerVersion(
+        command: command,
+        sdkmanagerPath: cmdlineToolsPath,
+        minimumVersion: minimumVersion,
+        out: out
+    )
+
+    try await installSDKComponents(
+        command: command,
+        components: ["platform-tools", "emulator"] + additionalComponents,
+        out: out
+    )
+
+    let emulatorPath = "\(androidHome)/emulator/emulator"
+    guard fm.isExecutableFile(atPath: emulatorPath) else {
+        throw EmulatorNotFoundError(androidHome: androidHome)
+    }
+    await out.write(status: .pass, "Android Emulator: \(emulatorPath)")
+
+    return CmdlineToolsResult(
+        sdkmanagerPath: cmdlineToolsPath,
+        version: version,
+        wasBootstrapped: isBootstrapping
+    )
+}
+
+/// Helper function to install platform-tools and emulator using the installed sdkmanager
+func installSDKComponents(
+    command: some MessageCommand & ToolOptionsCommand,
+    components: [String],
+    out: MessageQueue
+) async throws {
+    guard let androidHome = ProcessInfo.androidHome else {
+        throw DefaultAndroidHomeUnknownError()
+    }
+
+    let sdkmanager = try command.toolOptions.toolPath(for: "sdkmanager")
+
+    await command.withLogStream(title: "Install Android SDK components", with: out) {
+        try await command.run(with: out, "Configure Android SDK Manager", ["sh", "-c", "yes | \(sdkmanager) --sdk_root=\(androidHome) --licenses"])
+
+        for component in components {
+            _ = try await command.runTool("sdkmanager", with: out, "Install \(component)", arguments: ["--verbose", "--install", "--sdk_root=\(androidHome)", component])
+        }
+
+        await out.write(status: .pass, "Android SDK setup complete in \(androidHome)")
+    }
 }
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
@@ -1021,7 +1277,7 @@ struct AndroidEmulatorCommand: AsyncParsableCommand {
 }
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
-struct AndroidEmulatorCreateCommand: MessageCommand {
+struct AndroidEmulatorCreateCommand: MessageCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "create",
         abstract: "Install and create an Android emulator image",
@@ -1045,11 +1301,14 @@ struct AndroidEmulatorCreateCommand: MessageCommand {
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
 
+    @OptionGroup(title: "Tool Options")
+    var toolOptions: ToolOptions
+
     @Option(help: ArgumentHelp("Android API emulator level", valueName: "level"))
-    var androidAPILevel: Int = 34
+    var androidAPILevel: Int = defaultEmulatorAPILevel
 
     @Option(help: ArgumentHelp("Android emulator device profile", valueName: "profile"))
-    var deviceProfile: String = "medium_phone" // "pixel_7"
+    var deviceProfile: String = defaultEmulatorDeviceProfile
 
     @Option(name: [.customShort("n"), .long], help: ArgumentHelp("Android emulator name", valueName: "name"))
     var name: String? = nil
@@ -1078,48 +1337,37 @@ struct AndroidEmulatorCreateCommand: MessageCommand {
     }()
 
     func performCommand(with out: MessageQueue) async throws {
-        func sdkmanagerInstall(_ package: String) async throws {
-            try await run(with: out, "Install \(package)", ["sdkmanager", "--verbose", "--install", package])
-        }
+        
+        let actualAPILevel = self.androidAPILevel
 
+        var defaultName = "emulator-\(actualAPILevel)"
+        defaultName += "-\(deviceProfile.lowercased().replacing(" ", with: "-"))"
+        let emulatorName = name ?? defaultName
+
+        let emulatorSpec = self.package ?? "system-images;android-\(androidAPILevel);\(systemImage);\(arch)"
+        let emulatorSpecParts = emulatorSpec.split(separator: ";")
+        let androidPlatform = emulatorSpecParts.dropFirst().first ?? "android-\(androidAPILevel)"
+
+        let _ = try await ensureCmdlineTools(
+            command: self,
+            additionalComponents: ["platforms;\(androidPlatform)", emulatorSpec],
+            out: out
+        )
+        
         await withLogStream(title: "Create Android emulator", with: out) {
-            try await run(with: out, "Configure Android SDK Manager", ["sh", "-c", "yes | sdkmanager --licenses"])
+            let avdNames = try await listAVDNames(command: self, out: out)
+            if avdNames.contains(emulatorName) {
+                await out.write(status: .skip, "AVD '\(emulatorName)' already exists - skipping creation")
+                return
+            }
 
-            try await sdkmanagerInstall("platform-tools")
-            try await sdkmanagerInstall("emulator")
-
-            let emulatorSpec = self.package ?? "system-images;android-\(androidAPILevel);\(systemImage);\(arch)"
-
-            let emulatorSpecParts = emulatorSpec.split(separator: ";")
-            let androidPlatform = emulatorSpecParts.dropFirst().first ?? "android-\(androidAPILevel)"
-            let actualAPILevel = androidPlatform.split(separator: "-").last.flatMap({ Int($0) }) ?? self.androidAPILevel
-
-            try await sdkmanagerInstall("platforms;\(androidPlatform)")
-
-            try await sdkmanagerInstall(emulatorSpec)
-
-            var defaultName = "emulator-\(actualAPILevel)"
-            //if let deviceProfile {
-                defaultName += "-\(deviceProfile.lowercased().replacing(" ", with: "-"))"
-            //}
-            let emulatorName = name ?? defaultName
-
-            var createCommand = ["avdmanager", "create", "avd", "--force", "-n", emulatorName, "--package", emulatorSpec]
-            //if let deviceProfile {
-                createCommand += ["--device", deviceProfile]
-            //}
+            let createArgs = ["create", "avd", "--force", "-n", emulatorName, "--package", emulatorSpec, "--device", deviceProfile]
 
             // need to pipe through "no" to decline "Do you wish to create a custom hardware profile? [no]"
-            try await run(with: out, "Create emulator: \(emulatorName)", createCommand)
-
-            // save the emulatorName as the default for `skip android emulator launch`
-            UserDefaults.standard.set(emulatorName, forKey: lastEmulatorNameDefault)
+            _ = try await self.runTool("avdmanager", with: out, "Create emulator: \(emulatorName)", arguments: createArgs)
         }
     }
 }
-
-/// The UserDefaults key that remembers the last name of the emulator thay was created
-private let lastEmulatorNameDefault = "skipAndroidEmulatorLaunch"
 
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
@@ -1128,7 +1376,7 @@ struct AndroidEmulatorLaunchCommand: MessageCommand, ToolOptionsCommand {
         commandName: "launch",
         abstract: "Launch an Android emulator",
         usage: """
-        # Launches the most recently created or used emulator
+        # Launches the single available emulator, or the default if multiple exist
         skip android emulator launch
 
         # Launches an emulator with a certain name
@@ -1175,8 +1423,24 @@ struct AndroidEmulatorLaunchCommand: MessageCommand, ToolOptionsCommand {
         var exitCode: SkipDriveExternal.ProcessResult.ExitStatus? = nil
         //~/Library/Android/sdk/emulator/emulator -avd emulator-34-pixel_7
 
-        let emulatorName = name ?? UserDefaults.standard.string(forKey: lastEmulatorNameDefault) ?? "unknown"
-        UserDefaults.standard.set(emulatorName, forKey: lastEmulatorNameDefault)
+        let emulatorName: String
+        if let name {
+            emulatorName = name
+        } else {
+            let avdNames = try await listAVDNames(command: self, out: out)
+            switch avdNames.count {
+            case 0:
+                throw EmulatorLaunchSelectionError(avdNames: [])
+            case 1:
+                emulatorName = avdNames[0]
+            default:
+                if avdNames.contains(defaultEmulatorCreateName) {
+                    emulatorName = defaultEmulatorCreateName
+                } else {
+                    throw EmulatorLaunchSelectionError(avdNames: avdNames)
+                }
+            }
+        }
 
         var emulatorArgs = ["@\(emulatorName)", "-no-metrics"]
         if self.headless {
@@ -1745,4 +2009,56 @@ extension Collection where Element: Hashable {
         }
         return result
     }
+}
+
+
+// MARK: - AVD Existence Check
+
+/// Default API level and device profile for `skip android emulator create` when called with no arguments
+private let defaultEmulatorAPILevel = 34
+private let defaultEmulatorDeviceProfile = "medium_phone" // "pixel_7"
+
+/// Default AVD name created by `skip android emulator create` when called with no arguments
+private let defaultEmulatorCreateName = "emulator-\(defaultEmulatorAPILevel)-\(defaultEmulatorDeviceProfile)"
+
+/// Error thrown when emulator command cannot be executed
+struct EmulatorListAVDsError: LocalizedError {
+    let underlyingError: Error
+
+    var errorDescription: String? {
+        "Failed to run emulator -list-avds: \(underlyingError.localizedDescription)"
+    }
+}
+
+/// Error when no emulator name can be selected (no AVDs or multiple AVDs with no default match)
+struct EmulatorLaunchSelectionError: LocalizedError {
+    let avdNames: [String]
+
+    var errorDescription: String? {
+        if avdNames.isEmpty {
+            return "No Android emulators (AVDs) were found. Create one with: skip android emulator create"
+        } else {
+            let list = avdNames.sorted().joined(separator: ", ")
+            return "Multiple Android emulators were found (\(list)). When no --name is specified, we launch the default emulator '\(defaultEmulatorCreateName)' created by `skip android emulator create`. None of the installed AVDs match that name. Either run `skip android emulator create` to create it, or specify one with --name (e.g. skip android emulator launch --name \(avdNames.first ?? "name"))"
+        }
+    }
+}
+
+/// Returns the list of AVD names from `emulator -list-avds`
+/// - Throws: EmulatorListAVDsError if emulator command fails
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+func listAVDNames(command: some MessageCommand, out: MessageQueue) async throws -> [String] {
+    let output: ProcessOutput
+    do {
+        let result = try await command.run(
+            with: out,
+            "List available AVDs",
+            ["emulator", "-list-avds"],
+        )
+        output = try result.get()
+    } catch {
+        throw EmulatorListAVDsError(underlyingError: error)
+    }
+    let stdout = output.stdout
+    return stdout.split(separator: "\n").map { $0.trimmingCharacters(in: CharacterSet.whitespaces) }.filter { !$0.isEmpty }
 }

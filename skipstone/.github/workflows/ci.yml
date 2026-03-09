@@ -191,14 +191,6 @@ jobs:
 
           chmod +x emulator-test-script.sh
 
-      - name: "Create and Launch Emulator"
-        if: false # TODO: fix `skip android emulator` commands
-        #if: runner.arch != 'ARM64'
-        run: |
-          skip android emulator create
-          skip android emulator list
-          skip android emulator launch --background
-
       - name: "Prepare Android emulator environment"
         if: runner.os == 'Linux'
         run: |
@@ -209,39 +201,17 @@ jobs:
           # need to free disk space or the emulator fails to launch sometimes
           sudo rm -rf /Applications/Xcode_1[45]*.app /Applications/Xcode_16.[0123].app /opt/microsoft /opt/google /opt/az /usr/share/miniconda /usr/share/az* /usr/share/glade* /usr/local/share/chromium /usr/local/share/powershell /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/julia* /opt/hostedtoolcache/CodeQL /usr/local/share/boost
 
-      - name: "Android AVD cache"
-        uses: actions/cache@v5
-        id: avd-cache
-        # Emulator hangs when stopping, correlated to when the image is fetched from the cache
-        # https://github.com/ReactiveCircus/android-emulator-runner/issues/385#issuecomment-2423660038
-        if: false
-        with:
-          key: avd-${{ matrix.os }}-api-${{ matrix.android-api }}-${{ matrix.android-arch }}
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-
-      - name: "Create AVD and generate snapshot for caching"
-        if: false
-        #if: runner.arch != 'ARM64' && steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          force-avd-creation: false
-          api-level: ${{ matrix.android-api }}
-          arch: ${{ matrix.android-arch }}
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          script: echo "Generated AVD snapshot for caching."
+      - name: "Create and Launch Emulator"
+        if: runner.arch != 'ARM64'
+        run: |
+          export ANDROID_USER_HOME=$HOME/.android
+          export ANDROID_EMULATOR_HOME=$ANDROID_USER_HOME
+          export ANDROID_AVD_HOME=$ANDROID_EMULATOR_HOME/avd
+          skip android emulator create --verbose
+          skip android emulator list --verbose
+          skip android emulator launch --background --verbose
 
       - name: "Test Swift Package on Android"
         if: runner.arch != 'ARM64'
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          force-avd-creation: false
-          emulator-boot-timeout: 300
-          api-level: ${{ matrix.android-api }}
-          arch: ${{ matrix.android-arch }}
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
-          disable-animations: true
-          script: ./emulator-test-script.sh
+        run: ./emulator-test-script.sh
 

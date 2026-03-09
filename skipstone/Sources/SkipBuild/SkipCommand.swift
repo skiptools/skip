@@ -740,9 +740,23 @@ private extension AbsolutePath {
 }
 
 extension ProcessInfo {
-    /// The root path for Homebrew on this macOS
-    public static let homebrewRoot: String = {
-        if let envroot = ProcessInfo.processInfo.environment["HOMEBREW_PREFIX"] {
+    /// Mock environment for testing. When set (non-nil), all environment lookups
+    /// return values from this dictionary, allowing tests to explicitly mock the absence
+    /// of variables by not including them. Falls back to real process environment only when nil.
+    public static var mockEnvironment: [String: String]?
+
+    /// Returns an environment variable from mockEnvironment if it's set (even if nil/empty),
+    /// otherwise falls back to the real process environment.
+    public static func environmentVariable(_ key: String) -> String? {
+        if let mockEnvironment {
+            return mockEnvironment[key]
+        }
+        return ProcessInfo.processInfo.environment[key]
+    }
+
+    /// The root path for Homebrew on this macOS (checks mockEnvironment first if set)
+    public static var homebrewRoot: String {
+        if let envroot = environmentVariable("HOMEBREW_PREFIX") {
             return envroot
         }
 
@@ -753,11 +767,11 @@ extension ProcessInfo {
         // Linux
         return "/home/linuxbrew/.linuxbrew"
         #endif
-    }()
+    }
 
     /// The default `JAVA_HOME`
-    public static let javaHome: String? = {
-        if let e = ProcessInfo.processInfo.environment["JAVA_HOME"], !e.isEmpty {
+    public static var javaHome: String? {
+        if let e = ProcessInfo.environmentVariable("JAVA_HOME"), !e.isEmpty {
             return e
         }
         let paths = [
@@ -766,7 +780,7 @@ extension ProcessInfo {
         ]
 
         return paths.first(where: { FileManager.default.fileExists(atPath: $0) })
-    }()
+    }
 
     /// True when the current architecture is ARM
     public static let isARM = {
@@ -789,24 +803,38 @@ extension ProcessInfo {
         #endif
     }()
 
-    public static let androidHome: String? = {
-        if let e = ProcessInfo.processInfo.environment["ANDROID_HOME"], !e.isEmpty {
+    /// Returns the Android SDK path from the environment (checking mockEnvironment first if set)
+    public static var androidHome: String? {
+        if let e = environmentVariable("ANDROID_HOME"), !e.isEmpty {
             return e
         }
+        // Use the mocked HOME environment variable if set, otherwise expand tilde
+        let home = environmentVariable("HOME")
         #if os(macOS)
+        if let home = home, !home.isEmpty {
+            return "\(home)/Library/Android/sdk"
+        }
         return ("~/Library/Android/sdk" as NSString).expandingTildeInPath
         #elseif os(Windows)
+        if let home = home, !home.isEmpty {
+            return "\(home)/AppData/Local/Android/Sdk"
+        }
         return ("~/AppData/Local/Android/Sdk" as NSString).expandingTildeInPath
         #elseif os(Linux)
+        if let home = home, !home.isEmpty {
+            return "\(home)/Android/Sdk"
+        }
         return ("~/Android/Sdk" as NSString).expandingTildeInPath
         #else
         return nil
         #endif
-    }()
+    }
 
     /// The current process environment along with the default paths to various tools set
     public var environmentWithDefaultToolPaths: [String: String] {
-        var env = self.environment
+        // When mockEnvironment is set, use it exclusively (tests control the entire environment)
+        // Otherwise, start with real environment and apply defaults
+        var env = ProcessInfo.mockEnvironment ?? ProcessInfo.processInfo.environment
         let ANDROID_HOME = "ANDROID_HOME"
         if (env[ANDROID_HOME] ?? "").isEmpty {
             if let androidHome = ProcessInfo.androidHome {
@@ -823,7 +851,7 @@ extension ProcessInfo {
         // also add tool paths for the various Android tools in case they are not already in the PATH
         if var path = env["PATH"] {
             if let androidHome = ProcessInfo.androidHome {
-                path += ":\(androidHome)/platform-tools:\(androidHome)/tools/bin:\(androidHome)/emulator"
+                path = "\(androidHome)/platform-tools:\(androidHome)/cmdline-tools/latest/bin:\(androidHome)/tools/bin:\(androidHome)/emulator:\(path)"
             }
             env["PATH"] = path
         }
@@ -1049,8 +1077,11 @@ struct ToolOptions: ParsableArguments {
     @Option(help: ArgumentHelp("Android emulator path", valueName: "path"))
     var emulator: String? = nil
 
-    @Option(help: ArgumentHelp("Path to the Android SDK (ANDROID_HOME)", valueName: "path"))
-    var androidHome: String? = nil
+    @Option(help: ArgumentHelp("Android SDK Manager command path", valueName: "path"))
+    var sdkmanager: String? = nil
+
+    @Option(help: ArgumentHelp("Android AVD Manager command path", valueName: "path"))
+    var avdmanager: String? = nil
 
     @Option(help: ArgumentHelp("Path to JAVA_HOME", valueName: "path"))
     var javaHome: String? = nil
@@ -1061,11 +1092,13 @@ struct ToolOptions: ParsableArguments {
     func toolPath(for tool: String) throws -> String {
         func customTool() -> String? {
             switch tool {
-            case "swift": return self.swift ?? ProcessInfo.processInfo.environment["SKIP_SWIFT_PATH"]
-            case "xcodebuild": return self.xcodebuild ?? ProcessInfo.processInfo.environment["SKIP_XCODEBUILD_PATH"]
-            case "gradle": return self.gradle ?? ProcessInfo.processInfo.environment["SKIP_GRADLE_PATH"]
-            case "adb": return self.adb ?? ProcessInfo.processInfo.environment["SKIP_ADB_PATH"]
-            case "emulator": return self.emulator ?? ProcessInfo.processInfo.environment["SKIP_EMULATOR_PATH"] ?? self.emulatorBinary
+            case "swift": return self.swift ?? ProcessInfo.environmentVariable("SKIP_SWIFT_PATH")
+            case "xcodebuild": return self.xcodebuild ?? ProcessInfo.environmentVariable("SKIP_XCODEBUILD_PATH")
+            case "gradle": return self.gradle ?? ProcessInfo.environmentVariable("SKIP_GRADLE_PATH")
+            case "adb": return self.adb ?? ProcessInfo.environmentVariable("SKIP_ADB_PATH")
+            case "emulator": return self.emulator ?? ProcessInfo.environmentVariable("SKIP_EMULATOR_PATH") ?? self.emulatorBinary
+            case "sdkmanager": return self.sdkmanager ?? ProcessInfo.environmentVariable("SKIP_SDKMANAGER_PATH") ?? self.androidCmdlineTool("sdkmanager")
+            case "avdmanager": return self.avdmanager ?? ProcessInfo.environmentVariable("SKIP_AVDMANAGER_PATH") ?? self.androidCmdlineTool("avdmanager")
             case "java": return (javaHome ?? ProcessInfo.javaHome)?.appending("/bin/java")
             case "javac": return (javaHome ?? ProcessInfo.javaHome)?.appending("/bin/javac")
             default: return nil
@@ -1077,18 +1110,34 @@ struct ToolOptions: ParsableArguments {
         return try URL.findCommandInPath(toolName: tool, withAdditionalPaths: [ProcessInfo.homebrewRoot + "/bin"]).path
     }
 
+    /// Returns the path to an Android cmdline-tools tool (e.g., sdkmanager or avdmanager)
+    private func androidCmdlineTool(_ tool: String) -> String? {
+        guard let androidHome = ProcessInfo.androidHome else { return nil }
+        let cmdlinePath = "\(androidHome)/cmdline-tools/latest/bin/\(tool)"
+        if FileManager.default.isExecutableFile(atPath: cmdlinePath) {
+            return cmdlinePath
+        } else {
+            return nil
+        }
+    }
+
     /// Returns the path to the emulator binary
     var emulatorBinary: String {
+        if let androidHome = ProcessInfo.androidHome {
+            let androidHomeEmulator = "\(androidHome)/emulator/emulator"
+            if FileManager.default.isExecutableFile(atPath: androidHomeEmulator) {
+                return androidHomeEmulator
+            }
+        }
+
         // on Linux for Homebrew: /home/linuxbrew/.linuxbrew/share/android-commandlinetools/emulator/emulator
         // on macOS for Homebrew: /opt/homebrew/share/android-commandlinetools/emulator/emulator
-        // on macOS: ~/Library/Android/sdk/emulator/emulator
-        var emulatorBinary = ProcessInfo.homebrewRoot + "/share/android-commandlinetools/emulator/emulator"
-        // check whether it exists, and if not, fallback to ~/Library/Android/sdk/emulator/emulator or path
-        if !FileManager.default.isExecutableFile(atPath: emulatorBinary) {
-            // TODO: search around for, e.g., Android Studio's version
-            emulatorBinary = "emulator" // fallback to checking PATH
+        let homebrewEmulator = "\(ProcessInfo.homebrewRoot)/share/android-commandlinetools/emulator/emulator"
+        if FileManager.default.isExecutableFile(atPath: homebrewEmulator) {
+            return homebrewEmulator
         }
-        return emulatorBinary
+        // last resort: try to find it in the PATH
+        return "emulator"
     }
 
 }
