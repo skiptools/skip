@@ -208,6 +208,13 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         let _ = primaryModulePath
 
+        /// A collected resource entry with its URLs and mode
+        struct ResourceEntry {
+            let path: String
+            let urls: [URL]
+            let isCopyMode: Bool
+        }
+
         func buildSourceList() throws -> (sources: [URL], resources: [URL]) {
             let projectBaseURL = projectFolderPath.asURL
             let allProjectFiles: [URL] = try FileManager.default.enumeratedURLs(of: projectBaseURL)
@@ -289,6 +296,22 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         // load and merge each of the skip.yml files for the dependent modules
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
         let hasSkipFuse = configMap.keys.contains("SkipFuse")
+
+        // Build resource entries from skip.yml configuration, falling back to the default Resources/ folder
+        let resourceEntries: [ResourceEntry] = try {
+            let projectBaseURL = projectFolderPath.asURL
+            if let resourceConfigs = baseSkipConfig.skip?.resources {
+                return try resourceConfigs.map { config in
+                    let resourceDirURL = projectBaseURL.appendingPathComponent(config.path, isDirectory: true)
+                    let urls: [URL] = try FileManager.default.enumeratedURLs(of: resourceDirURL)
+                    return ResourceEntry(path: config.path, urls: urls, isCopyMode: config.isCopyMode)
+                }
+            } else if !resourceURLs.isEmpty {
+                return [ResourceEntry(path: "Resources", urls: resourceURLs, isCopyMode: false)]
+            } else {
+                return []
+            }
+        }()
 
         func moduleMode(for moduleName: String?) -> ModuleMode {
             let moduleMode: String?
@@ -1034,45 +1057,90 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
                 .appending(components: packageName.split(separator: ".").map(\.description))
                 .appending(component: "Resources")
 
-            for resourceFile in resourceURLs.map(\.path).sorted() {
-                let resourceFileCanonical = (resourceFile as NSString).standardizingPath
-                guard let resourceSourceURL = moduleNamePaths.compactMap({ (_, folder) -> URL? in
-                    let folderCanonical = (folder as NSString).standardizingPath
-                    guard resourceFileCanonical.hasPrefix(folderCanonical) else { return nil }
-                    let relativePath = String(resourceFileCanonical.dropFirst(folderCanonical.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-                    return URL(fileURLWithPath: relativePath, relativeTo: URL(fileURLWithPath: folderCanonical, isDirectory: true))
-                }).first else {
-                    // skip over resources that are not contained within the Resources/ folder (such as files in the Skip/ folder, which contain metadata that should not be copied)
-                    msg(.trace, "no module root parent for \(resourceFile)")
-                    continue
+            for entry in resourceEntries {
+                if entry.isCopyMode {
+                    try linkCopyResources(entry: entry, resourcesBasePath: resourcesBasePath)
+                } else {
+                    try linkProcessResources(entry: entry, resourcesBasePath: resourcesBasePath)
                 }
+            }
 
-                let sourcePath = try AbsolutePath(validating: resourceSourceURL.path)
+            /// Links resources in "copy" mode, preserving the directory hierarchy relative to the resource folder
+            func linkCopyResources(entry: ResourceEntry, resourcesBasePath: AbsolutePath) throws {
+                for resourceFile in entry.urls.map(\.path).sorted() {
+                    let resourceFileCanonical = (resourceFile as NSString).standardizingPath
+                    guard let resourceSourceURL = moduleNamePaths.compactMap({ (_, folder) -> URL? in
+                        let folderCanonical = (folder as NSString).standardizingPath
+                        guard resourceFileCanonical.hasPrefix(folderCanonical) else { return nil }
+                        let relativePath = String(resourceFileCanonical.dropFirst(folderCanonical.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                        return URL(fileURLWithPath: relativePath, relativeTo: URL(fileURLWithPath: folderCanonical, isDirectory: true))
+                    }).first else {
+                        msg(.trace, "no module root parent for \(resourceFile)")
+                        continue
+                    }
 
+                    let sourcePath = try AbsolutePath(validating: resourceSourceURL.path)
+                    let resourceComponents = try RelativePath(validating: resourceSourceURL.relativePath).components
 
-                let resourceComponents = try RelativePath(validating: resourceSourceURL.relativePath).components
-                // all resources get put into a single "Resources/" folder in the jar, so drop the first item and replace it with "Resources/"
-                let components = resourceComponents.dropFirst(1)
-                let resourceSourcePath = try RelativePath(validating: components.joined(separator: "/"))
+                    // In copy mode, preserve the full directory hierarchy including the resource folder name
+                    // (e.g., "ResourcesCopy/subdir/file.txt"), matching Darwin's .copy() behavior where
+                    // the folder name becomes a subdirectory in the bundle.
+                    let resourceSourcePath = try RelativePath(validating: resourceComponents.joined(separator: "/"))
+                    let destinationPath = resourcesBasePath.appending(resourceSourcePath)
 
-                if sourcePath.parentDirectory.basename == buildSrcFolderName {
-                    trace("skipping resource linking for buildSrc/")
-                } else if isCMakeProject {
-                    trace("skipping resource linking for CMake project")
-                } else if sourcePath.extension == "xcstrings" {
-                    try convertStrings(resourceSourceURL: resourceSourceURL, sourcePath: sourcePath)
-                //} else if sourcePath.extension == "xcassets" {
-                    // TODO: convert various assets into Android res/ folder
-                } else { // non-processed resources are just linked directly from the package
-                    // the Android "res" folder is special: it is intended to store Android-specific resources like values/strings.xml, and will be linked into the archive's res/ folder
-                    let isAndroidRes = resourceComponents.first == "res"
-                    let destinationPath = (isAndroidRes ? resOutputFolder : resourcesBasePath).appending(resourceSourcePath)
-
-                    // only create links for files that exist
-                    if fs.isFile(sourcePath) {
-                        info("\(destinationPath.relative(to: moduleBasePath).pathString) linking to \(sourcePath.pathString)", sourceFile: sourcePath.sourceFile)
+                    if sourcePath.parentDirectory.basename == buildSrcFolderName {
+                        trace("skipping resource linking for buildSrc/")
+                    } else if isCMakeProject {
+                        trace("skipping resource linking for CMake project")
+                    } else if fs.isFile(sourcePath) {
+                        info("\(destinationPath.relative(to: moduleBasePath).pathString) copying to \(sourcePath.pathString)", sourceFile: sourcePath.sourceFile)
                         try fs.createDirectory(destinationPath.parentDirectory, recursive: true)
                         try addLink(destinationPath, pointingAt: sourcePath, relative: false)
+                    }
+                }
+            }
+
+            /// Links resources in "process" mode, flattening the hierarchy and performing special processing for .xcstrings and other files
+            func linkProcessResources(entry: ResourceEntry, resourcesBasePath: AbsolutePath) throws {
+                for resourceFile in entry.urls.map(\.path).sorted() {
+                    let resourceFileCanonical = (resourceFile as NSString).standardizingPath
+                    guard let resourceSourceURL = moduleNamePaths.compactMap({ (_, folder) -> URL? in
+                        let folderCanonical = (folder as NSString).standardizingPath
+                        guard resourceFileCanonical.hasPrefix(folderCanonical) else { return nil }
+                        let relativePath = String(resourceFileCanonical.dropFirst(folderCanonical.count)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                        return URL(fileURLWithPath: relativePath, relativeTo: URL(fileURLWithPath: folderCanonical, isDirectory: true))
+                    }).first else {
+                        // skip over resources that are not contained within the resource folder
+                        msg(.trace, "no module root parent for \(resourceFile)")
+                        continue
+                    }
+
+                    let sourcePath = try AbsolutePath(validating: resourceSourceURL.path)
+
+                    let resourceComponents = try RelativePath(validating: resourceSourceURL.relativePath).components
+                    // all resources get put into a single "Resources/" folder in the jar, so drop the first item and replace it with "Resources/"
+                    let components = resourceComponents.dropFirst(1)
+                    let resourceSourcePath = try RelativePath(validating: components.joined(separator: "/"))
+
+                    if sourcePath.parentDirectory.basename == buildSrcFolderName {
+                        trace("skipping resource linking for buildSrc/")
+                    } else if isCMakeProject {
+                        trace("skipping resource linking for CMake project")
+                    } else if sourcePath.extension == "xcstrings" {
+                        try convertStrings(resourceSourceURL: resourceSourceURL, sourcePath: sourcePath)
+                    //} else if sourcePath.extension == "xcassets" {
+                        // TODO: convert various assets into Android res/ folder
+                    } else { // non-processed resources are just linked directly from the package
+                        // the Android "res" folder is special: it is intended to store Android-specific resources like values/strings.xml, and will be linked into the archive's res/ folder
+                        let isAndroidRes = resourceComponents.first == "res"
+                        let destinationPath = (isAndroidRes ? resOutputFolder : resourcesBasePath).appending(resourceSourcePath)
+
+                        // only create links for files that exist
+                        if fs.isFile(sourcePath) {
+                            info("\(destinationPath.relative(to: moduleBasePath).pathString) linking to \(sourcePath.pathString)", sourceFile: sourcePath.sourceFile)
+                            try fs.createDirectory(destinationPath.parentDirectory, recursive: true)
+                            try addLink(destinationPath, pointingAt: sourcePath, relative: false)
+                        }
                     }
                 }
             }

@@ -32,6 +32,8 @@ struct TranspilationConfig : Codable {
     var bridging: Either<Bool>.Or<BridgeConfig>?
     /// Namespace for code gen of dynamic types
     var dynamicroot: String?
+    /// Resource declarations with optional mode ("process" or "copy")
+    var resources: [ResourceConfig]?
 
     func isAutoBridgingEnabled() -> Bool {
         switch bridging {
@@ -79,4 +81,17 @@ struct BridgeConfig : Equatable, Codable {
 
 enum BridgeOption: String {
     case kotlincompat
+}
+
+/// Configuration for a resource directory in skip.yml
+struct ResourceConfig : Equatable, Codable {
+    /// The path to the resource directory, relative to the module source folder
+    var path: String
+    /// The resource processing mode: "process" (default) flattens and processes localization files; "copy" preserves the directory hierarchy as-is
+    var mode: String?
+
+    /// Whether this resource should be copied without any processing
+    var isCopyMode: Bool {
+        mode == "copy"
+    }
 }
