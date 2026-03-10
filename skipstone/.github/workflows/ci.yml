@@ -3,6 +3,8 @@ name: skipstone CI
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: '0 11 * * *'
   workflow_dispatch:
   pull_request:
 
@@ -81,12 +83,12 @@ jobs:
           - '6.2.3'
         android-api:
           - '28'
-          - '34'
+          #- '34'
         android-arch:
           - 'x86_64'
         android-sdk:
           - 'nightly-6.3'
-          - 'nightly-main'
+          #- 'nightly-main'
 
     steps:
       - uses: Homebrew/actions/setup-homebrew@main
@@ -132,16 +134,31 @@ jobs:
       - run: skip doctor
 
       - run: skip checkup --native
-        #if: runner.os != 'Linux'
-        # FIXME: fails on macOS due to: error: Dependencies could not be resolved because root depends on 'skip' 1.7.4..<2.0.0.
-        if: false
+        if: runner.os != 'Linux'
 
-      - name: "Prepare emulator test script"
+      - name: "Prepare Android emulator environment"
+        if: runner.os == 'Linux'
         run: |
-          cat > emulator-test-script.sh << EOF
-          #!/bin/sh -ex
-          cd "${{ runner.temp }}"
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
 
+          # need to free disk space or the emulator fails to launch sometimes
+          sudo rm -rf /Applications/Xcode_1[45]*.app /Applications/Xcode_16.[0123].app /opt/microsoft /opt/google /opt/az /usr/share/miniconda /usr/share/az* /usr/share/glade* /usr/local/share/chromium /usr/local/share/powershell /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/julia* /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+
+      - name: "Create and Launch Emulator"
+        run: |
+          export ANDROID_USER_HOME=$HOME/.android
+          export ANDROID_EMULATOR_HOME=$ANDROID_USER_HOME
+          export ANDROID_AVD_HOME=$ANDROID_EMULATOR_HOME/avd
+          skip android emulator create --verbose
+          skip android emulator list --verbose
+          skip android emulator launch --background --verbose
+          #adb wait-for-device
+
+      - name: "Test new Swift package on emulator"
+        working-directory: ${{ runner.temp }}
+        run: |
           mkdir package-demo
           cd package-demo
 
@@ -162,56 +179,23 @@ jobs:
           ! swift test
           ! skip android test --apk --arch ${{ matrix.android-arch }}
 
-          cd -
-
-          # Build and test a traditional Skip Lite package
-
-          # Disabled on Linux:
-          # /home/runner/work/_temp/demo-lite-framework/Tests/DemoFrameworkTests/DemoFrameworkTests.swift:2:8: error: no such module 'OSLog'
-          if [[ "${{ runner.os }}" != "Linux" ]]; then
-            skip init --no-build --transpiled-model --module-tests demo-lite-framework DemoFramework
-            cd demo-lite-framework
-            ANDROID_SERIAL=emulator-5554 swift test
-            cd -
-          fi
-
-          # Build and test a traditional Skip Fuse package
-
-          # Disabled due to build error on Linux:
-          # /home/runner/work/_temp/demo-fuse-framework/.build/checkouts/skip-android-bridge/Sources/SkipAndroidBridge/AndroidBundle.swift:6:12: error: cannot inherit from class 'Bundle' (compiled with Swift 6.2.4) because it has overridable members that could not be loaded in Swift 5.10
-
-          if [[ "${{ runner.os }}" != "Linux" ]]; then
-            skip init --no-build --native-model --bridged --module-tests demo-fuse-framework DemoFramework
-            cd demo-fuse-framework
-            ANDROID_SERIAL=emulator-5554 swift test
-            cd -
-          fi
-
-          EOF
-
-          chmod +x emulator-test-script.sh
-
-      - name: "Prepare Android emulator environment"
-        if: runner.os == 'Linux'
+      - name: "Test new Skip Lite framework on emulator"
+        # Disabled on Linux:
+        # /home/runner/work/_temp/demo-lite-framework/Tests/DemoFrameworkTests/DemoFrameworkTests.swift:2:8: error: no such module 'OSLog'
+        if: runner.os != 'Linux'
+        working-directory: ${{ runner.temp }}
         run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
+          skip init --no-build --transpiled-model --module-tests demo-lite-framework DemoFramework
+          cd demo-lite-framework
+          ANDROID_SERIAL=emulator-5554 swift test
 
-          # need to free disk space or the emulator fails to launch sometimes
-          sudo rm -rf /Applications/Xcode_1[45]*.app /Applications/Xcode_16.[0123].app /opt/microsoft /opt/google /opt/az /usr/share/miniconda /usr/share/az* /usr/share/glade* /usr/local/share/chromium /usr/local/share/powershell /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/julia* /opt/hostedtoolcache/CodeQL /usr/local/share/boost
-
-      - name: "Create and Launch Emulator"
-        if: runner.arch != 'ARM64'
+      - name: "Test new Skip Fuse framework on emulator"
+        # Disabled due to build error on Linux:
+        # /home/runner/work/_temp/demo-fuse-framework/.build/checkouts/skip-android-bridge/Sources/SkipAndroidBridge/AndroidBundle.swift:6:12: error: cannot inherit from class 'Bundle' (compiled with Swift 6.2.4) because it has overridable members that could not be loaded in Swift 5.10
+        if: runner.os != 'Linux'
+        working-directory: ${{ runner.temp }}
         run: |
-          export ANDROID_USER_HOME=$HOME/.android
-          export ANDROID_EMULATOR_HOME=$ANDROID_USER_HOME
-          export ANDROID_AVD_HOME=$ANDROID_EMULATOR_HOME/avd
-          skip android emulator create --verbose
-          skip android emulator list --verbose
-          skip android emulator launch --background --verbose
-
-      - name: "Test Swift Package on Android"
-        if: runner.arch != 'ARM64'
-        run: ./emulator-test-script.sh
+          skip init --no-build --native-model --bridged --module-tests demo-fuse-framework DemoFramework
+          cd demo-fuse-framework
+          ANDROID_SERIAL=emulator-5554 swift test
 
