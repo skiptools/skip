@@ -1256,9 +1256,123 @@ final class MacroExpansion: Expression {
             return RawExpression(sourceCode: "// #\(macroExpansionExpr.macroName.text) omitted", syntax: syntax, in: syntaxTree)
         case "colorLiteral":
             return colorLiteral(syntax: macroExpansionExpr)
+        case "expect":
+            return expectOrRequire(syntax: macroExpansionExpr, isThrowing: false, in: syntaxTree)
+        case "require":
+            return expectOrRequire(syntax: macroExpansionExpr, isThrowing: true, in: syntaxTree)
         default:
             throw Message.macroExpansionUnsupported(syntax, source: syntaxTree.source)
         }
+    }
+
+    /// Convert `#expect(...)` or `#require(...)` Swift Testing macros into function calls
+    /// that map to SkipUnit assertion functions.
+    ///
+    /// Supports:
+    /// - `#expect(condition)` → `expectTrue(condition)`
+    /// - `#expect(a == b)` → `expectEqual(a, b)`
+    /// - `#expect(a != b)` → `expectNotEqual(a, b)`
+    /// - `#expect(throws: ErrorType.self) { code }` → `expectThrows(ErrorType.self) { code }`
+    /// - `#require(condition)` → `requireTrue(condition)`
+    /// - `#require(optionalExpr)` → `requireNotNil(optionalExpr)`
+    ///
+    /// The `isThrowing` parameter distinguishes `#require` (which throws on failure) from `#expect`.
+    private static func expectOrRequire(syntax macroExpansionExpr: MacroExpansionExprSyntax, isThrowing: Bool, in syntaxTree: SyntaxTree) -> Expression {
+        let prefix = isThrowing ? "require" : "expect"
+        let args = Array(macroExpansionExpr.arguments)
+
+        // #expect(throws: SomeError.self) { ... } or #require(throws: SomeError.self) { ... }
+        if let throwsArg = args.first(where: { $0.label?.text == "throws" }) {
+            var functionArgs: [LabeledValue<Expression>] = [
+                LabeledValue(label: "throws", value: ExpressionDecoder.decode(syntax: throwsArg.expression, in: syntaxTree))
+            ]
+            // Include trailing closure if present
+            if let trailingClosure = macroExpansionExpr.trailingClosure {
+                let closureExpr = ExpressionDecoder.decode(syntax: trailingClosure, in: syntaxTree)
+                functionArgs.append(LabeledValue(value: closureExpr))
+            }
+            return FunctionCall(function: Identifier(name: "\(prefix)Throws"), arguments: functionArgs, trailingClosureCount: macroExpansionExpr.trailingClosure != nil ? 1 : 0, syntax: macroExpansionExpr)
+        }
+
+        // Single argument case: #expect(expr) or #require(expr)
+        guard let firstArg = args.first else {
+            // No arguments — emit as a raw call
+            return FunctionCall(function: Identifier(name: "\(prefix)True"), arguments: [], syntax: macroExpansionExpr)
+        }
+
+        let expression = firstArg.expression
+
+        // Check for comparison operators: ==, !=, >, <, >=, <=
+        // These appear as SequenceExprSyntax in SwiftSyntax. The comparison operator
+        // has the lowest precedence, so we find the last comparison operator in the
+        // sequence and split the expression on it.
+        if let sequenceExpr = expression.as(SequenceExprSyntax.self) {
+            let elements = Array(sequenceExpr.elements)
+            // Find the last comparison operator (lowest precedence in Swift)
+            let comparisonOps: Set<String> = ["==", "!=", ">", "<", ">=", "<="]
+            if let opIndex = elements.lastIndex(where: { elem in
+                if let op = elem.as(BinaryOperatorExprSyntax.self) {
+                    return comparisonOps.contains(op.operator.text)
+                }
+                return false
+            }), let op = elements[opIndex].as(BinaryOperatorExprSyntax.self) {
+                let opText = op.operator.text
+                let lhsElements = Array(elements[..<opIndex])
+                let rhsElements = Array(elements[(opIndex + 1)...])
+
+                // Reconstruct the LHS and RHS as expressions
+                let lhs: Expression
+                if lhsElements.count == 1 {
+                    lhs = ExpressionDecoder.decode(syntax: lhsElements[0], in: syntaxTree)
+                } else {
+                    // Re-wrap as a sequence expression for proper decoding
+                    let lhsSeq = SequenceExprSyntax(elements: ExprListSyntax(lhsElements))
+                    lhs = ExpressionDecoder.decode(syntax: lhsSeq, in: syntaxTree)
+                }
+
+                let rhs: Expression
+                if rhsElements.count == 1 {
+                    rhs = ExpressionDecoder.decode(syntax: rhsElements[0], in: syntaxTree)
+                } else {
+                    let rhsSeq = SequenceExprSyntax(elements: ExprListSyntax(rhsElements))
+                    rhs = ExpressionDecoder.decode(syntax: rhsSeq, in: syntaxTree)
+                }
+
+                // Find optional message argument
+                let msgArgs: [LabeledValue<Expression>] = args.dropFirst().compactMap { arg in
+                    if arg.label == nil || arg.label?.text == "sourceLocation" { return nil }
+                    return LabeledValue(value: ExpressionDecoder.decode(syntax: arg.expression, in: syntaxTree))
+                }
+
+                let funcName: String
+                switch opText {
+                case "==": funcName = "\(prefix)Equal"
+                case "!=": funcName = "\(prefix)NotEqual"
+                case ">": funcName = "\(prefix)GreaterThan"
+                case ">=": funcName = "\(prefix)GreaterThanOrEqual"
+                case "<": funcName = "\(prefix)LessThan"
+                case "<=": funcName = "\(prefix)LessThanOrEqual"
+                default: funcName = "\(prefix)True" // fallback
+                }
+                return FunctionCall(function: Identifier(name: funcName), arguments: [LabeledValue(value: lhs), LabeledValue(value: rhs)] + msgArgs, syntax: macroExpansionExpr)
+            }
+        }
+
+        // Default: treat as a boolean condition check
+        var allArgs: [LabeledValue<Expression>] = [LabeledValue(value: ExpressionDecoder.decode(syntax: expression, in: syntaxTree))]
+        // Include any extra message arguments
+        for arg in args.dropFirst() {
+            if arg.label?.text == "sourceLocation" { continue }
+            allArgs.append(LabeledValue(label: arg.label?.text, value: ExpressionDecoder.decode(syntax: arg.expression, in: syntaxTree)))
+        }
+
+        // If we have a trailing closure (e.g. #expect { ... }), use it
+        if let trailingClosure = macroExpansionExpr.trailingClosure, args.isEmpty {
+            let closureExpr = ExpressionDecoder.decode(syntax: trailingClosure, in: syntaxTree)
+            return FunctionCall(function: Identifier(name: "\(prefix)True"), arguments: [LabeledValue(value: closureExpr)], trailingClosureCount: 1, syntax: macroExpansionExpr)
+        }
+
+        return FunctionCall(function: Identifier(name: isThrowing ? "requireNotNil" : "\(prefix)True"), arguments: allArgs, syntax: macroExpansionExpr)
     }
 
     private static func colorLiteral(syntax macroExpansionExpr: MacroExpansionExprSyntax) -> Expression {

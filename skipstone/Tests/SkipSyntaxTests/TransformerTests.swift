@@ -74,6 +74,157 @@ final class TransformerTests: XCTestCase {
         """)
     }
 
+    // MARK: - Swift Testing Transformer Tests
+
+    func testSwiftTestingBasic() async throws {
+        try await check(swift: """
+        import Testing
+
+        struct MyTests {
+            @Test func addition() {
+                #expect(1 + 1 == 2)
+            }
+        }
+        """, kotlin: """
+        import skip.unit.*
+
+        @org.junit.runner.RunWith(androidx.test.ext.junit.runners.AndroidJUnit4::class)
+        internal class MyTests: XCTestCase {
+            @Test
+            internal fun addition(): Unit = expectEqual(1 + 1, 2)
+        }
+        """)
+    }
+
+    func testSwiftTestingExpectTrue() async throws {
+        try await check(swift: """
+        import Testing
+
+        struct MyTests {
+            @Test func boolCheck() {
+                let x = true
+                #expect(x)
+            }
+        }
+        """, kotlin: """
+        import skip.unit.*
+
+        @org.junit.runner.RunWith(androidx.test.ext.junit.runners.AndroidJUnit4::class)
+        internal class MyTests: XCTestCase {
+            @Test
+            internal fun boolCheck() {
+                val x = true
+                expectTrue(x)
+            }
+        }
+        """)
+    }
+
+    func testSwiftTestingExpectNotEqual() async throws {
+        try await check(swift: """
+        import Testing
+
+        struct MyTests {
+            @Test func inequality() {
+                #expect(1 != 2)
+            }
+        }
+        """, kotlin: """
+        import skip.unit.*
+
+        @org.junit.runner.RunWith(androidx.test.ext.junit.runners.AndroidJUnit4::class)
+        internal class MyTests: XCTestCase {
+            @Test
+            internal fun inequality(): Unit = expectNotEqual(1, 2)
+        }
+        """)
+    }
+
+    func testSwiftTestingRequire() async throws {
+        try await check(swift: """
+        import Testing
+
+        struct MyTests {
+            @Test func unwrap() throws {
+                let x: Int? = 42
+                let y = try #require(x)
+            }
+        }
+        """, kotlin: """
+        import skip.unit.*
+
+        @org.junit.runner.RunWith(androidx.test.ext.junit.runners.AndroidJUnit4::class)
+        internal class MyTests: XCTestCase {
+            @Test
+            internal fun unwrap() {
+                val x: Int? = 42
+                val y = requireNotNil(x)
+            }
+        }
+        """)
+    }
+
+    func testSwiftTestingMultipleFunctions() async throws {
+        try await check(swift: """
+        import Testing
+
+        struct MathTests {
+            @Test func addition() {
+                #expect(2 + 2 == 4)
+            }
+
+            @Test func subtraction() {
+                #expect(5 - 3 == 2)
+            }
+
+            func helperNotATest() -> Int {
+                return 42
+            }
+        }
+        """, kotlin: """
+        import skip.unit.*
+
+        @org.junit.runner.RunWith(androidx.test.ext.junit.runners.AndroidJUnit4::class)
+        internal class MathTests: XCTestCase {
+            @Test
+            internal fun addition(): Unit = expectEqual(2 + 2, 4)
+
+            @Test
+            internal fun subtraction(): Unit = expectEqual(5 - 3, 2)
+
+            internal fun helperNotATest(): Int = 42
+        }
+        """)
+    }
+
+    func testSwiftTestingComparisons() async throws {
+        try await check(swift: """
+        import Testing
+
+        struct CompTests {
+            @Test func comparisons() {
+                #expect(5 > 3)
+                #expect(3 < 5)
+                #expect(5 >= 5)
+                #expect(3 <= 5)
+            }
+        }
+        """, kotlin: """
+        import skip.unit.*
+
+        @org.junit.runner.RunWith(androidx.test.ext.junit.runners.AndroidJUnit4::class)
+        internal class CompTests: XCTestCase {
+            @Test
+            internal fun comparisons() {
+                expectGreaterThan(5, 3)
+                expectLessThan(3, 5)
+                expectGreaterThanOrEqual(5, 5)
+                expectLessThanOrEqual(3, 5)
+            }
+        }
+        """)
+    }
+
     func testModuleBundleTransformer() async throws {
         try await check(swift: """
         import Foundation

@@ -40,15 +40,11 @@ final class SkipCommandTests: XCTestCase {
               │  └─ TestData.json
               ├─ Skip
               │  └─ skip.yml
-              ├─ SomeModuleTests.swift
-              └─ XCSkipTests.swift
+              └─ SomeModuleTests.swift
 
         """)
 
         let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
-
-        let XCSkipTests = try load("Tests/SomeModuleTests/XCSkipTests.swift")
-        XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
@@ -177,15 +173,11 @@ final class SkipCommandTests: XCTestCase {
               │  └─ TestData.json
               ├─ Skip
               │  └─ skip.yml
-              ├─ SomeModuleTests.swift
-              └─ XCSkipTests.swift
+              └─ SomeModuleTests.swift
 
         """)
 
         let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
-
-        let XCSkipTests = try load("Tests/SomeModuleTests/XCSkipTests.swift")
-        XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
 
         let moduleCode = try load("Sources/SomeModule/SomeModule.swift")
         XCTAssertEqual(moduleCode, """
@@ -278,17 +270,12 @@ final class SkipCommandTests: XCTestCase {
               ├─ FreeModuleTests.swift
               ├─ Resources
               │  └─ TestData.json
-              ├─ Skip
-              │  └─ skip.yml
-              └─ XCSkipTests.swift
+              └─ Skip
+                 └─ skip.yml
 
         """)
 
         let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
-
-        let XCSkipTests = try load("Tests/FreeModuleTests/XCSkipTests.swift")
-        XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
-        XCTAssertTrue(XCSkipTests.hasPrefix(SourceLicense.lgpl3LinkingException.sourceHeader), "bad source license in: \(XCSkipTests)")
 
         let FreeModuleTests = try load("Tests/FreeModuleTests/FreeModuleTests.swift")
         XCTAssertTrue(FreeModuleTests.hasPrefix(SourceLicense.lgpl3LinkingException.sourceHeader), "bad source license in: \(FreeModuleTests)")
@@ -345,18 +332,12 @@ final class SkipCommandTests: XCTestCase {
               ├─ BridgedModuleTests.swift
               ├─ Resources
               │  └─ TestData.json
-              ├─ Skip
-              │  └─ skip.yml
-              └─ XCSkipTests.swift
+              └─ Skip
+                 └─ skip.yml
 
         """)
 
         let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
-
-        let XCSkipTests = try load("Tests/BridgedModuleTests/XCSkipTests.swift")
-        XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
-
-        //let BridgedModuleTests = try load("Tests/BridgedModuleTests/BridgedModuleTests.swift")
 
         let BridgedModule = try load("Sources/BridgedModule/BridgedModule.swift")
         XCTAssertEqual(BridgedModule, """
@@ -473,9 +454,8 @@ final class SkipCommandTests: XCTestCase {
               ├─ APPNAMETests.swift
               ├─ Resources
               │  └─ TestData.json
-              ├─ Skip
-              │  └─ skip.yml
-              └─ XCSkipTests.swift
+              └─ Skip
+                 └─ skip.yml
 
         """)
 
@@ -570,9 +550,8 @@ final class SkipCommandTests: XCTestCase {
               ├─ APPNAMETests.swift
               ├─ Resources
               │  └─ TestData.json
-              ├─ Skip
-              │  └─ skip.yml
-              └─ XCSkipTests.swift
+              └─ Skip
+                 └─ skip.yml
 
         """)
 
@@ -686,9 +665,8 @@ final class SkipCommandTests: XCTestCase {
               ├─ APPNAMETests.swift
               ├─ Resources
               │  └─ TestData.json
-              ├─ Skip
-              │  └─ skip.yml
-              └─ XCSkipTests.swift
+              └─ Skip
+                 └─ skip.yml
 
         """)
 
@@ -726,15 +704,11 @@ final class SkipCommandTests: XCTestCase {
               │  └─ TestData.json
               ├─ Skip
               │  └─ skip.yml
-              ├─ SomeModuleTests.swift
-              └─ XCSkipTests.swift
+              └─ SomeModuleTests.swift
 
         """)
 
         let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
-
-        let XCSkipTests = try load("Tests/SomeModuleTests/XCSkipTests.swift")
-        XCTAssertTrue(XCSkipTests.contains("testSkipModule()"))
 
         let moduleCode = try load("Sources/SomeModule/SomeModule.swift")
         XCTAssertEqual(moduleCode, """
@@ -988,16 +962,14 @@ final class SkipCommandTests: XCTestCase {
            │  ├─ AppModuleTests.swift
            │  ├─ Resources
            │  │  └─ TestData.json
-           │  ├─ Skip
-           │  │  └─ skip.yml
-           │  └─ XCSkipTests.swift
+           │  └─ Skip
+           │     └─ skip.yml
            └─ ModelModuleTests
               ├─ ModelModuleTests.swift
               ├─ Resources
               │  └─ TestData.json
-              ├─ Skip
-              │  └─ skip.yml
-              └─ XCSkipTests.swift
+              └─ Skip
+                 └─ skip.yml
 
         """)
 
@@ -1497,16 +1469,14 @@ final class SkipCommandTests: XCTestCase {
            │  ├─ FreeAppModelTests.swift
            │  ├─ Resources
            │  │  └─ TestData.json
-           │  ├─ Skip
-           │  │  └─ skip.yml
-           │  └─ XCSkipTests.swift
+           │  └─ Skip
+           │     └─ skip.yml
            └─ FreeAppTests
               ├─ FreeAppTests.swift
               ├─ Resources
               │  └─ TestData.json
-              ├─ Skip
-              │  └─ skip.yml
-              └─ XCSkipTests.swift
+              └─ Skip
+                 └─ skip.yml
 
         """)
 
@@ -1628,23 +1598,20 @@ final class SkipCommandTests: XCTestCase {
            │  ├─ BottomModuleTests.swift
            │  ├─ Resources
            │  │  └─ TestData.json
-           │  ├─ Skip
-           │  │  └─ skip.yml
-           │  └─ XCSkipTests.swift
+           │  └─ Skip
+           │     └─ skip.yml
            ├─ MiddleModuleTests
            │  ├─ MiddleModuleTests.swift
            │  ├─ Resources
            │  │  └─ TestData.json
-           │  ├─ Skip
-           │  │  └─ skip.yml
-           │  └─ XCSkipTests.swift
+           │  └─ Skip
+           │     └─ skip.yml
            └─ TopModuleTests
               ├─ Resources
               │  └─ TestData.json
               ├─ Skip
               │  └─ skip.yml
-              ├─ TopModuleTests.swift
-              └─ XCSkipTests.swift
+              └─ TopModuleTests.swift
 
         """)
 
@@ -1934,16 +1901,14 @@ final class SkipCommandTests: XCTestCase {
            │  ├─ M1Tests.swift
            │  ├─ Resources
            │  │  └─ TestData.json
-           │  ├─ Skip
-           │  │  └─ skip.yml
-           │  └─ XCSkipTests.swift
+           │  └─ Skip
+           │     └─ skip.yml
            └─ M2Tests
               ├─ M2Tests.swift
               ├─ Resources
               │  └─ TestData.json
-              ├─ Skip
-              │  └─ skip.yml
-              └─ XCSkipTests.swift
+              └─ Skip
+                 └─ skip.yml
 
         """)
 

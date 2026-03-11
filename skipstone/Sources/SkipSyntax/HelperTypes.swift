@@ -319,6 +319,8 @@ struct Attribute: Hashable, Codable {
         case published
         case state
         case stateObject
+        case suite
+        case test
         case toolbarContentBuilder
         case unavailable
         case unknown
@@ -395,6 +397,10 @@ struct Attribute: Hashable, Codable {
             return .state
         case "StateObject":
             return .stateObject
+        case "Suite":
+            return .suite
+        case "Test":
+            return .test
         case "ToolbarContentBuilder":
             return .toolbarContentBuilder
         case "ViewBuilder":

@@ -49,6 +49,7 @@ public final class CodebaseInfo {
         "SkipFuseUI": ["SkipUI", "SkipFoundation", "SkipModel"],
         "UIKit": ["SkipUI", "SkipFoundation", "SkipModel"],
         "UserNotifications": ["SkipUI", "SkipFoundation", "SkipModel"],
+        "Testing": ["SkipUnit"],
         "XCTest": ["SkipUnit"],
     ]
 
