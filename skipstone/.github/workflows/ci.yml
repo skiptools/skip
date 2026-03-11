@@ -89,6 +89,10 @@ jobs:
         android-sdk:
           - 'nightly-6.3'
           #- 'nightly-main'
+        android-ndk:
+          - 'r27d'
+          - 'r28c'
+          - 'r29'
 
     steps:
       - uses: Homebrew/actions/setup-homebrew@main
@@ -129,7 +133,7 @@ jobs:
 
       - run: skip version
 
-      - run: skip android sdk install --version '${{ matrix.android-sdk }}'
+      - run: skip android sdk install --version '${{ matrix.android-sdk }}' --ndk-version '${{ matrix.android-ndk }}'
 
       - run: skip doctor
 
