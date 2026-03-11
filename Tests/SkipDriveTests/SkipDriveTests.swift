@@ -448,7 +448,6 @@ class SkipCommandTests : XCTestCase {
         │     │  └─ TestData.json
         │     └─ Skip
         │        └─ skip.yml
-        │
         └─ empty.png
         
         """)
@@ -576,7 +575,6 @@ class SkipCommandTests : XCTestCase {
         │     │  └─ TestData.json
         │     └─ Skip
         │        └─ skip.yml
-        │
         └─ empty.png
         
         """)
@@ -721,7 +719,6 @@ class SkipCommandTests : XCTestCase {
         │     │  └─ TestData.json
         │     └─ Skip
         │        └─ skip.yml
-        │
         └─ empty.png
 
         """)
@@ -888,7 +885,6 @@ class SkipCommandTests : XCTestCase {
            │  │  └─ TestData.json
            │  └─ Skip
            │     └─ skip.yml
-           │
            └─ HelloSkipTests
               ├─ HelloSkipTests.swift
               ├─ Resources
@@ -965,28 +961,24 @@ class SkipCommandTests : XCTestCase {
            │  │  └─ TestData.json
            │  └─ Skip
            │     └─ skip.yml
-           │
            ├─ CoolBTests
            │  ├─ CoolBTests.swift
            │  ├─ Resources
            │  │  └─ TestData.json
            │  └─ Skip
            │     └─ skip.yml
-           │
            ├─ CoolCTests
            │  ├─ CoolCTests.swift
            │  ├─ Resources
            │  │  └─ TestData.json
            │  └─ Skip
            │     └─ skip.yml
-           │
            ├─ CoolDTests
            │  ├─ CoolDTests.swift
            │  ├─ Resources
            │  │  └─ TestData.json
            │  └─ Skip
            │     └─ skip.yml
-           │
            └─ CoolETests
               ├─ CoolETests.swift
               ├─ Resources
