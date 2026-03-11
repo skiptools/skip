@@ -267,7 +267,7 @@ import PackagePlugin
         let sourceBase = URL(fileURLWithPath: isTest ? "src/test" : "src/main", isDirectory: true, relativeTo: outputBase)
 
         var buildArguments = [
-            "transpile",
+            "skipstone",
             "--project", swiftSourceTarget.directory.string,
             "--skip-folder", skipFolder.string,
             "--sourcehash", sourcehashOutputPath.string,
@@ -342,6 +342,17 @@ import PackagePlugin
             }
             
             appendArguments(["--skip-bridge-output", skipBridgeOutputDir.string])
+        }
+
+        // auto-generate XCSkipTests.swift test harness for test targets that don't already have one
+        if isTest {
+            let hasTestHarness = target.sourceFiles(withSuffix: "swift").contains(where: { $0.path.lastComponent == "XCSkipTests.swift" })
+            if !hasTestHarness {
+                let testHarnessOutputDir = outputFolder.appending(subpath: "SkipTestHarness")
+                let testHarnessPath = testHarnessOutputDir.appending(subpath: "XCSkipTests.swift")
+                outputFiles.append(testHarnessPath)
+                appendArguments(["--test-harness-output", testHarnessPath.string])
+            }
         }
 
         appendArguments(buildModuleArgs)
