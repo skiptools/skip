@@ -17,12 +17,12 @@ struct DumpSkipCommand: AsyncParsableCommand {
     var files: [String]
 
     func run() async throws {
-        var opts = TranspilerInputOptions()
+        var opts = SkipstoneInputOptions()
         opts.symbols = symbols
         try await perform(on: files.map({ Source.FilePath(path: $0) }), options: opts)
     }
 
-    func perform(on sourceFiles: [Source.FilePath], options: TranspilerInputOptions) async throws {
+    func perform(on sourceFiles: [Source.FilePath], options: SkipstoneInputOptions) async throws {
         for sourceFile in sourceFiles {
             let source = try Source(file: sourceFile)
             let syntaxTree = SyntaxTree(source: source, preprocessorSymbols: Set(options.symbols))

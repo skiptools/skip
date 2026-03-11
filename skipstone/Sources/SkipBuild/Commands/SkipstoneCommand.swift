@@ -8,24 +8,21 @@ import Universal
 import SkipSyntax
 import TSCBasic
 
-protocol TranspilePhase: TranspilerInputOptionsCommand {
-    var transpileOptions: TranspileCommandOptions { get }
-}
-
 /// The file extension for the metadata about skipcode
 let skipcodeExtension = ".skipcode.json"
 
-struct TranspileCommand: TranspilePhase, StreamingCommand {
-    static var configuration = CommandConfiguration(commandName: "transpile", abstract: "Transpile Swift to Kotlin", shouldDisplay: false)
+/// The command executed by the Skip plugin that will perform all the actions to transform a SwiftPM module into a Gradle project, including transpiling source code, building native bridges, and processing resources.
+struct SkipstoneCommand: BuildPluginOptionsCommand, StreamingCommand {
+    static var configuration = CommandConfiguration(commandName: "skipstone", abstract: "Convert Swift project to Gradle", shouldDisplay: false, aliases: ["transpile"])
 
     /// The `ENABLE_PREVIEW` parameter specifies whether we are building for previews
     static let enablePreviews = ProcessInfo.processInfo.environment["ENABLE_PREVIEWS"] == "YES"
 
     @OptionGroup(title: "Check Options")
-    var inputOptions: TranspilerInputOptions
+    var inputOptions: SkipstoneInputOptions
 
-    @OptionGroup(title: "Transpile Options")
-    var transpileOptions: TranspileCommandOptions
+    @OptionGroup(title: "Skipstone Options")
+    var skipstoneOptions: SkipstoneCommandOptions
 
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
@@ -34,27 +31,27 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let transpilation: Transpilation
 
         func message(term: Term) -> String? {
-            // successful transpile outputs no message so as to not clutter xcode logs
+            // successful run outputs no message so as to not clutter xcode logs
             return nil
         }
     }
 
     var moduleNamePaths: [(module: String, path: String)] {
-        transpileOptions.moduleNames.map({
+        skipstoneOptions.moduleNames.map({
             let parts = $0.split(separator: ":")
             return (module: parts.first?.description ?? "", path: parts.last?.description ?? "")
         })
     }
 
     var linkNamePaths: [(module: String, link: String)] {
-        transpileOptions.linkPaths.map({
+        skipstoneOptions.linkPaths.map({
             let parts = $0.split(separator: ":")
             return (module: parts.first?.description ?? "", link: parts.last?.description ?? "")
         })
     }
 
     var dependencyIdPaths: [(targetName: String, packageID: String, packagePath: String)] {
-        transpileOptions.dependencies.compactMap({
+        skipstoneOptions.dependencies.compactMap({
             let parts = $0.split(separator: ":").map(\.description)
             if parts.count != 3 { return nil }
             return (targetName: parts[0], packageID: parts[1], packagePath: parts[2])
@@ -78,16 +75,16 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             return
         }
 
-        // show the local time in the transpile output; this helps identify from the Xcode Navigator when an old log file is being replayed for a plugin re-execution
+        // show the local time in the plugin output; this helps identify from the Xcode Navigator when an old log file is being replayed for a plugin re-execution
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "HH:mm:ss"
 
-        guard let moduleRoot = transpileOptions.moduleRoot else {
+        guard let moduleRoot = skipstoneOptions.moduleRoot else {
             throw error("Must specify --module-root")
         }
         let moduleRootPath = try AbsolutePath(validating: moduleRoot)
 
-        guard let skipFolder = transpileOptions.skipFolder else {
+        guard let skipFolder = skipstoneOptions.skipFolder else {
             throw error("Must specify --skip-folder")
         }
 
@@ -98,21 +95,21 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let skipFolderPath = try AbsolutePath(validating: skipFolder, relativeTo: baseOutputPath)
 
         // the --project flag
-        let projectFolderPath = try AbsolutePath(validating: transpileOptions.projectFolder, relativeTo: baseOutputPath)
+        let projectFolderPath = try AbsolutePath(validating: skipstoneOptions.projectFolder, relativeTo: baseOutputPath)
 
-        guard let outputFolder = transpileOptions.outputFolder else {
+        guard let outputFolder = skipstoneOptions.outputFolder else {
             throw error("Must specify --output-folder")
         }
         let outputFolderPath = try AbsolutePath(validating: outputFolder, relativeTo: baseOutputPath)
 
 
-        info("Skip \(v): skipstone plugin to: \(transpileOptions.outputFolder ?? "nowhere") at \(dateFormatter.string(from: .now))")
-        try await self.transpile(root: baseOutputPath, project: projectFolderPath, module: moduleRootPath, skip: skipFolderPath, output: outputFolderPath, fs: fs, with: out)
+        info("Skip \(v): skipstone plugin to: \(skipstoneOptions.outputFolder ?? "nowhere") at \(dateFormatter.string(from: .now))")
+        try await self.skipstone(root: baseOutputPath, project: projectFolderPath, module: moduleRootPath, skip: skipFolderPath, output: outputFolderPath, fs: fs, with: out)
     }
 
-    private func transpile(root rootPath: AbsolutePath, project projectFolderPath: AbsolutePath, module moduleRootPath: AbsolutePath, skip skipFolderPath: AbsolutePath, output outputFolderPath: AbsolutePath, fs: FileSystem, with out: MessageQueue) async throws {
+    private func skipstone(root rootPath: AbsolutePath, project projectFolderPath: AbsolutePath, module moduleRootPath: AbsolutePath, skip skipFolderPath: AbsolutePath, output outputFolderPath: AbsolutePath, fs: FileSystem, with out: MessageQueue) async throws {
         do {
-            try await transpileThrows(root: rootPath, project: projectFolderPath, module: moduleRootPath, skip: skipFolderPath, output: outputFolderPath, fs: fs, with: out)
+            try await skipstoneThrows(root: rootPath, project: projectFolderPath, module: moduleRootPath, skip: skipFolderPath, output: outputFolderPath, fs: fs, with: out)
         } catch {
             // ensure that the error is logged in some way before failing
             self.error("Skip \(skipVersion) error: \(error.localizedDescription)")
@@ -120,8 +117,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         }
     }
 
-    private func transpileThrows(root rootPath: AbsolutePath, project projectFolderPath: AbsolutePath, module moduleRootPath: AbsolutePath, skip skipFolderPath: AbsolutePath, output outputFolderPath: AbsolutePath, fs: FileSystem, with out: MessageQueue) async throws {
-        trace("transpileThrows: rootPath=\(rootPath), projectFolderPath=\(projectFolderPath), moduleRootPath=\(moduleRootPath), skipFolderPath=\(skipFolderPath), outputFolderPath=\(outputFolderPath)")
+    private func skipstoneThrows(root rootPath: AbsolutePath, project projectFolderPath: AbsolutePath, module moduleRootPath: AbsolutePath, skip skipFolderPath: AbsolutePath, output outputFolderPath: AbsolutePath, fs: FileSystem, with out: MessageQueue) async throws {
+        trace("skipstoneThrows: rootPath=\(rootPath), projectFolderPath=\(projectFolderPath), moduleRootPath=\(moduleRootPath), skipFolderPath=\(skipFolderPath), outputFolderPath=\(outputFolderPath)")
 
         // the path that will contain the `skip.yml`
 
@@ -134,11 +131,11 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
         let cmakeLists = projectFolderPath.appending(component: "CMakeLists.txt")
         let isCMakeProject = fs.exists(cmakeLists)
         if !isCMakeProject && !fs.isDirectory(skipFolderPath) {
-            throw error("In order to transpile the module, a Skip/ folder must exist and contain a skip.yml file at: \(skipFolderPath)")
+            throw error("In order for Skip to process the module, a Skip/ folder must exist and contain a skip.yml file at: \(skipFolderPath)")
         }
 
         // when renaming SomeClassA.swift to SomeClassB.swift, the stale SomeClassA.kt file from previous runs will be left behind, and will then cause a "Redeclaration:" error from the Kotlin compiler if they declare the same types
-        // so keep a snapshot of the output folder files that existed at the start of the transpile operation, so we can then clean up any output files that are no longer being produced
+        // so keep a snapshot of the output folder files that existed at the start of the skipstone operation, so we can then clean up any output files that are no longer being produced
         let outputFilesSnapshot: [URL] = try FileManager.default.enumeratedURLs(of: outputFolderPath.asURL)
         //msg(.warning, "transpiling to \(outputFolderPath.pathString) with existing files: \(outputFilesSnapshot.map(\.lastPathComponent).sorted().joined(separator: ", "))")
 
@@ -289,7 +286,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             //.prettyPrinted, // compacting JSON significantly reduces the size of the codebase files
         ]
 
-        let sourcehashOutputPath = try AbsolutePath(validating: transpileOptions.sourcehash)
+        let sourcehashOutputPath = try AbsolutePath(validating: skipstoneOptions.sourcehash)
         // We no longer remove the path because the plugin doesn't seem to require it to know to run in dependency order
         //removePath(sourcehashOutputPath) // delete the build completion marker to force its re-creation (removeFileTree doesn't throw when the file doesn't exist)
 
@@ -406,7 +403,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             try addLink(moduleBasePath.appending(component: buildSrcFolderName), pointingAt: buildSrcFolder, relative: false)
         }
 
-        // feed the transpiler the files to transpile and any compiled files to potentially bridge
+        // feed skipstone the files to transpile and any compiled files to potentially bridge
         var transpileFiles: [String] = []
         var swiftFiles: [String] = []
         for sourceFile in sourceURLs.map(\.path).sorted() {
@@ -509,7 +506,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
 
         func saveSkipBridgeCode() throws {
             // create the generated bridge files when the SKIP_BRIDGE environment is set and the plugin passed the --skip-bridge-output flag to the tool
-            if let skipBridgeOutput = transpileOptions.skipBridgeOutput {
+            if let skipBridgeOutput = skipstoneOptions.skipBridgeOutput {
                 let skipBridgeOutputFolder = try AbsolutePath(validating: skipBridgeOutput)
 
                 let swiftBridgeFileNameTranspilationMap = skipBridgeTranspilations.reduce(into: Dictionary<String, Transpilation>()) { result, transpilation in
@@ -940,7 +937,7 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             // when we are running with SKIP_BRIDGE, don't link over any files from the skip folder
             // failure to do this will result in (harmless) .kt files being copied over, but since no subsequent transpilation
             // will mark those as expected output file, they will raise warnings: "removing stale output file: …"
-            if transpileOptions.skipBridgeOutput != nil {
+            if skipstoneOptions.skipBridgeOutput != nil {
                 return []
             }
 
@@ -988,8 +985,8 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
             }
 
             // when we are running with SKIP_BRIDGE, we don't need to write out the Kotlin (which has already been generated in the first pass of the plugin)
-            if transpileOptions.skipBridgeOutput != nil {
-                //warn("suppressing transpiled Kotlin due to transpileOptions.skipBridgeOutput")
+            if skipstoneOptions.skipBridgeOutput != nil {
+                //warn("suppressing transpiled Kotlin due to skipstoneOptions.skipBridgeOutput")
                 return
             }
 
@@ -1371,15 +1368,12 @@ struct TranspileCommand: TranspilePhase, StreamingCommand {
     }
 }
 
-struct TranspileCommandOptions: ParsableArguments {
+struct SkipstoneCommandOptions: ParsableArguments {
     @Option(name: [.customLong("project"), .long], help: ArgumentHelp("The project folder to transpile", valueName: "folder"))
     var projectFolder: String // --project
 
     @Option(name: [.long], help: ArgumentHelp("The path to the source hash file to output", valueName: "path"))
     var sourcehash: String // --sourcehash
-
-    @Option(help: ArgumentHelp("Condition for transpile phase", valueName: "force/no"))
-    var transpile: PhaseGuard = .onDemand // --transpile
 
     @Option(name: [.customLong("module")], help: ArgumentHelp("ModuleName:SourcePath", valueName: "module"))
     var moduleNames: [String] = [] // --module name:path
@@ -1411,19 +1405,6 @@ extension Universal.XMLNode {
     mutating func addPlist(key: String, stringValue: String) {
         append(Universal.XMLNode(elementName: "key", children: [.content(key)]))
         append(Universal.XMLNode(elementName: "string", children: [.content(stringValue)]))
-    }
-}
-
-
-struct TranspileResult {
-
-}
-
-extension TranspilePhase {
-    func performTranspileActions() async throws -> (check: CheckResult, transpile: TranspileResult) {
-        let checkResult = try await performSkippyCommands()
-        let transpileResult = TranspileResult()
-        return (checkResult, transpileResult)
     }
 }
 

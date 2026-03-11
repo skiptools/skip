@@ -7,14 +7,14 @@ import ArgumentParser
 import TSCBasic
 import SkipSyntax
 
-struct SkippyCommand: TranspilerInputOptionsCommand {
+struct SkippyCommand: BuildPluginOptionsCommand {
     /// The "CONFIGURATION" parameter specifies whether we are to run in Skippy mode or full-transpile mode
     static let skippyOnly = ProcessInfo.processInfo.environment["CONFIGURATION"] == "Skippy"
 
     static var configuration = CommandConfiguration(commandName: "skippy", abstract: "Perform transpilation preflight checks", shouldDisplay: false)
 
     @OptionGroup(title: "Check Options")
-    var inputOptions: TranspilerInputOptions
+    var inputOptions: SkipstoneInputOptions
 
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions
@@ -29,7 +29,7 @@ struct SkippyCommand: TranspilerInputOptionsCommand {
         try await perform(on: inputOptions.files.map({ Source.FilePath(path: $0) }), options: inputOptions)
     }
 
-    func perform(on candidateSourceFiles: [Source.FilePath], options: TranspilerInputOptions) async throws {
+    func perform(on candidateSourceFiles: [Source.FilePath], options: SkipstoneInputOptions) async throws {
         // due to FB12969712 https://github.com/apple/swift-package-manager/issues/6816 , we need to tolerate missing source files because Xcode sends the same cached list of sources regardless of changes to the underlying project structure
         let sourceFiles = candidateSourceFiles.filter({
             !allowMissingSources || FileManager.default.fileExists(atPath: $0.path)

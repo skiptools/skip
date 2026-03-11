@@ -90,7 +90,7 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
             // Hidden commands used by the plugin
             InfoCommand.self,
             SkippyCommand.self,
-            TranspileCommand.self,
+            SkipstoneCommand.self,
             SnippetCommand.self,
             PluginCommand.self,
             DumpSwiftCommand.self,
@@ -172,34 +172,19 @@ struct VersionCommand: SingleStreamingCommand {
 }
 
 
-// MARK: Command Phases
+// MARK: BuildPluginOptionsCommand
 
-/// The condition under which the phase should be run
-enum PhaseGuard : String, Decodable, CaseIterable {
-    case no
-    case force
-    case onDemand = "on-demand"
+protocol BuildPluginOptionsCommand : SkipCommand {
+    var inputOptions: SkipstoneInputOptions { get }
 }
 
-extension PhaseGuard : ExpressibleByArgument {
-}
-
-// MARK: TranspilerInputOptionsCommand
-
-protocol TranspilerInputOptionsCommand : SkipCommand {
-    var inputOptions: TranspilerInputOptions { get }
-}
-
-extension TranspilerInputOptionsCommand {
+extension BuildPluginOptionsCommand {
     func performSkippyCommands() async throws -> CheckResult {
         return CheckResult()
     }
 }
 
-struct TranspilerInputOptions: ParsableArguments {
-    @Option(help: ArgumentHelp("Condition for check phase", valueName: "force/no"))
-    var check: PhaseGuard = .onDemand
-
+struct SkipstoneInputOptions: ParsableArguments {
     @Option(name: [.customShort("S")], help: ArgumentHelp("Preprocessor symbols", valueName: "file"))
     var symbols: [String] = []
 
@@ -222,14 +207,10 @@ protocol SnippetOptionsCommand: SkipCommand {
 }
 
 struct SnippetOptions: ParsableArguments {
-    @Option(help: ArgumentHelp("Condition for snippet phase", valueName: "force/no"))
-    var snippet: PhaseGuard = .onDemand // --snippet
 }
 
 struct SnippetResult {
 }
-
-
 
 extension Source.FilePath {
     /// Initialize this file reference with an `AbsolutePath`
