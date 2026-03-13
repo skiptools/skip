@@ -7,6 +7,8 @@ import ArgumentParser
 import TSCBasic
 import SkipSyntax
 
+extension TestCaseMode : ExpressibleByArgument { }
+
 /// Common functions for managing Skip Packages common protocol for `AppCommand` and `LibCommand`.
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 protocol PackageCommand : SkipCommand, ToolOptionsCommand, OutputOptionsCommand {
@@ -108,6 +110,9 @@ struct CreateOptions : ParsableArguments {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Whether to create github metadata", valueName: "enable"))
     var github: Bool = false
 
+    @Option(help: ArgumentHelp("Test case style: testing or xctest", valueName: "mode"))
+    var testCaseMode: TestCaseMode = .testing
+
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Validate generated Package.swift files", valueName: "validate"))
     var validatePackage: Bool = true
 
@@ -148,7 +153,7 @@ struct CreateOptions : ParsableArguments {
     }
 
     func projectOptionValues(projectName: String) -> ProjectOptionValues {
-        ProjectOptionValues(projectName: projectName, swiftPackageVersion: self.swiftPackageVersion, iOSMinVersion: self.iosMinVersion, macOSMinVersion: self.macosMinVersion, chain: self.chain, gitRepo: self.gitRepo, appfair: self.appfair, free: self.free || self.appfair, zero: self.zero, github: self.github, fastlane: self.fastlane)
+        ProjectOptionValues(projectName: projectName, swiftPackageVersion: self.swiftPackageVersion, iOSMinVersion: self.iosMinVersion, macOSMinVersion: self.macosMinVersion, chain: self.chain, gitRepo: self.gitRepo, appfair: self.appfair, free: self.free || self.appfair, zero: self.zero, github: self.github, fastlane: self.fastlane, testCaseMode: self.testCaseMode)
     }
 }
 

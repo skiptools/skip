@@ -115,7 +115,7 @@ This command performs a full system checkup to ensure that Skip can create and b
             }
             let runTests = primary && nativeMode.isEmpty
 
-            let options = ProjectOptionValues(projectName: projectName, swiftPackageVersion: CreateOptions.defaultSwiftPackageVersion, iOSMinVersion: 17.0, chain: true, gitRepo: false, appfair: false, free: true, zero: !isNative, github: true, fastlane: true)
+            let options = ProjectOptionValues(projectName: projectName, swiftPackageVersion: CreateOptions.defaultSwiftPackageVersion, iOSMinVersion: 17.0, chain: true, gitRepo: false, appfair: false, free: true, zero: !isNative, github: true, fastlane: true, testCaseMode: .testing)
 
             // create a project differently based on the index, but the ultimate binary output should be identical
             return try await initSkipProject(

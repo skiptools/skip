@@ -190,26 +190,25 @@ final class SkipCommandTests: XCTestCase {
 
         let testCaseCode = try load("Tests/SomeModuleTests/SomeModuleTests.swift")
         XCTAssertEqual(testCaseCode, """
-        import XCTest
+        import Testing
         import OSLog
         import Foundation
         @testable import SomeModule
 
         let logger: Logger = Logger(subsystem: "SomeModule", category: "Tests")
 
-        @available(macOS 13, *)
-        final class SomeModuleTests: XCTestCase {
+        @Suite struct SomeModuleTests {
 
-            func testSomeModule() throws {
+            @Test func someModule() throws {
                 logger.log("running testSomeModule")
-                XCTAssertEqual(1 + 2, 3, "basic test")
+                #expect(1 + 2 == 3, "basic test")
             }
 
-            func testDecodeType() throws {
+            @Test func decodeType() throws {
                 // load the TestData.json file from the Resources folder and decode it into a struct
-                let resourceURL: URL = try XCTUnwrap(Bundle.module.url(forResource: "TestData", withExtension: "json"))
+                let resourceURL: URL = try #require(Bundle.module.url(forResource: "TestData", withExtension: "json"))
                 let testData = try JSONDecoder().decode(TestData.self, from: Data(contentsOf: resourceURL))
-                XCTAssertEqual("SomeModule", testData.testModuleName)
+                #expect(testData.testModuleName == "SomeModule")
             }
 
         }
@@ -733,7 +732,7 @@ final class SkipCommandTests: XCTestCase {
 
         let testCaseCode = try load("Tests/SomeModuleTests/SomeModuleTests.swift")
         XCTAssertEqual(testCaseCode, """
-        import XCTest
+        import Testing
         import OSLog
         import Foundation
         import SkipBridge
@@ -741,24 +740,23 @@ final class SkipCommandTests: XCTestCase {
 
         let logger: Logger = Logger(subsystem: "SomeModule", category: "Tests")
 
-        @available(macOS 13, *)
-        final class SomeModuleTests: XCTestCase {
-            override func setUp() {
-                #if os(Android)
-                // needed to load the compiled bridge from the transpiled tests
+        @Suite struct SomeModuleTests {
+            init() {
+                #if SKIP
+                // needed to load the compiled bridge when the tests are transpiled
                 loadPeerLibrary(packageName: "basic-project", moduleName: "SomeModule")
                 #endif
             }
 
-            func testSomeModule() throws {
+            @Test func someModule() throws {
                 logger.log("running testSomeModule")
-                XCTAssertEqual(1 + 2, 3, "basic test")
+                #expect(1 + 2 == 3, "basic test")
             }
 
-            func testAsyncThrowsFunction() async throws {
+            @Test func asyncThrowsFunction() async throws {
                 let id = UUID()
                 let type: SomeModuleModule.SomeModuleType = try await SomeModuleModule.createSomeModuleType(id: id, delay: 0.001)
-                XCTAssertEqual(id, type.id)
+                #expect(type.id == id)
             }
 
         }
@@ -1014,7 +1012,7 @@ final class SkipCommandTests: XCTestCase {
 
         let testCaseCode = try load("Tests/ModelModuleTests/ModelModuleTests.swift")
         XCTAssertEqual(testCaseCode, """
-        import XCTest
+        import Testing
         import OSLog
         import Foundation
         import SkipBridge
@@ -1022,28 +1020,27 @@ final class SkipCommandTests: XCTestCase {
 
         let logger: Logger = Logger(subsystem: "ModelModule", category: "Tests")
 
-        @available(macOS 13, *)
-        final class ModelModuleTests: XCTestCase {
-            override func setUp() {
-                #if os(Android)
-                // needed to load the compiled bridge from the transpiled tests
+        @Suite struct ModelModuleTests {
+            init() {
+                #if SKIP
+                // needed to load the compiled bridge when the tests are transpiled
                 loadPeerLibrary(packageName: "cool-app", moduleName: "ModelModule")
                 #endif
             }
 
-            func testModelModule() throws {
+            @Test func modelModule() throws {
                 logger.log("running testModelModule")
-                XCTAssertEqual(1 + 2, 3, "basic test")
+                #expect(1 + 2 == 3, "basic test")
             }
 
-            func testViewModel() async throws {
+            @Test func viewModel() async throws {
                 let vm = ViewModel()
                 vm.items.append(Item(title: "ABC"))
-                XCTAssertFalse(vm.items.isEmpty)
-                XCTAssertEqual("ABC", vm.items.last?.title)
+                #expect(!vm.items.isEmpty)
+                #expect(vm.items.last?.title == "ABC")
 
                 vm.clear()
-                XCTAssertTrue(vm.items.isEmpty)
+                #expect(vm.items.isEmpty)
             }
 
         }
@@ -1200,7 +1197,7 @@ final class SkipCommandTests: XCTestCase {
 
         let testCaseCode = try load("Tests/ModelModuleTests/ModelModuleTests.swift")
         XCTAssertEqual(testCaseCode, """
-        import XCTest
+        import Testing
         import OSLog
         import Foundation
         import SkipBridge
@@ -1208,28 +1205,27 @@ final class SkipCommandTests: XCTestCase {
 
         let logger: Logger = Logger(subsystem: "ModelModule", category: "Tests")
 
-        @available(macOS 13, *)
-        final class ModelModuleTests: XCTestCase {
-            override func setUp() {
-                #if os(Android)
-                // needed to load the compiled bridge from the transpiled tests
+        @Suite struct ModelModuleTests {
+            init() {
+                #if SKIP
+                // needed to load the compiled bridge when the tests are transpiled
                 loadPeerLibrary(packageName: "cool-app", moduleName: "ModelModule")
                 #endif
             }
 
-            func testModelModule() throws {
+            @Test func modelModule() throws {
                 logger.log("running testModelModule")
-                XCTAssertEqual(1 + 2, 3, "basic test")
+                #expect(1 + 2 == 3, "basic test")
             }
 
-            func testViewModel() async throws {
+            @Test func viewModel() async throws {
                 let vm = ViewModel()
                 vm.items.append(Item(title: "ABC"))
-                XCTAssertFalse(vm.items.isEmpty)
-                XCTAssertEqual("ABC", vm.items.last?.title)
+                #expect(!vm.items.isEmpty)
+                #expect(vm.items.last?.title == "ABC")
 
                 vm.clear()
-                XCTAssertTrue(vm.items.isEmpty)
+                #expect(vm.items.isEmpty)
             }
 
         }
@@ -1969,10 +1965,85 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
+    func testLibInitXCTestMode() async throws {
+        let (projectURL, _) = try await skipInit(projectName: "basic-project", zero: false, mode: [.transpiledModel], tests: true, testCaseMode: .xctest, moduleNames: "SomeModule")
+
+        let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
+
+        let testCaseCode = try load("Tests/SomeModuleTests/SomeModuleTests.swift")
+        XCTAssertEqual(testCaseCode, """
+        import XCTest
+        import OSLog
+        import Foundation
+        @testable import SomeModule
+
+        let logger: Logger = Logger(subsystem: "SomeModule", category: "Tests")
+
+        @available(macOS 13, *)
+        final class SomeModuleTests: XCTestCase {
+
+            func testSomeModule() throws {
+                logger.log("running testSomeModule")
+                XCTAssertEqual(1 + 2, 3, "basic test")
+            }
+
+            func testDecodeType() throws {
+                // load the TestData.json file from the Resources folder and decode it into a struct
+                let resourceURL: URL = try XCTUnwrap(Bundle.module.url(forResource: "TestData", withExtension: "json"))
+                let testData = try JSONDecoder().decode(TestData.self, from: Data(contentsOf: resourceURL))
+                XCTAssertEqual("SomeModule", testData.testModuleName)
+            }
+
+        }
+
+        struct TestData : Codable, Hashable {
+            var testModuleName: String
+        }
+
+        """)
+    }
+
+    func testLibInitTestingMode() async throws {
+        let (projectURL, _) = try await skipInit(projectName: "basic-project", zero: false, mode: [.transpiledModel], tests: true, testCaseMode: .testing, moduleNames: "SomeModule")
+
+        let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
+
+        let testCaseCode = try load("Tests/SomeModuleTests/SomeModuleTests.swift")
+        XCTAssertEqual(testCaseCode, """
+        import Testing
+        import OSLog
+        import Foundation
+        @testable import SomeModule
+
+        let logger: Logger = Logger(subsystem: "SomeModule", category: "Tests")
+
+        @Suite struct SomeModuleTests {
+
+            @Test func someModule() throws {
+                logger.log("running testSomeModule")
+                #expect(1 + 2 == 3, "basic test")
+            }
+
+            @Test func decodeType() throws {
+                // load the TestData.json file from the Resources folder and decode it into a struct
+                let resourceURL: URL = try #require(Bundle.module.url(forResource: "TestData", withExtension: "json"))
+                let testData = try JSONDecoder().decode(TestData.self, from: Data(contentsOf: resourceURL))
+                #expect(testData.testModuleName == "SomeModule")
+            }
+
+        }
+
+        struct TestData : Codable, Hashable {
+            var testModuleName: String
+        }
+
+        """)
+    }
+
     /// Default arguments for `skip init` tests
     let initTestArgs = ["-jA", "--no-build", "--no-test", "--show-tree"]
 
-    func skipInit(projectName: String, documented: Bool = false, free: Bool? = nil, zero: Bool? = nil, bridged: Bool? = nil, appfair: Bool? = nil, mode: [ProjectMode], kotlincompat: Bool = false, tests moduleTests: Bool? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, swiftPackageVersion: String? = nil, resourcePath: String? = "Resources", backgroundColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
+    func skipInit(projectName: String, documented: Bool = false, free: Bool? = nil, zero: Bool? = nil, bridged: Bool? = nil, appfair: Bool? = nil, mode: [ProjectMode], kotlincompat: Bool = false, tests moduleTests: Bool? = nil, testCaseMode: TestCaseMode? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, swiftPackageVersion: String? = nil, resourcePath: String? = "Resources", backgroundColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["init"] + initTestArgs
@@ -2026,6 +2097,10 @@ final class SkipCommandTests: XCTestCase {
             cmd += ["--module-tests"]
         } else if moduleTests == false {
             cmd += ["--no-module-tests"]
+        }
+
+        if let testCaseMode = testCaseMode {
+            cmd += ["--test-case-mode", testCaseMode.rawValue]
         }
 
         if let swiftPackageVersion {

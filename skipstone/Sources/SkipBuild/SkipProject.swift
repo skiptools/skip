@@ -42,6 +42,11 @@ enum ModuleMode {
 
 }
 
+enum TestCaseMode: String, CaseIterable {
+    case testing
+    case xctest
+}
+
 struct ProjectOptionValues {
     var projectName: String
     var swiftPackageVersion: String
@@ -54,6 +59,7 @@ struct ProjectOptionValues {
     var zero: Bool
     var github: Bool
     var fastlane: Bool
+    var testCaseMode: TestCaseMode
     
     /// Prior to iOS 26, the default macOS version is 3 below the iOS version in terms of API compatibility (i.e., iOS 18.0 == macOS 15.0)
     var macOSMinVersionCalculated: Double {
@@ -1052,21 +1058,142 @@ public class \(moduleName)Module {
 
                 let rfolder = isNativeModule ? nil : resourceFolder
 
-                var testCaseCode = """
+                var testCaseCode: String
+                if options.testCaseMode == .testing {
+                    testCaseCode = """
+\(testSourceHeader)import Testing
+import OSLog
+import Foundation
+
+"""
+
+                    if isNativeModule {
+                        testCaseCode += """
+import SkipBridge
+
+"""
+                    }
+
+                    testCaseCode += """
+@testable import \(moduleName)
+
+let logger: Logger = Logger(subsystem: "\(moduleName)", category: "Tests")
+
+@Suite struct \(moduleName)Tests {
+
+"""
+
+                    if isNativeModule {
+                        testCaseCode += """
+    init() {
+        #if SKIP
+        // needed to load the compiled bridge when the tests are transpiled
+        loadPeerLibrary(packageName: "\(projectName)", moduleName: "\(moduleName)")
+        #endif
+    }
+
+"""
+                    }
+
+                    testCaseCode += """
+
+    @Test func \(moduleName.prefix(1).lowercased() + moduleName.dropFirst())() throws {
+        logger.log("running test\(moduleName)")
+        #expect(1 + 2 == 3, "basic test")
+    }
+
+"""
+
+                    if let folderName = rfolder {
+                        testCaseCode += """
+
+    @Test func decodeType() throws {
+        // load the TestData.json file from the \(folderName) folder and decode it into a struct
+        let resourceURL: URL = try #require(Bundle.module.url(forResource: "TestData", withExtension: "json"))
+        let testData = try JSONDecoder().decode(TestData.self, from: Data(contentsOf: resourceURL))
+        #expect(testData.testModuleName == "\(moduleName)")
+    }
+
+"""
+                    }
+
+                    if isNativeModule && (isModelModule || isNativeAppModule) {
+                        testCaseCode += """
+
+    @Test func viewModel() async throws {
+        let vm = ViewModel()
+        vm.items.append(Item(title: "ABC"))
+        #expect(!vm.items.isEmpty)
+        #expect(vm.items.last?.title == "ABC")
+
+        vm.clear()
+        #expect(vm.items.isEmpty)
+    }
+
+"""
+
+                    } else if isNativeModule {
+                        testCaseCode += """
+
+    @Test func asyncThrowsFunction() async throws {
+
+"""
+                        if moduleMode == .native || moduleMode == .nativeBridged {
+                            testCaseCode += """
+        let id = UUID()
+
+"""
+                        } else if moduleMode == .kotlincompat {
+                            testCaseCode += """
+        #if SKIP
+        // when the native module is in kotlincompat, types are unwrapped Java classes
+        let id = java.util.UUID.randomUUID()
+        #else
+        let id = UUID()
+        #endif
+
+"""
+                        }
+
+                        testCaseCode += """
+        let type: \(moduleName)Module.\(moduleName)Type = try await \(moduleName)Module.create\(moduleName)Type(id: id, delay: 0.001)
+        #expect(type.id == id)
+    }
+
+"""
+                    }
+
+                    testCaseCode += """
+
+}
+
+"""
+                    if rfolder != nil {
+                        testCaseCode += """
+
+struct TestData : Codable, Hashable {
+    var testModuleName: String
+}
+
+"""
+                    }
+                } else {
+                    // XCTest mode (default)
+                    testCaseCode = """
 \(testSourceHeader)import XCTest
 import OSLog
 import Foundation
 
 """
 
-                if isNativeModule {
-                    testCaseCode += """
+                    if isNativeModule {
+                        testCaseCode += """
 import SkipBridge
 
 """
-                }
+                    }
 
-                testCaseCode += """
+                    testCaseCode += """
 @testable import \(moduleName)
 
 let logger: Logger = Logger(subsystem: "\(moduleName)", category: "Tests")
@@ -1076,19 +1203,19 @@ final class \(moduleName)Tests: XCTestCase {
 
 """
 
-                if isNativeModule {
-                    testCaseCode += """
+                    if isNativeModule {
+                        testCaseCode += """
     override func setUp() {
-        #if os(Android)
-        // needed to load the compiled bridge from the transpiled tests
+        #if SKIP
+        // needed to load the compiled bridge when the tests are transpiled
         loadPeerLibrary(packageName: "\(projectName)", moduleName: "\(moduleName)")
         #endif
     }
 
 """
-                }
+                    }
 
-                testCaseCode += """
+                    testCaseCode += """
 
     func test\(moduleName)() throws {
         logger.log("running test\(moduleName)")
@@ -1097,8 +1224,8 @@ final class \(moduleName)Tests: XCTestCase {
 
 """
 
-                if let folderName = rfolder {
-                    testCaseCode += """
+                    if let folderName = rfolder {
+                        testCaseCode += """
 
     func testDecodeType() throws {
         // load the TestData.json file from the \(folderName) folder and decode it into a struct
@@ -1108,10 +1235,10 @@ final class \(moduleName)Tests: XCTestCase {
     }
 
 """
-                }
+                    }
 
-                if isNativeModule && (isModelModule || isNativeAppModule) {
-                    testCaseCode += """
+                    if isNativeModule && (isModelModule || isNativeAppModule) {
+                        testCaseCode += """
 
     func testViewModel() async throws {
         let vm = ViewModel()
@@ -1125,19 +1252,19 @@ final class \(moduleName)Tests: XCTestCase {
 
 """
 
-                } else if isNativeModule {
-                    testCaseCode += """
+                    } else if isNativeModule {
+                        testCaseCode += """
 
     func testAsyncThrowsFunction() async throws {
 
 """
-                    if moduleMode == .native || moduleMode == .nativeBridged {
-                        testCaseCode += """
+                        if moduleMode == .native || moduleMode == .nativeBridged {
+                            testCaseCode += """
         let id = UUID()
 
 """
-                    } else if moduleMode == .kotlincompat {
-                        testCaseCode += """
+                        } else if moduleMode == .kotlincompat {
+                            testCaseCode += """
         #if SKIP
         // when the native module is in kotlincompat, types are unwrapped Java classes
         let id = java.util.UUID.randomUUID()
@@ -1146,30 +1273,31 @@ final class \(moduleName)Tests: XCTestCase {
         #endif
 
 """
-                    }
+                        }
 
-                    testCaseCode += """
+                        testCaseCode += """
         let type: \(moduleName)Module.\(moduleName)Type = try await \(moduleName)Module.create\(moduleName)Type(id: id, delay: 0.001)
         XCTAssertEqual(id, type.id)
     }
 
 """
-                }
+                    }
 
 
-                testCaseCode += """
+                    testCaseCode += """
 
 }
 
 """
-                if rfolder != nil {
-                    testCaseCode += """
+                    if rfolder != nil {
+                        testCaseCode += """
 
 struct TestData : Codable, Hashable {
     var testModuleName: String
 }
 
 """
+                    }
                 }
 
                 try testCaseCode.write(to: testSwiftFile, atomically: false, encoding: .utf8)
