@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import XCTest
+@testable import SkipSyntax
+
+let testRunnerAnnotation: String = KotlinClassDeclaration.testRunnerAnnotation?.appending("\n") ?? ""
 
 final class TransformerTests: XCTestCase {
     func testUnitTestTransformer() async throws {
@@ -22,7 +25,7 @@ final class TransformerTests: XCTestCase {
         """, kotlin: """
         import skip.unit.*
 
-        internal open class TestCase: XCTestCase {
+        \(testRunnerAnnotation)internal open class TestCase: XCTestCase {
             @Test
             internal open fun testSomeTest() = Unit
 
@@ -52,7 +55,7 @@ final class TransformerTests: XCTestCase {
 
         import skip.unit.*
 
-        internal open class TestCase: XCTestCase {
+        \(testRunnerAnnotation)internal open class TestCase: XCTestCase {
 
             @OptIn(ExperimentalCoroutinesApi::class)
             @Test
@@ -86,7 +89,7 @@ final class TransformerTests: XCTestCase {
         """, kotlin: """
         import skip.unit.*
 
-        internal class MyTests: XCTestCase {
+        \(testRunnerAnnotation)internal class MyTests: XCTestCase {
             @Test
             internal fun addition(): Unit = expectEqual(1 + 1, 2)
         }
@@ -106,7 +109,7 @@ final class TransformerTests: XCTestCase {
         """, kotlin: """
         import skip.unit.*
 
-        internal class MyTests: XCTestCase {
+        \(testRunnerAnnotation)internal class MyTests: XCTestCase {
             @Test
             internal fun boolCheck() {
                 val x = true
@@ -128,7 +131,7 @@ final class TransformerTests: XCTestCase {
         """, kotlin: """
         import skip.unit.*
 
-        internal class MyTests: XCTestCase {
+        \(testRunnerAnnotation)internal class MyTests: XCTestCase {
             @Test
             internal fun inequality(): Unit = expectNotEqual(1, 2)
         }
@@ -148,7 +151,7 @@ final class TransformerTests: XCTestCase {
         """, kotlin: """
         import skip.unit.*
 
-        internal class MyTests: XCTestCase {
+        \(testRunnerAnnotation)internal class MyTests: XCTestCase {
             @Test
             internal fun unwrap() {
                 val x: Int? = 42
@@ -178,7 +181,7 @@ final class TransformerTests: XCTestCase {
         """, kotlin: """
         import skip.unit.*
 
-        internal class MathTests: XCTestCase {
+        \(testRunnerAnnotation)internal class MathTests: XCTestCase {
             @Test
             internal fun addition(): Unit = expectEqual(2 + 2, 4)
 
@@ -205,7 +208,7 @@ final class TransformerTests: XCTestCase {
         """, kotlin: """
         import skip.unit.*
 
-        internal class CompTests: XCTestCase {
+        \(testRunnerAnnotation)internal class CompTests: XCTestCase {
             @Test
             internal fun comparisons() {
                 expectGreaterThan(5, 3)
@@ -227,7 +230,7 @@ final class TransformerTests: XCTestCase {
         """, kotlin: """
         import skip.unit.*
 
-        internal class AdditionTests: XCTestCase {
+        \(testRunnerAnnotation)internal class AdditionTests: XCTestCase {
             @Test
             internal fun addition(): Unit = expectEqual(1 + 2, 3)
         }
@@ -252,12 +255,12 @@ final class TransformerTests: XCTestCase {
         """, kotlin: """
         import skip.unit.*
 
-        internal class AdditionTests: XCTestCase {
+        \(testRunnerAnnotation)internal class AdditionTests: XCTestCase {
             @Test
             internal fun addition(): Unit = expectEqual(1 + 1, 2)
         }
 
-        internal class SubtractionTests: XCTestCase {
+        \(testRunnerAnnotation)internal class SubtractionTests: XCTestCase {
             @Test
             internal fun subtraction(): Unit = expectEqual(5 - 3, 2)
         }
@@ -277,7 +280,7 @@ final class TransformerTests: XCTestCase {
         """, kotlin: """
         import skip.unit.*
 
-        internal class BoolCheckTests: XCTestCase {
+        \(testRunnerAnnotation)internal class BoolCheckTests: XCTestCase {
             @Test
             internal fun boolCheck() {
                 val x = true

@@ -294,7 +294,7 @@ extension XCTestCase {
         ].compactMap({ $0 })
 
         do {
-            let result = try await Process.checkNonZeroExit(arguments: args, environment: env, loggingHandler: { msg in
+            let result = try await Process.checkNonZeroExit(arguments: args, environmentBlock: .init(env), loggingHandler: { msg in
                 print("kotlinc> " + msg)
             })
 

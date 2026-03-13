@@ -19,8 +19,6 @@ final class KotlinUnitTestTransformer: KotlinTransformer {
     /// Types annotated with `@Suite` in Swift source.
     private var swiftTestingSuites: [Source.FilePath: Set<String>] = [:]
 
-    static let testRunnerAnnotation: String? = nil // was: "@org.junit.runner.RunWith(androidx.test.ext.junit.runners.AndroidJUnit4::class)"
-
     func gather(from syntaxTree: SyntaxTree) {
         var testFunctions: Set<String> = []
         var suiteTypes: Set<String> = []
@@ -88,11 +86,7 @@ final class KotlinUnitTestTransformer: KotlinTransformer {
                     } else {
                         functionDeclaration.annotations += ["@Test"]
                     }
-                    if let testRunnerAnnotation = Self.testRunnerAnnotation {
-                        if !owningClass.annotations.contains(testRunnerAnnotation) {
-                            owningClass.annotations += [testRunnerAnnotation]
-                        }
-                    }
+                    owningClass.addTestRunnerAnnotation()
                     // For Swift Testing @Suite types that don't extend XCTestCase,
                     // make them implement the XCTestCase interface for assertion access
                     if isSwiftTesting && !isXCTest {
@@ -141,9 +135,7 @@ final class KotlinUnitTestTransformer: KotlinTransformer {
         let classDeclaration = KotlinClassDeclaration(name: className, signature: .named(className, []), declarationType: .classDeclaration)
         classDeclaration.modifiers = Modifiers(isFinal: true)
         classDeclaration.inherits = [.named("XCTestCase", [])]
-        if let testRunnerAnnotation = Self.testRunnerAnnotation {
-            classDeclaration.annotations = [testRunnerAnnotation]
-        }
+        classDeclaration.addTestRunnerAnnotation()
         classDeclaration.extras = functionDeclaration.extras
 
         // Move the function into the class
@@ -213,5 +205,25 @@ final class KotlinUnitTestTransformer: KotlinTransformer {
         let infos = codebaseInfo.typeInfos(forNamed: owningType)
         // check for whether the containing class inherits from `XCTestCase`
         return infos.contains { $0.inherits.contains { $0.isNamed("XCTestCase", moduleName: "XCTest", generics: []) } }
+    }
+}
+
+extension KotlinClassDeclaration {
+    /// A default annotation to add to generated test cases, which is required by Robolectric to correcly mock various Android API
+    ///
+    /// Failure to include this will result in errors like:
+    /// ```
+    /// java.lang.RuntimeException: Method parse in android.net.Uri not mocked.
+    /// ```
+    /// See also: https://developer.android.com/training/testing/local-tests#mocking-dependencies
+    static let testRunnerAnnotation: String? = "@org.junit.runner.RunWith(androidx.test.ext.junit.runners.AndroidJUnit4::class)"
+
+    func addTestRunnerAnnotation() {
+        if let testRunnerAnnotation = Self.testRunnerAnnotation {
+            // only add the annotation of the class itself has not already specified an annotation
+            if !self.annotations.contains(where: { $0.hasPrefix("@org.junit.runner.RunWith(") || $0.hasPrefix("@RunWith(") }) {
+                self.annotations += [testRunnerAnnotation]
+            }
+        }
     }
 }
