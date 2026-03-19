@@ -269,20 +269,25 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         //return try await run(with: out, msg, ["zip", "-\(compressionLevel)", "--symlinks", "-r", zipFile.path, folder.lastPathComponent], in: folder.deletingLastPathComponent(), resultHandler: returnFileSize)
     }
 
-    func createIPA(configuration: BuildConfiguration, schemeName: String?, primaryModuleName: String, sdk: String = "iphoneos", cfgSuffix: String, projectURL: URL, out: MessageQueue, prefix re: String, xcodeProjectURL: URL, ipaURL ipaOutputURL: URL? = nil, xcarchiveURL: URL? = nil, teamID: String? = nil, verifyFile: Bool = true, returnHashes: Bool) async throws -> [URL : String?] {
+    /// Resolve the app scheme name from the Xcode project, using the provided scheme name override if given.
+    func resolveAppSchemeName(schemeName: String?, xcodeProjectURL: URL, out: MessageQueue) async throws -> String {
+        if let schemeName = schemeName {
+            return schemeName
+        }
+        let projectSchemes = try await run(with: out, "Check project schemes", ["xcodebuild", "-list", "-json", "-project", xcodeProjectURL.path]).get()
+        let schemeList = try JSONDecoder().decode(XcodeProjectSchemes.self, from: projectSchemes.stdout.data(using: .utf8) ?? Data())
+        guard let appSchemeName = schemeList.project.targets?.first else {
+            throw MissingProjectFileError(errorDescription: "No schemes found in project: \(xcodeProjectURL.path): \(projectSchemes.stdout)")
+        }
+        return appSchemeName
+    }
+
+    func createIPA(configuration: BuildConfiguration, appSchemeName: String, primaryModuleName: String, sdk: String = "iphoneos", cfgSuffix: String, projectURL: URL, out: MessageQueue, prefix re: String, xcodeProjectURL: URL, ipaURL ipaOutputURL: URL? = nil, xcarchiveURL: URL? = nil, teamID: String? = nil, verifyFile: Bool = true, returnHashes: Bool) async throws -> [URL : String?] {
         // xcodebuild -derivedDataPath .build/DerivedData -skipPackagePluginValidation -skipMacroValidation -archivePath "${ARCHIVE_PATH}" -configuration "${CONFIGURATION}" -scheme "${SKIP_MODULE}" -sdk "iphoneos" -destination "generic/platform=iOS" -jobs 1 archive CODE_SIGNING_ALLOWED=NO
         let cfg = configuration.rawValue.capitalized
         let archiveBasePath = darwinBuildFolder + "/Archives/" + cfg
 
         let archivePath = archiveBasePath + "/" + primaryModuleName + ".xcarchive"
-
-        // Get the scheme list from the Xcode project
-        let projectSchemes = try await run(with: out, "Check project schemes", ["xcodebuild", "-list", "-json", "-project", xcodeProjectURL.path]).get()
-        let schemeList = try JSONDecoder().decode(XcodeProjectSchemes.self, from: projectSchemes.stdout.data(using: .utf8) ?? Data())
-
-        guard let appSchemeName = schemeName ?? schemeList.project.targets?.first else {
-            throw MissingProjectFileError(errorDescription: "No schemes found in project: \(xcodeProjectURL.path): \(projectSchemes.stdout)")
-        }
 
         // note that derivedDataPath and archivePath are relative to CWD rather than
         let fullArchivePath = projectURL.path + "/" + archivePath
@@ -370,6 +375,37 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         return hashes
     }
 
+    /// Build an iOS simulator .app and zip it up, preserving symbolic links.
+    func createSimApp(configuration: BuildConfiguration, appSchemeName: String, primaryModuleName: String, projectURL: URL, out: MessageQueue, xcodeProjectURL: URL, simAppURL: URL) async throws {
+        let cfg = configuration.rawValue.capitalized
+        let fullDerivedDataPath = projectURL.path + "/" + darwinBuildFolder + "/DerivedData"
+
+        try await run(with: out, "Build iOS simulator app", [
+            "xcodebuild",
+            "build",
+            "-project", xcodeProjectURL.path,
+            "-derivedDataPath", fullDerivedDataPath,
+            "-skipPackagePluginValidation",
+            "-skipMacroValidation",
+            "-configuration", cfg,
+            "-scheme", appSchemeName,
+            "-sdk", "iphonesimulator",
+            "-destination", "generic/platform=iOS Simulator",
+            "CODE_SIGNING_ALLOWED=NO",
+        ], additionalEnvironment: ["SKIP_ZERO": "1", "SKIP_PLUGIN_DISABLED": "1"])
+
+        // Find the built .app in the DerivedData Build/Products directory
+        let productsPath = fullDerivedDataPath + "/Build/Products/\(cfg)-iphonesimulator"
+        let appBundlePath = productsPath + "/" + primaryModuleName + ".app"
+        let appBundleURL = URL(fileURLWithPath: appBundlePath, isDirectory: true)
+
+        if !FileManager.default.fileExists(atPath: appBundlePath) {
+            throw MissingProjectFileError(errorDescription: "Expected simulator app does not exist at: \(appBundlePath)")
+        }
+
+        try await zipFolder(with: out, message: "Archive \(simAppURL.lastPathComponent)", zipFile: simAppURL, folder: appBundleURL)
+    }
+
     func initSkipProject(options: ProjectOptionValues, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: BuildConfiguration, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, app isApp: Bool, appid: String?, appModuleName: String = "app", icon: IconParameters?, version: String?, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
         var options = options
         let baseName = options.projectName
@@ -421,7 +457,8 @@ extension ToolOptionsCommand where Self : StreamingCommand {
 
         let xcodeProjectURL = project.darwinProjectFolder
         if ipa == true  {
-            let ipaFiles = try await createIPA(configuration: configuration, schemeName: nil, primaryModuleName: primaryModuleName, cfgSuffix: cfgSuffix, projectURL: projectURL, out: out, prefix: re, xcodeProjectURL: xcodeProjectURL, returnHashes: returnHashes)
+            let appSchemeName = try await resolveAppSchemeName(schemeName: nil, xcodeProjectURL: xcodeProjectURL, out: out)
+            let ipaFiles = try await createIPA(configuration: configuration, appSchemeName: appSchemeName, primaryModuleName: primaryModuleName, cfgSuffix: cfgSuffix, projectURL: projectURL, out: out, prefix: re, xcodeProjectURL: xcodeProjectURL, returnHashes: returnHashes)
             artifactHashes.merge(ipaFiles, uniquingKeysWith: { $1 })
         }
 
