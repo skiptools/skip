@@ -205,6 +205,7 @@ extension XCTestCase {
             }
         } else {
             messages.forEach { print("Received expected message: \($0)") }
+            fflush(stdout)
         }
 
         // if we spcify to fork the kotlinc compiler, proceed with evaluating and comparing the results
@@ -232,6 +233,7 @@ extension XCTestCase {
         let messages = try await transpile(preflight: preflight, files: [tmpFile], isSwiftBridge: isSwiftBridge, transformers: transformers)
         XCTAssertTrue(!messages.isEmpty)
         messages.forEach { print("Received expected message: \($0)") }
+        fflush(stdout)
     }
 
     /// Transpiles the code without performing checks, e.g. for performance profiling.
