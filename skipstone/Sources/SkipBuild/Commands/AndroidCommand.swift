@@ -297,6 +297,7 @@ struct AndroidSDKCommand: AsyncParsableCommand {
         subcommands: [
             AndroidSDKListCommand.self,
             AndroidSDKInstallCommand.self,
+            AndroidSDKUninstallCommand.self,
         ])
 }
 
@@ -338,7 +339,8 @@ extension ToolchainOptionsCommand where Self : StreamingCommand {
             try await run(with: out, "Install Host Toolchain", ["swiftly", "install", "--assume-yes", matchingSDK.version])
 
             // Remove any pre-existing toolchain matching the version (permitting failure, in case it does not exist)
-            let androidSDKName = matchingSDK.version + "_android"
+            let swiftSDKName = matchingSDK.version.hasPrefix("swift-") ? matchingSDK.version : "swift-\(matchingSDK.version)-RELEASE"
+            let androidSDKName = swiftSDKName + "_android"
             try await run(with: out, "Check Android SDK", ["swiftly", "run", "swift", "sdk", "remove", androidSDKName, "+\(matchingSDK.version)"], permitFailure: true)
 
             // Install the Android SDK
@@ -346,6 +348,9 @@ extension ToolchainOptionsCommand where Self : StreamingCommand {
 
             // Install path will be like swift-6.3-DEVELOPMENT-SNAPSHOT-2025-12-18-a_android.artifactbundle
             let artifactInstallPath = self.localSDKsRootPath.appending(component: androidSDKName).appendingPathExtension("artifactbundle")
+            if artifactInstallPath.isDirectoryFile != true {
+                throw AndroidError(errorDescription: "Android SDK install path not found at \(artifactInstallPath.path)")
+            }
 
             let swiftAndroidRoot = artifactInstallPath.appending(component: "swift-android")
 
@@ -403,19 +408,22 @@ struct AndroidSDKInstallCommand: MessageCommand, ToolchainOptionsCommand {
         commandName: "install",
         abstract: "Install the native Swift Android SDK",
         usage: """
-        # Installs the default version of the Android SDK
+        # Installs the latest released version of the Android SDK
         skip android sdk install
 
-        # Installs the latest nightly for 6.3
-        skip android sdk install --version nightly-6.3
-        """,
-        shouldDisplay: true)
+        # Installs a specific version
+        skip android sdk install --version 6.3
 
-    static let defaultAndroidSDKVersion = "6.2" // TODO: 6.3
+        # Installs the latest nightly build
+        skip android sdk install --version nightly-main
+        """,
+        shouldDisplay: true,
+        aliases: ["upgrade"])
+
     static let defaultAndroidNDKVersion = "r27d"
 
-    @Option(help: ArgumentHelp("Version of the Swift Android SDK to install", valueName: "version"))
-    var version: String = Self.defaultAndroidSDKVersion
+    @Option(help: ArgumentHelp("Version of the Swift Android SDK to install (defaults to latest release)", valueName: "version"))
+    var version: String?
 
     @Option(help: ArgumentHelp("Version of the Android NDK to link to the toolchain", valueName: "ndk"))
     var ndkVersion: String = Self.defaultAndroidNDKVersion
@@ -436,9 +444,91 @@ struct AndroidSDKInstallCommand: MessageCommand, ToolchainOptionsCommand {
     var verify: Bool = true
 
     func performCommand(with out: MessageQueue) async throws {
-        await withLogStream(title: "Install Swift Android SDK \(version)", with: out) {
-            try await installAndroidSDK(version: version, ndkVersion: ndkVersion, reinstall: reinstall, selfTest: verify, with: out)
+        let resolvedVersion: String
+        if let version = version {
+            resolvedVersion = version
+        } else {
+            // Look up the latest released Android SDK version
+            let sdks = try await SwiftSDKOpenAPI.fetchSDKs(sdkName: "android")
+            guard let latest = sdks.first else {
+                throw AndroidError(errorDescription: "No released Android SDK versions found")
+            }
+            resolvedVersion = latest.version
         }
+        await withLogStream(title: "Install Swift Android SDK \(resolvedVersion)", with: out) {
+            try await installAndroidSDK(version: resolvedVersion, ndkVersion: ndkVersion, reinstall: reinstall, selfTest: verify, with: out)
+        }
+    }
+}
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+struct AndroidSDKUninstallCommand: MessageCommand, ToolchainOptionsCommand {
+    static var configuration = CommandConfiguration(
+        commandName: "uninstall",
+        abstract: "Uninstall the Swift Android SDK",
+        usage: """
+        # Uninstalls all installed Android SDKs
+        skip android sdk uninstall
+
+        # Uninstalls a specific version
+        skip android sdk uninstall --version swift-6.3-RELEASE_android
+
+        # Uninstalls all installed Android SDKs (explicit)
+        skip android sdk uninstall --version all
+        """,
+        shouldDisplay: true,
+        aliases: ["remove"])
+
+    @Option(help: ArgumentHelp("Version of the Swift Android SDK to uninstall, or 'all' to remove all installed versions", valueName: "version"))
+    var version: String?
+
+    @OptionGroup(title: "Output Options")
+    var outputOptions: OutputOptions
+
+    @OptionGroup(title: "Tool Options")
+    var toolOptions: ToolOptions
+
+    @OptionGroup(title: "Toolchain Options")
+    var toolchainOptions: ToolchainOptions
+
+    func performCommand(with out: MessageQueue) async throws {
+        let installedSDKs = try await listInstalledAndroidSDKs()
+        if installedSDKs.isEmpty {
+            await out.yield(MessageBlock(status: .warn, "No Android SDKs are currently installed"))
+            return
+        }
+
+        let sdksToRemove: [String]
+        if let version = version, version != "all" {
+            // Remove a specific version
+            let matching = installedSDKs.filter { $0 == version || $0.contains(version) }
+            if matching.isEmpty {
+                throw AndroidError(errorDescription: "No installed Android SDK matching '\(version)' was found. Installed SDKs: \(installedSDKs.joined(separator: ", "))")
+            }
+            sdksToRemove = matching
+        } else {
+            // Remove all installed Android SDKs
+            sdksToRemove = installedSDKs
+        }
+
+        await withLogStream(title: "Uninstall Swift Android SDK", with: out) {
+            for sdk in sdksToRemove {
+                try await run(with: out, "Remove Android SDK \(sdk)", ["swift", "sdk", "remove", sdk], permitFailure: true)
+            }
+        }
+    }
+
+    /// Lists the names of all installed Android SDKs by running `swift sdk list` and filtering for those containing "android".
+    func listInstalledAndroidSDKs() async throws -> [String] {
+        var sdks: [String] = []
+        let swiftSDKListOutput = try await launchTool("swift", arguments: ["sdk", "list"], includeStdErr: false)
+        for try await sdkLine in swiftSDKListOutput {
+            let name = sdkLine.line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if name.contains("android") {
+                sdks.append(name)
+            }
+        }
+        return sdks
     }
 }
 

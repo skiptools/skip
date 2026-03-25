@@ -241,7 +241,11 @@ Create a new project by following a series of interactive prompts.
 
         // auto-install the Android SDK if we are selecting a native project
         if installNativeSDK {
-            try await installAndroidSDK(version: AndroidSDKInstallCommand.defaultAndroidSDKVersion, ndkVersion: AndroidSDKInstallCommand.defaultAndroidNDKVersion, reinstall: false, selfTest: false, with: out)
+            let sdks = try await SwiftSDKOpenAPI.fetchSDKs(sdkName: "android")
+            guard let latestSDK = sdks.first else {
+                throw AndroidError(errorDescription: "No released Android SDK versions found")
+            }
+            try await installAndroidSDK(version: latestSDK.version, ndkVersion: AndroidSDKInstallCommand.defaultAndroidNDKVersion, reinstall: false, selfTest: false, with: out)
         }
 
         let dir = URL(fileURLWithPath: self.createOptions.dir ?? projectName, isDirectory: true)

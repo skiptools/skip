@@ -4,7 +4,7 @@
 # https://www.swift.org/download/#releases
 #
 # and install Linux Static SDK toolchain with:
-# swift sdk install https://download.swift.org/swift-6.2.3-release/static-sdk/swift-6.2.3-RELEASE/swift-6.2.3-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz --checksum f30ec724d824ef43b5546e02ca06a8682dafab4b26a99fbb0e858c347e507a2c
+# swift sdk install https://download.swift.org/swift-6.3-release/static-sdk/swift-6.3-RELEASE/swift-6.3-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz --checksum d2078b69bdeb5c31202c10e9d8a11d6f66f82938b51a4b75f032ccb35c4c286c
 #
 # SkipKey can be built and uploaded with:
 #
@@ -18,7 +18,7 @@ ARTIFACTBUNDLE="${ARTIFACT}.artifactbundle"
 PLUGIN_ZIP="${ARTIFACT}-linux.zip"
 ARTIFACT_BUILD_DIR=.build/artifactbundle-linux
 
-SWIFT_VERSION=${SWIFT_VERSION:-"6.2.3"}
+SWIFT_VERSION=${SWIFT_VERSION:-"6.3"}
 USE_SWIFTLY=${USE_SWIFTLY:-"1"}
 
 # Parse --arch flags; defaults to both x86_64 and aarch64
