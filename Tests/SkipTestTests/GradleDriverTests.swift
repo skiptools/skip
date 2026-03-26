@@ -38,11 +38,47 @@ final class GradleDriverTests: XCTestCase {
 
         let parsed = try GradleDriver.parseTestResults(in: GradleDriver.testResultFolders(for: testResultsFolder, actions: ["connectedDebugAndroidTest"]))
 
-        XCTAssertEqual(1, parsed.count)
-        XCTAssertEqual("skip.repro.ReproKitTests", parsed.first?.name)
-        XCTAssertEqual(1, parsed.first?.tests)
-        XCTAssertEqual(0, parsed.first?.failures)
-        XCTAssertEqual(0, parsed.first?.errors)
+        XCTAssertEqual(1, parsed.testSuites.count)
+        XCTAssertEqual(1, parsed.resultFiles.count)
+        XCTAssertEqual("skip.repro.ReproKitTests", parsed.testSuites.first?.name)
+        XCTAssertEqual(1, parsed.testSuites.first?.tests)
+        XCTAssertEqual(0, parsed.testSuites.first?.failures)
+        XCTAssertEqual(0, parsed.testSuites.first?.errors)
+    }
+
+    func testConnectedAndroidResultsIgnoreUnitTestOutput() throws {
+        let tempRoot = try FileManager.default.createTmpDir(name: "ConnectedGradleResultSelection")
+        let testResultsFolder = tempRoot
+            .appendingPathComponent(".build/ReproKit/test-results", isDirectory: true)
+        let unitTestFolder = testResultsFolder
+            .appendingPathComponent("testDebugUnitTest", isDirectory: true)
+        let connectedDebugFolder = tempRoot
+            .appendingPathComponent(".build/ReproKit/outputs/androidTest-results/connected/debug", isDirectory: true)
+
+        try FileManager.default.createDirectory(at: unitTestFolder, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: connectedDebugFolder, withIntermediateDirectories: true)
+
+        let unitXML = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <testsuite name="skip.repro.UnitTests" tests="1" failures="0" errors="0" skipped="0" time="0.123">
+          <testcase name="testUnit" classname="skip.repro.UnitTests" time="0.123"/>
+        </testsuite>
+        """
+        try Data(unitXML.utf8).write(to: unitTestFolder.appendingPathComponent("TEST-skip.repro.UnitTests.xml"))
+
+        let connectedXML = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <testsuite name="skip.repro.ConnectedTests" tests="1" failures="0" errors="0" skipped="0" time="0.123">
+          <testcase name="testConnected" classname="skip.repro.ConnectedTests" time="0.123"/>
+        </testsuite>
+        """
+        try Data(connectedXML.utf8).write(to: connectedDebugFolder.appendingPathComponent("TEST-skip.repro.ConnectedTests.xml"))
+
+        let parsed = try GradleDriver.parseTestResults(in: GradleDriver.testResultFolders(for: testResultsFolder, actions: ["connectedDebugAndroidTest"]))
+
+        XCTAssertEqual(1, parsed.testSuites.count)
+        XCTAssertEqual("skip.repro.ConnectedTests", parsed.testSuites.first?.name)
+        XCTAssertEqual("TEST-skip.repro.ConnectedTests.xml", parsed.resultFiles.first?.lastPathComponent)
     }
 
     /// Initialize a new Gradle project with the Kotlin DSL and run the test cases,
@@ -125,8 +161,8 @@ final class GradleDriverTests: XCTestCase {
 
             let results = try parseResults()
 
-            XCTAssertEqual(1, results.count)
-            let firstResult = try XCTUnwrap(results.first)
+            XCTAssertEqual(1, results.testSuites.count)
+            let firstResult = try XCTUnwrap(results.testSuites.first)
 
             // failFast should max the error count at 1, but it doesn't seem to work — maybe related to https://github.com/gradle/gradle/issues/4562
             let expectedFailCount = (failure ? 1 : 0) + (error ? 1 : 0)
