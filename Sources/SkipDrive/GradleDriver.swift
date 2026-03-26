@@ -248,13 +248,57 @@ public struct GradleDriver {
                 .appendingPathComponent("outputs", isDirectory: true)
                 .appendingPathComponent("androidTest-results", isDirectory: true)
                 .appendingPathComponent("connected", isDirectory: true)
-            return [
-                connectedRoot.appendingPathComponent("debug", isDirectory: true),
-                connectedRoot
-            ]
+            let variantFolders = connectedTestVariants(for: actions).map {
+                connectedRoot.appendingPathComponent($0, isDirectory: true)
+            }
+            return variantFolders + [connectedRoot]
         }
 
         return [testResultFolder]
+    }
+
+    public static func connectedTestVariants(for actions: [String]) -> [String] {
+        var variants: [String] = []
+        for action in actions {
+            guard let variant = connectedTestVariant(for: action), !variants.contains(variant) else {
+                continue
+            }
+            variants.append(variant)
+        }
+        return variants
+    }
+
+    public static func connectedTestVariant(for action: String) -> String? {
+        guard action.hasPrefix("connected"), action.hasSuffix("AndroidTest") else {
+            return nil
+        }
+
+        let start = action.index(action.startIndex, offsetBy: "connected".count)
+        let end = action.index(action.endIndex, offsetBy: -"AndroidTest".count)
+        let variant = String(action[start..<end])
+        guard !variant.isEmpty else {
+            return nil
+        }
+
+        return variant.prefix(1).lowercased() + variant.dropFirst()
+    }
+
+    public static func connectedResultVariant(for resultFile: URL) -> String? {
+        let components = resultFile.standardizedFileURL.pathComponents
+        guard let connectedIndex = components.firstIndex(of: "connected"),
+              components.indices.contains(connectedIndex + 1) else {
+            return nil
+        }
+
+        return components[connectedIndex + 1]
+    }
+
+    public static func unitTestResultFolderName(forConnectedResultFiles resultFiles: [URL]) -> String {
+        guard let variant = resultFiles.compactMap(connectedResultVariant(for:)).first else {
+            return "testDebugUnitTest"
+        }
+
+        return "test" + variant.prefix(1).uppercased() + variant.dropFirst() + "UnitTest"
     }
 
     /// Executes `skiptool info` and returns the info dictionary.

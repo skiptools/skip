@@ -166,9 +166,10 @@ extension XCGradleHarness where Self : XCTestCase {
             .appendingPathComponent(moduleName, isDirectory: true)
             .appendingPathComponent(".build", isDirectory: true)
             .appendingPathComponent(moduleName, isDirectory: true)
+        let junitTaskFolderName = GradleDriver.unitTestResultFolderName(forConnectedResultFiles: resultFiles)
         let junitResultRoot = buildRoot
             .appendingPathComponent("test-results", isDirectory: true)
-            .appendingPathComponent("testDebugUnitTest", isDirectory: true)
+            .appendingPathComponent(junitTaskFolderName, isDirectory: true)
 
         let fm = FileManager.default
         if fm.fileExists(atPath: junitResultRoot.path) {

@@ -18,6 +18,7 @@ final class GradleDriverTests: XCTestCase {
         let _ = line
     }
 
+    // Verifies connected Android tests fall back to the AGP output folder when unit-test results are absent.
     func testParseConnectedAndroidTestResultsFallback() throws {
         let tempRoot = try FileManager.default.createTmpDir(name: "ConnectedGradleResults")
         let testResultsFolder = tempRoot
@@ -46,6 +47,7 @@ final class GradleDriverTests: XCTestCase {
         XCTAssertEqual(0, parsed.testSuites.first?.errors)
     }
 
+    // Verifies connected Android runs prefer instrumented-test XML over stale unit-test XML in the canonical folder.
     func testConnectedAndroidResultsIgnoreUnitTestOutput() throws {
         let tempRoot = try FileManager.default.createTmpDir(name: "ConnectedGradleResultSelection")
         let testResultsFolder = tempRoot
@@ -79,6 +81,58 @@ final class GradleDriverTests: XCTestCase {
         XCTAssertEqual(1, parsed.testSuites.count)
         XCTAssertEqual("skip.repro.ConnectedTests", parsed.testSuites.first?.name)
         XCTAssertEqual("TEST-skip.repro.ConnectedTests.xml", parsed.resultFiles.first?.lastPathComponent)
+    }
+
+    // Verifies flavored connected tasks resolve results from the matching variant folder such as freeDebug.
+    func testConnectedAndroidResultFoldersSupportFlavorVariants() throws {
+        let tempRoot = try FileManager.default.createTmpDir(name: "ConnectedGradleFlavorResults")
+        let testResultsFolder = tempRoot
+            .appendingPathComponent(".build/ReproKit/test-results", isDirectory: true)
+        let flavoredFolder = tempRoot
+            .appendingPathComponent(".build/ReproKit/outputs/androidTest-results/connected/freeDebug", isDirectory: true)
+
+        try FileManager.default.createDirectory(at: flavoredFolder, withIntermediateDirectories: true)
+
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <testsuite name="skip.repro.FreeDebugTests" tests="1" failures="0" errors="0" skipped="0" time="0.123">
+          <testcase name="testConnected" classname="skip.repro.FreeDebugTests" time="0.123"/>
+        </testsuite>
+        """
+        let xmlURL = flavoredFolder.appendingPathComponent("TEST-skip.repro.FreeDebugTests.xml")
+        try Data(xml.utf8).write(to: xmlURL)
+
+        let parsed = try GradleDriver.parseTestResults(in: GradleDriver.testResultFolders(for: testResultsFolder, actions: ["connectedFreeDebugAndroidTest"]))
+
+        XCTAssertEqual("freeDebug", GradleDriver.connectedTestVariant(for: "connectedFreeDebugAndroidTest"))
+        XCTAssertEqual("skip.repro.FreeDebugTests", parsed.testSuites.first?.name)
+        XCTAssertEqual("TEST-skip.repro.FreeDebugTests.xml", parsed.resultFiles.first?.lastPathComponent)
+    }
+
+    // Verifies custom instrumented test build types resolve both the connected result folder and staged JUnit folder name.
+    func testConnectedAndroidResultFoldersSupportCustomTestBuildType() throws {
+        let tempRoot = try FileManager.default.createTmpDir(name: "ConnectedGradleStageResults")
+        let testResultsFolder = tempRoot
+            .appendingPathComponent(".build/ReproKit/test-results", isDirectory: true)
+        let stagedFolder = tempRoot
+            .appendingPathComponent(".build/ReproKit/outputs/androidTest-results/connected/stage", isDirectory: true)
+
+        try FileManager.default.createDirectory(at: stagedFolder, withIntermediateDirectories: true)
+
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <testsuite name="skip.repro.StageTests" tests="1" failures="0" errors="0" skipped="0" time="0.123">
+          <testcase name="testConnected" classname="skip.repro.StageTests" time="0.123"/>
+        </testsuite>
+        """
+        let xmlURL = stagedFolder.appendingPathComponent("TEST-skip.repro.StageTests.xml")
+        try Data(xml.utf8).write(to: xmlURL)
+
+        let parsed = try GradleDriver.parseTestResults(in: GradleDriver.testResultFolders(for: testResultsFolder, actions: ["connectedStageAndroidTest"]))
+
+        XCTAssertEqual("stage", GradleDriver.connectedTestVariant(for: "connectedStageAndroidTest"))
+        XCTAssertEqual("testStageUnitTest", GradleDriver.unitTestResultFolderName(forConnectedResultFiles: parsed.resultFiles))
+        XCTAssertEqual("skip.repro.StageTests", parsed.testSuites.first?.name)
     }
 
     /// Initialize a new Gradle project with the Kotlin DSL and run the test cases,
