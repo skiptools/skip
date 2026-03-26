@@ -110,10 +110,10 @@ jobs:
         android-arch:
           - 'x86_64'
         android-sdk:
-          # blank will use the default
+          # blank will use the latest official release (e.g., 6.3)
           - ''
-          - '6.3'
-          - 'nightly-6.3'
+          #- '6.3'
+          #- 'nightly-6.3'
           #- 'nightly-main'
         android-ndk:
           # blank will use the default

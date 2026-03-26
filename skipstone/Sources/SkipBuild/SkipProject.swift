@@ -2792,8 +2792,11 @@ struct WelcomeView : View {
             Image(systemName: "heart.fill")
                 .foregroundStyle(.red)
                 .scaleEffect(heartBeating ? 1.5 : 1.0)
-                .animation(.easeInOut(duration: 1).repeatForever(), value: heartBeating)
-                .task { heartBeating = true }
+                .task {
+                    withAnimation(.easeInOut(duration: 1).repeatForever()) {
+                        heartBeating = true
+                    }
+                }
         }
         .font(.largeTitle)
     }
