@@ -1,7 +1,7 @@
 // Copyright 2023–2026 Skip
 import XCTest
 @testable import SkipTest
-import SkipDrive
+@testable import SkipDrive
 
 #if os(macOS)
 #if !SKIP
@@ -16,6 +16,33 @@ final class GradleDriverTests: XCTestCase {
         }
 
         let _ = line
+    }
+
+    func testParseConnectedAndroidTestResultsFallback() throws {
+        let tempRoot = try FileManager.default.createTmpDir(name: "ConnectedGradleResults")
+        let testResultsFolder = tempRoot
+            .appendingPathComponent(".build/ReproKit/test-results", isDirectory: true)
+        let connectedDebugFolder = tempRoot
+            .appendingPathComponent(".build/ReproKit/outputs/androidTest-results/connected/debug", isDirectory: true)
+
+        try FileManager.default.createDirectory(at: connectedDebugFolder, withIntermediateDirectories: true)
+
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <testsuite name="skip.repro.ReproKitTests" tests="1" failures="0" errors="0" skipped="0" time="0.123">
+          <testcase name="testConnected" classname="skip.repro.ReproKitTests" time="0.123"/>
+        </testsuite>
+        """
+        let xmlURL = connectedDebugFolder.appendingPathComponent("TEST-skip.repro.ReproKitTests.xml")
+        try Data(xml.utf8).write(to: xmlURL)
+
+        let parsed = try GradleDriver.parseTestResults(in: GradleDriver.testResultFolders(for: testResultsFolder, actions: ["connectedDebugAndroidTest"]))
+
+        XCTAssertEqual(1, parsed.count)
+        XCTAssertEqual("skip.repro.ReproKitTests", parsed.first?.name)
+        XCTAssertEqual(1, parsed.first?.tests)
+        XCTAssertEqual(0, parsed.first?.failures)
+        XCTAssertEqual(0, parsed.first?.errors)
     }
 
     /// Initialize a new Gradle project with the Kotlin DSL and run the test cases,

@@ -57,7 +57,7 @@ extension XCGradleHarness where Self : XCTestCase {
 
         var actions = actions
         //let isTestAction = testFilter != nil
-        let isTestAction = actions.contains(where: { $0.hasPrefix("test") })
+        let isTestAction = actions.contains(where: { $0.hasPrefix("test") || $0.hasPrefix("connected") })
 
 
         // override test targets so we can specify "SKIP_GRADLE_TEST_TARGET=connectedDebugAndroidTest" and have the tests run against the Android emulator (e.g., using reactivecircus/android-emulator-runner@v2 with CI)
@@ -127,6 +127,11 @@ extension XCGradleHarness where Self : XCTestCase {
                 // if any of the actions are a test case, when try to parse the XML results
                 if isTestAction {
                     let testSuites = try parseResults()
+                    if actions.contains(where: { $0.hasPrefix("connected") }) {
+                        // The Skip CLI still expects the canonical unit-test JUnit path.
+                        // Mirror connected-device results there so downstream reporting works.
+                        try stageConnectedJUnitResultsForSkipCLI(dir: dir, moduleName: baseModuleName, testSuites: testSuites)
+                    }
                     // the absense of any test data probably indicates some sort of mis-configuration or else a build failure
                     if testSuites.isEmpty {
                         XCTFail("No tests were run; this may indicate an issue with running the tests on \(deviceID ?? "Robolectric"). See the test output and Report Navigator log for details.")
@@ -153,6 +158,94 @@ extension XCGradleHarness where Self : XCTestCase {
                 }
             }
         }
+    }
+
+    private func stageConnectedJUnitResultsForSkipCLI(dir: URL, moduleName: String, testSuites: [GradleDriver.TestSuite]) throws {
+        let buildRoot = dir
+            .appendingPathComponent(moduleName, isDirectory: true)
+            .appendingPathComponent(".build", isDirectory: true)
+            .appendingPathComponent(moduleName, isDirectory: true)
+        let connectedResultsRoot = buildRoot
+            .appendingPathComponent("outputs", isDirectory: true)
+            .appendingPathComponent("androidTest-results", isDirectory: true)
+            .appendingPathComponent("connected", isDirectory: true)
+            .appendingPathComponent("debug", isDirectory: true)
+        let junitResultRoot = buildRoot
+            .appendingPathComponent("test-results", isDirectory: true)
+            .appendingPathComponent("testDebugUnitTest", isDirectory: true)
+
+        let fm = FileManager.default
+        if fm.fileExists(atPath: junitResultRoot.path) {
+            try fm.removeItem(at: junitResultRoot)
+        }
+        try fm.createDirectory(at: junitResultRoot, withIntermediateDirectories: true)
+
+        var copiedXMLCount = 0
+        if let enumerator = fm.enumerator(at: connectedResultsRoot, includingPropertiesForKeys: nil) {
+            for case let sourceURL as URL in enumerator {
+                guard sourceURL.pathExtension.lowercased() == "xml" else {
+                    continue
+                }
+
+                copiedXMLCount += 1
+                let fileName = sourceURL.lastPathComponent.replacingOccurrences(of: " ", with: "_")
+                let destinationURL = junitResultRoot.appendingPathComponent(fileName)
+                let data = try Data(contentsOf: sourceURL)
+                try data.write(to: destinationURL)
+            }
+        }
+
+        if copiedXMLCount == 0 {
+            // Some runners produce parseable suites but do not leave behind files in the
+            // canonical location, so synthesize a minimal JUnit file for Skip CLI consumers.
+            let xml = syntheticConnectedJUnitXML(for: testSuites, moduleName: moduleName)
+            let fallbackURL = junitResultRoot.appendingPathComponent("TEST-\(moduleName).xml")
+            try Data(xml.utf8).write(to: fallbackURL)
+        }
+    }
+
+    private func syntheticConnectedJUnitXML(for testSuites: [GradleDriver.TestSuite], moduleName: String) -> String {
+        let tests = testSuites.reduce(0) { $0 + $1.tests }
+        let failures = testSuites.reduce(0) { $0 + $1.failures }
+        let errors = testSuites.reduce(0) { $0 + $1.errors }
+        let time = testSuites.reduce(0.0) { $0 + $1.time }
+        let skipped = testSuites
+            .flatMap(\.testCases)
+            .filter { $0.skipped }
+            .count
+        let suiteName = testSuites.first?.name ?? moduleName
+        let testCaseXML = testSuites
+            .flatMap(\.testCases)
+            .map { testCase -> String in
+                let escapedClassName = escapeXML(testCase.classname)
+                let escapedName = escapeXML(testCase.name)
+                if testCase.skipped {
+                    return #"  <testcase classname="\#(escapedClassName)" name="\#(escapedName)" time="\#(testCase.time)"><skipped/></testcase>"#
+                } else if let failure = testCase.failures.first {
+                    let message = escapeXML(failure.message)
+                    let contents = escapeXML(failure.contents ?? "")
+                    let type = escapeXML(failure.type ?? "failure")
+                    return #"  <testcase classname="\#(escapedClassName)" name="\#(escapedName)" time="\#(testCase.time)"><failure message="\#(message)" type="\#(type)">\#(contents)</failure></testcase>"#
+                } else {
+                    return #"  <testcase classname="\#(escapedClassName)" name="\#(escapedName)" time="\#(testCase.time)"/>"#
+                }
+            }
+            .joined(separator: "\n")
+
+        return """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <testsuite name="\(escapeXML(suiteName))" tests="\(tests)" failures="\(failures)" errors="\(errors)" skipped="\(skipped)" time="\(time)">
+        \(testCaseXML)
+        </testsuite>
+        """
+    }
+
+    private func escapeXML(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
     }
 
 
