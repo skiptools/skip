@@ -235,7 +235,7 @@ jobs:
           swift test
 
           # test using shared object file loaded from .apk
-          skip android test --verbose --apk --arch ${{ matrix.android-arch }}
+          skip android test --verbose --apk --arch ${{ matrix.android-arch }} --android-connect-timeout 60
 
           # test using xcrunner binary
           skip android test --verbose --arch ${{ matrix.android-arch }}

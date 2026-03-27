@@ -14,9 +14,15 @@ struct DevicesCommand: SkipCommand, StreamingCommand, OutputOptionsCommand, Tool
     static var configuration = CommandConfiguration(
         commandName: "devices",
         abstract: "List connected devices and emulators/simulators",
+        usage: """
+        # List all connected Android and iOS devices
+        skip devices
+        """,
         discussion: """
-This command will list all the connected Android emulators and devices and iOS simulators and devices.
-""",
+        Lists all connected Android emulators and devices (via adb) and iOS simulators \
+        and devices (via simctl and devicectl). Useful for verifying which targets are \
+        available before running or testing.
+        """,
         shouldDisplay: true)
 
     @OptionGroup(title: "Tool Options")
@@ -55,42 +61,9 @@ This command will list all the connected Android emulators and devices and iOS s
     }
 
     func listAndroidDevices(with out: MessageQueue) async throws {
-        let adbDevicesPattern = try NSRegularExpression(pattern: #"^(\S+)\s+(\S+)(.*)$"#)
-
-        var seenDevicesHeader = false
-        for try await pout in try await launchTool("adb", arguments: ["devices", "-l"]) {
-            let line = pout.line
-            // ignore everything output before the "List of devices" header
-            if line.hasPrefix("List of devices") {
-                seenDevicesHeader = true
-            } else if seenDevicesHeader {
-                guard let parts = adbDevicesPattern.extract(from: line) else {
-                    continue // unable to parse
-                }
-                guard let deviceID = parts.first,
-                      let deviceState = parts.dropFirst(1).first,
-                      let deviceInfo = parts.dropFirst(2).first else {
-                    continue
-                }
-
-                let _ = deviceState
-
-                func trim(_ string: String) -> String {
-                    string.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-                }
-
-                // create a dictionary from the device info string: "product:sdk_gphone64_arm64 model:sdk_gphone64_arm64 device:emu64a transport_id:1"
-                var deviceInfoMap = Dictionary<String, String>()
-
-                for keyValue in deviceInfo.split(separator: " ").map({ $0.split(separator: ":") }) {
-                    if keyValue.count == 2 {
-                        deviceInfoMap[keyValue[0].description] = keyValue[1].description
-                    }
-                }
-
-                let info = DevicesOutput(id: deviceID, type: .device, platform: .android, info: .init(deviceInfoMap))
-                await out.yield(info)
-            }
+        for device in try await getAndroidDevices() {
+            let info = DevicesOutput(id: device.id, type: .device, platform: .android, info: .init(device.info))
+            await out.yield(info)
         }
     }
 
@@ -223,6 +196,111 @@ This command will list all the connected Android emulators and devices and iOS s
             var subType: Int?
             var cpuType: Int?
         }
+    }
+}
+
+/// A connected Android device or emulator as reported by `adb devices -l`.
+struct AndroidDevice {
+    /// The device serial (e.g. "emulator-5554" or a USB serial)
+    let id: String
+    /// Key-value pairs from the device info string (product, model, device, transport_id, etc.)
+    let info: [String: String]
+
+    /// Whether this device appears to be an emulator rather than a physical device.
+    /// Detected by the serial starting with "emulator-" or the "device" info field starting with "emu".
+    var isEmulator: Bool {
+        id.hasPrefix("emulator-") || info["device"]?.hasPrefix("emu") == true
+    }
+}
+
+@available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
+extension ToolOptionsCommand where Self: StreamingCommand {
+    /// Query `adb devices -l` and return the list of connected Android devices/emulators.
+    func getAndroidDevices() async throws -> [AndroidDevice] {
+        let adbDevicesPattern = try NSRegularExpression(pattern: #"^(\S+)\s+(\S+)(.*)$"#)
+        var devices: [AndroidDevice] = []
+        var seenDevicesHeader = false
+        for try await pout in try await launchTool("adb", arguments: ["devices", "-l"]) {
+            let line = pout.line
+            if line.hasPrefix("List of devices") {
+                seenDevicesHeader = true
+            } else if seenDevicesHeader {
+                guard let parts = adbDevicesPattern.extract(from: line) else {
+                    continue
+                }
+                guard let deviceID = parts.first,
+                      let _ = parts.dropFirst(1).first,
+                      let deviceInfo = parts.dropFirst(2).first else {
+                    continue
+                }
+                var deviceInfoMap = [String: String]()
+                for keyValue in deviceInfo.split(separator: " ").map({ $0.split(separator: ":") }) {
+                    if keyValue.count == 2 {
+                        deviceInfoMap[keyValue[0].description] = keyValue[1].description
+                    }
+                }
+                devices.append(AndroidDevice(id: deviceID, info: deviceInfoMap))
+            }
+        }
+        return devices
+    }
+
+    /// Resolve an Android emulator/device identifier to a concrete `ANDROID_SERIAL` value.
+    ///
+    /// - Parameter androidSerial: The value to resolve:
+    ///   - `"auto"`: honour existing `ANDROID_SERIAL` env var, otherwise auto-detect (preferring emulators).
+    ///   - Any other string: treat as an explicit device serial and verify it exists.
+    /// - Returns: The serial to set as `ANDROID_SERIAL`, or `nil` when adb can figure it out on its own (single device).
+    func resolveAndroidSerial(androidSerial: String, with out: MessageQueue) async throws -> String? {
+        if androidSerial == "auto" {
+            // If the user already set ANDROID_SERIAL in the environment, honour it
+            if let existing = ProcessInfo.processInfo.environment["ANDROID_SERIAL"], !existing.isEmpty {
+                return existing
+            }
+            // Otherwise query connected devices, preferring emulators
+            let devices = try await getAndroidDevices()
+            if devices.isEmpty {
+                throw DevicesCommand.DevicesCommandError(errorDescription: "No connected Android devices or emulators were found. Launch an emulator from Android Studio's Virtual Device Manager, or connect a device via USB.")
+            }
+            if devices.count == 1 {
+                return nil // adb will target the only device automatically
+            }
+            // Multiple devices: prefer an emulator over a physical device
+            let emulators = devices.filter { $0.isEmulator }
+            let target = emulators.first ?? devices[0]
+            let listing = devices.map { "  \($0.id)\($0.info["model"].map { " (\($0))" } ?? "")" }.joined(separator: "\n")
+            await out.yield(MessageBlock(status: .warn, "Multiple Android devices found — targeting \(target.id). Use --android-serial to select a different device:\n\(listing)"))
+            return target.id
+        }
+
+        // Explicit device specified — verify it exists
+        let devices = try await getAndroidDevices()
+        if devices.contains(where: { $0.id == androidSerial }) {
+            return androidSerial
+        }
+        // No matching device
+        let listing = devices.isEmpty
+            ? "No connected Android devices or emulators were found."
+            : "Connected devices:\n" + devices.map { "  \($0.id)\($0.info["model"].map { " (\($0))" } ?? "")" }.joined(separator: "\n")
+        throw DevicesCommand.DevicesCommandError(errorDescription: "Android device '\(androidSerial)' not found. \(listing)")
+    }
+
+    /// Wait for an Android device to finish booting by polling `sys.boot_completed`.
+    /// - Parameters:
+    ///   - adb: Path to the `adb` binary.
+    ///   - additionalEnvironment: Environment variables (should include `ANDROID_SERIAL` when targeting a specific device).
+    ///   - timeout: Maximum seconds to wait. Pass `0` to skip waiting entirely.
+    func waitForDeviceBoot(adb: String, additionalEnvironment: [String: String], timeout: Int, with out: MessageQueue) async throws {
+        guard timeout > 0 else { return }
+        let deadline = Date().addingTimeInterval(TimeInterval(timeout))
+        while Date() < deadline {
+            let result = try? await run(with: out, "Waiting for device boot", [adb, "shell", "getprop", "sys.boot_completed"], additionalEnvironment: additionalEnvironment, watch: false, permitFailure: true)
+            if case .success(let output) = result, output.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "1" {
+                return
+            }
+            try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+        }
+        throw DevicesCommand.DevicesCommandError(errorDescription: "Timed out after \(timeout)s waiting for Android device to finish booting. Use --android-connect-timeout to increase the wait time, or check that the emulator is running.")
     }
 }
 

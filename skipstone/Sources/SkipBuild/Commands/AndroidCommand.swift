@@ -20,7 +20,12 @@ fileprivate let androidCommandEnabled = false
 struct AndroidCommand: AsyncParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "android",
-        abstract: "Perform a native Android package command",
+        abstract: "Build, run, and test Swift packages for Android",
+        discussion: """
+        Commands for cross-compiling Swift packages with the Swift Android SDK, \
+        running executables and tests on Android devices or emulators, and managing \
+        the Android SDK, toolchain, and emulator images.
+        """,
         shouldDisplay: androidCommandEnabled,
         subcommands: [
             AndroidBuildCommand.self,
@@ -38,6 +43,9 @@ struct AndroidHomeCommand: AsyncParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "home",
         abstract: "Install and manage the Android SDK in ANDROID_HOME",
+        discussion: """
+        Manage the base Android SDK installation (cmdline-tools, platform-tools, emulator).
+        """,
         shouldDisplay: androidCommandEnabled,
         subcommands: [
             AndroidHomeInstallCommand.self,
@@ -49,12 +57,16 @@ struct AndroidHomeInstallCommand: MessageCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "install",
         abstract: "Install Android SDK Command-line Tools, platform-tools, and emulator in ANDROID_HOME",
+        usage: """
+        # Install the Android SDK base components
+        skip android home install
+        """,
         discussion: """
-        This command sets up the Android SDK in your ANDROID_HOME directory:
+        Sets up the Android SDK in your ANDROID_HOME directory:
         1. Creates the ANDROID_HOME directory if it doesn't exist
         2. Installs cmdline-tools (if not present) using the bootstrap sdkmanager
         3. Uses the installed sdkmanager to install platform-tools and emulator
-        
+
         Run with the --verbose argument to observe the exact commands that it executes.
         """,
         shouldDisplay: true)
@@ -293,6 +305,10 @@ struct AndroidSDKCommand: AsyncParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "sdk",
         abstract: "Manage installation of Swift Android SDK",
+        discussion: """
+        Install, list, and uninstall the Swift cross-compilation SDK for Android. \
+        The SDK is required for compiling Swift code to run natively on Android.
+        """,
         shouldDisplay: androidCommandEnabled,
         subcommands: [
             AndroidSDKListCommand.self,
@@ -539,6 +555,13 @@ struct AndroidSDKListCommand: SkipCommand, StreamingCommand, OutputOptionsComman
     static var configuration = CommandConfiguration(
         commandName: "list",
         abstract: "List the installed Swift Android SDKs",
+        usage: """
+        # List locally installed SDKs
+        skip android sdk list
+
+        # List available remote SDKs
+        skip android sdk list --remote
+        """,
         shouldDisplay: true)
 
     @OptionGroup(title: "Tool Options")
@@ -601,6 +624,9 @@ struct AndroidToolchainCommand: AsyncParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "toolchain",
         abstract: "Manage installation of Swift Android Host Toolchain",
+        discussion: """
+        Inspect the installed Swift host toolchain used for cross-compiling to Android.
+        """,
         shouldDisplay: androidCommandEnabled,
         subcommands: [
             AndroidToolchainVersionCommand.self,
@@ -635,14 +661,38 @@ protocol ToolchainOptionsCommand : ToolOptionsCommand {
     var toolchainOptions: ToolchainOptions { get }
 }
 
+struct AndroidRuntimeOptions: ParsableArguments {
+    @Option(help: ArgumentHelp("Android device or emulator serial", valueName: "ANDROID_SERIAL"))
+    var androidSerial: String = "auto"
+
+    @Option(help: ArgumentHelp("Seconds to wait for device boot before installing", valueName: "seconds"))
+    var androidConnectTimeout: Int = 5
+}
+
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 protocol AndroidOperationCommand : MessageCommand, ToolchainOptionsCommand {
+    /// This command's toolchain options
+    var androidRuntimeOptions: AndroidRuntimeOptions { get }
 
     /// The arguments to the command to be executed
     var args: [String] { get }
 }
 
 extension AndroidOperationCommand {
+    /// Default runtime options for commands that don't expose the flag (e.g. build, toolchain version)
+    var androidRuntimeOptions: AndroidRuntimeOptions { AndroidRuntimeOptions() }
+
+    /// Resolve the `--android-serial` flag to a concrete `ANDROID_SERIAL` value.
+    /// Returns `nil` when no serial needs to be set (e.g. only one device connected and auto mode).
+    func resolveAndroidSerial(with out: MessageQueue) async throws -> String? {
+        try await resolveAndroidSerial(androidSerial: androidRuntimeOptions.androidSerial, with: out)
+    }
+
+    /// Wait for the Android device to finish booting, using the timeout from `androidRuntimeOptions`.
+    func waitForDeviceBoot(adb: String, additionalEnvironment: [String: String], with out: MessageQueue) async throws {
+        try await waitForDeviceBoot(adb: adb, additionalEnvironment: additionalEnvironment, timeout: androidRuntimeOptions.androidConnectTimeout, with: out)
+    }
+
     func runCommand(command: [String], env: [String: String], with out: MessageQueue) async throws {
         #if !canImport(SkipDriveExternal)
         throw ToolLaunchError(errorDescription: "Cannot launch android command without SkipDriveExternal")
@@ -883,7 +933,7 @@ extension AndroidOperationCommand {
 
             let runTests = cleanup != nil && executable == nil
 
-            let (_, env) = try await runToolchainCommand(tc, executable: executable, testMode: runTests ? .executable : nil, with: out)
+            var (_, env) = try await runToolchainCommand(tc, executable: executable, testMode: runTests ? .executable : nil, with: out)
 
             let buildOutputFolder = [
                 // the output folder is either the scratch path we have specified, or is the default package/.build output directory
@@ -949,6 +999,11 @@ extension AndroidOperationCommand {
 
             if executable == nil && runTests == false {
                 continue // nothing to do but build, so move on to the next list arch…
+            }
+
+            // Resolve the target Android device/emulator for adb commands
+            if let serial = try await resolveAndroidSerial(with: out) {
+                env["ANDROID_SERIAL"] = serial
             }
 
             // to figure out the generated test executable name, we need to parse the Package.swift
@@ -1294,6 +1349,20 @@ struct AndroidBuildCommand: AndroidOperationCommand {
     static var configuration = CommandConfiguration(
         commandName: "build",
         abstract: "Build the native project for Android",
+        usage: """
+        # Build for Android (debug)
+        skip android build
+
+        # Build for release
+        skip android build --configuration release
+
+        # Build and archive output to a folder
+        skip android build --dir output/
+        """,
+        discussion: """
+        Cross-compiles the Swift package for Android using the installed Swift Android SDK. \
+        Pass additional swift build flags as trailing arguments.
+        """,
         shouldDisplay: true)
 
     @Option(name: [.customShort("d"), .long], help: ArgumentHelp("Archive output folder", valueName: "directory"))
@@ -1321,7 +1390,22 @@ struct AndroidBuildCommand: AndroidOperationCommand {
 struct AndroidRunCommand: AndroidOperationCommand {
     static var configuration = CommandConfiguration(
         commandName: "run",
-        abstract: "Run the executable target Android device or emulator",
+        abstract: "Run the executable target on an Android device or emulator",
+        usage: """
+        # Build and run the default executable on a connected device
+        skip android run
+
+        # Run a specific executable with arguments
+        skip android run MyExecutable -- --flag value
+
+        # Run on a specific emulator
+        skip android run --android-serial emulator-5554
+        """,
+        discussion: """
+        Builds the package for Android, pushes the executable and its shared library \
+        dependencies to a connected device or emulator, and runs it. The temporary \
+        staging folder is cleaned up after execution unless --no-cleanup is specified.
+        """,
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")
@@ -1329,6 +1413,9 @@ struct AndroidRunCommand: AndroidOperationCommand {
 
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
+
+    @OptionGroup(title: "Android Runtime Options")
+    var androidRuntimeOptions: AndroidRuntimeOptions
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Cleanup temporary folders after running"))
     var cleanup: Bool = true
@@ -1358,6 +1445,10 @@ struct AndroidEmulatorCommand: AsyncParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "emulator",
         abstract: "Manage Android emulators",
+        discussion: """
+        Create, list, and launch Android emulator images (AVDs). \
+        Emulators are used for testing when no physical Android device is connected.
+        """,
         shouldDisplay: androidCommandEnabled,
         subcommands: [
             AndroidEmulatorCreateCommand.self,
@@ -1500,6 +1591,9 @@ struct AndroidEmulatorLaunchCommand: MessageCommand, ToolOptionsCommand {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Run in headless mode"))
     var headless: Bool = ProcessInfo.processInfo.environment["CI"] ?? "0" != "0"
 
+    @Option(help: ArgumentHelp("Seconds to wait for emulator boot", valueName: "seconds"))
+    var androidConnectTimeout: Int = 90
+
     /// Any arguments that are not recognized are passed through to the underlying swift build command
     @Argument(parsing: .remaining, help: ArgumentHelp("Emulator arguments"))
     var args: [String] = []
@@ -1511,7 +1605,6 @@ struct AndroidEmulatorLaunchCommand: MessageCommand, ToolOptionsCommand {
         throw SkipDriveError(errorDescription: "SkipDrive not linked")
         #else
         var exitCode: SkipDriveExternal.ProcessResult.ExitStatus? = nil
-        //~/Library/Android/sdk/emulator/emulator -avd emulator-34-pixel_7
 
         let emulatorName: String
         if let name {
@@ -1544,23 +1637,47 @@ struct AndroidEmulatorLaunchCommand: MessageCommand, ToolOptionsCommand {
 
         emulatorArgs += args
 
+        // Snapshot existing device serials so we can detect the new emulator
+        let existingSerials = Set((try? await getAndroidDevices())?.map(\.id) ?? [])
+
         let output = try await launchTool("emulator", arguments: emulatorArgs) {
             exitCode = $0.exitStatus
         }
 
-        for try await line in output {
-            await out.write(status: nil, line.line)
+        if self.background {
+            let adb = try toolOptions.toolPath(for: "adb")
 
-            // scan for lines like:
-            // INFO         | Boot completed in 23779 ms
-            // INFO         | Successfully loaded snapshot 'default_boot' using 414 ms
-            // 01-10 20:15:28.684     0     0 I ueventd : Coldboot took 0.096 seconds
-            if self.background && (
-                (line.line.hasPrefix("INFO") && line.line.contains("| Boot completed in ")) // emulator command output
-                || (line.line.contains("I ueventd : Coldboot took ")) // logcat output
-                ) {
-                await out.write(status: .pass, "Launch complete - moving process to background (run `adb logcat` to view logs and `adb emu kill` to stop emulator)")
-                break
+            // Detect the newly launched emulator's serial by polling for a new
+            // entry in `adb devices` that wasn't present before launch
+            let serialDeadline = Date().addingTimeInterval(TimeInterval(androidConnectTimeout))
+            var launchedSerial: String?
+            while Date() < serialDeadline {
+                let devices = (try? await getAndroidDevices()) ?? []
+                if let newDevice = devices.first(where: { !existingSerials.contains($0.id) && $0.isEmulator }) {
+                    launchedSerial = newDevice.id
+                    break
+                }
+                try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+            }
+
+            let adbEnv: [String: String]
+            if let serial = launchedSerial {
+                adbEnv = ["ANDROID_SERIAL": serial]
+            } else {
+                // Couldn't detect a new serial — fall through and try without
+                // targeting a specific device (will work if only one is running)
+                adbEnv = [:]
+            }
+
+            // Wait for the emulator to fully boot (sys.boot_completed == 1)
+            try await waitForDeviceBoot(adb: adb, additionalEnvironment: adbEnv, timeout: androidConnectTimeout, with: out)
+
+            let serialDesc = launchedSerial.map { " (\($0))" } ?? ""
+            await out.write(status: .pass, "Launch complete\(serialDesc) - moving process to background (run `adb logcat` to view logs and `adb emu kill` to stop emulator)")
+        } else {
+            // Foreground mode — stream emulator output until it exits
+            for try await line in output {
+                await out.write(status: nil, line.line)
             }
         }
 
@@ -1580,7 +1697,11 @@ struct AndroidEmulatorLaunchCommand: MessageCommand, ToolOptionsCommand {
 struct AndroidEmulatorListCommand: MessageCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "list",
-        abstract: "List installed Android emulators",
+        abstract: "List installed Android emulator images (AVDs)",
+        usage: """
+        # List all installed emulator images
+        skip android emulator list
+        """,
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")

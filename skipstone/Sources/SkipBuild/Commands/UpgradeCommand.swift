@@ -17,6 +17,14 @@ struct UpgradeCommand: MessageCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "upgrade",
         abstract: "Upgrade to the latest Skip version",
+        usage: """
+        # Upgrade Skip to the latest release
+        skip upgrade
+        """,
+        discussion: """
+        Checks for a newer version of the Skip toolchain and upgrades if available. \
+        This updates the skip command-line tool and its supporting components.
+        """,
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")

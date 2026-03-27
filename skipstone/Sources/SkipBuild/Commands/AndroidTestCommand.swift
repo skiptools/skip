@@ -15,6 +15,25 @@ struct AndroidTestCommand: AndroidOperationCommand {
     static var configuration = CommandConfiguration(
         commandName: "test",
         abstract: "Test the native project on an Android device or emulator",
+        usage: """
+        # Run tests on a connected device/emulator
+        skip android test
+
+        # Run tests packaged as an APK (instrumented tests)
+        skip android test --apk
+
+        # Target a specific emulator
+        skip android test --android-serial emulator-5554
+
+        # Run only Swift Testing tests
+        skip android test --testing-library testing
+        """,
+        discussion: """
+        Builds Swift tests for Android, pushes them to a device or emulator, and executes them. \
+        By default, tests run as a native executable via adb shell. With --apk, tests are \
+        packaged as an Android APK and run via instrumentation, which is required for tests \
+        that need an Android application context.
+        """,
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")
@@ -22,6 +41,9 @@ struct AndroidTestCommand: AndroidOperationCommand {
 
     @OptionGroup(title: "Tool Options")
     var toolOptions: ToolOptions
+
+    @OptionGroup(title: "Android Runtime Options")
+    var androidRuntimeOptions: AndroidRuntimeOptions
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Cleanup test folders after running"))
     var cleanup: Bool = true
@@ -194,7 +216,12 @@ fileprivate extension AndroidOperationCommand {
         let toolchainBin = tc.toolchainPath.appendingPathComponent("usr/bin", isDirectory: true)
         let swiftCmd = toolchainBin.appendingPathComponent("swift", isDirectory: false).path
 
-        let (_, env) = try await runToolchainCommand(tc, executable: nil, testMode: .sharedObject, with: out)
+        var (_, env) = try await runToolchainCommand(tc, executable: nil, testMode: .sharedObject, with: out)
+
+        // Resolve the target Android device/emulator for adb commands
+        if let serial = try await resolveAndroidSerial(with: out) {
+            env["ANDROID_SERIAL"] = serial
+        }
 
         let buildOutputFolder = [
             toolchainOptions.scratchPath ?? (packageDir + "/.build"),
@@ -362,12 +389,18 @@ fileprivate extension AndroidOperationCommand {
 
         // --- Install & Execute ---
         let adb = try toolOptions.toolPath(for: "adb")
+        let adbEnv = env.filter { $0.key == "ANDROID_SERIAL" }
+
+        // Wait for the device to finish booting before installing — avoids
+        // "Can't find service: package" errors on CI where the emulator may
+        // still be starting up when we reach this point
+        try await waitForDeviceBoot(adb: adb, additionalEnvironment: adbEnv, with: out)
 
         // Uninstall previous version (permit failure)
-        let _ = try? await run(with: out, "Uninstalling previous APK", [adb, "uninstall", apkPackageName], permitFailure: true)
+        let _ = try? await run(with: out, "Uninstalling previous APK", [adb, "uninstall", apkPackageName], additionalEnvironment: adbEnv, permitFailure: true)
 
         // Install the APK
-        try await run(with: out, "Installing test APK (\(signedAPK.fileSizeString))", [adb, "install", "-t", signedAPK.path])
+        try await run(with: out, "Installing test APK (\(signedAPK.fileSizeString))", [adb, "install", "-t", signedAPK.path], additionalEnvironment: adbEnv)
 
         // Launch instrumentation and parse structured output
         var testExitCode: Int32 = 1
@@ -375,7 +408,7 @@ fileprivate extension AndroidOperationCommand {
         let instrumentLines = try await launchTool("adb", arguments: [
             "shell", "am", "instrument", "-w", "-r",
             "\(apkPackageName)/\(testFullClass)",
-        ])
+        ], env: adbEnv)
 
         /// https://android.googlesource.com/platform/tools/base/+/master/ddmlib/src/main/java/com/android/ddmlib/testrunner/InstrumentationResultParser.java
         /// E.g.:
@@ -424,7 +457,7 @@ fileprivate extension AndroidOperationCommand {
 
         // Cleanup
         if cleanup {
-            let _ = try? await run(with: out, "Uninstalling test APK", [adb, "uninstall", apkPackageName], permitFailure: true)
+            let _ = try? await run(with: out, "Uninstalling test APK", [adb, "uninstall", apkPackageName], additionalEnvironment: adbEnv, permitFailure: true)
         }
 
         if let crashMessage = crashMessage {

@@ -15,9 +15,14 @@ struct CreateCommand: StreamingCommand, ToolchainOptionsCommand, CreateOptionsCo
     static var configuration = CommandConfiguration(
         commandName: "create",
         abstract: "Create a new Skip project interactively",
+        usage: """
+        # Create a new project with interactive prompts
+        skip create
+        """,
         discussion: """
-Create a new project by following a series of interactive prompts.
-""",
+        Walks through a series of prompts to create a new Skip app or library project. \
+        For non-interactive project creation, use `skip init` instead.
+        """,
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")

@@ -17,7 +17,18 @@ fileprivate let adbCommandEnabled = false
 struct ADBCommand: MessageCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "adb",
-        abstract: "Launch the adb build tool",
+        abstract: "Run an adb command with error scanning",
+        usage: """
+        # List connected devices
+        skip adb devices
+
+        # Open a shell on the connected device
+        skip adb shell
+        """,
+        discussion: """
+        Passes arguments through to the Android Debug Bridge (adb), with automatic \
+        scanning of output for common errors like missing devices or multiple emulators.
+        """,
         shouldDisplay: adbCommandEnabled)
 
     @OptionGroup(title: "Output Options")

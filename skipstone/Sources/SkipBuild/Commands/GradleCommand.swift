@@ -20,6 +20,17 @@ struct GradleCommand: SkipCommand {
     static var configuration = CommandConfiguration(
         commandName: "gradle",
         abstract: "Launch the gradle build tool",
+        usage: """
+        # Run a Gradle task in the current project
+        skip gradle assembleDebug
+
+        # Pass arguments through to Gradle
+        skip gradle --info dependencies
+        """,
+        discussion: """
+        Invokes the Gradle build tool with the given arguments. \
+        Useful for running Gradle tasks directly on the generated Android project.
+        """,
         shouldDisplay: gradleCommandEnabled)
 
     @OptionGroup(title: "Output Options")

@@ -220,10 +220,20 @@ struct ProcessOutput {
     /// Scan for common error patterns in the stderr and stdout
     func scanErrorLine() -> String? {
         let lines = (stdout + "\n" + stderr).split(separator: "\n")
-        let errors = lines.filter { line in
-            line.lowercased().hasPrefix("error: ")
-                || line.lowercased().hasPrefix("e: ") // Gradle error message
-                || line.contains(": error: ") // Xcode-formatted error message
+        let errors = lines.compactMap { line -> String? in
+            let l = line.lowercased()
+            if l.hasPrefix("error: ")
+                || l.hasPrefix("e: ") // Gradle error message
+                || l.contains(": error: ") { // Xcode-formatted error message
+                return String(line)
+            }
+            if l.hasPrefix("adb: ") { // ADB error message
+                if line.contains("more than one device/emulator") {
+                    return line + " — set ANDROID_SERIAL to specify a target (use `adb devices` to list)"
+                }
+                return String(line)
+            }
+            return nil
         }
         if errors.isEmpty {
             return nil // no error found

@@ -14,9 +14,17 @@ struct VerifyCommand: SkipCommand, StreamingCommand, ProjectCommand, ToolOptions
     static var configuration = CommandConfiguration(
         commandName: "verify",
         abstract: "Verify Skip project",
+        usage: """
+        # Verify the current project
+        skip verify
+
+        # Verify a project at a specific path
+        skip verify --project path/to/project
+        """,
         discussion: """
-This command is run on a Skip project to ensure that the structure and contents are valid.
-""",
+        Validates the structure and configuration of a Skip project, checking \
+        Package.swift layout, skip.yml files, and module dependencies.
+        """,
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")

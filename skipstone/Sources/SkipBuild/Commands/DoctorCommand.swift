@@ -16,9 +16,18 @@ struct DoctorCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
     static var configuration = CommandConfiguration(
         commandName: "doctor",
         abstract: "Evaluate and diagnose Skip development environment",
+        usage: """
+        # Run all environment checks
+        skip doctor
+
+        # Run checks including native Swift-on-Android support
+        skip doctor --native
+        """,
         discussion: """
-This command will check for system configuration and prerequisites. It is a subset of the skip checkup command.
-""",
+        Checks system configuration and prerequisites for Skip development: Xcode, \
+        Android Studio, JDK, Gradle, and SDK versions. This is a subset of `skip checkup` \
+        (which also creates and builds a sample project).
+        """,
         shouldDisplay: true)
 
     @OptionGroup(title: "Output Options")
