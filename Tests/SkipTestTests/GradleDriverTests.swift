@@ -135,6 +135,38 @@ final class GradleDriverTests: XCTestCase {
         XCTAssertEqual("skip.repro.StageTests", parsed.testSuites.first?.name)
     }
 
+    // Verifies connected Android failures still parse when AGP omits the failure message attribute.
+    func testConnectedAndroidFailuresWithoutMessageAttribute() throws {
+        let tempRoot = try FileManager.default.createTmpDir(name: "ConnectedGradleFailureResults")
+        let testResultsFolder = tempRoot
+            .appendingPathComponent(".build/ReproKit/test-results", isDirectory: true)
+        let connectedDebugFolder = tempRoot
+            .appendingPathComponent(".build/ReproKit/outputs/androidTest-results/connected/debug", isDirectory: true)
+
+        try FileManager.default.createDirectory(at: connectedDebugFolder, withIntermediateDirectories: true)
+
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <testsuite name="skip.repro.ReproKitTests" tests="1" failures="1" errors="0" skipped="0" time="0.123">
+          <testcase name="testConnected" classname="skip.repro.ReproKitTests" time="0.123">
+            <failure>java.lang.AssertionError: 1 != 2
+        at org.junit.Assert.fail(Assert.java:89)
+        at skip.unit.XCTestCase.XCTAssertEqual(XCTest.kt:65)
+        at skip.repro.ReproKitTests.testConnected$ReproKit_debugAndroidTest(ReproKitTests.kt:21)
+            </failure>
+          </testcase>
+        </testsuite>
+        """
+        let xmlURL = connectedDebugFolder.appendingPathComponent("TEST-skip.repro.ReproKitTests.xml")
+        try Data(xml.utf8).write(to: xmlURL)
+
+        let parsed = try GradleDriver.parseTestResults(in: GradleDriver.testResultFolders(for: testResultsFolder, actions: ["connectedDebugAndroidTest"]))
+
+        let failure = try XCTUnwrap(parsed.testSuites.first?.testCases.first?.failures.first)
+        XCTAssertEqual("java.lang.AssertionError: 1 != 2", failure.message)
+        XCTAssertTrue(failure.contents?.contains("testConnected$ReproKit_debugAndroidTest") == true)
+    }
+
     /// Initialize a new Gradle project with the Kotlin DSL and run the test cases,
     /// parsing the output and checking for the errors and failures that are inserted into the test.
     @available(macOS 13, *)

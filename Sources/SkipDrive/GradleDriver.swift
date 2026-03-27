@@ -580,13 +580,20 @@ public struct GradleDriver {
 
         #if os(macOS) || os(Linux) || targetEnvironment(macCatalyst)
         init(from element: XMLElement, in url: URL) throws {
-            guard let message = element.attribute(forName: "message")?.stringValue else {
-                throw GradleDriverError.missingProperty(url: url, propertyName: "message")
-            }
-
             let type = element.attribute(forName: "type")?.stringValue
 
             let contents = element.stringValue
+            // Connected Android reports can omit the failure message attribute and
+            // only provide the assertion text in the element body.
+            let message = element.attribute(forName: "message")?.stringValue
+                ?? contents?
+                    .split(separator: "\n", maxSplits: 1)
+                    .first?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            guard let message, !message.isEmpty else {
+                throw GradleDriverError.missingProperty(url: url, propertyName: "message")
+            }
             
             self.message = message
             self.type = type
