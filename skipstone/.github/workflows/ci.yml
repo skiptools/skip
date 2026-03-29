@@ -221,8 +221,10 @@ jobs:
           export ANDROID_AVD_HOME=$ANDROID_EMULATOR_HOME/avd
           skip android emulator create --verbose
           skip android emulator list --verbose
-          skip android emulator launch --background --verbose
-          #adb wait-for-device
+          # watch the logs for errors
+          (sleep 30; adb logcat) &
+          skip android emulator launch --background --android-connect-timeout=300 --verbose
+          timeout 60 adb wait-for-device
 
       - name: "Test new Swift package on emulator"
         working-directory: ${{ runner.temp }}
