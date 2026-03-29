@@ -140,7 +140,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
             } else if licenseGPL.isReadableFile == true {
                 await checkFileContents(licenseGPL, message: "Verify free software license", trailingContents: [SourceLicense.gpl2.licenseContents, SourceLicense.gpl3.licenseContents])
             } else if licenseTXT.isReadableFile == true {
-                await checkFileContents(licenseTXT, message: "Verify free software license", trailingContents: [SourceLicense.gpl2.licenseContents, SourceLicense.gpl3.licenseContents, SourceLicense.lgpl3.licenseContents, SourceLicense.osl.licenseContents, SourceLicense.eupl.licenseContents])
+                await checkFileContents(licenseTXT, message: "Verify free software license", trailingContents: [SourceLicense.mpl2.licenseContents, SourceLicense.gpl2.licenseContents, SourceLicense.gpl3.licenseContents, SourceLicense.lgpl3.licenseContents, SourceLicense.osl.licenseContents, SourceLicense.eupl.licenseContents])
             }
         }
 

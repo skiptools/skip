@@ -182,7 +182,7 @@ dependencies {
 /// `SkipGradlePlugins.kt`
 private func skipGradlePluginContent() -> String {
 """
-// SPDX-License-Identifier: LGPL-3.0-only WITH LGPL-3.0-linking-exception
+// SPDX-License-Identifier: MPL-2.0
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
