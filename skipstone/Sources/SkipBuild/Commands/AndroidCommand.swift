@@ -1662,7 +1662,7 @@ struct AndroidEmulatorLaunchCommand: MessageCommand, ToolOptionsCommand {
 
             let adbEnv: [String: String]
             if let serial = launchedSerial {
-                await out.write(status: .info, "Using ANDROID_SERIAL=\(serial)")
+                await out.write(status: .pass, "Using ANDROID_SERIAL=\(serial)")
                 adbEnv = ["ANDROID_SERIAL": serial]
             } else {
                 // Couldn't detect a new serial — fall through and try without
