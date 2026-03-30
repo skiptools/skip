@@ -57,7 +57,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
+                .library(name: "SomeModule", targets: ["SomeModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -138,7 +138,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "TeenyModule", type: .dynamic, targets: ["TeenyModule"]),
+                .library(name: "TeenyModule", targets: ["TeenyModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -230,7 +230,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
+                .library(name: "SomeModule", targets: ["SomeModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -293,7 +293,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "FreeModule", type: .dynamic, targets: ["FreeModule"]),
+                .library(name: "FreeModule", targets: ["FreeModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -361,7 +361,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "BridgedModule", type: .dynamic, targets: ["BridgedModule"]),
+                .library(name: "BridgedModule", targets: ["BridgedModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -792,7 +792,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
+                .library(name: "SomeModule", targets: ["SomeModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -882,7 +882,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
+                .library(name: "SomeModule", targets: ["SomeModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -1058,8 +1058,8 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "AppModule", type: .dynamic, targets: ["AppModule"]),
-                .library(name: "ModelModule", type: .dynamic, targets: ["ModelModule"]),
+                .library(name: "AppModule", targets: ["AppModule"]),
+                .library(name: "ModelModule", targets: ["ModelModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -1243,8 +1243,8 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "AppModule", type: .dynamic, targets: ["AppModule"]),
-                .library(name: "ModelModule", type: .dynamic, targets: ["ModelModule"]),
+                .library(name: "AppModule", targets: ["AppModule"]),
+                .library(name: "ModelModule", targets: ["ModelModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -1358,7 +1358,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "AppModule", type: .dynamic, targets: ["AppModule"]),
+                .library(name: "AppModule", targets: ["AppModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -1489,8 +1489,8 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "FreeApp", type: .dynamic, targets: ["FreeApp"]),
-                .library(name: "FreeAppModel", type: .dynamic, targets: ["FreeAppModel"]),
+                .library(name: "FreeApp", targets: ["FreeApp"]),
+                .library(name: "FreeAppModel", targets: ["FreeAppModel"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -1625,9 +1625,9 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "TopModule", type: .dynamic, targets: ["TopModule"]),
-                .library(name: "MiddleModule", type: .dynamic, targets: ["MiddleModule"]),
-                .library(name: "BottomModule", type: .dynamic, targets: ["BottomModule"]),
+                .library(name: "TopModule", targets: ["TopModule"]),
+                .library(name: "MiddleModule", targets: ["MiddleModule"]),
+                .library(name: "BottomModule", targets: ["BottomModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -1788,11 +1788,11 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "M1", type: .dynamic, targets: ["M1"]),
-                .library(name: "M2", type: .dynamic, targets: ["M2"]),
-                .library(name: "M3", type: .dynamic, targets: ["M3"]),
-                .library(name: "M4", type: .dynamic, targets: ["M4"]),
-                .library(name: "M5", type: .dynamic, targets: ["M5"]),
+                .library(name: "M1", targets: ["M1"]),
+                .library(name: "M2", targets: ["M2"]),
+                .library(name: "M3", targets: ["M3"]),
+                .library(name: "M4", targets: ["M4"]),
+                .library(name: "M5", targets: ["M5"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -1922,11 +1922,11 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "M1", type: .dynamic, targets: ["M1"]),
-                .library(name: "M2", type: .dynamic, targets: ["M2"]),
-                .library(name: "M3", type: .dynamic, targets: ["M3"]),
-                .library(name: "M4", type: .dynamic, targets: ["M4"]),
-                .library(name: "M5", type: .dynamic, targets: ["M5"]),
+                .library(name: "M1", targets: ["M1"]),
+                .library(name: "M2", targets: ["M2"]),
+                .library(name: "M3", targets: ["M3"]),
+                .library(name: "M4", targets: ["M4"]),
+                .library(name: "M5", targets: ["M5"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
