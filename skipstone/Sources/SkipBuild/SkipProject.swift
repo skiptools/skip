@@ -1331,12 +1331,12 @@ struct TestData : Codable, Hashable {
             // when we are an app module, override the module name with the product name, since we need a distinct name for importing into the project
             if isAppModule {
                 products += """
-                        .library(name: "\(productName ?? moduleName)", type: .dynamic, targets: ["\(moduleName)"]),
+                        .library(name: "\(productName ?? moduleName)", targets: ["\(moduleName)"]),
 
                 """
             } else {
                 products += """
-                        .library(name: "\(moduleName)", type: .dynamic, targets: ["\(moduleName)"]),
+                        .library(name: "\(moduleName)", targets: ["\(moduleName)"]),
 
                 """
             }
@@ -1546,7 +1546,7 @@ struct TestData : Codable, Hashable {
         ## Building
 
         This project is a \(options.free ? "free " : "")Swift Package Manager module that uses the
-        [Skip](https://skip.dev) plugin to transpile Swift into Kotlin.
+        [Skip](https://skip.dev) plugin to build the package for both iOS and Android.
 
         Building the module requires that Skip be installed using
         [Homebrew](https://brew.sh) with `brew install skiptools/skip/skip`.
