@@ -1330,8 +1330,9 @@ struct TestData : Codable, Hashable {
 
             // when we are an app module, override the module name with the product name, since we need a distinct name for importing into the project
             if isAppModule {
+                // the library type must be .dynamic to support native apps
                 products += """
-                        .library(name: "\(productName ?? moduleName)", targets: ["\(moduleName)"]),
+                        .library(name: "\(productName ?? moduleName)", type: .dynamic, targets: ["\(moduleName)"]),
 
                 """
             } else {

@@ -1058,7 +1058,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "AppModule", targets: ["AppModule"]),
+                .library(name: "AppModule", type: .dynamic, targets: ["AppModule"]),
                 .library(name: "ModelModule", targets: ["ModelModule"]),
             ],
             dependencies: [
@@ -1243,7 +1243,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "AppModule", targets: ["AppModule"]),
+                .library(name: "AppModule", type: .dynamic, targets: ["AppModule"]),
                 .library(name: "ModelModule", targets: ["ModelModule"]),
             ],
             dependencies: [
@@ -1358,7 +1358,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "AppModule", targets: ["AppModule"]),
+                .library(name: "AppModule", type: .dynamic, targets: ["AppModule"]),
             ],
             dependencies: [
                 .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
@@ -1489,7 +1489,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "FreeApp", targets: ["FreeApp"]),
+                .library(name: "FreeApp", type: .dynamic, targets: ["FreeApp"]),
                 .library(name: "FreeAppModel", targets: ["FreeAppModel"]),
             ],
             dependencies: [
@@ -1625,7 +1625,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "TopModule", targets: ["TopModule"]),
+                .library(name: "TopModule", type: .dynamic, targets: ["TopModule"]),
                 .library(name: "MiddleModule", targets: ["MiddleModule"]),
                 .library(name: "BottomModule", targets: ["BottomModule"]),
             ],
@@ -1788,7 +1788,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "M1", targets: ["M1"]),
+                .library(name: "M1", type: .dynamic, targets: ["M1"]),
                 .library(name: "M2", targets: ["M2"]),
                 .library(name: "M3", targets: ["M3"]),
                 .library(name: "M4", targets: ["M4"]),
@@ -1922,7 +1922,7 @@ final class SkipCommandTests: XCTestCase {
             defaultLocalization: "en",
             platforms: [.iOS(.v17), .macOS(.v14)],
             products: [
-                .library(name: "M1", targets: ["M1"]),
+                .library(name: "M1", type: .dynamic, targets: ["M1"]),
                 .library(name: "M2", targets: ["M2"]),
                 .library(name: "M3", targets: ["M3"]),
                 .library(name: "M4", targets: ["M4"]),
