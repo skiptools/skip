@@ -564,7 +564,7 @@ final class BridgeToSwiftTests: XCTestCase {
         public var i: Int {
             get async {
                 return await withCheckedContinuation { f_continuation in
-                    let f_return_callback: (Int) -> Void = { f_return in
+                    let f_return_callback: @Sendable (Int) -> Void = { f_return in
                         f_continuation.resume(returning: f_return)
                     }
                     jniContext {
@@ -605,7 +605,7 @@ final class BridgeToSwiftTests: XCTestCase {
         public var i: Int {
             get async throws {
                 return try await withCheckedThrowingContinuation { f_continuation in
-                    let f_return_callback: (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
+                    let f_return_callback: @Sendable (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
                         if let f_error {
                             f_continuation.resume(throwing: JThrowable.toError(f_error, options: [])!)
                         } else {
@@ -1406,7 +1406,7 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public func f(i p_0: Int) async -> Int {
             return await withCheckedContinuation { f_continuation in
-                let f_return_callback: (Int) -> Void = { f_return in
+                let f_return_callback: @Sendable (Int) -> Void = { f_return in
                     f_continuation.resume(returning: f_return)
                 }
                 jniContext {
@@ -1441,7 +1441,7 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public func f(i p_0: Int) async -> Int {
             return await withCheckedContinuation { f_continuation in
-                let f_return_callback: (Int) -> Void = { f_return in
+                let f_return_callback: @Sendable (Int) -> Void = { f_return in
                     f_continuation.resume(returning: f_return)
                 }
                 jniContext {
@@ -1473,7 +1473,7 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public func f() async {
             await withCheckedContinuation { f_continuation in
-                let f_return_callback: () -> Void = {
+                let f_return_callback: @Sendable () -> Void = {
                     f_continuation.resume()
                 }
                 jniContext {
@@ -1510,7 +1510,7 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public func f() async throws -> Int {
             return try await withCheckedThrowingContinuation { f_continuation in
-                let f_return_callback: (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
+                let f_return_callback: @Sendable (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
                     if let f_error {
                         f_continuation.resume(throwing: JThrowable.toError(f_error, options: [])!)
                     } else {
@@ -1549,7 +1549,7 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public func f(i p_0: Int) async throws {
             return try await withCheckedThrowingContinuation { f_continuation in
-                let f_return_callback: (JavaObjectPointer?) -> Void = { f_error in
+                let f_return_callback: @Sendable (JavaObjectPointer?) -> Void = { f_error in
                     if let f_error {
                         f_continuation.resume(throwing: JThrowable.toError(f_error, options: [])!)
                     } else {
@@ -2291,7 +2291,7 @@ final class BridgeToSwiftTests: XCTestCase {
         
             public func add() async -> Int {
                 return await withCheckedContinuation { f_continuation in
-                    let f_return_callback: (Int) -> Void = { f_return in
+                    let f_return_callback: @Sendable (Int) -> Void = { f_return in
                         f_continuation.resume(returning: f_return)
                     }
                     jniContext {
@@ -4496,7 +4496,7 @@ final class BridgeToSwiftTests: XCTestCase {
             public var x: Int {
                 get async {
                     return await withCheckedContinuation { f_continuation in
-                        let f_return_callback: (Int) -> Void = { f_return in
+                        let f_return_callback: @Sendable (Int) -> Void = { f_return in
                             f_continuation.resume(returning: f_return)
                         }
                         jniContext {
@@ -4527,7 +4527,7 @@ final class BridgeToSwiftTests: XCTestCase {
         
             public func f(i p_0: Int) async -> String {
                 return await withCheckedContinuation { f_continuation in
-                    let f_return_callback: (String) -> Void = { f_return in
+                    let f_return_callback: @Sendable (String) -> Void = { f_return in
                         f_continuation.resume(returning: f_return)
                     }
                     jniContext {
@@ -5393,7 +5393,7 @@ final class BridgeToSwiftTests: XCTestCase {
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public func f<T>(p p_0: T) async throws -> T {
             return try await withCheckedThrowingContinuation { f_continuation in
-                let f_return_callback: (T?, JavaObjectPointer?) -> Void = { f_return, f_error in
+                let f_return_callback: @Sendable (T?, JavaObjectPointer?) -> Void = { f_return, f_error in
                     if let f_error {
                         f_continuation.resume(throwing: JThrowable.toError(f_error, options: [])!)
                     } else {

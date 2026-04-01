@@ -640,16 +640,16 @@ final class KotlinBridgeToSwiftVisitor {
             let callbackType = bridgable.return.type.callbackClosureType(apiFlags: apiFlags, kotlin: false)
             indentation = indentation.inc()
             if callbackType.parameters.isEmpty {
-                swift.append(indentation, "let f_return_callback: \(callbackType) = {")
+                swift.append(indentation, "let f_return_callback: @Sendable \(callbackType) = {")
                 swift.append(indentation.inc(), "f_continuation.resume()")
             } else if !isThrows {
-                swift.append(indentation, "let f_return_callback: \(callbackType) = { f_return in")
+                swift.append(indentation, "let f_return_callback: @Sendable \(callbackType) = { f_return in")
                 swift.append(indentation.inc(), "f_continuation.resume(returning: f_return)")
             } else {
                 if callbackType.parameters.count == 1 {
-                    swift.append(indentation, "let f_return_callback: \(callbackType) = { f_error in")
+                    swift.append(indentation, "let f_return_callback: @Sendable \(callbackType) = { f_error in")
                 } else {
-                    swift.append(indentation, "let f_return_callback: \(callbackType) = { f_return, f_error in")
+                    swift.append(indentation, "let f_return_callback: @Sendable \(callbackType) = { f_return, f_error in")
                 }
                 indentation = indentation.inc()
                 swift.append(indentation, "if let f_error {")

@@ -4601,7 +4601,7 @@ final class BridgeToKotlinTests: XCTestCase {
             }
             public func f(url p_0: URL) async throws -> Int {
                 return try await withCheckedThrowingContinuation { f_continuation in
-                    let f_return_callback: (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
+                    let f_return_callback: @Sendable (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
                         if let f_error {
                             f_continuation.resume(throwing: JThrowable.toError(f_error, options: [.kotlincompat])!)
                         } else {
@@ -5732,7 +5732,7 @@ final class BridgeToKotlinTests: XCTestCase {
             }
             public func fetchData(with p_0: URL, method p_1: String, httpHeaders p_2: [String: String], body p_3: String?) async throws -> String {
                 return try await withCheckedThrowingContinuation { f_continuation in
-                    let f_return_callback: (String?, JavaObjectPointer?) -> Void = { f_return, f_error in
+                    let f_return_callback: @Sendable (String?, JavaObjectPointer?) -> Void = { f_return, f_error in
                         if let f_error {
                             f_continuation.resume(throwing: JThrowable.toError(f_error, options: [.kotlincompat])!)
                         } else {

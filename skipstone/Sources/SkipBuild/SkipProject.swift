@@ -1545,7 +1545,7 @@ struct TestData : Codable, Hashable {
 
         ## Building
 
-        This project is a \(options.free ? "free " : "")Swift Package Manager module that uses the
+        This project is a Swift Package Manager module that uses the
         [Skip](https://skip.dev) plugin to build the package for both iOS and Android.
 
         Building the module requires that Skip be installed using
