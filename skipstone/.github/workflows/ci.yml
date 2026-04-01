@@ -222,9 +222,8 @@ jobs:
           skip android emulator create --verbose
           skip android emulator list --verbose
           # watch the logs for errors
-          (sleep 30; ${ANDROID_HOME}/platform-tools/adb logcat) &
+          (sleep 20; ${ANDROID_HOME}/platform-tools/adb logcat) &
           skip android emulator launch --background --android-connect-timeout=300 --verbose
-          timeout 60 ${ANDROID_HOME}/platform-tools/adb wait-for-device
 
       - name: "Test new Swift package on emulator"
         working-directory: ${{ runner.temp }}
