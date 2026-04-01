@@ -1645,6 +1645,14 @@ struct AndroidEmulatorLaunchCommand: MessageCommand, ToolOptionsCommand {
         }
 
         if self.background {
+            // Drain the emulator's stdout/stderr in the background to prevent
+            // the pipe buffer from filling up, which would cause the emulator
+            // process to block and never finish booting. This is critical on CI
+            // where the emulator runs with verbose logcat output.
+            let drainTask = Task {
+                for try await _ in output { }
+            }
+
             let adb = try toolOptions.toolPath(for: "adb")
 
             // Detect the newly launched emulator's serial by polling for a new
@@ -1652,6 +1660,10 @@ struct AndroidEmulatorLaunchCommand: MessageCommand, ToolOptionsCommand {
             let serialDeadline = Date().addingTimeInterval(TimeInterval(androidConnectTimeout))
             var launchedSerial: String?
             while Date() < serialDeadline {
+                // If the emulator process has already exited, stop waiting
+                if let exitCode, case .terminated(let code) = exitCode, code != 0 {
+                    throw EmulatorLaunchError(errorDescription: "Emulator process exited with code \(code) before a device appeared in adb. Check the emulator log output above for errors.")
+                }
                 let devices = (try? await getAndroidDevices()) ?? []
                 if let newDevice = devices.first(where: { !existingSerials.contains($0.id) && $0.isEmulator }) {
                     launchedSerial = newDevice.id
