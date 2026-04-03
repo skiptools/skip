@@ -223,7 +223,18 @@ jobs:
           skip android emulator list --verbose
           # watch the logs for errors
           (sleep 20; ${ANDROID_HOME}/platform-tools/adb logcat) &
+
           skip android emulator launch --background --android-connect-timeout=300 --verbose
+
+          echo "Waiting for device"
+          ${ANDROID_HOME}/platform-tools/adb wait-for-device
+          sleep 30
+          date
+          echo "echoing PING"
+          ${ANDROID_HOME}/platform-tools/adb shell echo PING
+          echo "running shell getprop sys.boot_completed"
+          ${ANDROID_HOME}/platform-tools/adb shell getprop sys.boot_completed
+          date
 
       - name: "Test new Swift package on emulator"
         working-directory: ${{ runner.temp }}

@@ -1329,15 +1329,15 @@ struct TestData : Codable, Hashable {
             }
 
             // when we are an app module, override the module name with the product name, since we need a distinct name for importing into the project
+            // in theory, the app and library modules do not need to be .dynamic, but they are required when the app/library is native or else they cannot be loaded; we could disable this for non-native Skip Lite projects, but then it would make it difficult to migrate between Lite and Fuse
             if isAppModule {
-                // the library type must be .dynamic to support native apps
                 products += """
                         .library(name: "\(productName ?? moduleName)", type: .dynamic, targets: ["\(moduleName)"]),
 
                 """
             } else {
                 products += """
-                        .library(name: "\(moduleName)", targets: ["\(moduleName)"]),
+                        .library(name: "\(moduleName)", type: .dynamic, targets: ["\(moduleName)"]),
 
                 """
             }
