@@ -2269,7 +2269,7 @@ func listAVDNames(command: some MessageCommand, out: MessageQueue) async throws 
         let result = try await command.run(
             with: out,
             "List available AVDs",
-            ["emulator", "-list-avds"],
+            ["emulator", "-list-avds"]
         )
         output = try result.get()
     } catch {
