@@ -7,7 +7,7 @@ as well as the Homebrew Cask via
 [https://github.com/skiptools/homebrew-skip/blob/main/Casks/skip.rb](https://github.com/skiptools/homebrew-skip/blob/main/Casks/skip.rb).
 
 The exact same binary is used by both the Xcode/SwiftPM `skipstone` build plugin
-as well as the command-line tool installed via Homebrew's `brew install skiptools/skip/skip`
+as well as the command-line tool installed via Homebrew's `brew install skip`
 
 > [!NOTE]
 > This repository, https://github.com/skiptools/skipstone.git, vends the `skip` tool,
@@ -36,7 +36,7 @@ Once Homebrew is set up, Skip can be installed (and updated) by running the Term
 Cloning into '/opt/homebrew/Library/Taps/skiptools/homebrew-skip'...
 Tapped 1 cask (15 files, 417KB).
 
-% brew install skiptools/skip/skip
+% brew install skip
 
 ==> Downloading https://source.skip.dev/skip/releases/download/1.0.0/skip.zip
 ==> Installing dependencies: android-platform-tools
