@@ -1549,11 +1549,6 @@ struct TestData : Codable, Hashable {
         This project is a Swift Package Manager module that uses the
         [Skip](https://skip.dev) plugin to build the package for both iOS and Android.
 
-        Building the module requires that Skip be installed using
-        [Homebrew](https://brew.sh) with `brew install skiptools/skip/skip`.
-        This will also install the necessary build prerequisites:
-        Kotlin, Gradle, and the Android build tools.
-
         ## Testing
 
         The module can be tested using the standard `swift test` command
@@ -1622,15 +1617,6 @@ struct TestData : Codable, Hashable {
         This project is both a stand-alone Swift Package Manager module,
         as well as an Xcode project that builds and translates the project
         into a Kotlin Gradle project for Android using the skipstone plugin.
-
-        Building the module requires that Skip be installed using
-        [Homebrew](https://brew.sh) with `brew install skiptools/skip/skip`.
-
-        This will also install the necessary Skip prerequisites:
-        Kotlin, Gradle, and the Android build tools.
-
-        Installation prerequisites can be confirmed by running
-        `skip checkup`. The project can be validated with `skip verify`.
 
         ## Running
 

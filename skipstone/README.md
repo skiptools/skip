@@ -30,11 +30,14 @@ The `skip` CLI is installed using [Homebrew](https://brew.sh). Skip is distribut
 Once Homebrew is set up, Skip can be installed (and updated) by running the Terminal command:
 
 ```console title="Installing skip with Homebrew"
-% brew install skiptools/skip/skip
+% brew tap skiptools/skip
 
 ==> Tapping skiptools/skip
 Cloning into '/opt/homebrew/Library/Taps/skiptools/homebrew-skip'...
 Tapped 1 cask (15 files, 417KB).
+
+% brew install skiptools/skip/skip
+
 ==> Downloading https://source.skip.dev/skip/releases/download/1.0.0/skip.zip
 ==> Installing dependencies: android-platform-tools
 ==> Downloading https://dl.google.com/android/repository/platform-tools_r34.0.5-darwin.zip
