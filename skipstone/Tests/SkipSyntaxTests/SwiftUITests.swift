@@ -579,6 +579,49 @@ final class SwiftUITests: XCTestCase {
         """)
     }
 
+    func testEquatableSendableModifierGetsComposeTailCall() async throws {
+        let supportingSwift = baseSupportingSwift + """
+        struct GeometryProxy {
+            var width: Double { 0 }
+        }
+        extension View {
+            // SKIP DECLARE: fun <T : Any> onGeometryChange(for_: kotlin.reflect.KClass<T>, of: (GeometryProxy) -> T, action: (T) -> Unit): View
+            func onGeometryChange<T>(for type: T.Type, of transform: @escaping (GeometryProxy) -> T, action: @escaping (T) -> Void) -> any View where T : Equatable, T : Sendable {
+                return self
+            }
+        }
+        """
+        try await check(supportingSwift: supportingSwift, swift: """
+        import SwiftUI
+        struct OnGeometryChangeExample: View {
+            var body: some View {
+                Text("test")
+                    .onGeometryChange(for: Bool.self, of: { _ in true }, action: { _ in })
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
+        internal class OnGeometryChangeExample: View {
+            override fun body(): View {
+                return ComposeBuilder { composectx: ComposeContext ->
+                    Text("test")
+                        .onGeometryChange(for_ = Boolean::class, of = { _ -> true }, action = { _ ->  }).Compose(composectx)
+                }
+            }
+        }
+        """)
+    }
+
     func testStateVariable() async throws {
         try await check(supportingSwift: baseSupportingSwift, swift: """
         import SwiftUI

@@ -1566,6 +1566,13 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
         switch strippedTarget {
         case .any, .anyObject:
             return 1.0
+        case .named:
+            if strippedTarget.isEquatable { return 1.9 }
+            if strippedTarget.isSendable { return isSwiftBuiltinSendable ? 1.9 : nil }
+            return nil
+        case .composition:
+            // Protocol composition (e.g. Equatable & Sendable) — check via inheritance
+            return inheritanceCompatibilityScore(target: target, codebaseInfo: codebaseInfo)
         case .none:
             return 0.0
         default:
@@ -1576,6 +1583,19 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
     private func inheritanceCompatibilityScore(target: TypeSignature, codebaseInfo: CodebaseInfo.Context) -> Double? {
         // TODO: Match on generics
         let target = target.withGenerics([])
+
+        // When target is a protocol composition (e.g. Equatable & Sendable from generic constraints),
+        // the source conforms if it conforms to each protocol.
+        if case .composition(let protocolTypes) = target, !protocolTypes.isEmpty {
+            var totalComponentScore = 0.0
+            for protocolType in protocolTypes {
+                guard let score = compatibilityScore(target: protocolType, codebaseInfo: codebaseInfo) else {
+                    return nil
+                }
+                totalComponentScore += score
+            }
+            return totalComponentScore / Double(protocolTypes.count)
+        }
 
         // Perform a breadth-first search to find a matching inherited type
         var queue: [TypeSignature] = [self]
@@ -1595,6 +1615,21 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             level += 1.0
         }
         return nil
+    }
+
+    /// Swift standard types that conform to Sendable (used when codebase lacks type info).
+    /// Equatable is satisfied by all types in Skip; Sendable has a known set of conforming built-ins.
+    private var isSwiftBuiltinSendable: Bool {
+        switch self {
+        case .bool, .int, .int8, .int16, .int32, .int64, .int128,
+             .uint, .uint8, .uint16, .uint32, .uint64, .uint128,
+             .double, .float, .string, .character:
+            return true
+        case .optional(let inner):
+            return inner.isSwiftBuiltinSendable
+        default:
+            return false
+        }
     }
 
     /// Whether this type signature does not have any `.none` values.
