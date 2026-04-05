@@ -976,7 +976,14 @@ extension Range where Bound == Version {
         if let workingDirectory = workingDirectory?.path {
             // not available on glibc 2.27 in Ubuntu Bionic
             // https://github.com/swiftlang/swift-corelibs-foundation/issues/4762
-            //posix_spawn_file_actions_addchdir_np(&fileActions, workingDirectory)
+            //
+            // we could do something like this:
+            // https://github.com/swiftlang/swift-tools-support-core/pull/113/changes
+            //
+            // but for now we simple ignore workingDirectory flag on Linux
+            #if !os(Linux)
+            posix_spawn_file_actions_addchdir_np(&fileActions, workingDirectory)
+            #endif
         }
 
         var stdinPipe: [Int32] = [-1, -1]
