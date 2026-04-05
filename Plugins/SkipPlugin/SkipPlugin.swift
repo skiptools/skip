@@ -37,6 +37,9 @@ import PackagePlugin
     /// Whether we are in SkipBridge generation mode
     let skipBridgeMode = (ProcessInfo.processInfo.environment["SKIP_BRIDGE"] ?? "0") != "0"
 
+    /// When set, pass `--quiet` to skip
+    let skipQuiet = (ProcessInfo.processInfo.environment["SKIP_QUIET"] ?? "0") != "0"
+
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
         if skipDisabled {
             Diagnostics.remark("Skip plugin disabled through SKIP_PLUGIN_DISABLED environment variable")
@@ -266,14 +269,17 @@ import PackagePlugin
         let outputBase = URL(fileURLWithPath: kotlinModule, isDirectory: true, relativeTo: outputURL)
         let sourceBase = URL(fileURLWithPath: isTest ? "src/test" : "src/main", isDirectory: true, relativeTo: outputBase)
 
-        var buildArguments = [
-            "skipstone",
+        var buildArguments = ["skipstone"]
+        if skipQuiet {
+            buildArguments.append("--quiet")
+        }
+        buildArguments += [
             "--project", swiftSourceTarget.directory.string,
             "--skip-folder", skipFolder.string,
             "--sourcehash", sourcehashOutputPath.string,
             "--output-folder", sourceBase.path,
             "--module-root", outputBase.path,
-            ]
+        ]
 
         func appendArguments(_ args: [String], unlessAlreadySet: Bool = true) {
             // scan the existing arguments to see if the same arg already exists
