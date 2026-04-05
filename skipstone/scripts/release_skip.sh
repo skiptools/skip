@@ -57,6 +57,9 @@ cd ${SKIPPKGDIR}
 git fetch --tags --force
 #git tag -l --sort=-version:refname
 
+# Update the skip submodule
+git submodule update --remote --merge
+
 SKIP_VERSION_OLD=$(git tag -l --sort=-version:refname | grep '[0-9]*\.[0-9]*\.[0-9]*' | head -n 1)
 
 major=$(echo "${SKIP_VERSION_OLD}" | tr '.' '\n' | head -n 1 | tail -n 1)
