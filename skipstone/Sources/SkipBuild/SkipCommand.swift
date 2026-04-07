@@ -688,7 +688,7 @@ extension StreamingCommand {
 
     /// Output the given message (info/trace to stdout, warnings/errors to stderr)
     func msg(_ kind: Message.Kind = .note, _ message: @autoclosure () throws -> String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) rethrows {
-        if outputOptions.quiet == true {
+        if outputOptions.quiet == true && kind == .note {
             return
         }
         if kind == .trace && outputOptions.verbose != true {

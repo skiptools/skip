@@ -24,7 +24,7 @@ public struct OutputOptions: ParsableArguments {
     @Flag(name: [.customShort("v"), .long], help: ArgumentHelp("Whether to display verbose messages"))
     var verbose: Bool = false
     
-    @Flag(name: [.customShort("q"), .long], help: ArgumentHelp("Quiet mode: suppress output"))
+    @Flag(name: [.customShort("q"), .long], help: ArgumentHelp("Suppress informational (note) messages; warnings and errors are still shown"))
     var quiet: Bool = false
     
     @Flag(name: [.customShort("J"), .long], help: ArgumentHelp("Emit output as formatted JSON"))
