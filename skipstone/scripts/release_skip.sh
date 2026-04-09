@@ -201,6 +201,8 @@ git push --follow-tags
 # works, but is slow and we don't document it
 # mint run skiptools/skip version
 
+brew remove --formula skip || true
+
 # check that homebrew can install/upgrade and run the tool
 HOMEBREW_AUTO_UPDATE_SECS=0 brew upgrade skiptools/skip/skip || brew install skiptools/skip/skip
 skip welcome 
