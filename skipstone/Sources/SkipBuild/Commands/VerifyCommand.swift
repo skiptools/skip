@@ -211,9 +211,6 @@ extension ToolOptionsCommand where Self : StreamingCommand {
 
         let packageJSON = try await parseSwiftPackage(with: out, at: projectPath)
         let packageName = packageJSON.name
-        guard let moduleName = packageJSON.products.first?.name else {
-            throw AppVerifyError(errorDescription: "No products declared in package \(packageName) at \(projectPath)")
-        }
 
         //let project = try FrameworkProjectLayout(root: projectFolderURL)
         //let sourcesDir = URL(fileURLWithPath: "Sources", isDirectory: true, relativeTo: projectFolderURL)
@@ -257,6 +254,14 @@ extension ToolOptionsCommand where Self : StreamingCommand {
                 }
 
                 throw MissingProjectFileError(errorDescription: "Expected path at \(url.path) does not exist")
+            }
+
+            guard let firstProduct = packageJSON.products.first else {
+                throw AppVerifyError(errorDescription: "No products declared in package \(packageName) at \(projectPath)")
+            }
+
+            guard let moduleName = firstProduct.targets.first else {
+                throw AppVerifyError(errorDescription: "The products \(firstProduct) declared in package \(packageName) at \(projectPath) has no targets")
             }
 
             let project = try AppProjectLayout(moduleName: moduleName, root: projectFolderURL, check: validateLayoutURL)

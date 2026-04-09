@@ -88,26 +88,23 @@ public final class KotlinBundleTransformer: KotlinTransformer {
         let className = moduleBundleAccessorClassName(moduleName: moduleName)
         let outputNode = SwiftDefinition { output, indentation, _ in
             // The blank line after the SkipBridge import is expected by our bridge testing
+            // the unusedp_0 param is needed or else error: initializer 'init(path:)' declared in 'Bundle' cannot be overridden from extension
             output.append("""
             import SkipBridge
 
             import Foundation
             import SkipAndroidBridge
             
-            typealias Bundle = AndroidModuleBundle
-            class AndroidModuleBundle : AndroidBundle, @unchecked Sendable {
-                required init(_ bundle: SkipAndroidBridge.BundleAccess) {
-                    super.init(bundle)
-                }
-            
-                init?(path: String) {
-                    super.init(path: path, moduleName: "\(moduleName)") {
+            public typealias Bundle = AndroidBundle
+
+            // Interceptor for initializing a Bundle with a path
+            // (either manually or through the synthesized Bundle.module property),
+            // which forwards the bundle access up to the Android asset manager
+            extension AndroidBundle {
+                convenience init?(path: String, unusedp_0: Void? = nil) {
+                    self.init(path: path, moduleName: "\(moduleName)") {
                         try! AnyDynamicObject(className: "\(packageName).\(className)").moduleBundle!
                     }
-                }
-
-                override init?(url: URL) {
-                    super.init(url: url)
                 }
             }
             

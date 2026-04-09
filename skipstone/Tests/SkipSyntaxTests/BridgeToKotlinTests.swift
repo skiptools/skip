@@ -9044,20 +9044,16 @@ final class BridgeToKotlinTests: XCTestCase {
         import Foundation
         import SkipAndroidBridge
 
-        typealias Bundle = AndroidModuleBundle
-        class AndroidModuleBundle : AndroidBundle, @unchecked Sendable {
-            required init(_ bundle: SkipAndroidBridge.BundleAccess) {
-                super.init(bundle)
-            }
+        public typealias Bundle = AndroidBundle
 
-            init?(path: String) {
-                super.init(path: path, moduleName: "") {
+        // Interceptor for initializing a Bundle with a path
+        // (either manually or through the synthesized Bundle.module property),
+        // which forwards the bundle access up to the Android asset manager
+        extension AndroidBundle {
+            convenience init?(path: String, unusedp_0: Void? = nil) {
+                self.init(path: path, moduleName: "") {
                     try! AnyDynamicObject(className: ".module._ModuleBundleAccessor_").moduleBundle!
                 }
-            }
-
-            override init?(url: URL) {
-                super.init(url: url)
             }
         }
 
