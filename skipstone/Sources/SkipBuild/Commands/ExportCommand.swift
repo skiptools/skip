@@ -93,6 +93,9 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
     @Option(help: ArgumentHelp("Destination architectures for native libraries", valueName: "arch"))
     var arch: [AndroidArchArgument] = []
 
+    @Flag(help: ArgumentHelp("Generate SPDX SBOM files alongside export artifacts"))
+    var sbom: Bool = false
+
     func performCommand(with out: MessageQueue) async {
         await withLogStream(with: out) {
             try await runExport(with: out)
@@ -316,6 +319,22 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
             createdURLs.append(projectExportZip.asURL)
 
             try fs.removeFileTree(projectOutputBaseFolder) // only export the zip file; remove the sources
+        }
+
+        // Generate SBOM files if requested
+        if self.sbom {
+            let projectURL = URL(fileURLWithPath: self.project).standardized
+            let sbomFiles = try await SBOMGenerator.generateSBOMFiles(
+                generateIOS: self.ios,
+                generateAndroid: self.android,
+                projectPath: projectURL.path,
+                packageName: packageName,
+                packageJSON: packageJSON,
+                outputDirAbsolute: outputFolderAbsolute,
+                command: self,
+                out: out
+            )
+            createdURLs.append(contentsOf: sbomFiles)
         }
 
         let outputFolderTitle = outputFolder.abbreviatingWithTilde

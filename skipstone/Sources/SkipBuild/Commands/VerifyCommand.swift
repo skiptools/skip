@@ -5,7 +5,7 @@
 import Foundation
 import ArgumentParser
 import Universal
-//import TSCUtility
+import TSCBasic
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 struct VerifyCommand: SkipCommand, StreamingCommand, ProjectCommand, ToolOptionsCommand {
@@ -49,9 +49,100 @@ struct VerifyCommand: SkipCommand, StreamingCommand, ProjectCommand, ToolOptions
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Attempt to automatically fix issues"))
     var fix: Bool = false
 
+    @Flag(help: ArgumentHelp("Verify SBOM dependency licenses (uses FLOSS policy when --free is set)"))
+    var sbom: Bool = false
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Verify source file license headers match the project license"))
+    var licenses: Bool? = nil
+
     func performCommand(with out: MessageQueue) async {
         await withLogStream(with: out) {
             try await performVerifyCommand(project: project, autofix: fix, free: free, fastlane: fastlane, with: out)
+
+            if sbom {
+                let projectURL = URL(fileURLWithPath: project).standardized
+                let packageJSON = try await parseSwiftPackage(with: out, at: project)
+
+                if free == true {
+                    let violations = try await SBOMGenerator.verifyFLOSSLicenses(
+                        projectPath: projectURL.path,
+                        packageName: packageJSON.name,
+                        packageJSON: packageJSON,
+                        command: self,
+                        out: out
+                    )
+
+                    if violations > 0 {
+                        throw error("SBOM license verification failed")
+                    }
+                }
+            }
+
+            // Verify source file license headers when --licenses is specified,
+            // or auto-detect when --free is set and a license file is present
+            let projectURL = URL(fileURLWithPath: project).standardized
+            let checkLicenses = licenses ?? (free == true)
+            if checkLicenses {
+                try await verifySourceLicenseHeaders(projectPath: projectURL.path, out: out)
+            }
+        }
+    }
+
+    /// Detect the project's license and verify that all source files have matching SPDX headers.
+    private func verifySourceLicenseHeaders(projectPath: String, out: MessageQueue) async throws {
+        // Detect the project license from license files in the project root
+        guard let projectLicense = LicenseIdentification.detectLicense(at: projectPath) else {
+            await out.write(status: .warn, "License headers: no license file found in project root, skipping header check")
+            return
+        }
+
+        let expectedIdentifier = projectLicense.spdxIdentifier
+        await out.write(status: .pass, "License headers: project license is \(expectedIdentifier)")
+
+        let fm = FileManager.default
+        let sourcesPath = projectPath + "/Sources"
+        guard fm.fileExists(atPath: sourcesPath) else {
+            await out.write(status: .warn, "License headers: no Sources/ directory found")
+            return
+        }
+
+        // Collect all Swift source files under Sources/
+        guard let enumerator = fm.enumerator(atPath: sourcesPath) else { return }
+
+        var checked = 0
+        var violations = 0
+
+        while let relativePath = enumerator.nextObject() as? String {
+            guard relativePath.hasSuffix(".swift") else { continue }
+
+            let filePath = sourcesPath + "/" + relativePath
+            guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
+
+            checked += 1
+
+            // Check the first ~20 lines for an SPDX-License-Identifier header
+            let headerLines = content.components(separatedBy: .newlines).prefix(20)
+            let spdxIdentifier = headerLines.compactMap { line -> String? in
+                guard let range = line.range(of: "SPDX-License-Identifier:", options: .caseInsensitive) else { return nil }
+                let id = line[range.upperBound...].trimmingCharacters(in: .whitespaces)
+                return id.isEmpty ? nil : id
+            }.first
+
+            if let spdxIdentifier = spdxIdentifier {
+                if !LicenseIdentification.areCompatible(spdxIdentifier, expectedIdentifier) {
+                    await out.write(status: .fail, "License headers: \(relativePath) has \(spdxIdentifier), expected \(expectedIdentifier)")
+                    violations += 1
+                }
+            } else {
+                await out.write(status: .fail, "License headers: \(relativePath) missing SPDX-License-Identifier header")
+                violations += 1
+            }
+        }
+
+        if violations == 0 && checked > 0 {
+            await out.write(status: .pass, "License headers: \(checked) source files verified")
+        } else if violations > 0 {
+            throw error("\(violations) source file\(violations == 1 ? "" : "s") with incorrect or missing license headers")
         }
     }
 }
@@ -120,11 +211,8 @@ extension ToolOptionsCommand where Self : StreamingCommand {
 
         let packageJSON = try await parseSwiftPackage(with: out, at: projectPath)
         let packageName = packageJSON.name
-        guard var moduleName = packageJSON.products.first?.name else {
+        guard let moduleName = packageJSON.products.first?.name else {
             throw AppVerifyError(errorDescription: "No products declared in package \(packageName) at \(projectPath)")
-        }
-        if moduleName.hasSuffix("App") {
-            moduleName = moduleName.dropLast(3).description
         }
 
         //let project = try FrameworkProjectLayout(root: projectFolderURL)

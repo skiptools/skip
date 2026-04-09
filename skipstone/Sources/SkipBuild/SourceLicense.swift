@@ -10,9 +10,9 @@ extension ProjectOptionValues {
         if self.free {
             if app {
                 if self.appfair {
-                    return .gpl3
+                    return .gpl2
                 } else {
-                    return .gpl3
+                    return .gpl2
                 }
             } else {
                 return .mpl2
@@ -71,6 +71,507 @@ enum SourceLicense: Equatable, CaseIterable {
         case .eupl: return licenseEUPLContents
         }
     }
+}
+
+// MARK: - License Identification
+
+/// Shared license identification and matching utilities used by SBOM generation and verification.
+enum LicenseIdentification {
+
+    // MARK: - Detected License
+
+    struct DetectedLicense {
+        let spdxIdentifier: String
+        let name: String
+    }
+
+    // MARK: - File-Based License Detection (for SwiftPM checkouts)
+
+    /// Well-known license file names to search for in a package checkout directory.
+    private static let licenseFileNames = [
+        "LICENSE", "LICENSE.txt", "LICENSE.TXT", "LICENSE.md", "LICENSE.MD",
+        "License", "License.txt", "License.TXT", "License.md", "License.MD",
+        "license", "license.txt", "license.TXT", "license.md", "license.MD",
+        "LICENCE", "LICENCE.txt", "LICENCE.TXT", "LICENCE.md", "LICENCE.MD",
+        "Licence", "Licence.txt", "Licence.md",
+        "licence", "licence.txt", "licence.md",
+        "COPYING", "COPYING.txt", "COPYING.md",
+        "copying", "copying.txt",
+        "LICENSE-MIT", "LICENSE-APACHE", "LICENSE.rst", "LICENSE.RST",
+        "LICENSE-MIT.txt", "LICENSE-APACHE.txt",
+        "MIT-LICENSE", "MIT-LICENSE.txt",
+        "APACHE-LICENSE", "APACHE-LICENSE.txt",
+        "LICENSE.LGPL", "LICENSE.GPL", "LICENSE.AGPL",
+        "LICENSE.MIT", "LICENSE.APACHE", "LICENSE.BSD",
+        "LICENSE.MPL",
+    ]
+
+    /// Detect the license of a package by scanning for license files in the given directory.
+    static func detectLicense(at path: String) -> DetectedLicense? {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: path) else { return nil }
+
+        for name in licenseFileNames {
+            let filePath = (path as NSString).appendingPathComponent(name)
+            guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else {
+                continue
+            }
+            if let license = identifyLicenseFromContent(content) {
+                return license
+            }
+        }
+
+        let packageSwiftPath = (path as NSString).appendingPathComponent("Package.swift")
+        if let content = try? String(contentsOfFile: packageSwiftPath, encoding: .utf8) {
+            if let license = identifyLicenseFromPackageSwift(content) {
+                return license
+            }
+        }
+
+        return nil
+    }
+
+    /// Identify a license from the full text content of a license file.
+    static func identifyLicenseFromContent(_ content: String) -> DetectedLicense? {
+        let upper = content.uppercased()
+
+        // Check for SPDX-License-Identifier header first
+        if let spdxMatch = extractSPDXIdentifier(from: content) {
+            return DetectedLicense(spdxIdentifier: spdxMatch, name: spdxMatch)
+        }
+
+        // Apache 2.0
+        if upper.contains("APACHE LICENSE") && upper.contains("VERSION 2.0") {
+            return DetectedLicense(spdxIdentifier: "Apache-2.0", name: "Apache License 2.0")
+        }
+
+        // MIT
+        if upper.contains("MIT LICENSE") || upper.contains("PERMISSION IS HEREBY GRANTED, FREE OF CHARGE") {
+            return DetectedLicense(spdxIdentifier: "MIT", name: "MIT License")
+        }
+
+        // BSD 3-Clause
+        if upper.contains("BSD") && upper.contains("3-CLAUSE") {
+            return DetectedLicense(spdxIdentifier: "BSD-3-Clause", name: "BSD 3-Clause License")
+        }
+        if upper.contains("REDISTRIBUTION AND USE IN SOURCE AND BINARY FORMS") && upper.contains("NEITHER THE NAME") {
+            return DetectedLicense(spdxIdentifier: "BSD-3-Clause", name: "BSD 3-Clause License")
+        }
+
+        // BSD 2-Clause
+        if upper.contains("BSD") && upper.contains("2-CLAUSE") {
+            return DetectedLicense(spdxIdentifier: "BSD-2-Clause", name: "BSD 2-Clause License")
+        }
+        if upper.contains("REDISTRIBUTION AND USE IN SOURCE AND BINARY FORMS") && !upper.contains("NEITHER THE NAME") {
+            return DetectedLicense(spdxIdentifier: "BSD-2-Clause", name: "BSD 2-Clause License")
+        }
+
+        // ISC
+        if upper.contains("ISC LICENSE") || (upper.contains("PERMISSION TO USE, COPY, MODIFY") && upper.contains("ISC")) {
+            return DetectedLicense(spdxIdentifier: "ISC", name: "ISC License")
+        }
+
+        // MPL 2.0
+        if upper.contains("MOZILLA PUBLIC LICENSE") && upper.contains("VERSION 2.0") {
+            return DetectedLicense(spdxIdentifier: "MPL-2.0", name: "Mozilla Public License 2.0")
+        }
+
+        // LGPL 3.0 (with or without linking exception)
+        if upper.contains("GNU LESSER GENERAL PUBLIC LICENSE") && upper.contains("VERSION 3") || upper.contains("LGPL3") {
+            if upper.contains("LINKING EXCEPTION") || upper.contains("LINKS STATICALLY OR DYNAMICALLY") {
+                return DetectedLicense(spdxIdentifier: "LGPL-3.0-only WITH LGPL-3.0-linking-exception", name: "GNU Lesser General Public License v3.0 with Linking Exception")
+            }
+            return DetectedLicense(spdxIdentifier: "LGPL-3.0-only", name: "GNU Lesser General Public License v3.0")
+        }
+
+        // AGPL 3.0 (must be checked before GPL since AGPL text contains "GNU GENERAL PUBLIC LICENSE")
+        if upper.contains("GNU AFFERO GENERAL PUBLIC LICENSE") && upper.contains("VERSION 3") {
+            return DetectedLicense(spdxIdentifier: "AGPL-3.0-only", name: "GNU Affero General Public License v3.0")
+        }
+
+        // GPL 3.0
+        if upper.contains("GNU GENERAL PUBLIC LICENSE") && upper.contains("VERSION 3") {
+            return DetectedLicense(spdxIdentifier: "GPL-3.0-only", name: "GNU General Public License v3.0")
+        }
+
+        // GPL 2.0
+        if upper.contains("GNU GENERAL PUBLIC LICENSE") && upper.contains("VERSION 2") {
+            return DetectedLicense(spdxIdentifier: "GPL-2.0-only", name: "GNU General Public License v2.0")
+        }
+
+        // Unlicense
+        if upper.contains("THIS IS FREE AND UNENCUMBERED SOFTWARE RELEASED INTO THE PUBLIC DOMAIN") {
+            return DetectedLicense(spdxIdentifier: "Unlicense", name: "The Unlicense")
+        }
+
+        // Zlib
+        if upper.contains("ZLIB LICENSE") || (upper.contains("ZLIB") && upper.contains("FREELY") && upper.contains("ALTERED SOURCE VERSIONS")) {
+            return DetectedLicense(spdxIdentifier: "Zlib", name: "zlib License")
+        }
+
+        // CC0
+        if upper.contains("CC0 1.0 UNIVERSAL") || upper.contains("CREATIVE COMMONS ZERO") {
+            return DetectedLicense(spdxIdentifier: "CC0-1.0", name: "Creative Commons Zero v1.0 Universal")
+        }
+
+        // EUPL
+        if upper.contains("EUROPEAN UNION PUBLIC LICENCE") {
+            return DetectedLicense(spdxIdentifier: "EUPL-1.2", name: "European Union Public License 1.2")
+        }
+
+        // OSL
+        if upper.contains("OPEN SOFTWARE LICENSE") && upper.contains("3.0") {
+            return DetectedLicense(spdxIdentifier: "OSL-3.0", name: "Open Software License 3.0")
+        }
+
+        // Swift License (Apache 2.0 with Runtime Library Exception)
+        if upper.contains("APACHE LICENSE") && upper.contains("SWIFT RUNTIME LIBRARY EXCEPTION") {
+            return DetectedLicense(spdxIdentifier: "Apache-2.0 WITH Swift-exception", name: "Apache License 2.0 with Swift Runtime Library Exception")
+        }
+
+        // Boost
+        if upper.contains("BOOST SOFTWARE LICENSE") {
+            return DetectedLicense(spdxIdentifier: "BSL-1.0", name: "Boost Software License 1.0")
+        }
+
+        return nil
+    }
+
+    // MARK: - SPDX Compatibility
+
+    /// Check whether two SPDX license identifiers are compatible.
+    /// Treats `-only` and `-or-later` variants of the same license as compatible
+    /// (e.g. `GPL-2.0-only` is compatible with `GPL-2.0-or-later`).
+    static func areCompatible(_ a: String, _ b: String) -> Bool {
+        if a == b { return true }
+        // Strip the -only/-or-later suffix and compare the base license
+        let baseA = spdxBase(a)
+        let baseB = spdxBase(b)
+        return baseA == baseB && baseA != a // only match if a suffix was actually stripped
+    }
+
+    /// Return the base license identifier by stripping `-only` or `-or-later` suffixes,
+    /// and also stripping ` WITH ...` exception clauses for the base comparison.
+    private static func spdxBase(_ identifier: String) -> String {
+        var id = identifier
+        // Strip WITH clauses: "GPL-2.0-only WITH Classpath-exception-2.0" -> "GPL-2.0-only"
+        if let withRange = id.range(of: " WITH ", options: .caseInsensitive) {
+            id = String(id[id.startIndex..<withRange.lowerBound])
+        }
+        // Strip -only / -or-later suffixes
+        if id.hasSuffix("-only") {
+            return String(id.dropLast(5))
+        }
+        if id.hasSuffix("-or-later") {
+            return String(id.dropLast(9))
+        }
+        return id
+    }
+
+    /// Extract an SPDX-License-Identifier value from file content.
+    static func extractSPDXIdentifier(from content: String) -> String? {
+        let lines = content.components(separatedBy: .newlines)
+        for line in lines {
+            if let range = line.range(of: "SPDX-License-Identifier:", options: .caseInsensitive) {
+                let identifier = line[range.upperBound...].trimmingCharacters(in: .whitespaces)
+                if !identifier.isEmpty {
+                    return identifier
+                }
+            }
+        }
+        return nil
+    }
+
+    /// Identify a license from a Package.swift file's content.
+    static func identifyLicenseFromPackageSwift(_ content: String) -> DetectedLicense? {
+        if content.contains(".MIT") {
+            return DetectedLicense(spdxIdentifier: "MIT", name: "MIT License")
+        }
+        if content.contains(".apache") || content.contains("Apache") {
+            return DetectedLicense(spdxIdentifier: "Apache-2.0", name: "Apache License 2.0")
+        }
+        return nil
+    }
+
+    // MARK: - SPDX LicenseRef Resolution (for SPDX documents)
+
+    /// Build a mapping from LicenseRef-* identifiers to standard SPDX identifiers
+    /// using the document's `hasExtractedLicensingInfos` section.
+    static func buildLicenseRefLookup(from doc: [String: Any]) -> [String: String] {
+        guard let infos = doc["hasExtractedLicensingInfos"] as? [[String: Any]] else {
+            return [:]
+        }
+
+        var lookup: [String: String] = [:]
+        for info in infos {
+            guard let licenseId = info["licenseId"] as? String else { continue }
+            let name = info["name"] as? String ?? ""
+            let urls = info["seeAlsos"] as? [String] ?? []
+
+            if let spdx = resolveLicenseRef(name: name, urls: urls) {
+                lookup[licenseId] = spdx
+            }
+        }
+        return lookup
+    }
+
+    /// Build a mapping from LicenseRef-* identifiers to their human-readable names
+    /// from the document's `hasExtractedLicensingInfos` section.
+    static func buildLicenseRefNames(from doc: [String: Any]) -> [String: String] {
+        guard let infos = doc["hasExtractedLicensingInfos"] as? [[String: Any]] else {
+            return [:]
+        }
+
+        var names: [String: String] = [:]
+        for info in infos {
+            guard let licenseId = info["licenseId"] as? String,
+                  let name = info["name"] as? String, !name.isEmpty else { continue }
+            names[licenseId] = name
+        }
+        return names
+    }
+
+    /// Attempt to map a license name and URLs from an extracted licensing info entry
+    /// to a standard SPDX identifier.
+    static func resolveLicenseRef(name: String, urls: [String]) -> String? {
+        // First check if the name itself is already a valid SPDX identifier
+        if flossLicenses.contains(name) {
+            return name
+        }
+
+        // Try URL-based matching (most reliable)
+        for url in urls {
+            if let spdx = matchLicenseURL(url) {
+                return spdx
+            }
+        }
+
+        // Try name-based matching
+        if let spdx = matchLicenseName(name) {
+            return spdx
+        }
+
+        return nil
+    }
+
+    // MARK: - URL-Based License Matching
+
+    /// Well-known license URL patterns to SPDX identifiers.
+    static let licenseURLPatterns: [(pattern: String, spdx: String)] = [
+        ("apache.org/licenses/license-2.0", "Apache-2.0"),
+        ("opensource.org/licenses/mit", "MIT"),
+        ("opensource.org/license/mit", "MIT"),
+        ("spdx.org/licenses/mit", "MIT"),
+        ("opensource.org/licenses/bsd-license", "BSD-2-Clause"),
+        ("opensource.org/licenses/bsd-2-clause", "BSD-2-Clause"),
+        ("opensource.org/licenses/bsd-3-clause", "BSD-3-Clause"),
+        ("eclipse.org/legal/epl-2.0", "EPL-2.0"),
+        ("eclipse.org/legal/epl-v20", "EPL-2.0"),
+        ("eclipse.org/legal/epl-v10", "EPL-1.0"),
+        ("eclipse.org/org/documents/edl-v10", "BSD-3-Clause"),
+        ("gnu.org/licenses/lgpl-2.1", "LGPL-2.1-or-later"),
+        ("gnu.org/licenses/old-licenses/lgpl-2.1", "LGPL-2.1-or-later"),
+        ("gnu.org/licenses/lgpl-3", "LGPL-3.0-or-later"),
+        ("gnu.org/licenses/gpl-2", "GPL-2.0-or-later"),
+        ("gnu.org/licenses/old-licenses/gpl-2", "GPL-2.0-or-later"),
+        ("gnu.org/licenses/gpl-3", "GPL-3.0-or-later"),
+        ("creativecommons.org/publicdomain/zero/1.0", "CC0-1.0"),
+        ("creativecommons.org/licenses/by/4.0", "CC-BY-4.0"),
+        ("creativecommons.org/licenses/by/3.0", "CC-BY-3.0"),
+        ("mozilla.org/mpl/2.0", "MPL-2.0"),
+        ("golang.org/license", "BSD-3-Clause"),
+    ]
+
+    /// Match a URL against well-known license URL patterns.
+    static func matchLicenseURL(_ url: String) -> String? {
+        let lower = url.lowercased()
+        for mapping in licenseURLPatterns {
+            if lower.contains(mapping.pattern) {
+                return mapping.spdx
+            }
+        }
+        return nil
+    }
+
+    // MARK: - Name-Based License Matching
+
+    /// Well-known license names to SPDX identifiers (case-insensitive exact match).
+    static let licenseNameMap: [String: String] = [
+        // Apache
+        "the apache software license, version 2.0": "Apache-2.0",
+        "the apache license, version 2.0": "Apache-2.0",
+        "apache license, version 2.0": "Apache-2.0",
+        "apache license 2.0": "Apache-2.0",
+        "apache-2.0": "Apache-2.0",
+        "apache 2.0": "Apache-2.0",
+        "apache 2": "Apache-2.0",
+        // MIT
+        "the mit license": "MIT",
+        "mit license": "MIT",
+        "mit": "MIT",
+        "mit-0": "MIT-0",
+        // BSD
+        "bsd 3-clause license": "BSD-3-Clause",
+        "the 3-clause bsd license": "BSD-3-Clause",
+        "new bsd license": "BSD-3-Clause",
+        "bsd-3-clause": "BSD-3-Clause",
+        "revised bsd license": "BSD-3-Clause",
+        "bsd 2-clause license": "BSD-2-Clause",
+        "simplified bsd license": "BSD-2-Clause",
+        "the bsd license": "BSD-2-Clause",
+        "bsd-2-clause": "BSD-2-Clause",
+        "bsd license": "BSD-2-Clause",
+        // Eclipse
+        "eclipse public license 2.0": "EPL-2.0",
+        "eclipse public license - v 2.0": "EPL-2.0",
+        "epl 2.0": "EPL-2.0",
+        "epl-2.0": "EPL-2.0",
+        "eclipse public license 1.0": "EPL-1.0",
+        "eclipse public license - v 1.0": "EPL-1.0",
+        "epl 1.0": "EPL-1.0",
+        "epl-1.0": "EPL-1.0",
+        "eclipse distribution license - v 1.0": "BSD-3-Clause",
+        "edl 1.0": "BSD-3-Clause",
+        // GPL/LGPL
+        "gnu general public license, version 2": "GPL-2.0-only",
+        "gpl-2.0": "GPL-2.0-only",
+        "gnu general public license, version 3": "GPL-3.0-only",
+        "gpl-3.0": "GPL-3.0-only",
+        "gnu lesser general public license, version 2.1": "LGPL-2.1-only",
+        "lgpl-2.1": "LGPL-2.1-only",
+        "lgpl-2.1-or-later": "LGPL-2.1-or-later",
+        "gnu lesser general public license, version 3": "LGPL-3.0-only",
+        "lgpl-3.0": "LGPL-3.0-only",
+        "lgpl-3.0-or-later": "LGPL-3.0-or-later",
+        "gpl2 w/ cpe": "GPL-2.0-only WITH Classpath-exception-2.0",
+        // Mozilla
+        "mozilla public license, version 2.0": "MPL-2.0",
+        "mozilla public license 2.0": "MPL-2.0",
+        "mpl 2.0": "MPL-2.0",
+        "mpl-2.0": "MPL-2.0",
+        // Other
+        "cc0 1.0 universal": "CC0-1.0",
+        "cc0": "CC0-1.0",
+        "the unlicense": "Unlicense",
+        "unlicense": "Unlicense",
+        "isc license": "ISC",
+        "isc": "ISC",
+        "zlib license": "Zlib",
+        "zlib": "Zlib",
+        "boost software license 1.0": "BSL-1.0",
+        "bsl-1.0": "BSL-1.0",
+        "bouncy castle licence": "MIT",
+        "go license": "BSD-3-Clause",
+        "cddl 1.0": "CDDL-1.0",
+        "cddl 1.1": "CDDL-1.1",
+        "artistic license 2.0": "Artistic-2.0",
+        "postgresql license": "PostgreSQL",
+    ]
+
+    /// Match a license name against well-known names (case-insensitive exact match).
+    static func matchLicenseName(_ name: String) -> String? {
+        licenseNameMap[name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()]
+    }
+
+    // MARK: - SPDX Expression Parsing
+
+    /// Parse an SPDX license expression into its individual license identifiers.
+    /// Handles compound expressions like "(Apache-2.0 AND MIT)" or "Apache-2.0 OR MIT"
+    /// and "WITH" exception suffixes like "GPL-2.0-only WITH Classpath-exception-2.0".
+    static func parseSPDXExpression(_ expression: String) -> [String] {
+        var expr = expression.trimmingCharacters(in: .whitespaces)
+        while expr.hasPrefix("(") && expr.hasSuffix(")") {
+            expr = String(expr.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
+        }
+
+        var components: [String] = []
+        var remaining = expr
+
+        while !remaining.isEmpty {
+            var bestRange: Range<String.Index>? = nil
+            for op in [" AND ", " OR "] {
+                if let range = remaining.range(of: op) {
+                    if bestRange == nil || range.lowerBound < bestRange!.lowerBound {
+                        bestRange = range
+                    }
+                }
+            }
+
+            if let range = bestRange {
+                let part = String(remaining[remaining.startIndex..<range.lowerBound]).trimmingCharacters(in: .init(charactersIn: "() "))
+                if !part.isEmpty { components.append(part) }
+                remaining = String(remaining[range.upperBound...])
+            } else {
+                let part = remaining.trimmingCharacters(in: .init(charactersIn: "() "))
+                if !part.isEmpty { components.append(part) }
+                break
+            }
+        }
+
+        return components.isEmpty ? [expression] : components
+    }
+
+    // MARK: - FSF-Compatible Free/Open-Source Licenses
+
+    /// Curated set of SPDX identifiers for licenses recognized as free/open-source,
+    /// based on the FSF's list of GPL-compatible and other free software licenses.
+    /// See: https://www.gnu.org/licenses/license-list.html
+    static let flossLicenses: Set<String> = [
+        // Permissive licenses
+        "MIT",
+        "Apache-2.0",
+        "BSD-2-Clause",
+        "BSD-3-Clause",
+        "ISC",
+        "Unlicense",
+        "CC0-1.0",
+        "BSL-1.0",
+        "Zlib",
+        "0BSD",
+        "MIT-0",
+        "WTFPL",
+        "X11",
+        "curl",
+        "PostgreSQL",
+
+        // Copyleft licenses
+        "GPL-2.0-only",
+        "GPL-2.0-or-later",
+        "GPL-3.0-only",
+        "GPL-3.0-or-later",
+        "LGPL-2.0-only",
+        "LGPL-2.0-or-later",
+        "LGPL-2.1-only",
+        "LGPL-2.1-or-later",
+        "LGPL-3.0-only",
+        "LGPL-3.0-or-later",
+        "AGPL-3.0-only",
+        "AGPL-3.0-or-later",
+        "MPL-2.0",
+        "EPL-1.0",
+        "EPL-2.0",
+        "EUPL-1.1",
+        "EUPL-1.2",
+        "OSL-3.0",
+        "CDDL-1.0",
+        "CDDL-1.1",
+        "CPL-1.0",
+        "IPL-1.0",
+        "Artistic-2.0",
+
+        // Common compound/exception expressions
+        "GPL-2.0-only WITH Classpath-exception-2.0",
+        "GPL-2.0-or-later WITH Classpath-exception-2.0",
+        "Apache-2.0 WITH LLVM-exception",
+        "Apache-2.0 WITH Swift-exception",
+        "LGPL-3.0-only WITH LGPL-3.0-linking-exception",
+
+        // Creative Commons (content/data licenses)
+        "CC-BY-3.0",
+        "CC-BY-4.0",
+        "CC-BY-SA-3.0",
+        "CC-BY-SA-4.0",
+    ]
 }
 
 private let licenseEUPLContents = """
