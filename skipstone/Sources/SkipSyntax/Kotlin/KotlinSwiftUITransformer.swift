@@ -59,6 +59,15 @@ final class KotlinSwiftUITransformer: KotlinTransformer {
         return ret
     }
 
+    /// Return a string of the init parameters needed to construct a `ScaledMetric` after `wrappedValue`.
+    static func scaledMetricAdditionalInitParameters(for variableDeclaration: KotlinVariableDeclaration) -> String {
+        let tokens = variableDeclaration.attributes.of(kind: .scaledMetric).first?.tokens ?? []
+        guard let relativeTo = tokens.first else {
+            return ""
+        }
+        return ", relativeTo = \(relativeTo)"
+    }
+
     /// If the given variable is the `body` of a `View`, return the parent view.
     static func viewForBody(_ variableDeclaration: KotlinVariableDeclaration, codebaseInfo: CodebaseInfo.Context?) -> KotlinClassDeclaration? {
         guard variableDeclaration.role == .property, variableDeclaration.propertyName == "body", !variableDeclaration.isStatic, let classDeclaration = variableDeclaration.parent as? KotlinClassDeclaration else {
@@ -249,6 +258,8 @@ private final class TranslateVisitor {
                     return ("_" + variableName, "skip.ui.Environment")
                 } else if variable.attributes.contains(.focusState) {
                     return ("_" + variableName, "skip.ui.FocusState")
+                } else if variable.attributes.contains(.scaledMetric) {
+                    return ("_" + variableName, "skip.ui.ScaledMetric")
                 } else {
                     return nil
                 }
@@ -339,6 +350,7 @@ private final class TranslateVisitor {
         let bindingVariables = variableDeclarations.filter { $0.attributes.contains(.binding) }
         let bindableVariables = variableDeclarations.filter { $0.attributes.contains(.bindable) || $0.attributes.contains(.observedObject) }
         let appStorageVariables = variableDeclarations.filter { $0.attributes.contains(.appStorage) }
+        let scaledMetricVariables = variableDeclarations.filter { $0.attributes.contains(.scaledMetric) }
         if !stateVariables.isEmpty || !focusStateVariables.isEmpty || !environmentVariables.isEmpty || !appStorageVariables.isEmpty {
             let evaluateFunction = synthesizeEvaluateFunction(isModifier: isModifier, stateVariables: stateVariables, focusStateVariables: focusStateVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables)
             classDeclaration.insert(statements: [evaluateFunction], after: body)
@@ -363,6 +375,9 @@ private final class TranslateVisitor {
         }
         for appStorageVariable in appStorageVariables {
             synthesizeAppStorageBacking(variable: appStorageVariable)
+        }
+        for scaledMetricVariable in scaledMetricVariables {
+            synthesizeScaledMetricBacking(variable: scaledMetricVariable)
         }
     }
 
@@ -634,6 +649,35 @@ private final class TranslateVisitor {
             } else if variable.propertyType.isOptional {
                 output.append(" = skip.ui.AppStorage(null, ")
                 output.append(KotlinSwiftUITransformer.appStorageAdditionalInitParameters(for: variable, codebaseInfo: codebaseInfo))
+                output.append(")")
+            }
+            output.append("\n")
+        }
+        variable.storage = storage
+    }
+
+    /// Create the additional property synthesized for `@ScaledMetric` variables.
+    private func synthesizeScaledMetricBacking(variable: KotlinVariableDeclaration) {
+        // Tell the @ScaledMetric variable to get its value using _variable of type ScaledMetric
+        variable.apiFlags.options.remove(.writeable)
+        let storageName = "_\(variable.propertyName)"
+        var storage = KotlinVariableStorage()
+        storage.isSingleStatementAppendable = { _ in true }
+        storage.appendGet = { variable, sref, isSingleStatement, output, indentation in
+            if !isSingleStatement {
+                output.append(indentation).append("return ")
+            }
+            output.append(storageName).append(".wrappedValue")
+            sref()
+            output.append("\n")
+        }
+        storage.appendStorage = { variable, output, indentation in
+            let storageType = variable.propertyType.asPropertyWrapper("skip.ui.ScaledMetric").kotlin
+            output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName).append(": ").append(storageType)
+            if let value = variable.value {
+                output.append(" = skip.ui.ScaledMetric(wrappedValue = ")
+                value.append(to: output, indentation: indentation)
+                output.append(KotlinSwiftUITransformer.scaledMetricAdditionalInitParameters(for: variable))
                 output.append(")")
             }
             output.append("\n")

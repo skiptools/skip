@@ -211,6 +211,13 @@ final class KotlinStructTransformer: KotlinTransformer {
                 }
                 let appStorageParameters = KotlinSwiftUITransformer.appStorageAdditionalInitParameters(for: variableDeclaration, codebaseInfo: translator.codebaseInfo)
                 assignment = "this._\(variableDeclaration.propertyName) = skip.ui.AppStorage(wrappedValue = \(value), \(appStorageParameters))"
+            } else if variableDeclaration.attributes.contains(.scaledMetric) {
+                var value = variableDeclaration.propertyName
+                if variableDeclaration.mayBeSharedMutableStruct {
+                    value += ".sref()"
+                }
+                let scaledMetricParameters = KotlinSwiftUITransformer.scaledMetricAdditionalInitParameters(for: variableDeclaration)
+                assignment = "this._\(variableDeclaration.propertyName) = skip.ui.ScaledMetric(wrappedValue = \(value)\(scaledMetricParameters))"
             } else if variableDeclaration.attributes.contains(.binding) {
                 assignment = "this._\(variableDeclaration.propertyName) = \(variableDeclaration.propertyName)"
             } else if variableDeclaration.attributes.contains(.bindable) || variableDeclaration.attributes.contains(.observedObject) {
@@ -330,7 +337,7 @@ final class KotlinStructTransformer: KotlinTransformer {
             bodyStatements += variableDeclarations.map { variableDeclaration in
                 if variableDeclaration.attributes.stateAttribute != nil {
                     return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.State(copy.\(variableDeclaration.propertyName))")
-                } else if variableDeclaration.attributes.contains(.appStorage) || variableDeclaration.attributes.contains(.binding) {
+                } else if variableDeclaration.attributes.contains(.appStorage) || variableDeclaration.attributes.contains(.binding) || variableDeclaration.attributes.contains(.scaledMetric) {
                     return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = copy._\(variableDeclaration.propertyName)")
                 } else if variableDeclaration.attributes.contains(.bindable) || variableDeclaration.attributes.contains(.observedObject) {
                     return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.Bindable(copy.\(variableDeclaration.propertyName))")
@@ -470,7 +477,7 @@ final class KotlinStructTransformer: KotlinTransformer {
         return storedVariableDeclarations.map { variableDeclaration in
             if variableDeclaration.attributes.stateAttribute != nil {
                 return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.State(\(copy).\(variableDeclaration.propertyName))")
-            } else if variableDeclaration.attributes.contains(.appStorage) || variableDeclaration.attributes.contains(.binding) {
+            } else if variableDeclaration.attributes.contains(.appStorage) || variableDeclaration.attributes.contains(.binding) || variableDeclaration.attributes.contains(.scaledMetric) {
                 return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = \(copy)._\(variableDeclaration.propertyName)")
             } else if variableDeclaration.attributes.contains(.bindable) || variableDeclaration.attributes.contains(.observedObject) {
                 return KotlinRawStatement(sourceCode: "this._\(variableDeclaration.propertyName) = skip.ui.Bindable(\(copy).\(variableDeclaration.propertyName))")

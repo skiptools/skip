@@ -213,7 +213,7 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
 
     /// Some property wrappers are non-mutating.
     var isNonMutating: Bool {
-        return contains(.appStorage) || contains(.bindable) || contains(.binding) || contains(.environment) || contains(.environmentObject) || contains(.focusState) || contains(.gestureState) || contains(.nonmutating) || contains(.observedObject) || contains(.state) || contains(.stateObject)
+        return contains(.appStorage) || contains(.bindable) || contains(.binding) || contains(.environment) || contains(.environmentObject) || contains(.focusState) || contains(.gestureState) || contains(.nonmutating) || contains(.observedObject) || contains(.scaledMetric) || contains(.state) || contains(.stateObject)
     }
 
     /// Convenience to retrieve any @Environment or @EnvironmentObject attribute.
@@ -317,6 +317,7 @@ struct Attribute: Hashable, Codable {
         case observationIgnored
         case observedObject
         case published
+        case scaledMetric
         case state
         case stateObject
         case suite
@@ -393,6 +394,8 @@ struct Attribute: Hashable, Codable {
             return .observedObject
         case "Published":
             return .published
+        case "ScaledMetric":
+            return .scaledMetric
         case "State":
             return .state
         case "StateObject":

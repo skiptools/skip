@@ -2486,6 +2486,42 @@ final class SwiftUITests: XCTestCase {
         """)
     }
 
+    func testScaledMetric() async throws {
+        try await check(supportingSwift: baseSupportingSwift, swift: """
+        import SwiftUI
+        struct V: View {
+            @ScaledMetric var scaledDemoPadding: Double = 8
+            var body: some View {
+                Text("A: \\(scaledDemoPadding)")
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
+        internal class V: View {
+            internal val scaledDemoPadding: Double
+                get() = _scaledDemoPadding.wrappedValue
+            internal var _scaledDemoPadding: skip.ui.ScaledMetric<Double>
+            override fun body(): View {
+                return ComposeBuilder { composectx: ComposeContext -> Text("A: ${scaledDemoPadding}").Compose(composectx) }
+            }
+
+            constructor(scaledDemoPadding: Double = 8.0) {
+                this._scaledDemoPadding = skip.ui.ScaledMetric(wrappedValue = scaledDemoPadding)
+            }
+        }
+        """)
+    }
+
     func testMainActorViewBody() async throws {
         let supportingSwift = """
         struct Task<Success, Failure> where Failure: Error {
