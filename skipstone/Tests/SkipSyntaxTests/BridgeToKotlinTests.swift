@@ -4686,6 +4686,40 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testProtocolAsyncClosureParameterBridge() async throws {
+        let transformers = builtinKotlinTransformers() + [KotlinBridgeTransformer(options: .kotlincompat)]
+        try await check(swiftBridge: """
+        public protocol P {
+            func f(c: @escaping () async -> Void)
+        }
+        """, kotlin: """
+        interface P {
+            fun f(c: suspend () -> Unit)
+        }
+        """, swiftBridgeSupport: """
+        public final class P_BridgeImpl: P, BridgedFromKotlin {
+            nonisolated private static let Java_class = try! JClass(name: "P")
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            public func f(c p_0: @escaping () async -> Void) {
+                jniContext {
+                    let p_0_java = SwiftAsyncClosure0.javaObject(for: p_0, options: [.kotlincompat])!.toJavaParameter(options: [.kotlincompat])
+                    try! Java_peer.call(method: Self.Java_f_0_methodID, options: [.kotlincompat], args: [p_0_java])
+                }
+            }
+            nonisolated private static let Java_f_0_methodID = Java_class.getMethodID(name: "f", sig: "(Lkotlin/jvm/functions/Function1;)V")!
+            nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            nonisolated public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+        }
+        """, transformers: transformers)
+    }
+
     func testProtocolTypeMembers() async throws {
         try await check(swiftBridge: """
         public protocol P {

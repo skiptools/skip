@@ -692,12 +692,13 @@ extension TypeSignature {
             return type.jni(options: options)
         case .float:
             return "F"
-        case .function(let parameters, let returnType, _, _):
+        case .function(let parameters, let returnType, let apiFlags, _):
             if isFunctionDeclaration {
                 let parametersJNI = parameters.map { $0.type.jni(options: options) }.joined(separator: "")
                 return "(" + parametersJNI + ")" + returnType.jni(options: options)
             } else {
-                return "Lkotlin/jvm/functions/Function\(parameters.count);"
+                let functionArity = apiFlags.options.contains(.async) ? parameters.count + 1 : parameters.count
+                return "Lkotlin/jvm/functions/Function\(functionArity);"
             }
         case .int, .uint:
             return "I"
@@ -1610,4 +1611,3 @@ private func checkNonTypedThrows(_ sourceDerived: SourceDerived?, apiFlags: APIF
     }
     return false
 }
-
