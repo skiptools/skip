@@ -18,7 +18,7 @@ ARTIFACTBUNDLE="${ARTIFACT}.artifactbundle"
 PLUGIN_ZIP="${ARTIFACT}-linux.zip"
 ARTIFACT_BUILD_DIR=.build/artifactbundle-linux
 
-SWIFT_VERSION=${SWIFT_VERSION:-"6.3"}
+SWIFT_VERSION=${SWIFT_VERSION:-"6.3.1"}
 USE_SWIFTLY=${USE_SWIFTLY:-"1"}
 
 # Parse --arch flags; defaults to both x86_64 and aarch64
