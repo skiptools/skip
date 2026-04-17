@@ -4,7 +4,8 @@
 # https://www.swift.org/download/#releases
 #
 # and install Linux Static SDK toolchain with:
-# swift sdk install https://download.swift.org/swift-6.3-release/static-sdk/swift-6.3-RELEASE/swift-6.3-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz --checksum d2078b69bdeb5c31202c10e9d8a11d6f66f82938b51a4b75f032ccb35c4c286c
+#
+# curl -fSLo ${TMPDIR}/swift-linux-sdk.tar.gz https://download.swift.org/swift-6.3.1-release/static-sdk/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz && swift sdk install ${TMPDIR}/swift-linux-sdk.tar.gz
 #
 # SkipKey can be built and uploaded with:
 #
