@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         swift:
-          - '6.3'
+          - '6.3.1'
         os:
           - 'ubuntu-latest'
           #- 'macos-latest'
@@ -89,7 +89,7 @@ jobs:
       - run: skip welcome
 
       - name: "Upload Build Artifacts"
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: skip-plugin-${{ runner.os }}
           path: artifacts/
@@ -143,7 +143,7 @@ jobs:
       - run: swift --version
 
       - name: "Download skip plugin"
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: skip-plugin-${{ runner.os }}
           path: skip-artifact

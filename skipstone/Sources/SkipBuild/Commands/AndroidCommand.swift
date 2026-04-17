@@ -8,6 +8,7 @@ import FoundationNetworking
 #endif
 import ArgumentParser
 import TSCBasic
+import struct TSCUtility.Version
 import ELFKit
 #if canImport(SkipDriveExternal)
 import SkipDriveExternal
@@ -466,7 +467,9 @@ struct AndroidSDKInstallCommand: MessageCommand, ToolchainOptionsCommand {
         } else {
             // Look up the latest released Android SDK version
             let sdks = try await SwiftSDKOpenAPI.fetchSDKs(sdkName: "android")
-            guard let latest = sdks.first else {
+            // sort by semantic version so 6.3.1 > 6.3
+            let latestReleases = try? sdks.sorted(by: { try Version(versionString: $0.version, usesLenientParsing: true) < Version(versionString: $1.version, usesLenientParsing: true) })
+            guard let latest = latestReleases?.last ?? sdks.last else {
                 throw AndroidError(errorDescription: "No released Android SDK versions found")
             }
             resolvedVersion = latest.version
