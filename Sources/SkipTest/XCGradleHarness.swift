@@ -24,6 +24,8 @@ extension XCGradleHarness where Self : XCTestCase {
     ///
     /// - SeeAlso: https://developer.android.com/studio/test/command-line
     /// - SeeAlso: https://docs.gradle.org/current/userguide/java_testing.html#test_filtering
+    ///
+    /// When the `SKIP_TEST_FILTER` environment variable is set (e.g. by `skip test --filter`), it must be one pattern per line; each line is passed to Gradle as `--tests`.
     public func runGradleTests(device: String? = ProcessInfo.processInfo.environment["ANDROID_SERIAL"], file: StaticString = #file, line: UInt = #line) async throws {
         do {
             #if DEBUG
@@ -33,7 +35,13 @@ extension XCGradleHarness where Self : XCTestCase {
             let testAction = device == nil ? "testRelease" : "connectedAndroidTest"
             #endif
             let info = !["NO", "no", "false", "0"].contains(ProcessInfo.processInfo.environment["SKIP_GRADLE_VERBOSE"] ?? "NO")
-            try await invokeGradle(actions: [testAction], info: info, deviceID: device)
+            let testFilters: [String] = {
+                guard let raw = ProcessInfo.processInfo.environment["SKIP_TEST_FILTER"], !raw.isEmpty else {
+                    return []
+                }
+                return raw.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+            }()
+            try await invokeGradle(actions: [testAction], info: info, deviceID: device, testFilters: testFilters)
             print("Completed gradle test run for \(device ?? "local")")
         } catch {
             XCTFail("\((error as? LocalizedError)?.localizedDescription ?? error.localizedDescription)", file: file, line: line)
@@ -47,16 +55,13 @@ extension XCGradleHarness where Self : XCTestCase {
     ///   - actions: the actions to invoke, such as `test` or `assembleDebug`
     ///   - arguments: and additional arguments
     ///   - deviceID: the optional device ID against which to run
+    ///   - testFilters: Gradle `--tests` patterns (OR); usually from `SKIP_TEST_FILTER` via `runGradleTests()`
     ///   - moduleSuffix: the expected module name for automatic test determination
     ///   - sourcePath: the full path to the test case call site, which is used to determine the package root
     @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
-    func invokeGradle(actions: [String], arguments: [String] = [], info: Bool = false, deviceID: String? = nil, testFilter: String? = nil, moduleName: String? = nil, maxMemory: UInt64? = ProcessInfo.processInfo.physicalMemory, fromSourceFileRelativeToPackageRoot sourcePath: StaticString? = #file) async throws {
-
-        // the filters should be passed through to the --tests argument, but they don't seem to work for Android unit tests, neighter for Robolectric nor connected tests
-        precondition(testFilter == nil, "test filtering does not yet work")
+    func invokeGradle(actions: [String], arguments: [String] = [], info: Bool = false, deviceID: String? = nil, testFilters: [String] = [], moduleName: String? = nil, maxMemory: UInt64? = ProcessInfo.processInfo.physicalMemory, fromSourceFileRelativeToPackageRoot sourcePath: StaticString? = #file) async throws {
 
         var actions = actions
-        //let isTestAction = testFilter != nil
         let isTestAction = actions.contains(where: { $0.hasPrefix("test") || $0.hasPrefix("connected") })
 
 
@@ -98,9 +103,9 @@ extension XCGradleHarness where Self : XCTestCase {
                 }
 
                 var args = arguments
-                if let testFilter = testFilter {
-                    // NOTE: test filtering does not seem to work; no patterns are matched,
-                    args += ["--tests", testFilter]
+                // Repeated --tests is OR-style in Gradle. Some Android/Robolectric setups may still ignore patterns.
+                for pattern in testFilters where !pattern.isEmpty {
+                    args += ["--tests", pattern]
                 }
 
                 // specify additional arguments in the GRADLE_ARGUMENT variable, such as `-P android.testInstrumentationRunnerArguments.package=skip.ui.SkipUITests`
