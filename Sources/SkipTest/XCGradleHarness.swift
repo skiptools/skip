@@ -24,6 +24,7 @@ extension XCGradleHarness where Self : XCTestCase {
     ///
     /// - SeeAlso: https://developer.android.com/studio/test/command-line
     /// - SeeAlso: https://docs.gradle.org/current/userguide/java_testing.html#test_filtering
+    nonisolated(nonsending)
     public func runGradleTests(device: String? = ProcessInfo.processInfo.environment["ANDROID_SERIAL"], file: StaticString = #file, line: UInt = #line) async throws {
         do {
             #if DEBUG
@@ -50,6 +51,7 @@ extension XCGradleHarness where Self : XCTestCase {
     ///   - moduleSuffix: the expected module name for automatic test determination
     ///   - sourcePath: the full path to the test case call site, which is used to determine the package root
     @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
+    nonisolated(nonsending)
     func invokeGradle(actions: [String], arguments: [String] = [], info: Bool = false, deviceID: String? = nil, testFilter: String? = nil, moduleName: String? = nil, maxMemory: UInt64? = ProcessInfo.processInfo.physicalMemory, fromSourceFileRelativeToPackageRoot sourcePath: StaticString? = #file) async throws {
 
         // the filters should be passed through to the --tests argument, but they don't seem to work for Android unit tests, neighter for Robolectric nor connected tests
