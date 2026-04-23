@@ -1212,6 +1212,31 @@ final class ConcurrencyTests: XCTestCase {
         """)
     }
 
+    func testActorExplicitAsyncUsesActorRun() async throws {
+        try await check(swift: """
+        actor A {
+            func call() async {
+                call2()
+            }
+
+            func call2() async {
+                print(1)
+            }
+        }
+        """, kotlin: """
+        internal class A: Actor {
+            override val isolatedContext = Actor.isolatedContext()
+            internal suspend fun call(): Unit = Actor.run(this) {
+                call2()
+            }
+
+            internal suspend fun call2(): Unit = Actor.run(this) {
+                print(1)
+            }
+        }
+        """)
+    }
+
     func testActorAccess() async throws {
         try await check(supportingSwift: """
         actor A {

@@ -1175,7 +1175,7 @@ final class FunctionDeclaration: Statement {
             }
         }
         generics = generics.resolved(in: self, context: context)
-        if asyncBehavior == .sync, type != .initDeclaration, !modifiers.isNonisolated && !modifiers.isStatic, (parent as? TypeDeclaration)?.nonExtensionDeclarationType == .actorDeclaration {
+        if asyncBehavior != .actor, type != .initDeclaration, !modifiers.isNonisolated && !modifiers.isStatic, (parent as? TypeDeclaration)?.nonExtensionDeclarationType == .actorDeclaration {
             asyncBehavior = .actor
         }
     }
@@ -1343,7 +1343,7 @@ final class SubscriptDeclaration: Statement {
             }
         }
         generics = generics.resolved(in: self, context: context)
-        if asyncBehavior == .sync, !modifiers.isNonisolated && !modifiers.isStatic, (parent as? TypeDeclaration)?.nonExtensionDeclarationType == .actorDeclaration {
+        if asyncBehavior != .actor, !modifiers.isNonisolated && !modifiers.isStatic, (parent as? TypeDeclaration)?.nonExtensionDeclarationType == .actorDeclaration {
             asyncBehavior = .actor
         }
     }
@@ -1949,7 +1949,7 @@ final class VariableDeclaration: Statement {
             }
         }
         throwsType = throwsType.resolved(in: self, context: context)
-        if asyncBehavior == .sync, !modifiers.isNonisolated && !modifiers.isStatic, !isLet, (parent as? TypeDeclaration)?.nonExtensionDeclarationType == .actorDeclaration {
+        if asyncBehavior != .actor, !modifiers.isNonisolated && !modifiers.isStatic, !isLet, (parent as? TypeDeclaration)?.nonExtensionDeclarationType == .actorDeclaration {
             asyncBehavior = .actor
         }
     }
