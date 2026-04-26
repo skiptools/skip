@@ -301,6 +301,66 @@ final class BuiltinTypeTests: XCTestCase {
         """)
     }
 
+    func testDollarSignEscape() async throws {
+        // Single-line strings can escape `$` with a backslash.
+        try await check(swift: """
+        "abc $xyz"
+        """, kotlin: """
+        "abc \\$xyz"
+        """)
+
+        try await check(swift: """
+        "It costs $5.00"
+        """, kotlin: """
+        "It costs \\$5.00"
+        """)
+
+        // Raw (multi-line) Kotlin strings: backslash escape of `$` does NOT work
+        // inside triple-quoted Kotlin strings, so the transpiler must emit the
+        // `${"$"}` template form instead.
+        try await check(swift: ##"#"$xyz"#"##, kotlin: ##""""${"$"}xyz""""##)
+
+        try await check(swift: ##"#"abc $xyz"#"##, kotlin: ##""""abc ${"$"}xyz""""##)
+
+        try await check(swift: ##"#"It costs $5.00"#"##, kotlin: ##""""It costs ${"$"}5.00""""##)
+
+        try await check(swift: ##"#"a $ b $$ c"#"##, kotlin: ##""""a ${"$"} b ${"$"}${"$"} c""""##)
+
+        // Raw string with literal backslash followed by `$`:
+        // Kotlin triple-quoted strings treat backslashes literally,
+        // so `\${"$"}` produces `\` + `$` in the resulting string.
+        try await check(swift: ##"#"\$xyz"#"##, kotlin: ##""""\${"$"}xyz""""##)
+
+        // Multi-line Swift triple-quoted string with `$`.
+        try await check(swift: """
+        let s = \"""
+            abc $xyz
+            \"""
+        """, kotlin: """
+        internal val s = \"""abc ${"$"}xyz""\"
+        """)
+
+        // Multi-line Swift string with `$` and an interpolation.
+        try await check(swift: """
+        let s = \"""
+            abc $xyz \\(foo)
+            \"""
+        """, kotlin: """
+        internal val s = \"""abc ${"$"}xyz ${foo}""\"
+        """)
+
+        // Multi-line Swift string spanning multiple lines with `$`.
+        try await check(swift: """
+        let s = \"""
+            abc
+            $xyz
+            \"""
+        """, kotlin: """
+        internal val s = \"""abc
+        ${"$"}xyz""\"
+        """)
+    }
+
     func testCharacterLiteral() async throws {
         try await check(swift: """
         let c1: Character = "a"

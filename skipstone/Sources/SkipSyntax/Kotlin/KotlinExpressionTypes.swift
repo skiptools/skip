@@ -2603,7 +2603,7 @@ final class KotlinStringLiteral: KotlinExpression {
             for segment in expression.segments {
                 switch segment {
                 case .string(let string):
-                    let kstring = translateStringSegment(string)
+                    let kstring = translateStringSegment(string, isMultiline: expression.isMultiline)
                     if kstring == string, expression.segments.count == 1 {
                         swiftString = string
                     }
@@ -2623,7 +2623,7 @@ final class KotlinStringLiteral: KotlinExpression {
         return kexpression
     }
 
-    private static func translateStringSegment(_ string: String) -> String {
+    private static func translateStringSegment(_ string: String, isMultiline: Bool = false) -> String {
         var kstring = ""
         var backslashCount = 0
         var skipNextClosingBraceCount = 0
@@ -2649,8 +2649,15 @@ final class KotlinStringLiteral: KotlinExpression {
                 }
                 kstring.append(c)
             case "$":
-                kstring.append("\\")
-                kstring.append("$")
+                // Kotlin's backslash escape for `$` does not work inside
+                // triple-quoted (multiline) strings, so use the `${"$"}`
+                // template form instead. Single-line strings still use `\$`.
+                if isMultiline {
+                    kstring.append("${\"$\"}")
+                } else {
+                    kstring.append("\\")
+                    kstring.append("$")
+                }
             case "}":
                 if skipNextClosingBraceCount > 0 {
                     skipNextClosingBraceCount -= 1
