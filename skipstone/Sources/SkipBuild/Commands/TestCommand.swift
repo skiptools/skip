@@ -152,8 +152,6 @@ extension TestCommand {
 
         let xunit = xunit ?? ".build/xcunit-\(UUID().uuidString).xml"
 
-        try await run(with: out, "Build Project", ["swift", "build", "--build-tests", "--verbose", "--configuration", configuration, "--package-path", project], additionalEnvironment: additionalEnv)
-
         var testResult: Result<ProcessOutput, Error>? = nil
         if test == true {
             var testArgs = ["swift", "test", "--parallel", "-c", configuration, "--enable-code-coverage", "--xunit-output", xunit, "--package-path", project]
