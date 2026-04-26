@@ -51,13 +51,15 @@ struct APIFlags: Hashable, Codable {
         static let writeable = Options(rawValue: 1 << 5)
         static let swiftUIBindable = Options(rawValue: 1 << 6)
         static let computed = Options(rawValue: 1 << 7)
+        static let concurrent = Options(rawValue: 1 << 8)
+        static let nonisolatedNonsending = Options(rawValue: 1 << 9)
 
         init(rawValue: Int) {
             self.rawValue = rawValue
         }
     }
 
-    init(isAsync: Bool = false, isMainActor: Bool = false, isSwiftUIBindable: Bool = false, isViewBuilder: Bool = false, isComputed: Bool = false, isWriteable: Bool = false, throwsType: TypeSignature = .none) {
+    init(isAsync: Bool = false, isMainActor: Bool = false, isSwiftUIBindable: Bool = false, isViewBuilder: Bool = false, isComputed: Bool = false, isWriteable: Bool = false, isConcurrent: Bool = false, isNonisolatedNonsending: Bool = false, throwsType: TypeSignature = .none) {
         if isAsync {
             options.insert(.async)
         }
@@ -75,6 +77,12 @@ struct APIFlags: Hashable, Codable {
         }
         if isWriteable {
             options.insert(.writeable)
+        }
+        if isConcurrent {
+            options.insert(.concurrent)
+        }
+        if isNonisolatedNonsending {
+            options.insert(.nonisolatedNonsending)
         }
         if throwsType != .none {
             self.throwsType = throwsType
@@ -109,6 +117,17 @@ enum AsyncBehavior {
     case sync
     case async
     case actor
+}
+
+/// Centralized default async isolation policy for transpilation.
+///
+/// Today Skip Lite remains `@concurrent`-by-default, but this switch provides
+/// a single migration point for a future `nonisolated(nonsending)`-by-default mode.
+enum AsyncDefaultIsolationPolicy {
+    case concurrent
+    case nonisolatedNonsending
+
+    static let current: AsyncDefaultIsolationPolicy = .concurrent
 }
 
 /// @Attributes on a declaration.
@@ -169,6 +188,8 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
                 apiFlags.options.insert(.autoclosure)
             case .directive:
                 attributes.append(attribute)
+            case .concurrent:
+                apiFlags.options.insert(.concurrent)
             case .escaping:
                 attributes.append(attribute)
             case .mainActor:
@@ -297,6 +318,7 @@ struct Attribute: Hashable, Codable {
         case binding
         case bridge
         case bridgeIgnored
+        case concurrent
         case deprecated
         case discardableResult
         /// Recorded from `StatementExtras.attributes`.
@@ -354,6 +376,8 @@ struct Attribute: Hashable, Codable {
             return .bridge
         case "BridgeIgnored":
             return .bridgeIgnored
+        case "concurrent":
+            return .concurrent
         case "discardableResult":
             return .discardableResult
         case "directive":
@@ -806,6 +830,12 @@ extension LabeledValue: Equatable, Hashable where V: Equatable, V: Hashable {
 ///
 /// - Note: `Codable` for use in `CodebaseInfo`.
 struct Modifiers: PrettyPrintable, Hashable, Codable {
+    enum NonisolatedBehavior: String, Hashable, Codable {
+        case unspecified
+        case standard
+        case nonisolatedNonsending
+    }
+
     /// Visibility modifier.
     ///
     /// - Note: `Codable` for use in `CodebaseInfo`.
@@ -826,12 +856,16 @@ struct Modifiers: PrettyPrintable, Hashable, Codable {
     var isOverride: Bool
     var isLazy: Bool
     var isNonisolated: Bool
-
-    private enum CodingKeys: String, CodingKey {
-        case visibility = "v", setVisibility = "sv", isStatic = "s", isMutating = "m", isFinal = "f", isOverride = "o", isLazy = "l", isNonisolated = "n"
+    var nonisolatedBehavior: NonisolatedBehavior
+    var isNonisolatedNonsending: Bool {
+        return nonisolatedBehavior == .nonisolatedNonsending
     }
 
-    init(visibility: Visibility = .default, setVisibility: Visibility = .default, isStatic: Bool = false, isMutating: Bool = false, isFinal: Bool = false, isOverride: Bool = false, isLazy: Bool = false, isNonisolated: Bool = false) {
+    private enum CodingKeys: String, CodingKey {
+        case visibility = "v", setVisibility = "sv", isStatic = "s", isMutating = "m", isFinal = "f", isOverride = "o", isLazy = "l", isNonisolated = "n", nonisolatedBehavior = "nb"
+    }
+
+    init(visibility: Visibility = .default, setVisibility: Visibility = .default, isStatic: Bool = false, isMutating: Bool = false, isFinal: Bool = false, isOverride: Bool = false, isLazy: Bool = false, isNonisolated: Bool = false, nonisolatedBehavior: NonisolatedBehavior = .unspecified) {
         self.visibility = visibility
         self.setVisibility = setVisibility
         self.isStatic = isStatic
@@ -840,6 +874,7 @@ struct Modifiers: PrettyPrintable, Hashable, Codable {
         self.isOverride = isOverride
         self.isLazy = isLazy
         self.isNonisolated = isNonisolated
+        self.nonisolatedBehavior = nonisolatedBehavior
     }
 
     /// Decode the modifier information in the given syntax.
@@ -855,6 +890,7 @@ struct Modifiers: PrettyPrintable, Hashable, Codable {
         var isOverride = false
         var isLazy = false
         var isNonisolated = false
+        var nonisolatedBehavior: NonisolatedBehavior = .unspecified
         for modifier in syntax {
             switch modifier.name.text {
             case "open":
@@ -902,11 +938,16 @@ struct Modifiers: PrettyPrintable, Hashable, Codable {
                 isLazy = true
             case "nonisolated":
                 isNonisolated = true
+                if modifier.detail?.detail.text == "nonsending" {
+                    nonisolatedBehavior = .nonisolatedNonsending
+                } else {
+                    nonisolatedBehavior = .standard
+                }
             default:
                 break
             }
         }
-        return Modifiers(visibility: visibility, setVisibility: setVisibility, isStatic: isStatic, isMutating: isMutating, isFinal: isFinal, isOverride: isOverride, isLazy: isLazy, isNonisolated: isNonisolated)
+        return Modifiers(visibility: visibility, setVisibility: setVisibility, isStatic: isStatic, isMutating: isMutating, isFinal: isFinal, isOverride: isOverride, isLazy: isLazy, isNonisolated: isNonisolated, nonisolatedBehavior: nonisolatedBehavior)
     }
 
     var isEmpty: Bool {
@@ -937,7 +978,11 @@ struct Modifiers: PrettyPrintable, Hashable, Codable {
             children.append(PrettyPrintTree(root: "lazy"))
         }
         if isNonisolated {
-            children.append(PrettyPrintTree(root: "nonisolated"))
+            if isNonisolatedNonsending {
+                children.append(PrettyPrintTree(root: "nonisolated(nonsending)"))
+            } else {
+                children.append(PrettyPrintTree(root: "nonisolated"))
+            }
         }
         return PrettyPrintTree(root: "modifiers", children: children)
     }

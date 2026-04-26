@@ -1047,7 +1047,12 @@ final class FunctionDeclaration: Statement {
     private(set) var generics: Generics
     let body: CodeBlock?
     var functionType: TypeSignature {
-        let apiFlags = APIFlags(isAsync: asyncBehavior != .sync, throwsType: throwsType)
+        let apiFlags = APIFlags(
+            isAsync: asyncBehavior != .sync,
+            isConcurrent: attributes.contains(.concurrent),
+            isNonisolatedNonsending: modifiers.isNonisolatedNonsending,
+            throwsType: throwsType
+        )
         let function: TypeSignature = .function(parameters.map(\.signature), returnType, apiFlags, nil)
         return attributes.apply(toFunction: function)
     }
@@ -1271,7 +1276,12 @@ final class SubscriptDeclaration: Statement {
     let getter: Accessor<CodeBlock>?
     let setter: Accessor<CodeBlock>?
     var getterType: TypeSignature {
-        let apiFlags = APIFlags(isAsync: asyncBehavior != .sync, throwsType: throwsType)
+        let apiFlags = APIFlags(
+            isAsync: asyncBehavior != .sync,
+            isConcurrent: attributes.contains(.concurrent),
+            isNonisolatedNonsending: modifiers.isNonisolatedNonsending,
+            throwsType: throwsType
+        )
         let function: TypeSignature = .function(parameters.map(\.signature), elementType, apiFlags, nil)
         return attributes.apply(toFunction: function)
     }
@@ -1824,7 +1834,7 @@ final class VariableDeclaration: Statement {
     var apiFlags: APIFlags {
         // Default to assuming that get-only protocol properties are computed
         let isComputed = getter?.body != nil || (getter != nil && setter == nil)
-        return APIFlags(isAsync: asyncBehavior != .sync, isMainActor: attributes.contains(.mainActor), isSwiftUIBindable: attributes.contains(.bindable) || attributes.contains(.observedObject) || attributes.contains(.state) || attributes.contains(.stateObject) || attributes.contains(.binding) || attributes.contains(.environmentObject) || attributes.environmentAttribute?.tokenTypeSignature != nil || attributes.contains(.focusState) || attributes.contains(.gestureState), isViewBuilder: attributes.contains(.viewBuilder), isComputed: isComputed, isWriteable: !isLet && (getter == nil || setter != nil), throwsType: throwsType)
+        return APIFlags(isAsync: asyncBehavior != .sync, isMainActor: attributes.contains(.mainActor), isSwiftUIBindable: attributes.contains(.bindable) || attributes.contains(.observedObject) || attributes.contains(.state) || attributes.contains(.stateObject) || attributes.contains(.binding) || attributes.contains(.environmentObject) || attributes.environmentAttribute?.tokenTypeSignature != nil || attributes.contains(.focusState) || attributes.contains(.gestureState), isViewBuilder: attributes.contains(.viewBuilder), isComputed: isComputed, isWriteable: !isLet && (getter == nil || setter != nil), isConcurrent: attributes.contains(.concurrent), isNonisolatedNonsending: modifiers.isNonisolatedNonsending, throwsType: throwsType)
     }
     var isMutating: Bool {
         return !isLet && (getter == nil || setter != nil) && !attributes.isNonMutating

@@ -34,6 +34,47 @@ enum KotlinStatementType {
     case message
 }
 
+private enum KotlinAsyncDispatchMode {
+    case inherited
+    case concurrent
+    case actor
+    case mainActor
+}
+
+private func kotlinAsyncDispatchMode(apiFlags: APIFlags, isActorIsolated: Bool) -> KotlinAsyncDispatchMode {
+    if apiFlags.options.contains(.mainActor) {
+        return .mainActor
+    }
+    if isActorIsolated {
+        return .actor
+    }
+    if apiFlags.options.contains(.nonisolatedNonsending) {
+        return .inherited
+    }
+    if apiFlags.options.contains(.concurrent) {
+        return .concurrent
+    }
+    switch AsyncDefaultIsolationPolicy.current {
+    case .concurrent:
+        return .concurrent
+    case .nonisolatedNonsending:
+        return .inherited
+    }
+}
+
+private func kotlinDispatchExpression(for mode: KotlinAsyncDispatchMode) -> String? {
+    switch mode {
+    case .mainActor:
+        return "MainActor.run"
+    case .actor:
+        return "Actor.run(this)"
+    case .concurrent:
+        return "Async.run"
+    case .inherited:
+        return nil
+    }
+}
+
 final class KotlinBreak: KotlinStatement, KotlinSingleStatementAppendable {
     var label: String?
 
@@ -2248,12 +2289,12 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
         }
 
         if apiFlags.options.contains(.async) && !isNoDispatch {
-            if apiFlags.options.contains(.mainActor) {
-                output.append(" = MainActor.run ")
-            } else if isActorIsolated {
-                output.append(" = Actor.run(this) ")
+            let dispatchMode = kotlinAsyncDispatchMode(apiFlags: apiFlags, isActorIsolated: isActorIsolated)
+            let dispatchExpression = kotlinDispatchExpression(for: dispatchMode)
+            if let dispatchExpression {
+                output.append(" = \(dispatchExpression) ")
             } else {
-                output.append(" = Async.run ")
+                output.append(" ")
             }
             if hasAsyncExplicitReturn {
                 output.append("\(KotlinClosure.returnLabel)@")
@@ -3093,12 +3134,13 @@ final class KotlinVariableDeclaration: KotlinStatement, KotlinMemberDeclaration 
     }
 
     private func appendAsFunctionDefinition(_ body: KotlinCodeBlock, to output: OutputGenerator, indentation: Indentation) {
-        if apiFlags.options.contains(.mainActor) {
-            output.append(" = MainActor.run ")
-        } else if isActorIsolated {
-            output.append(" = Actor.run(this) ")
-        } else if apiFlags.options.contains(.async) {
-            output.append(" = Async.run ")
+        if apiFlags.options.contains(.async) {
+            let dispatchMode = kotlinAsyncDispatchMode(apiFlags: apiFlags, isActorIsolated: isActorIsolated)
+            if let dispatchExpression = kotlinDispatchExpression(for: dispatchMode) {
+                output.append(" = \(dispatchExpression) ")
+            } else {
+                output.append(" ")
+            }
         } else {
             output.append(" ")
         }

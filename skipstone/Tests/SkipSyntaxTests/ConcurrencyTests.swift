@@ -29,6 +29,21 @@ final class ConcurrencyTests: XCTestCase {
         XCTAssertEqual(infos.count, 1)
         XCTAssertTrue(infos[0] is CodebaseInfo.FunctionInfo)
         XCTAssertTrue(infos[0].modifiers.isNonisolated)
+        XCTAssertFalse(infos[0].modifiers.isNonisolatedNonsending)
+    }
+
+    func testNonisolatedNonsendingModifier() async throws {
+        let context = try await setUpContext(swift: """
+        @MainActor class C {
+            nonisolated(nonsending) func f() async {
+            }
+        }
+        """)
+        let infos = context.global.lookup(name: "f")
+        XCTAssertEqual(infos.count, 1)
+        XCTAssertTrue(infos[0] is CodebaseInfo.FunctionInfo)
+        XCTAssertTrue(infos[0].modifiers.isNonisolated)
+        XCTAssertTrue(infos[0].modifiers.isNonisolatedNonsending)
     }
 
     func testMainActorSubclassInference() async throws {
@@ -1208,6 +1223,38 @@ final class ConcurrencyTests: XCTestCase {
             }
 
             internal fun h() = Unit
+        }
+        """)
+    }
+
+    func testNonsendingAndConcurrentDispatchModes() async throws {
+        try await check(swift: """
+        struct S {
+            nonisolated(nonsending) func performAsync() async {
+                print(1)
+            }
+
+            @concurrent func alwaysSwitch() async {
+                print(2)
+            }
+
+            func defaultAsync() async {
+                print(3)
+            }
+        }
+        """, kotlin: """
+        internal class S {
+            internal suspend fun performAsync(): Unit {
+                print(1)
+            }
+
+            internal suspend fun alwaysSwitch(): Unit = Async.run {
+                print(2)
+            }
+
+            internal suspend fun defaultAsync(): Unit = Async.run {
+                print(3)
+            }
         }
         """)
     }
