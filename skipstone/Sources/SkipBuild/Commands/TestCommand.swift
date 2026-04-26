@@ -264,9 +264,16 @@ extension TestCommand {
                 let className = xunitCase.classname.split(separator: ".").last?.description ?? xunitCase.classname
                 let junitModuleCases = junitModuleCases(for: className)
 
+                // Swift Testing XUnit uses function-style names with "()", e.g. "add()"; JUnit Gradle output uses "add$SkipLib_debugUnitTest".
+                let junitMatchLabel = testName.hasSuffix("()") ? String(testName.dropLast(2)) : testName
                 // in JUnit, test names are sometimes the raw test name, and other times will be something like "testName$ModuleName_debugUnitTest"
                 // async tests are prefixed with "run"
-                let cases = junitModuleCases.filter({ $0.name == testName || $0.name.hasPrefix(testName + "$") || $0.name.hasPrefix("run" + testName + "$") })
+                let cases = junitModuleCases.filter({
+                    $0.name == testName
+                        || $0.name == junitMatchLabel
+                        || $0.name.hasPrefix(junitMatchLabel + "$")
+                        || $0.name.hasPrefix("run" + junitMatchLabel + "$")
+                })
                 if cases.count > 1 {
                     throw SkipDriveError(errorDescription: "Multiple conflicting XUnit and JUnit test cases named “\(testName)” in \(skipModule).")
                 }
