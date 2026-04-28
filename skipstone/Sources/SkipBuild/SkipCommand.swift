@@ -78,6 +78,7 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
             InitCommand.self, // skip init is shorthand for skip lib init
             VerifyCommand.self,
             IconCommand.self,
+            AppCommand.self,
 
             // Conditional on SkipDrive being imported
             GradleCommand.self,
