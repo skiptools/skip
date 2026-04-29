@@ -1169,6 +1169,7 @@ struct SkipstoneCommand: BuildPluginOptionsCommand, StreamingCommand {
 
             func convertStrings(resourceSourceURL: URL, sourcePath: AbsolutePath) throws {
                 // process the .xcstrings in the same way that Xcode does: parse the JSON and use the localizations keys to synthesize a LANG.lproj/TABLENAME.strings file
+                // note that this is essentially the same thing that `/Applications/Xcode.app/Contents/Developer/usr/bin/xcstringstool compile` does as part of the resource processing for an Xcode build, so we could validate our output by comparing the results of that command to this process
                 let xcstrings = try JSONDecoder().decode(LocalizableStringsDictionary.self, from: Data(contentsOf: resourceSourceURL))
                 let defaultLanguage = xcstrings.sourceLanguage
                 let locales = Set(xcstrings.strings.values.compactMap(\.localizations?.keys).joined())
