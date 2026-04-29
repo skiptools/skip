@@ -1019,7 +1019,7 @@ extension ToolOptionsCommand {
 
     /// Perform a monitor check on the given URL
     @discardableResult func checkFile(_ url: URL, with out: MessageQueue, title: String? = nil, handle: @escaping (_ title: String, _ url: URL) throws -> CheckStatus) async -> Bool {
-        let title = title ?? "Check \(url.relativeString)"
+        let title = title ?? "Check \(url.lastPathComponent)"
         let result = await outputOptions.monitor(with: out, title, resultHandler: { result in
             do {
                 if let resultURL = try result?.get() {

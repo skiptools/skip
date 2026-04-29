@@ -1444,7 +1444,58 @@ extension URL {
             try AbsolutePath(validating: path)
         }
     }
+
+    /// Returns the path of the receiver expressed relative to the given root URL.
+    ///
+    /// Both URLs are first resolved to their canonical representations (symlinks
+    /// resolved, `.` and `..` components removed, standardized).
+    ///
+    /// - Parameters:
+    ///   - root: The URL to express the receiver's path relative to.
+    ///   - relativeEvenWithoutSharedRoot: If `false` (the default), the receiver's
+    ///     full canonical path is returned when it does not lie within `root`.
+    ///     If `true`, a relative path is constructed using `../` traversals to
+    ///     walk up from `root` to a common ancestor and then back down to the
+    ///     receiver.
+    /// - Returns: A path string. When the receiver is inside `root`, this is a
+    ///   path relative to `root` with no leading `/`. When the receiver equals
+    ///   `root`, the empty string is returned.
+    func pathRelativeTo(root: URL, relativeEvenWithoutSharedRoot: Bool = false) -> String {
+        // Canonicalize both URLs: resolve symlinks and normalize ./ and ../
+        let canonicalSelf = self.resolvingSymlinksInPath().standardizedFileURL
+        let canonicalRoot = root.resolvingSymlinksInPath().standardizedFileURL
+
+        // Split into non-empty path components. We work with arrays of components
+        // so we don't have to fight with string prefixes and trailing slashes.
+        let selfComponents = canonicalSelf.pathComponents.filter { $0 != "/" }
+        let rootComponents = canonicalRoot.pathComponents.filter { $0 != "/" }
+
+        // Find the length of the shared prefix.
+        var shared = 0
+        let maxShared = min(selfComponents.count, rootComponents.count)
+        while shared < maxShared && selfComponents[shared] == rootComponents[shared] {
+            shared += 1
+        }
+
+        // Case 1: root is a prefix of self (self lies inside root, or equals it).
+        if shared == rootComponents.count {
+            let remainder = selfComponents.dropFirst(shared)
+            return remainder.joined(separator: "/")
+        }
+
+        // Case 2: root is not a prefix of self.
+        if !relativeEvenWithoutSharedRoot {
+            return canonicalSelf.path
+        }
+
+        // Case 3: build a "../"-prefixed relative path via the common ancestor.
+        let upCount = rootComponents.count - shared
+        let downComponents = selfComponents.dropFirst(shared)
+        let ups = Array(repeating: "..", count: upCount)
+        return (ups + downComponents).joined(separator: "/")
+    }
 }
+
 
 extension FileManager {
     /// Remove the given file URL, attempting to trash it when on macOS, otherwise just deleting it

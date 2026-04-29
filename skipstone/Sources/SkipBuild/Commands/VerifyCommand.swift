@@ -157,9 +157,18 @@ extension ToolOptionsCommand where Self : StreamingCommand {
     func performVerifyCommand(project projectPath: String, autofix: Bool, free: Bool? = nil, fastlane: Bool? = nil, with out: MessageQueue) async throws {
         let projectFolderURL = URL(fileURLWithPath: projectPath, isDirectory: true)
 
+        func relativeURL(_ url: URL) -> String {
+            url.pathRelativeTo(root: projectFolderURL)
+        }
+
+        @discardableResult func verifyFile(_ url: URL, title: String? = nil, handle: @escaping (_ title: String, _ url: URL) throws -> CheckStatus) async -> Bool {
+            let title = title ?? "Check \(relativeURL(url))"
+            return await checkFile(url, with: out, title: title, handle: handle)
+        }
+
         func checkFolder(_ dir: URL, _ message: String? = nil) async -> Bool {
-            await checkFile(dir, with: out, title: message ?? "Check folder: \(dir.lastPathComponents(2))") { title, url in
-                return CheckStatus(status: url.isDirectoryFile == true ? .pass : .fail, message: message ?? "Check folder: \(dir.lastPathComponents(2))")
+            await verifyFile(dir, title: message ?? "Check folder: \(relativeURL(dir))") { title, url in
+                return CheckStatus(status: url.isDirectoryFile == true ? .pass : .fail, message: message ?? "Check folder: \(relativeURL(dir))")
             }
         }
 
@@ -175,10 +184,16 @@ extension ToolOptionsCommand where Self : StreamingCommand {
             return fileURLs.first { $0.isReadableFile == true } != nil
         }
 
-        @discardableResult func checkFileContents(_ file: URL, message: String? = nil, length: Range<Int>? = nil, trailingContents: Array<String> = [], isURL: Bool = false) async -> Bool {
-            await checkFile(file, with: out, title: message) { title, url in
+        @discardableResult func checkFileContents(_ file: URL, message: String? = nil, length: Range<Int>? = nil, trailingContents: Array<String> = [], required: Bool = true, isURL: Bool = false) async -> Bool {
+            if required == false && !file.fileExists() {
+                // permit non-required files to not exist
+                return false
+            }
+
+            return await verifyFile(file, title: message) { title, url in
+                let fileFragment = relativeURL(file)
                 if url.isRegularFile != true {
-                    return CheckStatus(status: .fail, message: "Missing file: \(file.relativePath)")
+                    return CheckStatus(status: .fail, message: "Missing file: \(fileFragment)")
                 }
 
                 func trim(_ string: String) -> String {
@@ -190,22 +205,22 @@ extension ToolOptionsCommand where Self : StreamingCommand {
                    !trailingContents.contains(where: {
                        trim(contents).hasSuffix(trim($0)) || trim(contents).hasPrefix(trim($0))
                    }) {
-                    return CheckStatus(status: .fail, message: "Contents did not match expected contents: \(file.relativePath)")
+                    return CheckStatus(status: .fail, message: "Contents did not match expected contents: \(fileFragment)")
                 }
 
                 if let length, contents.count < length.lowerBound {
-                    return CheckStatus(status: .fail, message: "Contents too short (\(contents.count) < \(length.lowerBound)): \(file.relativePath)")
+                    return CheckStatus(status: .fail, message: "Contents too short (\(contents.count) < \(length.lowerBound)): \(fileFragment)")
                 }
 
                 if let length, contents.count > length.upperBound {
-                    return CheckStatus(status: .fail, message: "Contents too long (\(contents.count) < \(length.upperBound)): \(file.relativePath)")
+                    return CheckStatus(status: .fail, message: "Contents too long (\(contents.count) < \(length.upperBound)): \(fileFragment)")
                 }
 
                 if isURL == true && (contents.hasPrefix("https://") == false || URL(string: contents.trimmingCharacters(in: .newlines)) == nil) {
-                    return CheckStatus(status: .fail, message: "Contents not a valid URL: \(file.relativePath)")
+                    return CheckStatus(status: .fail, message: "Contents not a valid URL: \(fileFragment)")
                 }
 
-                return CheckStatus(status: .pass, message: message ?? "Verify file: \(file.relativePath)")
+                return CheckStatus(status: .pass, message: message ?? "Verify file: \(fileFragment)")
             }
         }
 
@@ -266,12 +281,12 @@ extension ToolOptionsCommand where Self : StreamingCommand {
 
             let project = try AppProjectLayout(moduleName: moduleName, root: projectFolderURL, check: validateLayoutURL)
 
-            await checkFile(project.skipEnv, with: out) { title, url in
+            await verifyFile(project.skipEnv) { title, url in
                 //let plist = try PLIST.parse(Data(contentsOf: url))
                 return CheckStatus(status: .pass)
             }
 
-            await checkFile(project.androidGradleSettings, with: out) { title, url in
+            await verifyFile(project.androidGradleSettings) { title, url in
                 let expectedContents = AppProjectLayout.createSettingsGradle()
                 let actualContents = try String(contentsOf: url)
                 if expectedContents.trimmingCharacters(in: .whitespacesAndNewlines) != actualContents.trimmingCharacters(in: .whitespacesAndNewlines) {
@@ -286,7 +301,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
                 }
             }
 
-            await checkFile(project.androidManifest, with: out) { title, url in
+            await verifyFile(project.androidManifest) { title, url in
                 let node = try XMLNode.parse(data: Data(contentsOf: url), options: [.processNamespaces], entityResolver: nil)
                 guard let manifest = node.elementChildren.first else {
                     return CheckStatus(status: .fail, message: "Verify AndroidManifest.xml: root node is not <manifest>: \(node.elementName)")
@@ -306,17 +321,35 @@ extension ToolOptionsCommand where Self : StreamingCommand {
             if flagOrFiles(fastlane, project.darwinFastlaneFolder, project.androidFastlaneFolder) {
                 if await checkFolder(project.darwinFastlaneFolder) {
                     let metadataDir = project.darwinFastlaneMetadataFolder
-                    for locale in ["en-US"] {
-                        let enUSDir = metadataDir.appendingPathComponent(locale, isDirectory: true)
-                        await checkFileContents(enUSDir.appendingPathComponent("title.txt"), length: 1..<30)
-                        await checkFileContents(enUSDir.appendingPathComponent("subtitle.txt"), length: 1..<30)
-                        await checkFileContents(enUSDir.appendingPathComponent("description.txt"), length: 1..<4000)
-                        await checkFileContents(enUSDir.appendingPathComponent("keywords.txt"), length: 1..<255)
-                        await checkFileContents(enUSDir.appendingPathComponent("release_notes.txt"), length: 1..<4000)
-                        await checkFileContents(enUSDir.appendingPathComponent("version_whats_new.txt"), length: 1..<4000)
-                        await checkFileContents(enUSDir.appendingPathComponent("software_url.txt"), length: 1..<255, isURL: true)
-                        await checkFileContents(enUSDir.appendingPathComponent("privacy_url.txt"), length: 1..<255, isURL: true)
-                        await checkFileContents(enUSDir.appendingPathComponent("support_url.txt"), length: 1..<255, isURL: true)
+                    let enUSDir = metadataDir.appendingPathComponent("en-US", isDirectory: true)
+                    let defaultDir = metadataDir.appendingPathComponent("default", isDirectory: true)
+
+                    if defaultDir.fileExists(isDirectory: true) {
+                        try await checkDarwinMetadata(defaultDir, complete: true)
+                    } else {
+                        // if no "default", then "en-US" must exist
+                        try await checkDarwinMetadata(enUSDir, complete: true)
+                    }
+
+                    // check the rest of the localized folders
+                    for localeDir in try FileManager.default.contentsOfDirectory(at: metadataDir, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) {
+                        if localeDir.isDirectoryFile == true {
+                            if await checkFolder(localeDir) {
+                                try await checkDarwinMetadata(localeDir, complete: false)
+                            }
+                        }
+                    }
+
+                    func checkDarwinMetadata(_ dir: URL, complete: Bool) async throws {
+                        await checkFileContents(dir.appendingPathComponent("title.txt"), length: 1..<30, required: true)
+                        await checkFileContents(dir.appendingPathComponent("subtitle.txt"), length: 1..<30, required: true)
+                        await checkFileContents(dir.appendingPathComponent("description.txt"), length: 1..<4000, required: true)
+                        await checkFileContents(dir.appendingPathComponent("keywords.txt"), length: 1..<255, required: true)
+                        await checkFileContents(dir.appendingPathComponent("release_notes.txt"), length: 1..<4000, required: complete)
+                        await checkFileContents(dir.appendingPathComponent("version_whats_new.txt"), length: 1..<4000, required: complete)
+                        await checkFileContents(dir.appendingPathComponent("software_url.txt"), length: 1..<255, required: complete, isURL: true)
+                        await checkFileContents(dir.appendingPathComponent("privacy_url.txt"), length: 1..<255, required: complete, isURL: true)
+                        await checkFileContents(dir.appendingPathComponent("support_url.txt"), length: 1..<255, required: complete, isURL: true)
 
                         // TODO: replicate Fastlane's deliver checks like:
                         /*
@@ -336,11 +369,15 @@ extension ToolOptionsCommand where Self : StreamingCommand {
 
                 if await checkFolder(project.androidFastlaneFolder) {
                     let metadataDir = project.androidFastlaneMetadataFolder
-                    for locale in ["en-US"] {
-                        let enUSDir = metadataDir.appendingPathComponent(locale, isDirectory: true)
-                        await checkFileContents(enUSDir.appendingPathComponent("title.txt"), length: 1..<30)
-                        await checkFileContents(enUSDir.appendingPathComponent("short_description.txt"), length: 1..<100)
-                        await checkFileContents(enUSDir.appendingPathComponent("full_description.txt"), length: 30..<4000)
+
+                    for localeDir in try FileManager.default.contentsOfDirectory(at: metadataDir, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) {
+                        if localeDir.isDirectoryFile == true {
+                            if await checkFolder(localeDir) {
+                                await checkFileContents(localeDir.appendingPathComponent("title.txt"), length: 1..<30)
+                                await checkFileContents(localeDir.appendingPathComponent("short_description.txt"), length: 1..<100)
+                                await checkFileContents(localeDir.appendingPathComponent("full_description.txt"), length: 30..<4000)
+                            }
+                        }
                     }
                 }
             }
