@@ -344,7 +344,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
                         await checkFileContents(dir.appendingPathComponent("title.txt"), length: 1..<30, required: true)
                         await checkFileContents(dir.appendingPathComponent("subtitle.txt"), length: 1..<30, required: true)
                         await checkFileContents(dir.appendingPathComponent("description.txt"), length: 1..<4000, required: true)
-                        await checkFileContents(dir.appendingPathComponent("keywords.txt"), length: 1..<255, required: true)
+                        await checkFileContents(dir.appendingPathComponent("keywords.txt"), length: 1..<100, required: true)
                         await checkFileContents(dir.appendingPathComponent("release_notes.txt"), length: 1..<4000, required: complete)
                         await checkFileContents(dir.appendingPathComponent("version_whats_new.txt"), length: 1..<4000, required: complete)
                         await checkFileContents(dir.appendingPathComponent("software_url.txt"), length: 1..<255, required: complete, isURL: true)
