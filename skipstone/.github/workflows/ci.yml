@@ -171,9 +171,9 @@ jobs:
         run: |
           skip init --transpiled-app --free --appid some.app.id some-app SomeApp SomeAppModel
           # verify that the project itself is free
-          skip verify --sbom --free --project some-app
+          skip verify --free --project some-app
           # perform an export of the app
-          skip export --sbom --show-tree --project some-app
+          skip export --appindex --show-tree --project some-app
 
       # disables to speed up CI
       #- name: "Create and export new Skip Lite app project"

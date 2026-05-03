@@ -93,8 +93,11 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
     @Option(help: ArgumentHelp("Destination architectures for native libraries", valueName: "arch"))
     var arch: [AndroidArchArgument] = []
 
-    @Flag(help: ArgumentHelp("Generate SPDX SBOM files alongside export artifacts"))
-    var sbom: Bool = false
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Generate appindex.json metadata alongside export artifacts"))
+    var appindex: Bool = false
+
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Create a symlink from app Resources to the generated appindex.json"))
+    var linkAppindex: Bool = true
 
     func performCommand(with out: MessageQueue) async {
         await withLogStream(with: out) {
@@ -180,6 +183,16 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
             }
 
             let projectLayout = try AppProjectLayout(moduleName: appModuleName, root: projectURL, check: validateLayoutURL)
+
+            // Generate and link app index before building so it is included in the app bundle
+            if self.appindex {
+                let catalog = try await AppIndexGenerator.generateAppIndex(projectURL: projectURL, packageJSON: packageJSON, includeSBOM: true, command: self, out: out)
+                try fs.createDirectory(outputFolderAbsolute, recursive: true)
+                let appIndexURL = outputFolderAbsolute.asURL.appendingPathComponent(AppIndexGenerator.appIndexFilename)
+                let indexURL = try await AppIndexGenerator.writeAppIndex(catalog, to: appIndexURL, linkResource: self.linkAppindex, appModuleName: appModuleName, projectURL: projectURL, out: out)
+                createdURLs.append(indexURL)
+                await out.write(status: .pass, "Generated \(AppIndexGenerator.appIndexFilename)")
+            }
 
             // Resolve the scheme name once for all iOS builds
             let appSchemeName = (self.ios || self.iosSim) ? try await resolveAppSchemeName(schemeName: self.schemeName, xcodeProjectURL: projectLayout.darwinProjectFolder, out: out) : nil
@@ -319,22 +332,6 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
             createdURLs.append(projectExportZip.asURL)
 
             try fs.removeFileTree(projectOutputBaseFolder) // only export the zip file; remove the sources
-        }
-
-        // Generate SBOM files if requested
-        if self.sbom {
-            let projectURL = URL(fileURLWithPath: self.project).standardized
-            let sbomFiles = try await SBOMGenerator.generateSBOMFiles(
-                generateIOS: self.ios,
-                generateAndroid: self.android,
-                projectPath: projectURL.path,
-                packageName: packageName,
-                packageJSON: packageJSON,
-                outputDirAbsolute: outputFolderAbsolute,
-                command: self,
-                out: out
-            )
-            createdURLs.append(contentsOf: sbomFiles)
         }
 
         let outputFolderTitle = outputFolder.abbreviatingWithTilde

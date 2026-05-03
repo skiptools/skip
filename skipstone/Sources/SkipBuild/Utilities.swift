@@ -231,6 +231,31 @@ extension URL {
     }
 }
 
+/// Compute a relative path from one file system location to another.
+///
+/// When `from` is an ancestor of `to`, returns the simple suffix (e.g. `"sub/file.txt"`).
+/// When they diverge, walks up with `..` components (e.g. `"../../other/file.txt"`).
+///
+/// - Parameters:
+///   - from: The directory to compute the path relative to.
+///   - to: The target file or directory.
+/// - Returns: A relative path string suitable for symlinks or display.
+func relativePath(from fromDir: String, to toPath: String) -> String {
+    let fromComponents = URL(fileURLWithPath: fromDir).standardized.pathComponents
+    let toComponents = URL(fileURLWithPath: toPath).standardized.pathComponents
+
+    var commonLength = 0
+    while commonLength < fromComponents.count && commonLength < toComponents.count
+            && fromComponents[commonLength] == toComponents[commonLength] {
+        commonLength += 1
+    }
+
+    let ups = fromComponents.count - commonLength
+    var parts = Array(repeating: "..", count: ups)
+    parts.append(contentsOf: toComponents[commonLength...])
+    return parts.joined(separator: "/")
+}
+
 extension NSRegularExpression {
     /// Returns the array of matches for a string against the regular expression.
     func extract(from string: String, options: NSRegularExpression.MatchingOptions = []) -> [String]? {

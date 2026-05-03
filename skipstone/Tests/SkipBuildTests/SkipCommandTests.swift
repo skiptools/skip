@@ -429,6 +429,7 @@ final class SkipCommandTests: XCTestCase {
         │  │  └─ Contents.json
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
+        │  ├─ InfoPlist.xcstrings
         │  └─ Sources
         │     └─ Main.swift
         ├─ LICENSE.txt
@@ -506,6 +507,7 @@ final class SkipCommandTests: XCTestCase {
         │  │  └─ Contents.json
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
+        │  ├─ InfoPlist.xcstrings
         │  ├─ Sources
         │  │  └─ Main.swift
         │  └─ fastlane
@@ -640,6 +642,7 @@ final class SkipCommandTests: XCTestCase {
         │  │  └─ Contents.json
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
+        │  ├─ InfoPlist.xcstrings
         │  └─ Sources
         │     └─ Main.swift
         ├─ LICENSE.txt
@@ -932,6 +935,7 @@ final class SkipCommandTests: XCTestCase {
         │  │  └─ Contents.json
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
+        │  ├─ InfoPlist.xcstrings
         │  └─ Sources
         │     └─ Main.swift
         ├─ Package.swift
@@ -1124,6 +1128,7 @@ final class SkipCommandTests: XCTestCase {
         │  │  └─ Contents.json
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
+        │  ├─ InfoPlist.xcstrings
         │  └─ Sources
         │     └─ Main.swift
         ├─ Package.swift
@@ -1305,6 +1310,7 @@ final class SkipCommandTests: XCTestCase {
         │  │  └─ Contents.json
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
+        │  ├─ InfoPlist.xcstrings
         │  └─ Sources
         │     └─ Main.swift
         ├─ Package.swift
@@ -1417,6 +1423,7 @@ final class SkipCommandTests: XCTestCase {
         │  │     └─ xcschemes
         │  │        └─ FreeApp App.xcscheme
         │  ├─ Info.plist
+        │  ├─ InfoPlist.xcstrings
         │  ├─ Sources
         │  │  └─ Main.swift
         │  └─ fastlane
@@ -1554,6 +1561,7 @@ final class SkipCommandTests: XCTestCase {
         │  │  └─ Contents.json
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
+        │  ├─ InfoPlist.xcstrings
         │  ├─ Sources
         │  │  └─ Main.swift
         │  ├─ TopModule.xcconfig
@@ -1724,6 +1732,7 @@ final class SkipCommandTests: XCTestCase {
         │  │  └─ Contents.json
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
+        │  ├─ InfoPlist.xcstrings
         │  ├─ M1.xcconfig
         │  ├─ M1.xcodeproj
         │  │  ├─ project.pbxproj
@@ -1851,6 +1860,7 @@ final class SkipCommandTests: XCTestCase {
         │  │  └─ Contents.json
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
+        │  ├─ InfoPlist.xcstrings
         │  ├─ M1.xcconfig
         │  ├─ M1.xcodeproj
         │  │  ├─ project.pbxproj

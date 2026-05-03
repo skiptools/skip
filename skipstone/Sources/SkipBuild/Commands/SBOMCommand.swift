@@ -624,10 +624,12 @@ enum SBOMGenerator {
         for pin in resolved.pins {
             let depSPDXID = "SPDXRef-Package-\(spdxSafeID(pin.identity))"
 
+            let versionInfo = pin.state.version ?? pin.state.branch ?? pin.state.revision
+
             var pkg: [String: Any] = [
                 "SPDXID": depSPDXID,
                 "name": pin.identity,
-                "versionInfo": pin.state.version,
+                "versionInfo": versionInfo,
                 "downloadLocation": pin.location,
                 "filesAnalyzed": false,
                 "supplier": "NOASSERTION",
@@ -952,24 +954,7 @@ enum SBOMGenerator {
 
 /// Compute a relative path from a directory to a target file path.
 /// Both paths should be absolute. The result is suitable for use as a symlink destination.
-private func relativePath(from fromDir: String, to toPath: String) -> String {
-    let fromComponents = URL(fileURLWithPath: fromDir).standardized.pathComponents
-    let toComponents = URL(fileURLWithPath: toPath).standardized.pathComponents
-
-    // Find the common prefix length
-    var commonLength = 0
-    while commonLength < fromComponents.count && commonLength < toComponents.count
-            && fromComponents[commonLength] == toComponents[commonLength] {
-        commonLength += 1
-    }
-
-    // Number of ".." needed to go up from fromDir to the common ancestor
-    let ups = fromComponents.count - commonLength
-    var parts = Array(repeating: "..", count: ups)
-    // Append the remaining path components from toPath
-    parts.append(contentsOf: toComponents[commonLength...])
-    return parts.joined(separator: "/")
-}
+// relativePath(from:to:) is defined in Utilities.swift
 
 /// Shared license policy for SBOM verification, used by both `skip sbom verify` and `skip verify --sbom`.
 struct SBOMLicensePolicy {

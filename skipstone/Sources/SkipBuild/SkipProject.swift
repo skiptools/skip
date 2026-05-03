@@ -1789,6 +1789,7 @@ class AppProjectLayout : FrameworkProjectLayout {
 
     let darwinEntitlementsPlist: URL
     let darwinInfoPlist: URL
+    let darwinInfoPlistXcstrings: URL
     let darwinProjectConfig: URL
     let darwinProjectFolder: URL
     let darwinProjectContents: URL
@@ -1847,6 +1848,7 @@ class AppProjectLayout : FrameworkProjectLayout {
         self.darwinSchemesFolder = darwinProjectFolder.resolve("xcshareddata/xcschemes/", check: optional)
         self.darwinEntitlementsPlist = try darwinFolder.resolve("Entitlements.plist", check: check)
         self.darwinInfoPlist = darwinFolder.resolve("Info.plist", check: optional)
+        self.darwinInfoPlistXcstrings = darwinFolder.resolve("InfoPlist.xcstrings", check: optional)
 
         self.darwinAssetsFolder = try darwinFolder.resolve("Assets.xcassets/", check: check)
         self.darwinAssetsContents = try darwinAssetsFolder.resolve("Contents.json", check: check)
@@ -1974,6 +1976,17 @@ class AppProjectLayout : FrameworkProjectLayout {
 
         try infoPlistContents.write(to: appProject.darwinInfoPlist.createParentDirectory(), atomically: false, encoding: .utf8)
 
+        let infoPlistXcstringsContents = """
+{
+  "sourceLanguage" : "en",
+  "strings" : { },
+  "version" : "1.0"
+}
+
+"""
+        try infoPlistXcstringsContents.write(to: appProject.darwinInfoPlistXcstrings.createParentDirectory(), atomically: false, encoding: .utf8)
+
+
         // create the top-level Skip.env which is the source or truth for Xcode and Gradle
         let skipEnvContents = """
 // The configuration file for your Skip App (https://skip.dev).
@@ -2031,7 +2044,6 @@ GENERATE_INFOPLIST_FILE = YES
 // The user-visible name of the app (localizable)
 //INFOPLIST_KEY_CFBundleDisplayName = App Name
 //INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.utilities
-//INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app uses your location to …"
 
 // iOS-specific Info.plist property keys
 INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphone*] = YES
@@ -2044,13 +2056,13 @@ IPHONEOS_DEPLOYMENT_TARGET = \(options.iOSMinVersion)
 MACOSX_DEPLOYMENT_TARGET = \(options.macOSMinVersionCalculated)
 SUPPORTS_MACCATALYST = NO
 
+SUPPORTED_PLATFORMS = iphoneos iphonesimulator macosx
+
 // iPhone + iPad
 TARGETED_DEVICE_FAMILY = 1,2
 
 // iPhone only
 // TARGETED_DEVICE_FAMILY = 1
-
-SWIFT_EMIT_LOC_STRINGS = YES
 
 // the name of the product module; this can be anything, but cannot conflict with any Swift module names
 PRODUCT_MODULE_NAME = $(PRODUCT_NAME:c99extidentifier)App
@@ -2059,8 +2071,6 @@ PRODUCT_MODULE_NAME = $(PRODUCT_NAME:c99extidentifier)App
 // PRODUCT_BUNDLE_IDENTIFIER[config=Debug][sdk=iphoneos*] = cool.beans.BundleIdentifer
 
 SDKROOT = auto
-SUPPORTED_PLATFORMS = iphoneos iphonesimulator macosx
-SWIFT_EMIT_LOC_STRINGS = YES
 
 SWIFT_VERSION = \(swiftVersionMajor)
 
@@ -3158,6 +3168,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
         496EB72F2A6AE4DE00C1253A /* Skip.env */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Skip.env; path = ../Skip.env; sourceTree = "<group>"; };
         496EB72F2A6AE4DE00C1253B /* \(APP_NAME).xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = \(APP_NAME).xcconfig; sourceTree = "<group>"; };
         496EB72F2A6AE4DE00C1253C /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../README.md; sourceTree = "<group>"; };
+        4971EFA92FA4FEA50002D3F7 /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
         499AB9082B0581F4005E8330 /* plugins */ = {isa = PBXFileReference; lastKnownFileType = folder; name = plugins; path = ../../Intermediates.noindex/BuildToolPluginIntermediates; sourceTree = BUILT_PRODUCTS_DIR; };
         49F90C2B2A52156200F06D93 /* Main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Main.swift; path = Sources/Main.swift; sourceTree = SOURCE_ROOT; };
         49F90C2F2A52156300F06D93 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -3213,6 +3224,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
                 49F90C2F2A52156300F06D93 /* Assets.xcassets */,
                 49F90C312A52156300F06D93 /* Entitlements.plist */,
                 4900101C2BACEA710000DE33 /* Info.plist */,
+                4971EFA92FA4FEA50002D3F7 /* InfoPlist.xcstrings */,
             );
             name = App;
             sourceTree = "<group>";
@@ -3280,6 +3292,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
             isa = PBXResourcesBuildPhase;
             buildActionMask = 2147483647;
             files = (
+                4971EFAA2FA4FEA50002D3F7 /* InfoPlist.xcstrings in Resources */,
                 499CD4402AC5B799001AE8D8 /* Assets.xcassets in Resources */,
                 496BDBEE2B8A7E9C00C09264 /* Localizable.xcstrings in Resources */,
             );
@@ -3356,6 +3369,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
                 MTL_FAST_MATH = YES;
                 ONLY_ACTIVE_ARCH = YES;
                 SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+                SWIFT_EMIT_LOC_STRINGS = YES;
                 SWIFT_OPTIMIZATION_LEVEL = "-Onone";
             };
             name = Debug;
@@ -3374,6 +3388,7 @@ skip gradle -p ../Android ${SKIP_ACTION:-launch}${CONFIGURATION:-Debug}
                 MTL_ENABLE_DEBUG_INFO = NO;
                 MTL_FAST_MATH = YES;
                 SWIFT_COMPILATION_MODE = wholemodule;
+                SWIFT_EMIT_LOC_STRINGS = YES;
             };
             name = Release;
         };

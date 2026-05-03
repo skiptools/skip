@@ -85,7 +85,7 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
             ADBCommand.self,
             AndroidCommand.self,
             ExportCommand.self,
-            SBOMCommand.self,
+            MetaCommand.self,
             DevicesCommand.self,
             TestCommand.self,
 
@@ -1317,7 +1317,8 @@ public struct PackageResolved : Hashable, Decodable {
 
         public struct State: Hashable, Decodable {
             public var revision: String
-            public var version: String
+            public var version: String?
+            public var branch: String?
         }
     }
 }
