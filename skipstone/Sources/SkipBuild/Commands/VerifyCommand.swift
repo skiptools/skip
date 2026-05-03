@@ -374,7 +374,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
                         if localeDir.isDirectoryFile == true {
                             if await checkFolder(localeDir) {
                                 await checkFileContents(localeDir.appendingPathComponent("title.txt"), length: 1..<30)
-                                await checkFileContents(localeDir.appendingPathComponent("short_description.txt"), length: 1..<100)
+                                await checkFileContents(localeDir.appendingPathComponent("short_description.txt"), length: 1..<80)
                                 await checkFileContents(localeDir.appendingPathComponent("full_description.txt"), length: 30..<4000)
                             }
                         }
