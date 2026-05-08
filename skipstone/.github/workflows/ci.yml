@@ -116,7 +116,7 @@ jobs:
           - ''
           #- '6.3'
           #- 'nightly-6.3'
-          #- 'nightly-main'
+          - 'nightly-main'
         android-ndk:
           # blank will use the default
           - ''

@@ -740,7 +740,7 @@ extension AndroidOperationCommand {
         #endif
     }
 
-    func runToolchainCommand(_ tc: ToolchainPaths, executable: String?, testMode: TestingMode?, with out: MessageQueue) async throws -> (cmd: [String], env: [String: String]) {
+    func runToolchainCommand(_ tc: ToolchainPaths, executable: String?, testMode: TestingMode?, with out: MessageQueue) async throws -> (cmd: [String], env: [String: String], binPath: String?) {
         var env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths
         let toolchainLib = tc.toolchainPath.appendingPathComponent("usr/lib", isDirectory: true)
         let toolchainBin = tc.toolchainPath.appendingPathComponent("usr/bin", isDirectory: true)
@@ -892,7 +892,39 @@ extension AndroidOperationCommand {
 
         try await runCommand(command: cmd, env: env, with: out)
 
-        return (cmd: cmd, env: env)
+        // Query the actual binary output path using --show-bin-path.
+        // This accommodates different build systems (native vs swiftbuild)
+        // which place outputs in different directories.
+        var binPathCmd: [String] = [swiftCmd, "build", "--show-bin-path"]
+        if let destinationURL = tc.destinationURL {
+            binPathCmd += ["--destination", destinationURL.path]
+        } else if let sdkName = tc.sdkName {
+            binPathCmd += ["--swift-sdk", sdkName]
+        }
+        if let packagePath = toolchainOptions.packagePath {
+            binPathCmd += ["--package-path", packagePath]
+        }
+        if let scratchPath = toolchainOptions.scratchPath {
+            binPathCmd += ["--scratch-path", scratchPath]
+        }
+        if let configuration = toolchainOptions.configuration {
+            binPathCmd += ["--configuration", configuration.rawValue]
+        }
+        // Forward --build-system if specified in args
+        if let bsIdx = args.firstIndex(of: "--build-system"), bsIdx + 1 < args.count {
+            binPathCmd += ["--build-system", args[bsIdx + 1]]
+        }
+        var binPath: String? = nil
+        if let binPathStream = try? await launchTool(swiftCmd, arguments: Array(binPathCmd.dropFirst()), env: env) {
+            var lines: [String] = []
+            for try await line in binPathStream {
+                let trimmed = line.line.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty { lines.append(trimmed) }
+            }
+            binPath = lines.last
+        }
+
+        return (cmd: cmd, env: env, binPath: binPath)
     }
 
     // filter out some of the native Android libraries that are located in the same folder as the Swift libraries
@@ -936,14 +968,19 @@ extension AndroidOperationCommand {
 
             let runTests = cleanup != nil && executable == nil
 
-            var (_, env) = try await runToolchainCommand(tc, executable: executable, testMode: runTests ? .executable : nil, with: out)
+            var (_, env, binPath) = try await runToolchainCommand(tc, executable: executable, testMode: runTests ? .executable : nil, with: out)
 
-            let buildOutputFolder = [
-                // the output folder is either the scratch path we have specified, or is the default package/.build output directory
-                toolchainOptions.scratchPath ?? (packageDir + "/.build"),
-                arch.tripleKey(api: toolchainOptions.androidAPILevel, sdkVersion: tc.swiftSDKVersion),
-                buildConfig.rawValue,
-            ].joined(separator: "/")
+            let buildOutputFolder: String
+            if let binPath = binPath, !binPath.isEmpty {
+                buildOutputFolder = binPath
+            } else {
+                // Fallback to the legacy path construction
+                buildOutputFolder = [
+                    toolchainOptions.scratchPath ?? (packageDir + "/.build"),
+                    arch.tripleKey(api: toolchainOptions.androidAPILevel, sdkVersion: tc.swiftSDKVersion),
+                    buildConfig.rawValue,
+                ].joined(separator: "/")
+            }
 
             let buildOutputFolderURL = URL(fileURLWithPath: buildOutputFolder)
 
@@ -1013,9 +1050,46 @@ extension AndroidOperationCommand {
             let packageManifest = try await parseSwiftPackage(with: out, at: packageDir, swift: swiftCmd)
             let packageName = packageManifest.name
 
-            // take the ./.build/aarch64-unknown-linux-android24/debug/android-native-demoPackageTests.xctest file
-            // and copy it with all the dependent .so files to the Android host and execute the test executable
-            let executableBase = executable ?? packageName + "PackageTests.xctest"
+            // Discover the test executable. The output differs between build systems:
+            //   native:     .build/{triple}/{config}/{Package}PackageTests.xctest
+            //   swiftbuild: .build/out/Products/{Config}-android/{Module}Tests-test-runner
+            //               + .build/out/Products/{Config}-android/{Module}Tests.so
+            let executableBase: String
+            if let exe = executable {
+                executableBase = exe
+            } else {
+                let xctestName = packageName + "PackageTests.xctest"
+                let xctestPath = buildOutputFolderURL.appendingPathComponent(xctestName)
+
+                if FileManager.default.isExecutableFile(atPath: xctestPath.path) {
+                    // Native build system output
+                    executableBase = xctestName
+                } else {
+                    // swiftbuild output: look for {Module}Tests-test-runner
+                    let testTargets = packageManifest.targets.compactMap(\.a).filter({ $0.type == "test" }).map(\.name)
+                    var foundRunner: String? = nil
+                    for targetName in testTargets {
+                        let runnerName = targetName + "-test-runner"
+                        let runnerPath = buildOutputFolderURL.appendingPathComponent(runnerName)
+                        if FileManager.default.isExecutableFile(atPath: runnerPath.path) {
+                            foundRunner = runnerName
+                            break
+                        }
+                    }
+                    if let runner = foundRunner {
+                        executableBase = runner
+                    } else {
+                        // Last resort: check for any -test-runner in the build output
+                        let allFiles = try? FileManager.default.contentsOfDirectory(atPath: buildOutputFolderURL.path)
+                        let runner = allFiles?.first(where: { $0.hasSuffix("-test-runner") })
+                        if let runner = runner {
+                            executableBase = runner
+                        } else {
+                            throw AndroidError(errorDescription: "Could not find test executable in: \(buildOutputFolderURL.path). Expected \(xctestName) (native) or a *-test-runner file (swiftbuild)")
+                        }
+                    }
+                }
+            }
 
             let executablePath = buildOutputFolderURL.appendingPathComponent(executableBase)
             if !FileManager.default.isExecutableFile(atPath: executablePath.path) {
@@ -1024,6 +1098,16 @@ extension AndroidOperationCommand {
 
             // create the list of files that need to be uploaded to the device to run the test cases
             var transferFiles = [executablePath]
+
+            // For swiftbuild output, also include the companion .so test library
+            // (e.g., SwiftAlgorithmsTests.so alongside SwiftAlgorithmsTests-test-runner)
+            if executableBase.hasSuffix("-test-runner") {
+                let soName = executableBase.replacingOccurrences(of: "-test-runner", with: ".so")
+                let soPath = buildOutputFolderURL.appendingPathComponent(soName)
+                if FileManager.default.fileExists(atPath: soPath.path) {
+                    transferFiles.append(soPath)
+                }
+            }
 
             // add any resource folders used by the tests (e.g., "swift-corelibs-foundation_TestFoundation.resources")
             let resources = try dirs(at: buildOutputFolderURL)

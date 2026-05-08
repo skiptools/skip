@@ -216,24 +216,56 @@ fileprivate extension AndroidOperationCommand {
         let toolchainBin = tc.toolchainPath.appendingPathComponent("usr/bin", isDirectory: true)
         let swiftCmd = toolchainBin.appendingPathComponent("swift", isDirectory: false).path
 
-        var (_, env) = try await runToolchainCommand(tc, executable: nil, testMode: .sharedObject, with: out)
+        var (_, env, binPath) = try await runToolchainCommand(tc, executable: nil, testMode: .sharedObject, with: out)
 
         // Resolve the target Android device/emulator for adb commands
         if let serial = try await resolveAndroidSerial(with: out) {
             env["ANDROID_SERIAL"] = serial
         }
 
-        let buildOutputFolder = [
-            toolchainOptions.scratchPath ?? (packageDir + "/.build"),
-            arch.tripleKey(api: apiLevel, sdkVersion: tc.swiftSDKVersion),
-            buildConfig.rawValue,
-        ].joined(separator: "/")
+        let buildOutputFolder: String
+        if let binPath = binPath, !binPath.isEmpty {
+            buildOutputFolder = binPath
+        } else {
+            buildOutputFolder = [
+                toolchainOptions.scratchPath ?? (packageDir + "/.build"),
+                arch.tripleKey(api: apiLevel, sdkVersion: tc.swiftSDKVersion),
+                buildConfig.rawValue,
+            ].joined(separator: "/")
+        }
         let buildOutputFolderURL = URL(fileURLWithPath: buildOutputFolder)
 
         let packageManifest = try await parseSwiftPackage(with: out, at: packageDir, swift: swiftCmd)
         let packageName = packageManifest.name
-        let testLibName = packageName + "PackageTests.xctest"
-        let testLibPath = buildOutputFolderURL.appendingPathComponent(testLibName)
+
+        // Discover the test library: native uses .xctest, swiftbuild uses .so
+        let xctestName = packageName + "PackageTests.xctest"
+        let xctestPath = buildOutputFolderURL.appendingPathComponent(xctestName)
+        let testLibName: String
+        let testLibPath: URL
+
+        if FileManager.default.fileExists(atPath: xctestPath.path) {
+            testLibName = xctestName
+            testLibPath = xctestPath
+        } else {
+            // swiftbuild: look for {Module}Tests.so
+            let testTargets = packageManifest.targets.compactMap(\.a).filter({ $0.type == "test" }).map(\.name)
+            var foundLib: String? = nil
+            for targetName in testTargets {
+                let soName = targetName + ".so"
+                let soPath = buildOutputFolderURL.appendingPathComponent(soName)
+                if FileManager.default.fileExists(atPath: soPath.path) {
+                    foundLib = soName
+                    break
+                }
+            }
+            if let lib = foundLib {
+                testLibName = lib
+                testLibPath = buildOutputFolderURL.appendingPathComponent(lib)
+            } else {
+                throw AndroidError(errorDescription: "Could not find test library in: \(buildOutputFolderURL.path). Expected \(xctestName) (native) or a *Tests.so file (swiftbuild)")
+            }
+        }
 
         if !FileManager.default.fileExists(atPath: testLibPath.path) {
             throw AndroidError(errorDescription: "Expected test library did not exist at: \(testLibPath.path)")
@@ -302,14 +334,42 @@ fileprivate extension AndroidOperationCommand {
         if outputOptions.verbose {
             harnessCmd += ["--verbose"]
         }
+        // Forward --build-system if specified
+        if let bsIdx = args.firstIndex(of: "--build-system"), bsIdx + 1 < args.count {
+            harnessCmd += ["--build-system", args[bsIdx + 1]]
+        }
         try await runCommand(command: harnessCmd, env: env, with: out)
 
-        // Locate the built .so and copy it into the APK lib dir
-        let harnessBuildOutput = [
-            harnessDir.path + "/.build",
-            arch.tripleKey(api: apiLevel, sdkVersion: tc.swiftSDKVersion),
-            buildConfig.rawValue,
-        ].joined(separator: "/")
+        // Locate the built .so using --show-bin-path
+        var harnessBinPathCmd: [String] = [swiftCmd, "build", "--show-bin-path"]
+        if let sdkName = tc.sdkName {
+            harnessBinPathCmd += ["--swift-sdk", sdkName]
+        }
+        harnessBinPathCmd += ["--package-path", harnessDir.path, "--configuration", buildConfig.rawValue]
+        if let bsIdx = args.firstIndex(of: "--build-system"), bsIdx + 1 < args.count {
+            harnessBinPathCmd += ["--build-system", args[bsIdx + 1]]
+        }
+
+        var harnessBuildOutput: String
+        if let stream = try? await launchTool(swiftCmd, arguments: Array(harnessBinPathCmd.dropFirst()), env: env) {
+            var lines: [String] = []
+            for try await line in stream {
+                let trimmed = line.line.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty { lines.append(trimmed) }
+            }
+            harnessBuildOutput = lines.last ?? ""
+        } else {
+            harnessBuildOutput = ""
+        }
+
+        if harnessBuildOutput.isEmpty {
+            // Fallback to legacy path construction
+            harnessBuildOutput = [
+                harnessDir.path + "/.build",
+                arch.tripleKey(api: apiLevel, sdkVersion: tc.swiftSDKVersion),
+                buildConfig.rawValue,
+            ].joined(separator: "/")
+        }
 
         let testHarnessLibSo = "lib\(testHarnessLib).so"
         let harnessLibPath = URL(fileURLWithPath: harnessBuildOutput).appendingPathComponent(testHarnessLibSo, isDirectory: false)
