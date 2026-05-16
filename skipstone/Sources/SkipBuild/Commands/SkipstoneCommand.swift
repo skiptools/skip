@@ -292,7 +292,11 @@ struct SkipstoneCommand: BuildPluginOptionsCommand, StreamingCommand {
 
         // load and merge each of the skip.yml files for the dependent modules
         let (baseSkipConfig, mergedSkipConfig, configMap) = try loadSkipConfig(merge: true)
+        // SkipFuse may appear in the dependency closure even when it does not
+        // ship a Skip/skip.yml of its own (which would exclude it from configMap),
+        // so we also look at the raw target dependency list passed by the plugin.
         let hasSkipFuse = configMap.keys.contains("SkipFuse")
+            || dependencyIdPaths.contains(where: { $0.targetName == "SkipFuse" })
 
         // Build resource entries from skip.yml configuration, falling back to the default Resources/ folder
         let resourceEntries: [ResourceEntry] = try {

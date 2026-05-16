@@ -69,17 +69,16 @@ struct ProjectOptionValues {
 }
 
 func isValidProjectName(_ name: String) -> String? {
-    let invalidDesc = "Project name must contain only lower-case letters or a dash"
+    let invalidDesc = "Project name must contain only letters, numbers, or a dash"
 
     // Ensure the name is not empty
     guard !name.isEmpty else { return invalidDesc }
 
     if name.count < 2 { return invalidDesc }
 
-    // Ensure the first character is an uppercase letter
-    if name != name.lowercased() { return invalidDesc }
-
-    // Define a character set with valid characters (letters, numbers)
+    // Define a character set with valid characters (letters, numbers, dash).
+    // Case is no longer constrained, so e.g. "Sun-Bow" is accepted; the
+    // app-fair path downstream lowercases the name where it needs to.
     let validCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-"))
 
     // Check if the name contains only valid characters

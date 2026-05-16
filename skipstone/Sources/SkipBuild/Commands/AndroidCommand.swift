@@ -429,7 +429,7 @@ struct AndroidSDKInstallCommand: MessageCommand, ToolchainOptionsCommand {
         skip android sdk install
 
         # Installs a specific version
-        skip android sdk install --version 6.3
+        skip android sdk install --version 6.3.2
 
         # Installs the latest nightly build
         skip android sdk install --version nightly-main
