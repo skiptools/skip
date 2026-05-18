@@ -3647,8 +3647,8 @@ extension FrameworkProjectLayout {
                 jniLibs {
                     keepDebugSymbols.add("**/*.so")
                     pickFirsts.add("**/*.so")
-                    // this option will compress JNI .so files
-                    useLegacyPackaging = true
+                    // this option would compress JNI .so files and reduce overall size for Skip Fuse apps, but cost more at install time
+                    //useLegacyPackaging = true
                 }
             }
 

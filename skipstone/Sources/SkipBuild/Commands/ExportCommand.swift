@@ -99,6 +99,9 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Create a symlink from app Resources to the generated appindex.json"))
     var linkAppindex: Bool = true
 
+    @Flag(inversion: .prefixedNo, help: ArgumentHelp("Unpack the exported app project zip into a temp folder and run `gradle assembleDebug` there to confirm the export builds standalone without Skip installed"))
+    var validateExport: Bool = false
+
     func performCommand(with out: MessageQueue) async {
         await withLogStream(with: out) {
             try await runExport(with: out)
@@ -324,12 +327,37 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
                 try fs.createDirectory(projectOutputFolder.parentDirectory, recursive: true)
 
                 try FileManager.default.copyItem(at: skipOutputFolder.asURL, to: projectOutputFolder.asURL, traverseLinks: true, excludeNames: ["build", ".build", "skip-export"])
+
+                // For app projects, fold the Android/ scaffold and Skip.env
+                // into the exported zip and patch out the skip plugin
+                // dependencies so the project can build with plain `gradle`
+                // on a host without the Skip CLI installed. See
+                // `extendExportWithAndroidScaffold` for the surgery details.
+                if isAppProject {
+                    let projectURL = URL(fileURLWithPath: self.project)
+                    try Self.extendExportWithAndroidScaffold(
+                        projectURL: projectURL,
+                        exportRoot: projectOutputFolder.asURL,
+                        appModuleName: moduleName)
+                }
             }
 
             let projectExportZip = outputFolderAbsolute.appending(components: ["\(moduleName)-project.zip"])
 
             try await zipFolder(with: out, message: "Archive project source \(projectExportZip.asURL.lastPathComponent)", zipFile: projectExportZip.asURL, folder: projectOutputFolder.asURL)
             createdURLs.append(projectExportZip.asURL)
+
+            // When `--validate-export` is set, unpack the zip into a private
+            // temp folder and run `gradle assembleDebug` to prove the export
+            // truly stands alone (no Skip CLI, no `skip-build-plugin`
+            // dependency). The temp folder is removed on success.
+            if isAppProject && self.validateExport {
+                try await self.validateExportedProjectZip(
+                    zipFile: projectExportZip.asURL,
+                    appModuleName: moduleName,
+                    env: env,
+                    out: out)
+            }
 
             try fs.removeFileTree(projectOutputBaseFolder) // only export the zip file; remove the sources
         }
@@ -363,7 +391,328 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
         if showTree {
             await showFileTree(in: outputFolderAbsolute, folderName: outputFolderTitle, with: out)
         }
-        
+
+    }
+
+    /// Copy the project's `Android/` scaffold and `Skip.env` into an already-
+    /// populated `exportRoot` (the per-module export folder that holds the
+    /// transpiled sources), then add the local infrastructure that lets the
+    /// project build standalone without the Skip CLI.
+    ///
+    /// Approach (does NOT modify `Android/app/build.gradle.kts`):
+    ///   * `Android/settings.gradle.kts` is replaced with a copy of the
+    ///     transpiled root's `settings.gradle.kts` whose `project(":X").projectDir`
+    ///     paths are rewritten to point one directory up (because the Android/
+    ///     folder lives next to the transpiled modules in the export). The
+    ///     `:app` project is then included so the Android app builds against
+    ///     the transpiled libraries as plain Gradle projects.
+    ///   * `Android/buildSrc/` is generated with a precompiled-script plugin
+    ///     `skip-build-plugin.gradle.kts`. Gradle's `kotlin-dsl` plugin
+    ///     registers it as a project plugin with id `skip-build-plugin`, the
+    ///     same id requested by `Android/app/build.gradle.kts`. The plugin
+    ///     reads `Skip.env` and applies the manifest placeholder /
+    ///     applicationId / versionCode / versionName / module dependency
+    ///     wiring that the upstream skip-build-plugin does at runtime.
+    ///   * `Android/gradle.properties` gets a JVM heap bump appended so the
+    ///     Kotlin compile of the transpiled SkipUI module fits in memory.
+    ///
+    /// Sensitive files (`keystore.jks`, `keystore.properties`), Gradle's local
+    /// cache (`build/`, `.gradle/`), and any prior `skip-export/` output are
+    /// filtered out of the copy.
+    static func extendExportWithAndroidScaffold(projectURL: URL, exportRoot: URL, appModuleName: String) throws {
+        let fm = FileManager.default
+        let androidSrcURL = projectURL.appendingPathComponent("Android", isDirectory: true)
+        let androidDstURL = exportRoot.appendingPathComponent("Android", isDirectory: true)
+
+        // Nothing to do for a non-app or otherwise non-conventional project.
+        guard fm.fileExists(atPath: androidSrcURL.path) else { return }
+
+        // Defensive: a previous export run could have left the destination in
+        // place. Remove it first so the copy starts clean.
+        if fm.fileExists(atPath: androidDstURL.path) {
+            try fm.removeItem(at: androidDstURL)
+        }
+        try fm.copyItem(at: androidSrcURL, to: androidDstURL, traverseLinks: true, excludeNames: standaloneExportAndroidExcludes)
+
+        // Copy Skip.env into the export root so the registered
+        // skip-build-plugin precompiled script can read it via
+        // `rootDir.parentFile` from inside Android/.
+        let skipEnvSrcURL = projectURL.appendingPathComponent("Skip.env")
+        if fm.fileExists(atPath: skipEnvSrcURL.path) {
+            let skipEnvDstURL = exportRoot.appendingPathComponent("Skip.env")
+            if fm.fileExists(atPath: skipEnvDstURL.path) {
+                try fm.removeItem(at: skipEnvDstURL)
+            }
+            try fm.copyItem(at: skipEnvSrcURL, to: skipEnvDstURL)
+        }
+
+        // Rewrite Android/settings.gradle.kts to use the transpiled root's
+        // settings, with project paths shifted up one directory plus an
+        // include() for the app/ subproject. This drops the `skip plugin
+        // --prebuild` invocation in the original file, which would require
+        // the Skip CLI to be on PATH.
+        let transpiledSettingsURL = exportRoot.appendingPathComponent("settings.gradle.kts")
+        if fm.fileExists(atPath: transpiledSettingsURL.path) {
+            let transpiledSettings = try String(contentsOf: transpiledSettingsURL, encoding: .utf8)
+            let standaloneSettings = standaloneAndroidSettings(transpiledSettings: transpiledSettings)
+            let androidSettingsURL = androidDstURL.appendingPathComponent("settings.gradle.kts")
+            try standaloneSettings.write(to: androidSettingsURL, atomically: false, encoding: .utf8)
+        }
+
+        // Drop a buildSrc-based skip-build-plugin into the export so the
+        // unchanged `id("skip-build-plugin")` request in Android/app/build.gradle.kts
+        // resolves to a precompiled script plugin local to the project.
+        try writeStandaloneSkipBuildPluginBuildSrc(androidRoot: androidDstURL)
+
+        // Bump the JVM heap in Android/gradle.properties so subsequent
+        // gradle invocations (including --validate-export) have enough
+        // memory for the Kotlin compile pass.
+        try ensureStandaloneGradleProperties(androidRoot: androidDstURL)
+    }
+
+    /// File / directory names excluded when copying the project's Android/
+    /// folder into the standalone export. Hidden entries (`.gradle`, `.idea`,
+    /// etc.) are already filtered by `copyItem(at:to:traverseLinks:excludeNames:)`.
+    static let standaloneExportAndroidExcludes: Set<String> = [
+        "build", ".build", ".gradle", "skip-export",
+        // Signing material must never leak into a redistributable export.
+        "keystore.jks", "keystore.properties",
+    ]
+
+    /// Transform the transpiled root's settings.gradle.kts into the form the
+    /// standalone Android/ folder needs: shift the `file("X")` project paths
+    /// up one directory (since Android/ lives below the transpiled root in
+    /// the export) and tack on the `:app` include.
+    static func standaloneAndroidSettings(transpiledSettings: String) -> String {
+        // Each transpiled module declares
+        //   project(":X").projectDir = file("X")
+        // which is relative to the settings file. In our standalone layout
+        // Android/ is one level below, so adjust to `file("../X")`.
+        var content = transpiledSettings.replacingOccurrences(
+            of: ".projectDir = file(\"",
+            with: ".projectDir = file(\"../")
+
+        if !content.hasSuffix("\n") { content += "\n" }
+        content += """
+
+        // ---- Skip standalone export: include the Android :app module ----
+        include(":app")
+        project(":app").projectDir = file("app")
+        """
+        return content
+    }
+
+    /// Create `Android/buildSrc/` so that Gradle's `kotlin-dsl` plugin
+    /// registers a precompiled script plugin named `skip-build-plugin` that
+    /// satisfies the `id("skip-build-plugin")` reference in the project's
+    /// `Android/app/build.gradle.kts`. The generated plugin reads Skip.env
+    /// directly and applies the same applicationId / versionCode /
+    /// versionName / manifestPlaceholders / module dependency wiring that
+    /// the Skip-CLI-provided skip-build-plugin does at runtime.
+    static func writeStandaloneSkipBuildPluginBuildSrc(androidRoot: URL) throws {
+        let fm = FileManager.default
+        let buildSrcURL = androidRoot.appendingPathComponent("buildSrc", isDirectory: true)
+
+        // If the user already has a buildSrc/ folder, do not overwrite it —
+        // their own conventions belong there. The skip-build-plugin id will
+        // not resolve in that case, which is a clear signal to the user.
+        if fm.fileExists(atPath: buildSrcURL.path) {
+            return
+        }
+
+        let pluginsDir = buildSrcURL.appendingPathComponent("src/main/kotlin", isDirectory: true)
+        try fm.createDirectory(at: pluginsDir, withIntermediateDirectories: true)
+
+        let buildGradleKts = buildSrcURL.appendingPathComponent("build.gradle.kts")
+        try standaloneBuildSrcBuildGradleContent.write(to: buildGradleKts, atomically: false, encoding: .utf8)
+
+        let pluginScript = pluginsDir.appendingPathComponent("skip-build-plugin.gradle.kts")
+        try standaloneSkipBuildPluginScriptContent.write(to: pluginScript, atomically: false, encoding: .utf8)
+    }
+
+    /// Append a higher JVM heap setting to `Android/gradle.properties` so
+    /// downstream `gradle assembleDebug` (including the one driven by
+    /// `--validate-export`) has enough memory to compile the transpiled
+    /// SkipUI module. Properties parsing uses last-write-wins semantics, so
+    /// appending is enough to override any lower `org.gradle.jvmargs` already
+    /// set in the file.
+    static func ensureStandaloneGradleProperties(androidRoot: URL) throws {
+        let fm = FileManager.default
+        let gradlePropertiesURL = androidRoot.appendingPathComponent("gradle.properties")
+        var existing = ""
+        if fm.fileExists(atPath: gradlePropertiesURL.path) {
+            existing = (try? String(contentsOf: gradlePropertiesURL, encoding: .utf8)) ?? ""
+        }
+        if existing.contains("# Skip standalone export") {
+            return // already extended on a prior export pass
+        }
+        let separator = existing.isEmpty || existing.hasSuffix("\n") ? "" : "\n"
+        let updated = existing + separator + standaloneGradlePropertiesAppendix
+        try updated.write(to: gradlePropertiesURL, atomically: false, encoding: .utf8)
+    }
+
+    /// `buildSrc/build.gradle.kts` — enables Gradle's Kotlin DSL precompiled
+    /// script plugin mechanism. Nothing else is needed; the kotlin-dsl
+    /// plugin handles compilation and registration.
+    static let standaloneBuildSrcBuildGradleContent: String = """
+// Generated by `skip export` to register the local
+// `skip-build-plugin` precompiled script plugin.
+plugins {
+    `kotlin-dsl`
+}
+
+repositories {
+    mavenCentral()
+    google()
+    gradlePluginPortal()
+}
+"""
+
+    /// `buildSrc/src/main/kotlin/skip-build-plugin.gradle.kts` — Gradle's
+    /// kotlin-dsl plugin compiles this into a project plugin with id
+    /// `skip-build-plugin` (the script name minus the `.gradle.kts` suffix).
+    /// This is the same id that `Android/app/build.gradle.kts` requests via
+    /// `id("skip-build-plugin")`, so no edits to that file are needed.
+    ///
+    /// The script avoids depending on AGP types by configuring the
+    /// `android {}` extension through `withGroovyBuilder`; the user's
+    /// build.gradle.kts lists `alias(libs.plugins.android.application)` ahead
+    /// of `id("skip-build-plugin")`, so AGP has already registered its
+    /// extension by the time this plugin's body runs.
+    static let standaloneSkipBuildPluginScriptContent: String = """
+// ----------------------------------------------------------------
+// Local stand-in for the `skip-build-plugin` shipped with the Skip CLI.
+// Generated by `skip export` so the exported project builds on a host
+// without Skip installed; functionally equivalent to SkipBuildPlugin in
+// skipstone's PluginCommand.swift, but reads Skip.env directly without
+// invoking the Skip toolchain.
+//
+// The script name registers this as a precompiled script plugin with id
+// `skip-build-plugin`, satisfying the `id("skip-build-plugin")` request
+// in Android/app/build.gradle.kts.
+// ----------------------------------------------------------------
+import java.util.Properties
+import org.gradle.api.GradleException
+import org.gradle.kotlin.dsl.withGroovyBuilder
+
+// Empty marker extension so the user's `skip { }` block compiles. Mirrors
+// the SkipBuildExtension type defined by the upstream plugin.
+interface SkipBuildExtension
+extensions.create("skip", SkipBuildExtension::class.java)
+
+val skipEnv = Properties().apply {
+    val skipEnvFile = rootDir.parentFile.resolve("Skip.env")
+    require(skipEnvFile.isFile) {
+        "Required Skip.env file is missing at ${skipEnvFile}"
+    }
+    skipEnvFile.reader(Charsets.UTF_8).use(::load)
+    // Skip.env uses xcconfig `//` line comments; java.util.Properties
+    // parses them as a single empty key, so drop it.
+    remove("//")
+}
+
+fun lookupSkipEnv(key: String): String =
+    skipEnv.getProperty(key)
+        ?: System.getProperty("SKIP_${key}")
+        ?: throw GradleException(
+            "Required key '${key}' is not set in Skip.env or system property SKIP_${key}")
+
+// `android { namespace = group as String }` in the user's build.gradle.kts
+// requires `group` to be the Android package name.
+project.group = lookupSkipEnv("ANDROID_PACKAGE_NAME")
+
+// AGP's android {} extension is registered before this precompiled plugin
+// is applied (the app build.gradle.kts lists com.android.application before
+// `id("skip-build-plugin")` in its plugins block), so we can configure it
+// immediately using the Groovy builder DSL to avoid a compile-time
+// dependency on AGP types in buildSrc.
+//
+// Note: precompiled script plugins delegate properties through the
+// script class, so `withGroovyBuilder` must be called on the project
+// explicitly rather than through the implicit receiver.
+project.withGroovyBuilder {
+    getProperty("android").withGroovyBuilder {
+        getProperty("defaultConfig").withGroovyBuilder {
+            val applicationId = (skipEnv.getProperty("ANDROID_APPLICATION_ID")
+                ?: lookupSkipEnv("PRODUCT_BUNDLE_IDENTIFIER")).replace("-", "_")
+            setProperty("applicationId", applicationId)
+            setProperty("versionCode", lookupSkipEnv("CURRENT_PROJECT_VERSION").toInt())
+            setProperty("versionName", lookupSkipEnv("MARKETING_VERSION"))
+            getProperty("manifestPlaceholders").withGroovyBuilder {
+                for ((rawKey, rawValue) in skipEnv) {
+                    val key = rawKey.toString()
+                    if (key.isNotBlank()) {
+                        setProperty(key, rawValue.toString())
+                    }
+                }
+            }
+        }
+    }
+}
+
+dependencies {
+    // The transpiled app module is included as a sibling project; see
+    // `include(":<PRODUCT_NAME>")` in ../settings.gradle.kts.
+    add("implementation", project(":${lookupSkipEnv("PRODUCT_NAME")}"))
+}
+"""
+
+    /// Appended (via last-write-wins property semantics) to `Android/gradle.properties`
+    /// so the Kotlin compile in `gradle assembleDebug` has enough heap for the
+    /// transpiled SkipUI module on hosts where the upstream 4g default OOMs.
+    static let standaloneGradlePropertiesAppendix: String = """
+
+# Skip standalone export: bump JVM heap so the Kotlin compile of the
+# transpiled SkipUI module fits. Java `Properties` parsing uses
+# last-write-wins, so this overrides any lower `org.gradle.jvmargs` set
+# earlier in the file.
+org.gradle.jvmargs=-Xmx8g -XX:MaxMetaspaceSize=2g
+
+"""
+
+    /// Unpack the exported project zip into a private temp folder and run
+    /// `gradle assembleDebug` there. If the build succeeds and produces an
+    /// .apk, the temp folder is removed; on failure the path is reported so
+    /// the user can investigate.
+    func validateExportedProjectZip(zipFile: URL, appModuleName: String, env: [String: String], out: MessageQueue) async throws {
+        let fm = FileManager.default
+        let tmpRoot = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("skip-validate-export-\(UUID().uuidString)", isDirectory: true)
+        try fm.createDirectory(at: tmpRoot, withIntermediateDirectories: true)
+
+        await out.write(status: nil, "Validating export by unpacking and assembling at \(tmpRoot.path)")
+        do {
+            try await run(with: out, "Unzip exported project", ["unzip", "-q", zipFile.path, "-d", tmpRoot.path])
+        } catch {
+            await out.write(status: .fail, "Could not unzip \(zipFile.path) into \(tmpRoot.path): \(error)")
+            throw error
+        }
+
+        // The exported zip is rooted at <appModuleName>/, so the standalone
+        // Android project sits below it. The build is run with --no-daemon to
+        // avoid leaving a stray daemon claiming the temp folder.
+        let exportRoot = tmpRoot.appendingPathComponent(appModuleName, isDirectory: true)
+        let androidRoot = exportRoot.appendingPathComponent("Android", isDirectory: true)
+        guard fm.fileExists(atPath: androidRoot.path) else {
+            throw error("Exported zip \(zipFile.lastPathComponent) does not contain the expected Android/ folder at \(androidRoot.path)")
+        }
+
+        let gradleArgs = ["gradle", "--project-dir", androidRoot.path, "--console=plain", "--no-daemon", "assembleDebug"]
+        do {
+            try await run(with: out, "Validate export with `gradle assembleDebug`", gradleArgs, environment: env)
+        } catch {
+            await out.write(status: .fail, "Standalone build of exported project failed at \(androidRoot.path). The unpacked tree was left in place for debugging.")
+            throw error
+        }
+
+        // Confirm the apk landed where Android's `assembleDebug` puts it.
+        let apkURL = androidRoot.appendingPathComponent("app/build/outputs/apk/debug/app-debug.apk")
+        guard fm.fileExists(atPath: apkURL.path) else {
+            throw error("Standalone build completed but the expected APK was not produced at \(apkURL.path)")
+        }
+
+        await out.write(status: .pass, "Export validated: \(apkURL.lastPathComponent) was produced from the exported zip at \(apkURL.path)")
+        try? fm.removeItem(at: tmpRoot)
     }
 }
 

@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-plugin:
-    timeout-minutes: 30
+    timeout-minutes: 45
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -96,7 +96,7 @@ jobs:
 
   android-ci:
     needs: build-plugin
-    timeout-minutes: 120
+    timeout-minutes: 240
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -173,16 +173,7 @@ jobs:
           # verify that the project itself is free
           skip verify --free --project some-app
           # perform an export of the app
-          skip export --appindex --show-tree --project some-app
-
-      # disables to speed up CI
-      #- name: "Create and export new Skip Lite app project"
-      #  if: runner.os != 'Linux'
-      #  working-directory: ${{ runner.temp }}
-      #  run: |
-      #    skip init --no-build --transpiled-app --appid=some.app.id demo-skip-applite DemoSkipApp
-      #    cd demo-skip-applite
-      #    skip export --debug --ios-sim
+          skip export --appindex --validate-export --show-tree --project some-app
 
       - run: |
           sdk_arg=""
