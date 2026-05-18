@@ -889,6 +889,9 @@ final class KotlinBridgeToKotlinVisitor {
     }
 
     @discardableResult private func update(_ interfaceDeclaration: KotlinInterfaceDeclaration) -> Bool {
+        guard !interfaceDeclaration.attributes.isNoBridge else {
+            return false
+        }
         guard interfaceDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator) else {
             return false
         }
@@ -945,6 +948,9 @@ final class KotlinBridgeToKotlinVisitor {
 
     @discardableResult private func update(_ classDeclaration: KotlinClassDeclaration) -> Bool {
         guard !classDeclaration.isGenerated else {
+            return false
+        }
+        guard !classDeclaration.attributes.isNoBridge else {
             return false
         }
         guard classDeclaration.checkBridgable(direction: .toKotlin, options: options, translator: translator) else {

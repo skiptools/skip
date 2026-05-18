@@ -1542,7 +1542,7 @@ class TypeDeclaration: Statement {
         var attributes = Attributes.for(syntax: classDecl.attributes, in: syntaxTree)
         attributes.addDirectives(from: extras, in: syntaxTree)
         guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
-            if syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, attributes.contains(.observable) {
+            if !attributes.isNoBridge, syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, attributes.contains(.observable) {
                 return UnbridgedMemberDeclaration(member: .observableType(name), syntax: classDecl, extras: extras, in: syntaxTree)
             }
             return nil
@@ -1567,8 +1567,8 @@ class TypeDeclaration: Statement {
         var decodeLevel = self.decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
         var decodeFlags: DecodeFlags = []
         if decodeLevel == .none {
-            // We need to decode native views for adapting to SkipSwiftUI
-            if syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, let inheritsView = inherits.first(where: { isSwiftUIType($0) }) {
+            // We need to decode native views for adapting to SkipSwiftUI, unless explicitly opted out
+            if !attributes.isNoBridge, syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, let inheritsView = inherits.first(where: { isSwiftUIType($0) }) {
                 decodeLevel = .api
                 decodeFlags.insert(.swiftUIState)
                 // We don't care about other protocols
@@ -1621,8 +1621,8 @@ class TypeDeclaration: Statement {
         var decodeLevel = self.decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
         var decodeFlags: DecodeFlags = []
         if decodeLevel == .none {
-            // We need to decode native views for adapting to SkipSwiftUI
-            if syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, let inheritsView = inherits.first(where: { isSwiftUIType($0) }) {
+            // We need to decode native views for adapting to SkipSwiftUI, unless explicitly opted out
+            if !attributes.isNoBridge, syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, let inheritsView = inherits.first(where: { isSwiftUIType($0) }) {
                 decodeLevel = .api
                 decodeFlags.insert(.swiftUIState)
                 // We don't care about other protocols

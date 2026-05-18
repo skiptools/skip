@@ -417,7 +417,17 @@ struct SkipstoneCommand: BuildPluginOptionsCommand, StreamingCommand {
                 transpileFiles.append(sourceFile)
             }
         }
-        let transpiler = Transpiler(packageName: packageName, transpileFiles: transpileFiles.map(Source.FilePath.init(path:)), bridgeFiles: swiftFiles.map(Source.FilePath.init(path:)), autoBridge: autoBridge, isBridgeGatherEnabled: dynamicRoot != nil, codebaseInfo: codebaseInfo, preprocessorSymbols: Set(inputOptions.symbols), transformers: transformers)
+        // Implicitly define SKIP_MODE_FUSE in Fuse bridge mode and SKIP_MODE_LITE otherwise so that
+        // user code can gate types out of bridging with `#if !SKIP_MODE_FUSE` (or in Lite-only code
+        // with `#if SKIP_MODE_LITE`). These mirror the convention used in app Package.swift files
+        // that pass `-DSKIP_MODE_FUSE`/`-DSKIP_MODE_LITE` to the Swift compiler.
+        var preprocessorSymbols = Set(inputOptions.symbols)
+        if skipstoneOptions.skipBridgeOutput != nil {
+            preprocessorSymbols.insert("SKIP_MODE_FUSE")
+        } else {
+            preprocessorSymbols.insert("SKIP_MODE_LITE")
+        }
+        let transpiler = Transpiler(packageName: packageName, transpileFiles: transpileFiles.map(Source.FilePath.init(path:)), bridgeFiles: swiftFiles.map(Source.FilePath.init(path:)), autoBridge: autoBridge, isBridgeGatherEnabled: dynamicRoot != nil, codebaseInfo: codebaseInfo, preprocessorSymbols: preprocessorSymbols, transformers: transformers)
 
         try await transpiler.transpile(handler: handleTranspilation)
         try saveCodebaseInfo() // save out the ModuleName.skipcode.json

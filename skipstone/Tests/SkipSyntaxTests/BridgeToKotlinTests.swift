@@ -7471,6 +7471,37 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testNoBridgeView() async throws {
+        try await check(swiftBridge: """
+        import SkipFuseUI
+        // SKIP @nobridge
+        struct V: View {
+            @State var count = 1
+            var body: some View {
+                Text("Hello")
+            }
+        }
+        """, kotlin: """
+        """, swiftBridgeSupport: """
+        """, transformers: transformers)
+    }
+
+    func testNoBridgeInFuseModeBlock() async throws {
+        try await check(swiftBridge: """
+        import SkipFuseUI
+        #if !SKIP_MODE_FUSE
+        struct V: View {
+            @State var count = 1
+            var body: some View {
+                Text("Hello")
+            }
+        }
+        #endif
+        """, kotlin: """
+        """, swiftBridgeSupport: """
+        """, preprocessorSymbols: ["SKIP_MODE_FUSE"], transformers: transformers)
+    }
+
     func testGenericView() async throws {
         try await check(swiftBridge: """
         import SkipFuseUI
