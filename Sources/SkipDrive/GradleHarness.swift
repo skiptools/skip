@@ -83,7 +83,16 @@ extension GradleHarness {
                         let linkFrom = localModuleLink.path, linkTo = outputFolder.path
                         if (try? FileManager.default.destinationOfSymbolicLink(atPath: linkFrom)) != linkTo {
                             try? FileManager.default.removeItem(atPath: linkFrom) // if it exists
-                            try FileManager.default.createSymbolicLink(atPath: linkFrom, withDestinationPath: linkTo)
+                            do {
+                                try FileManager.default.createSymbolicLink(atPath: linkFrom, withDestinationPath: linkTo)
+                            } catch {
+                                // Concurrent test targets in the same package race to create the same symlink
+                                // (same linkFrom, same linkTo). If another target won the race, the link will
+                                // already point where we want — treat that as success.
+                                if (try? FileManager.default.destinationOfSymbolicLink(atPath: linkFrom)) != linkTo {
+                                    throw error
+                                }
+                            }
                         }
 
                         let localTranspilerOut = URL(fileURLWithPath: outputFolder.lastPathComponent, isDirectory: true, relativeTo: localModuleLink)
