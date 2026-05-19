@@ -61,7 +61,7 @@ extension XCGradleHarness where Self : XCTestCase {
     ///   - sourcePath: the full path to the test case call site, which is used to determine the package root
     @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
     nonisolated(nonsending)
-    func invokeGradle(actions: [String], arguments: [String] = [], info: Bool = false, deviceID: String? = nil, testFilter: String? = nil, moduleName: String? = nil, maxMemory: UInt64? = ProcessInfo.processInfo.physicalMemory, fromSourceFileRelativeToPackageRoot sourcePath: StaticString? = #file) async throws {
+    func invokeGradle(actions: [String], arguments: [String] = [], info: Bool = false, deviceID: String? = nil, testFilters: [String]? = nil, moduleName: String? = nil, maxMemory: UInt64? = ProcessInfo.processInfo.physicalMemory, fromSourceFileRelativeToPackageRoot sourcePath: StaticString? = #file) async throws {
         var actions = actions
         let isTestAction = actions.contains(where: { $0.hasPrefix("test") || $0.hasPrefix("connected") })
 
