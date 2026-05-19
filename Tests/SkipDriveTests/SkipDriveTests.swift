@@ -169,6 +169,7 @@ class SkipCommandTests : XCTestCase {
         │  │     └─ xcschemes
         │  │        └─ HelloSkip App.xcscheme
         │  ├─ Info.plist
+        │  ├─ InfoPlist.xcstrings
         │  ├─ Sources
         │  │  └─ Main.swift
         │  └─ fastlane
@@ -282,6 +283,7 @@ class SkipCommandTests : XCTestCase {
         │  │        └─ Demo App.xcscheme
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
+        │  ├─ InfoPlist.xcstrings
         │  ├─ Sources
         │  │  └─ Main.swift
         │  └─ fastlane
@@ -403,6 +405,7 @@ class SkipCommandTests : XCTestCase {
         │  │        └─ Demo App.xcscheme
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
+        │  ├─ InfoPlist.xcstrings
         │  ├─ Sources
         │  │  └─ Main.swift
         │  └─ fastlane
@@ -530,6 +533,7 @@ class SkipCommandTests : XCTestCase {
         │  │        └─ Demo App.xcscheme
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
+        │  ├─ InfoPlist.xcstrings
         │  ├─ Sources
         │  │  └─ Main.swift
         │  └─ fastlane
@@ -674,6 +678,7 @@ class SkipCommandTests : XCTestCase {
         │  │        └─ Demo App.xcscheme
         │  ├─ Entitlements.plist
         │  ├─ Info.plist
+        │  ├─ InfoPlist.xcstrings
         │  ├─ Sources
         │  │  └─ Main.swift
         │  └─ fastlane
@@ -834,6 +839,7 @@ class SkipCommandTests : XCTestCase {
         │  │     └─ xcschemes
         │  │        └─ HelloSkip App.xcscheme
         │  ├─ Info.plist
+        │  ├─ InfoPlist.xcstrings
         │  ├─ Sources
         │  │  └─ Main.swift
         │  └─ fastlane
