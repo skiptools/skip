@@ -3,7 +3,7 @@
 import Foundation
 
 /// A line and column in a particular source location.
-public struct SourceLocation : Equatable {
+public struct SourceLocation : Equatable, Sendable {
     public var path: String
     public var position: SourceLocation.Position
 
@@ -14,7 +14,7 @@ public struct SourceLocation : Equatable {
 
     /// A line and column-based position in the source, appropriate for Xcode reporting.
     /// Line and column numbers start with 1 rather than 0.
-    public struct Position: Equatable, Comparable, Decodable {
+    public struct Position: Equatable, Comparable, Decodable, Sendable {
         public let line: Int
         public let column: Int
 
@@ -64,28 +64,28 @@ public extension SourceLocation {
 }
 
 /// A decoded source map. This is the decodable counterpart to `SkipSyntax.OutputMap`
-public struct SourceMap : Decodable {
+public struct SourceMap : Decodable, Sendable {
     public let entries: [Entry]
 
-    public struct Entry : Decodable {
+    public struct Entry : Decodable, Sendable {
         public let sourceFile: Source.FilePath
         public let sourceRange: Source.Range?
         public let range: Source.Range
     }
 
     public struct Source {
-        public struct SourceLine : Decodable {
+        public struct SourceLine : Decodable, Sendable {
             public let offset: Int
             public let line: String
         }
 
         /// A Swift source file.
-        public struct FilePath: Hashable, Decodable {
+        public struct FilePath: Hashable, Decodable, Sendable {
             public let path: String
         }
 
         /// A line and column-based range in the source, appropriate for Xcode reporting.
-        public struct Range: Equatable, Decodable {
+        public struct Range: Equatable, Decodable, Sendable {
             public let start: SourceLocation.Position
             public let end: SourceLocation.Position
         }
