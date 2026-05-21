@@ -511,6 +511,12 @@ extension Range where Bound == Version {
     }
 }
 
+/// Mutable reference cell for sharing optional read results between reader threads,
+/// guarded externally by an NSLock so it is safe to cross the Sendable boundary.
+fileprivate final class PendingResultBox: @unchecked Sendable {
+    var value: Result<[UInt8], Swift.Error>?
+}
+
 /// Process allows spawning new subprocesses and working with them.
 ///
 /// Note: This class is thread safe.
@@ -532,7 +538,7 @@ extension Range where Bound == Version {
         case stream(stdout: OutputClosure, stderr: OutputClosure, redirectStderr: Bool)
 
         /// Default collect OutputRedirection that defaults to not redirect stderr. Provided for API compatibility.
-        public static let collect: OutputRedirection = .collect(redirectStderr: false)
+        nonisolated(unsafe) public static let collect: OutputRedirection = .collect(redirectStderr: false)
 
         /// Default stream OutputRedirection that defaults to not redirect stderr. Provided for API compatibility.
         public static func stream(stdout: @escaping OutputClosure, stderr: @escaping OutputClosure) -> Self {
@@ -591,7 +597,7 @@ extension Range where Bound == Version {
     /// Typealias for logging handling closure
     public typealias LoggingHandler = (String) -> Void
 
-    private static var _loggingHandler: LoggingHandler?
+    nonisolated(unsafe) private static var _loggingHandler: LoggingHandler?
     private static let loggingHandlerLock = NSLock()
 
     /// Global logging handler. Use with care! preferably use instance level instead of setting one globally.
@@ -707,7 +713,7 @@ extension Range where Bound == Version {
     ///
     /// Key: Executable name or path.
     /// Value: Path to the executable, if found.
-    private static var validatedExecutablesMap = [String: URL?]()
+    nonisolated(unsafe) private static var validatedExecutablesMap = [String: URL?]()
     private static let validatedExecutablesMapLock = NSLock()
 
     /// Create a new process instance.
@@ -1050,10 +1056,12 @@ extension Range where Bound == Version {
                 self.state = .outputReady(stdout: .success([]), stderr: .success([]))
             }
         } else {
-            var pending: Result<[UInt8], Swift.Error>?
+            let pending = PendingResultBox()
             let pendingLock = NSLock()
 
             let outputClosures = outputRedirection.outputClosures
+            let outputPipe = outputPipe
+            let stderrPipe = stderrPipe
 
             // Close the local write end of the output pipe.
             try close(fd: outputPipe[1])
@@ -1063,16 +1071,16 @@ extension Range where Bound == Version {
             let stdoutThread = Thread { [weak self] in
                 if let readResult = self?.readOutput(onFD: outputPipe[0], outputClosure: outputClosures?.stdoutClosure) {
                     pendingLock.withLock {
-                        if let stderrResult = pending {
+                        if let stderrResult = pending.value {
                             self?.stateLock.withLock {
                                 self?.state = .outputReady(stdout: readResult, stderr: stderrResult)
                             }
                         } else  {
-                            pending = readResult
+                            pending.value = readResult
                         }
                     }
                     group.leave()
-                } else if let stderrResult = (pendingLock.withLock { pending }) {
+                } else if let stderrResult = (pendingLock.withLock { pending.value }) {
                     // TODO: this is more of an error
                     self?.stateLock.withLock {
                         self?.state = .outputReady(stdout: .success([]), stderr: stderrResult)
@@ -1092,16 +1100,16 @@ extension Range where Bound == Version {
                 stderrThread = Thread { [weak self] in
                     if let readResult = self?.readOutput(onFD: stderrPipe[0], outputClosure: outputClosures?.stderrClosure) {
                         pendingLock.withLock {
-                            if let stdoutResult = pending {
+                            if let stdoutResult = pending.value {
                                 self?.stateLock.withLock {
                                     self?.state = .outputReady(stdout: stdoutResult, stderr: readResult)
                                 }
                             } else {
-                                pending = readResult
+                                pending.value = readResult
                             }
                         }
                         group.leave()
-                    } else if let stdoutResult = (pendingLock.withLock { pending }) {
+                    } else if let stdoutResult = (pendingLock.withLock { pending.value }) {
                         // TODO: this is more of an error
                         self?.stateLock.withLock {
                             self?.state = .outputReady(stdout: stdoutResult, stderr: .success([]))
@@ -1111,7 +1119,7 @@ extension Range where Bound == Version {
                 }
             } else {
                 pendingLock.withLock {
-                    pending = .success([])  // no stderr in this case
+                    pending.value = .success([])  // no stderr in this case
                 }
             }
 
@@ -2760,12 +2768,12 @@ public extension FileSystemError {
 
 
 /// Public stdout stream instance.
-public var stdoutStream: ThreadSafeOutputByteStream = try! ThreadSafeOutputByteStream(LocalFileOutputByteStream(
+nonisolated(unsafe) public var stdoutStream: ThreadSafeOutputByteStream = try! ThreadSafeOutputByteStream(LocalFileOutputByteStream(
     filePointer: stdout,
     closeOnDeinit: false))
 
 /// Public stderr stream instance.
-public var stderrStream: ThreadSafeOutputByteStream = try! ThreadSafeOutputByteStream(LocalFileOutputByteStream(
+nonisolated(unsafe) public var stderrStream: ThreadSafeOutputByteStream = try! ThreadSafeOutputByteStream(LocalFileOutputByteStream(
     filePointer: stderr,
     closeOnDeinit: false))
 
