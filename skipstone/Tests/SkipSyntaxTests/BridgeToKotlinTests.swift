@@ -1349,6 +1349,47 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testNestedClosureFunction() async throws {
+        // A function-typed parameter whose own parameter is itself a function type. The bridge
+        // emits explicit per-parameter conversions via `invokeJava:` so each value is converted
+        // to Java using its statically known type, avoiding the generic `AnyBridging.toJavaObject(Any?)`
+        // path that cannot bridge Swift closures.
+        try await check(swiftBridge: """
+        public func f(c: (Int, @escaping (String) -> Void) -> Bool) -> Int? {
+            return nil
+        }
+        """, kotlin: """
+        fun f(c: (Int, (String) -> Unit) -> Boolean): Int? = Swift_f_0(c)
+        private external fun Swift_f_0(c: (Int, (String) -> Unit) -> Boolean): Int?
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1f_10")
+        public func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaObjectPointer) -> JavaObjectPointer? {
+            let p_0_swift = SwiftClosure2.closure(forJavaObject: p_0, options: [], invokeJava: { _javaClosure, p0, p1 in try _javaClosure.invokeJava(AnyBridging.toJavaObject(p0, options: []), SwiftClosure1.javaObject(for: p1, options: [])) })! as (Int, @escaping (String) -> Void) -> Bool
+            let f_return_swift = f(c: p_0_swift)
+            return f_return_swift.toJavaObject(options: [])
+        }
+        """, transformers: transformers)
+    }
+
+    func testNestedMainActorClosureFunction() async throws {
+        // Nested inner closure carries @MainActor — bridge must use `forMainActor:` label.
+        try await check(swiftBridge: """
+        public func f(c: (Int, @escaping @MainActor (String) -> Void) -> Bool) -> Int? {
+            return nil
+        }
+        """, kotlin: """
+        fun f(c: (Int, (String) -> Unit) -> Boolean): Int? = Swift_f_0(c)
+        private external fun Swift_f_0(c: (Int, (String) -> Unit) -> Boolean): Int?
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1f_10")
+        public func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaObjectPointer) -> JavaObjectPointer? {
+            let p_0_swift = SwiftClosure2.closure(forJavaObject: p_0, options: [], invokeJava: { _javaClosure, p0, p1 in try _javaClosure.invokeJava(AnyBridging.toJavaObject(p0, options: []), SwiftClosure1.javaObject(forMainActor: p1, options: [])) })! as (Int, @MainActor @escaping (String) -> Void) -> Bool
+            let f_return_swift = f(c: p_0_swift)
+            return f_return_swift.toJavaObject(options: [])
+        }
+        """, transformers: transformers)
+    }
+
     func testVariadicFunction() async throws {
         try await checkProducesMessage(swift: """
         public func f(i: Int...) { }

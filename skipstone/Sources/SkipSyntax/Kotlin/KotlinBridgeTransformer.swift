@@ -494,7 +494,33 @@ extension TypeSignature {
         switch self.asOptional(false) {
         case .function(let parameters, let signature, let apiFlags, var attributes):
             let closurePrefix = apiFlags.options.contains(.async) ? "SwiftAsyncClosure" : "SwiftClosure"
-            let converted = "\(closurePrefix)\(parameters.count).closure(forJavaObject: \(value), options: \(options.jconvertibleOptions))"
+            let isAsync = apiFlags.options.contains(.async)
+            let hasFunctionTypedParameter = parameters.contains { parameter in
+                if case .function = parameter.type.asOptional(false) { return true }
+                return false
+            }
+
+            let converted: String
+            if hasFunctionTypedParameter && !isAsync && parameters.count >= 1 && parameters.count <= 5 {
+                // Nested function-typed parameter: emit explicit per-parameter bridging so each
+                // parameter is converted to Java using its statically known type. This avoids the
+                // generic `AnyBridging.toJavaObject(Any?)` path, which cannot bridge Swift closures.
+                let paramNames = (0..<parameters.count).map { "p\($0)" }
+                let bridgedArgs = zip(parameters, paramNames).map { (parameter, name) -> String in
+                    switch parameter.type.asOptional(false) {
+                    case .function(let innerParameters, _, let innerFlags, _):
+                        let innerClosurePrefix = innerFlags.options.contains(.async) ? "SwiftAsyncClosure" : "SwiftClosure"
+                        let valueLabel = innerFlags.options.contains(.mainActor) && !innerFlags.options.contains(.async) ? "forMainActor" : "for"
+                        return "\(innerClosurePrefix)\(innerParameters.count).javaObject(\(valueLabel): \(name), options: \(options.jconvertibleOptions))"
+                    default:
+                        return "AnyBridging.toJavaObject(\(name), options: \(options.jconvertibleOptions))"
+                    }
+                }
+                let closureBody = "{ _javaClosure, \(paramNames.joined(separator: ", ")) in try _javaClosure.invokeJava(\(bridgedArgs.joined(separator: ", "))) }"
+                converted = "\(closurePrefix)\(parameters.count).closure(forJavaObject: \(value), options: \(options.jconvertibleOptions), invokeJava: \(closureBody))"
+            } else {
+                converted = "\(closurePrefix)\(parameters.count).closure(forJavaObject: \(value), options: \(options.jconvertibleOptions))"
+            }
             if let filtered = attributes?.attributes.filter({ $0.kind != .escaping }) {
                 attributes = Attributes(attributes: filtered)
             }
