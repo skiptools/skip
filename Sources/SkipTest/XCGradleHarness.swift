@@ -26,7 +26,7 @@ extension XCGradleHarness where Self : XCTestCase {
     /// - SeeAlso: https://docs.gradle.org/current/userguide/java_testing.html#test_filtering
     ///
     /// When the `SKIP_TEST_FILTER` environment variable is set (e.g. by `skip test --filter`), it must be one pattern per line; each line is passed to Gradle as `--tests`.
-    nonisolated(nonsending)
+    // nonisolated(nonsending) // https://github.com/skiptools/skip/issues/675
     public func runGradleTests(device: String? = ProcessInfo.processInfo.environment["ANDROID_SERIAL"], file: StaticString = #file, line: UInt = #line) async throws {
         do {
             #if DEBUG
@@ -60,7 +60,7 @@ extension XCGradleHarness where Self : XCTestCase {
     ///   - moduleSuffix: the expected module name for automatic test determination
     ///   - sourcePath: the full path to the test case call site, which is used to determine the package root
     @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
-    nonisolated(nonsending)
+    // nonisolated(nonsending) // https://github.com/skiptools/skip/issues/675
     func invokeGradle(actions: [String], arguments: [String] = [], info: Bool = false, deviceID: String? = nil, testFilters: [String] = [], moduleName: String? = nil, maxMemory: UInt64? = ProcessInfo.processInfo.physicalMemory, fromSourceFileRelativeToPackageRoot sourcePath: StaticString? = #file) async throws {
         var actions = actions
         let isTestAction = actions.contains(where: { $0.hasPrefix("test") || $0.hasPrefix("connected") })
