@@ -784,6 +784,20 @@ final class SkipCommandTests: XCTestCase {
 
         """)
 
+        // the test target for a native module must explicitly opt into transpiled mode so its
+        // XCTest cases become JUnit tests (a native test target would have its test classes dropped)
+        let TestsSkipYML = try load("Tests/SomeModuleTests/Skip/skip.yml")
+        XCTAssertEqual(TestsSkipYML, """
+        # Skip configuration for SomeModuleTests module
+
+        #build:
+        #  contents:
+
+        skip:
+          mode: 'transpiled'
+
+        """)
+
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
         // swift-tools-version: 6.1

@@ -1048,10 +1048,11 @@ public class \(moduleName)Module {
 
             // only create tests if we have specified to do so, and we are not a dependent native module
             let createTestModule = createModuleTests && !isDependentNativeModule && !isNativeAppModule
+            let testsModuleName = moduleName + "Tests"
 
             if createTestModule {
                 let testsURL = try projectFolderURL.append(path: "Tests", create: true)
-                let testDir = try testsURL.append(path: moduleName + "Tests", create: true)
+                let testDir = try testsURL.append(path: testsModuleName, create: true)
                 let testSkipDir = try testDir.append(path: "Skip", create: true)
                 let testSwiftFile = testDir.appending(path: "\(moduleName)Tests.swift")
 
@@ -1301,20 +1302,30 @@ struct TestData : Codable, Hashable {
 
                 try testCaseCode.write(to: testSwiftFile, atomically: false, encoding: .utf8)
 
-                let skipYamlAppTests = """
-                # # Skip configuration for \(moduleName) module
+                var testSkipYaml = """
+                # Skip configuration for \(testsModuleName) module
+
                 #build:
                 #  contents:
+
                 """
 
-                let skipYamlModuleTests = """
-                # # Skip configuration for \(moduleName) module
-                #build:
-                #  contents:
-                """
+                if moduleMode.isNative {
+                    // The test target for a natively-compiled Skip Fuse module must itself be transpiled: its
+                    // XCTest cases are transpiled to JUnit tests so the test harness can collect the results.
+                    // A native test target would have its test classes dropped during bridging, leaving no
+                    // tests to run, so it must explicitly opt into transpiled mode.
+                    testSkipYaml += """
+
+                    skip:
+                      mode: 'transpiled'
+
+                    """
+
+                }
 
                 let testSkipYamlFile = testSkipDir.appending(path: "skip.yml")
-                try (isAppModule ? skipYamlAppTests : skipYamlModuleTests).write(to: testSkipYamlFile, atomically: false, encoding: .utf8)
+                try testSkipYaml.write(to: testSkipYamlFile, atomically: false, encoding: .utf8)
 
                 if let resourceFolder = resourceFolder, !resourceFolder.isEmpty {
                     let testResourcesDir = try testDir.append(path: resourceFolder, create: true)
@@ -1438,7 +1449,7 @@ struct TestData : Codable, Hashable {
                 let skipTestDependency = ",\n            \(skipTestProduct)\n        ]"
 
                 targets += """
-                        .testTarget(name: "\(moduleName)Tests", dependencies: [
+                        .testTarget(name: "\(testsModuleName)", dependencies: [
                             "\(moduleName)"\(skipTestDependency)\(resourcesAttribute), plugins: \(skipPluginArray)),
 
                 """

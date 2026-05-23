@@ -1574,6 +1574,11 @@ class TypeDeclaration: Statement {
                 // We don't care about other protocols
                 inherits = [inheritsView]
             } else {
+                // A native SwiftUI view renders only via its generated bridge, so `// SKIP @nobridge` keeps it
+                // from ever appearing. Warn instead of silently producing a view that never renders.
+                if attributes.isNoBridge, syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, inherits.contains(where: { isSwiftUIType($0) }) {
+                    syntaxTree.root.messages.append(.noBridgeView(structDecl, source: syntaxTree.source))
+                }
                 return nil
             }
         }
@@ -1628,6 +1633,11 @@ class TypeDeclaration: Statement {
                 // We don't care about other protocols
                 inherits = [inheritsView]
             } else {
+                // A native SwiftUI view renders only via its generated bridge, so `// SKIP @nobridge` keeps it
+                // from ever appearing. Warn instead of silently producing a view that never renders.
+                if attributes.isNoBridge, syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, inherits.contains(where: { isSwiftUIType($0) }) {
+                    syntaxTree.root.messages.append(.noBridgeView(enumDecl, source: syntaxTree.source))
+                }
                 return nil
             }
         }

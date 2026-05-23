@@ -147,6 +147,11 @@ extension Message {
         return Message(kind: .warning, message: "Skip does not understand complex preprocessor directives. When using Skip-related preprocessor symbols, use only SYMBOL, !SYMBOL, or a list where all symbols are combined by either && or || (but not a combination of the two)", source: source, sourceRange: range)
     }
 
+    static func noBridgeView(_ syntax: SyntaxProtocol, source: Source) -> Message {
+        let range = syntax.range(in: source)
+        return Message(kind: .warning, message: "A SwiftUI View must be bridged in order to render as a native view, but `// SKIP @nobridge` prevents bridging, so this view will not appear on Android. Remove the `// SKIP @nobridge` directive to allow this view to render.", source: source, sourceRange: range)
+    }
+
     // Idea: translate subscripts to Kotlin get/set operator functions
     static func subscriptNotSupported(_ syntax: SyntaxProtocol, source: Source) -> Message {
         let range = syntax.range(in: source)

@@ -7513,7 +7513,10 @@ final class BridgeToKotlinTests: XCTestCase {
     }
 
     func testNoBridgeView() async throws {
-        try await check(swiftBridge: """
+        // A `// SKIP @nobridge` SwiftUI View renders only via its bridge, so suppressing the bridge would leave
+        // it blank. The view is therefore not bridged (no output), and the transpiler emits a warning
+        // explaining that the view must be bridged in order to render as a native view.
+        try await check(expectMessages: true, swiftBridge: """
         import SkipFuseUI
         // SKIP @nobridge
         struct V: View {
@@ -7521,6 +7524,20 @@ final class BridgeToKotlinTests: XCTestCase {
             var body: some View {
                 Text("Hello")
             }
+        }
+        """, kotlin: """
+        """, swiftBridgeSupport: """
+        """, transformers: transformers)
+    }
+
+    func testNoBridgeNonView() async throws {
+        // @nobridge still fully suppresses bridging for non-view types, and (unlike a @nobridge View) must
+        // NOT produce the "must be bridged in order to render" warning, which is scoped to SwiftUI views.
+        try await check(swiftBridge: """
+        import SkipFuseUI
+        // SKIP @nobridge
+        public struct Helper {
+            public var count = 1
         }
         """, kotlin: """
         """, swiftBridgeSupport: """
