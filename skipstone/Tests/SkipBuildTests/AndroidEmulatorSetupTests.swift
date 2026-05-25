@@ -227,7 +227,7 @@ final class AndroidEmulatorSetupTests: XCTestCase {
 
         ProcessInfo.mockEnvironment = mockEnv.environment()
 
-        let command = try TestMessageCommand.parse([])
+        let command = try await TestMessageCommand.parse([])
 
         let (result, messages) = try await runValidator { queue in
             try await ensureCmdlineTools(
@@ -255,7 +255,7 @@ final class AndroidEmulatorSetupTests: XCTestCase {
 
         ProcessInfo.mockEnvironment = mockEnv.environment()
 
-        let command = try TestMessageCommand.parse([])
+        let command = try await TestMessageCommand.parse([])
 
         await XCTAssertThrowsErrorAsync(
             { _ = try await runValidator { queue in
@@ -282,7 +282,7 @@ final class AndroidEmulatorSetupTests: XCTestCase {
 
         ProcessInfo.mockEnvironment = mockEnv.environment()
 
-        let command = try TestMessageCommand.parse([])
+        let command = try await TestMessageCommand.parse([])
 
         let (result, messages) = try await runValidator { queue in
             try await ensureCmdlineTools(
@@ -304,7 +304,7 @@ final class AndroidEmulatorSetupTests: XCTestCase {
     func testCmdlineToolsNotFoundAnywhereFails() async throws {
         ProcessInfo.mockEnvironment = mockEnv.environment()
 
-        let command = try TestMessageCommand.parse([])
+        let command = try await TestMessageCommand.parse([])
 
         await XCTAssertThrowsErrorAsync(
             { _ = try await runValidator { queue in
@@ -330,7 +330,7 @@ final class AndroidEmulatorSetupTests: XCTestCase {
 
         ProcessInfo.mockEnvironment = mockEnv.environment()
 
-        let command = try AndroidHomeInstallCommand.parse([])
+        let command = try await AndroidHomeInstallCommand.parse([])
 
         let stream = MessageStream { continuation in
             Task {
@@ -397,7 +397,7 @@ final class AndroidEmulatorSetupTests: XCTestCase {
 
         ProcessInfo.mockEnvironment = mockEnv.environment()
 
-        let command = try AndroidEmulatorCreateCommand.parse([])
+        let command = try await AndroidEmulatorCreateCommand.parse([])
 
         let stream = MessageStream { continuation in
             Task {
@@ -427,7 +427,7 @@ final class AndroidEmulatorSetupTests: XCTestCase {
     func testAndroidEmulatorCreateCommandFailsWhenCmdlineToolsMissing() async throws {
         ProcessInfo.mockEnvironment = mockEnv.environment()
 
-        let command = try AndroidEmulatorCreateCommand.parse([])
+        let command = try await AndroidEmulatorCreateCommand.parse([])
 
         await XCTAssertThrowsErrorAsync(
             { _ = try await runValidator { queue in
