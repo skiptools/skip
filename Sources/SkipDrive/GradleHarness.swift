@@ -332,6 +332,10 @@ extension GradleHarness {
            let projectArg = arguments.dropFirst(projectFlagIndex + 1).first {
             project.appendPathComponent(projectArg, isDirectory: true)
         }
+
+        // for app projects, warn about build.gradle.kts settings that are incompatible with newer AGP versions
+        checkAppBuildGradle(in: project)
+
         project.appendPathComponent("settings.gradle.kts", isDirectory: false)
 
         if FileManager.default.fileExists(atPath: project.path) {
@@ -343,6 +347,24 @@ extension GradleHarness {
                     print(issue.xcodeMessageString)
                 }
             }
+        }
+    }
+
+    /// For an app project — detected by the presence of an `app/build.gradle.kts` application module in the
+    /// Gradle project folder — warn about any `build.gradle.kts` settings that are incompatible with newer
+    /// Android Gradle Plugin (AGP) versions. `skip verify --fix` can remove these settings automatically.
+    func checkAppBuildGradle(in projectFolder: URL) {
+        let appBuildGradle = projectFolder.appendingPathComponent("app/build.gradle.kts", isDirectory: false)
+        guard FileManager.default.fileExists(atPath: appBuildGradle.path),
+              let buildContents = try? String(contentsOf: appBuildGradle, encoding: .utf8) else {
+            return // not an app project (no app module build.gradle.kts)
+        }
+
+        for issue in AppBuildGradleAGPIssue.issues(inAppBuildGradle: buildContents) {
+            // report the 1-based line number of the offending active setting so the warning is clickable in the IDE
+            let line = buildContents.gradleLines().firstIndex(where: { $0.activelyContains(issue.trigger) }).map({ $0 + 1 }) ?? 0
+            let gradleIssue = GradleIssue(kind: .warning, message: "Android/app/build.gradle.kts: " + issue.message, location: SourceLocation(path: appBuildGradle.path, position: SourceLocation.Position(line: line, column: 0)))
+            print(gradleIssue.xcodeMessageString)
         }
     }
 
@@ -450,6 +472,81 @@ public struct GradleIssue {
         } else {
             return msg
         }
+    }
+}
+
+/// A setting in an app's `build.gradle.kts` that is incompatible with newer Android Gradle Plugin (AGP)
+/// versions. The same definitions drive both the build-time warning (in `preprocessGradleArguments`) and the
+/// automatic fix performed by `skip verify --fix`, so the two never drift apart. Detection and fixes only
+/// consider *active* (non-commented) lines, so a commented-out reference in the project template is ignored.
+public struct AppBuildGradleAGPIssue {
+    /// The substring whose presence on an active line of `build.gradle.kts` indicates the issue.
+    public let trigger: String
+    /// A description of what should be removed and why, including a support link.
+    public let message: String
+    /// Returns the given `build.gradle.kts` contents with this issue removed.
+    let removingIssue: (String) -> String
+
+    /// All AGP-compatibility issues that are checked for an app's `build.gradle.kts`.
+    public static let all: [AppBuildGradleAGPIssue] = [
+        // AGP 9 no longer ships the default proguard-android.txt that earlier SkipProject defaults referenced
+        // in the line: proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
+        AppBuildGradleAGPIssue(trigger: #"getDefaultProguardFile("proguard-android.txt")"#,
+            message: #"remove the getDefaultProguardFile("proguard-android.txt") section to be compliant with Android Gradle Plugin (AGP) version 9. Details: https://forums.skip.dev/categories/announcements"#,
+            removingIssue: { contents in
+                // remove the getDefaultProguardFile(…) argument from active proguardFiles lines, keeping the rest
+                contents.gradleLines().map { line in
+                    guard line.activelyContains(#"getDefaultProguardFile("proguard-android.txt")"#) else { return line }
+                    var fixed = line
+                    for variant in [
+                        #"getDefaultProguardFile("proguard-android.txt"), "#,
+                        #"getDefaultProguardFile("proguard-android.txt"),"#,
+                        #", getDefaultProguardFile("proguard-android.txt")"#,
+                        #"getDefaultProguardFile("proguard-android.txt")"#,
+                    ] {
+                        fixed = fixed.replacingOccurrences(of: variant, with: "")
+                    }
+                    return fixed
+                }.joined(separator: "\n")
+            }),
+        // the kotlin.android Gradle plugin is no longer needed for building Skip apps
+        AppBuildGradleAGPIssue(trigger: "alias(libs.plugins.kotlin.android)",
+            message: "remove the line alias(libs.plugins.kotlin.android) as it is no longer needed for building apps. Details: https://forums.skip.dev/categories/announcements",
+            removingIssue: { contents in
+                // remove active (non-commented) lines that declare the kotlin.android plugin
+                contents.gradleLines().filter { !$0.activelyContains("alias(libs.plugins.kotlin.android)") }.joined(separator: "\n")
+            }),
+    ]
+
+    /// Whether an active (non-commented) line in the given `build.gradle.kts` contains this issue's trigger.
+    public func isActive(in contents: String) -> Bool {
+        contents.gradleLines().contains { $0.activelyContains(trigger) }
+    }
+
+    /// Returns the issues that are actively present in the given `build.gradle.kts` contents.
+    public static func issues(inAppBuildGradle contents: String) -> [AppBuildGradleAGPIssue] {
+        all.filter { $0.isActive(in: contents) }
+    }
+
+    /// Returns the given `build.gradle.kts` contents with every actively-present AGP issue removed.
+    public static func removingIssues(fromAppBuildGradle contents: String) -> String {
+        var result = contents
+        for issue in all where issue.isActive(in: result) {
+            result = issue.removingIssue(result)
+        }
+        return result
+    }
+}
+
+private extension String {
+    /// The lines of these gradle file contents, preserving empty lines.
+    func gradleLines() -> [String] {
+        split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    }
+
+    /// Whether this line contains `substring` as active content, i.e. the line is not a `//` comment.
+    func activelyContains(_ substring: String) -> Bool {
+        contains(substring) && !trimmingCharacters(in: .whitespaces).hasPrefix("//")
     }
 }
 
