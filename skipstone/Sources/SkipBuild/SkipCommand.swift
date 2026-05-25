@@ -120,7 +120,7 @@ struct VersionOptions: ParsableArguments {
 extension SkipCommandExecutor {
     /// Run the given command on the given arguments.
     static func runInProcess(_ arguments: [String], basePath: AbsolutePath = localFileSystem.currentWorkingDirectory!, out: WritableByteStream? = nil, err: WritableByteStream? = nil) async throws {
-        var cmd: ParsableCommand = try parseAsRoot(arguments)
+        var cmd: ParsableCommand = try await parseAsRoot(arguments)
         if var cmd = cmd as? any StreamingCommand {
             if let outputFile = cmd.outputOptions.output {
                 let path = try AbsolutePath(validating: outputFile, relativeTo: basePath)
