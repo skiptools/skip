@@ -7,6 +7,9 @@ import SkipSyntax
 import SwiftSyntax
 import Universal
 import XCTest
+#if canImport(SkipDriveExternal)
+import SkipDriveExternal // for AppBuildGradleAGPIssue
+#endif
 
 final class SkipConfigTests: XCTestCase {
     func expectGradle(yaml configYAMLs: String, gradle expectedGradle: String, line: UInt = #line) throws {
@@ -216,4 +219,68 @@ final class SkipConfigTests: XCTestCase {
 
 
     }
+
+#if canImport(SkipDriveExternal)
+    /// Verify detection and `--fix` removal of AGP-incompatible settings in an app's build.gradle.kts.
+    func testAppBuildGradleAGPIssues() throws {
+        // a fresh project: the kotlin.android plugin appears only as a commented-out template hint, so there
+        // are no *active* AGP issues and a fix must leave the file unchanged (no false positives)
+        let clean = """
+        plugins {
+            alias(libs.plugins.kotlin.compose)
+            alias(libs.plugins.android.application)
+            id("skip-build-plugin")
+        }
+        android {
+            buildTypes {
+                getByName("release") {
+                    proguardFiles("proguard-rules.pro")
+                }
+            }
+        }
+        """
+        XCTAssertEqual(0, AppBuildGradleAGPIssue.issues(inAppBuildGradle: clean).count)
+        XCTAssertEqual(clean, AppBuildGradleAGPIssue.removingIssues(fromAppBuildGradle: clean))
+
+        // a build.gradle.kts with both incompatibilities: the kotlin.android plugin and the default proguard file
+        let problematic = """
+        plugins {
+            alias(libs.plugins.android.application)
+            alias(libs.plugins.kotlin.android)
+            alias(libs.plugins.kotlin.compose)
+        }
+        android {
+            buildTypes {
+                getByName("release") {
+                    proguardFiles("proguard-rules.pro")
+                }
+            }
+        }
+        """
+        let issues = AppBuildGradleAGPIssue.issues(inAppBuildGradle: problematic)
+        XCTAssertEqual(2, issues.count)
+        // every issue message links to the support forum
+        for issue in issues {
+            XCTAssertTrue(issue.message.contains("https://forums.skip.dev/categories/announcements"), "issue should link to the forum: \(issue.message)")
+        }
+
+        // fixing removes the getDefaultProguardFile section (keeping proguard-rules.pro) and the kotlin.android line
+        let fixed = AppBuildGradleAGPIssue.removingIssues(fromAppBuildGradle: problematic)
+        XCTAssertEqual(fixed, """
+        plugins {
+            alias(libs.plugins.android.application)
+            alias(libs.plugins.kotlin.compose)
+        }
+        android {
+            buildTypes {
+                getByName("release") {
+                    proguardFiles("proguard-rules.pro")
+                }
+            }
+        }
+        """)
+        // the fixed contents no longer trigger any issues
+        XCTAssertEqual(0, AppBuildGradleAGPIssue.issues(inAppBuildGradle: fixed).count)
+    }
+#endif
 }

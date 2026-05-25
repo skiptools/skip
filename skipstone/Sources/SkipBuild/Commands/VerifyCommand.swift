@@ -6,6 +6,9 @@ import Foundation
 import ArgumentParser
 import Universal
 import TSCBasic
+#if canImport(SkipDriveExternal)
+import SkipDriveExternal // for AppBuildGradleAGPIssue (shared with preprocessGradleArguments)
+#endif
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 struct VerifyCommand: SkipCommand, StreamingCommand, ProjectCommand, ToolOptionsCommand {
@@ -317,6 +320,24 @@ extension ToolOptionsCommand where Self : StreamingCommand {
 
                 return CheckStatus(status: .pass)
             }
+
+            #if canImport(SkipDriveExternal)
+            // Warn about (or, with --fix, remove) app build.gradle.kts settings incompatible with newer AGP versions
+            await verifyFile(project.androidAppBuildGradle) { title, url in
+                let contents = try String(contentsOf: url)
+                let issues = AppBuildGradleAGPIssue.issues(inAppBuildGradle: contents)
+                if issues.isEmpty {
+                    return CheckStatus(status: .pass)
+                }
+                if autofix {
+                    let fixed = AppBuildGradleAGPIssue.removingIssues(fromAppBuildGradle: contents)
+                    try fixed.write(to: url, atomically: false, encoding: .utf8)
+                    return CheckStatus(status: .warn, message: "\(title): removed \(issues.count) Android Gradle Plugin (AGP) incompatible setting\(issues.count == 1 ? "" : "s")")
+                } else {
+                    return CheckStatus(status: .warn, message: "\(title): contains Android Gradle Plugin (AGP) incompatible settings: run skip verify --fix")
+                }
+            }
+            #endif
 
             if flagOrFiles(fastlane, project.darwinFastlaneFolder, project.androidFastlaneFolder) {
                 if await checkFolder(project.darwinFastlaneFolder) {
