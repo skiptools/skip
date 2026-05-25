@@ -492,20 +492,13 @@ public struct AppBuildGradleAGPIssue {
         // AGP 9 no longer ships the default proguard-android.txt that earlier SkipProject defaults referenced
         // in the line: proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
         AppBuildGradleAGPIssue(trigger: #"getDefaultProguardFile("proguard-android.txt")"#,
-            message: #"remove the getDefaultProguardFile("proguard-android.txt") section to be compliant with Android Gradle Plugin (AGP) version 9. Details: https://forums.skip.dev/categories/announcements"#,
+            message: #"change the getDefaultProguardFile("proguard-android.txt") section to getDefaultProguardFile("proguard-android-optimize.txt") be compliant with Android Gradle Plugin (AGP) version 9. Details: https://forums.skip.dev/categories/announcements"#,
             removingIssue: { contents in
                 // remove the getDefaultProguardFile(…) argument from active proguardFiles lines, keeping the rest
                 contents.gradleLines().map { line in
                     guard line.activelyContains(#"getDefaultProguardFile("proguard-android.txt")"#) else { return line }
                     var fixed = line
-                    for variant in [
-                        #"getDefaultProguardFile("proguard-android.txt"), "#,
-                        #"getDefaultProguardFile("proguard-android.txt"),"#,
-                        #", getDefaultProguardFile("proguard-android.txt")"#,
-                        #"getDefaultProguardFile("proguard-android.txt")"#,
-                    ] {
-                        fixed = fixed.replacingOccurrences(of: variant, with: "")
-                    }
+                    fixed = fixed.replacingOccurrences(of: #"getDefaultProguardFile("proguard-android.txt")"#, with: #"getDefaultProguardFile("proguard-android-optimize.txt")"#)
                     return fixed
                 }.joined(separator: "\n")
             }),
