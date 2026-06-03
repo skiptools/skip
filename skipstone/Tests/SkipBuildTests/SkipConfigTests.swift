@@ -220,6 +220,208 @@ final class SkipConfigTests: XCTestCase {
 
     }
 
+    // MARK: - merge: prepend (leaf-wins for first-call-wins DSLs)
+
+    /// Sanity check that the default merge mode (no `merge:` field) keeps the existing
+    /// append behavior, where the second YAML document's contents are emitted after the
+    /// first's. This is a regression guard for the targeted-prepend change.
+    func testMergedGradleDefaultAppend() throws {
+        try expectGradle(yaml: """
+        contents:
+          - block: 'versionCatalogs'
+            contents:
+              - block: 'create("libs")'
+                contents:
+                  - 'version("android-sdk-min", "28")'
+        ---
+        contents:
+          - block: 'versionCatalogs'
+            contents:
+              - block: 'create("libs")'
+                contents:
+                  - 'version("android-sdk-min", "26")'
+        """, gradle: """
+        versionCatalogs {
+            create("libs") {
+                version("android-sdk-min", "28")
+                version("android-sdk-min", "26")
+            }
+        }
+        """)
+    }
+
+    /// With `merge: 'prepend'` declared on the dependent-side block, the leaf module's
+    /// later-merged entries are emitted *before* the dependent's earlier entries — so the
+    /// leaf's `version("android-sdk-min", "26")` appears first in the generated DSL and
+    /// wins in Gradle's first-call-wins version catalog.
+    func testMergedGradlePrependOnDependent() throws {
+        try expectGradle(yaml: """
+        contents:
+          - block: 'versionCatalogs'
+            contents:
+              - block: 'create("libs")'
+                merge: 'prepend'
+                contents:
+                  - 'version("android-sdk-min", "28")'
+        ---
+        contents:
+          - block: 'versionCatalogs'
+            contents:
+              - block: 'create("libs")'
+                contents:
+                  - 'version("android-sdk-min", "26")'
+        """, gradle: """
+        versionCatalogs {
+            create("libs") {
+                version("android-sdk-min", "26")
+                version("android-sdk-min", "28")
+            }
+        }
+        """)
+    }
+
+    /// Declaring `merge: 'prepend'` on the leaf-side block produces the same result as
+    /// declaring it on the dependent side. Either side opting into prepend is enough.
+    func testMergedGradlePrependOnLeaf() throws {
+        try expectGradle(yaml: """
+        contents:
+          - block: 'versionCatalogs'
+            contents:
+              - block: 'create("libs")'
+                contents:
+                  - 'version("android-sdk-min", "28")'
+        ---
+        contents:
+          - block: 'versionCatalogs'
+            contents:
+              - block: 'create("libs")'
+                merge: 'prepend'
+                contents:
+                  - 'version("android-sdk-min", "26")'
+        """, gradle: """
+        versionCatalogs {
+            create("libs") {
+                version("android-sdk-min", "26")
+                version("android-sdk-min", "28")
+            }
+        }
+        """)
+    }
+
+    /// The `merge: prepend` flag is scoped to the block that declares it. A sibling
+    /// `dependencies` block — which uses last-wins / order-irrelevant DSL semantics —
+    /// must keep its default append behavior so leaf overrides of property assignments
+    /// (like `minSdk = …`) and dependency declarations continue to work.
+    func testMergedGradlePrependDoesNotAffectSiblings() throws {
+        try expectGradle(yaml: """
+        contents:
+          - block: 'versionCatalogs'
+            contents:
+              - block: 'create("libs")'
+                merge: 'prepend'
+                contents:
+                  - 'version("android-sdk-min", "28")'
+          - block: 'dependencies'
+            contents:
+              - 'implementation("dep-from-base")'
+          - block: 'android'
+            contents:
+              - block: 'defaultConfig'
+                contents:
+                  - 'minSdk = 31'
+        ---
+        contents:
+          - block: 'versionCatalogs'
+            contents:
+              - block: 'create("libs")'
+                contents:
+                  - 'version("android-sdk-min", "26")'
+          - block: 'dependencies'
+            contents:
+              - 'implementation("dep-from-leaf")'
+          - block: 'android'
+            contents:
+              - block: 'defaultConfig'
+                contents:
+                  - 'minSdk = 26'
+        """, gradle: """
+        versionCatalogs {
+            create("libs") {
+                version("android-sdk-min", "26")
+                version("android-sdk-min", "28")
+            }
+        }
+
+        dependencies {
+            implementation("dep-from-base")
+            implementation("dep-from-leaf")
+        }
+
+        android {
+            defaultConfig {
+                minSdk = 31
+                minSdk = 26
+            }
+        }
+        """)
+    }
+
+    /// `merge: prepend` composes cleanly with `remove:` — the leaf module's explicit removal
+    /// still strips the targeted dependent-side line, and the surviving entries are emitted
+    /// with the leaf's contributions prepended ahead of the dependent's defaults.
+    func testMergedGradlePrependRespectsRemove() throws {
+        try expectGradle(yaml: """
+        contents:
+          - block: 'create("libs")'
+            merge: 'prepend'
+            contents:
+              - 'version("android-sdk-min", "28")'
+              - 'version("android-sdk-compile", "36")'
+        ---
+        contents:
+          - block: 'create("libs")'
+            remove: ['version("android-sdk-compile", "36")']
+            contents:
+              - 'version("android-sdk-compile", "35")'
+        """, gradle: """
+        create("libs") {
+            version("android-sdk-compile", "35")
+            version("android-sdk-min", "28")
+        }
+        """)
+    }
+
+    /// `merge: prepend` is sticky across a chain of three or more layered merges. Even when
+    /// only the deepest dependent declares `merge: 'prepend'`, the leaf's entries still end
+    /// up first, with each intervening module's entries inserted ahead of the modules deeper
+    /// than it. This models a realistic skip-unit → skip-foundation → skip-ui → app chain
+    /// where only skip-unit's `create("libs")` carries the flag.
+    func testMergedGradlePrependStickyAcrossChain() throws {
+        try expectGradle(yaml: """
+        contents:
+          - block: 'create("libs")'
+            merge: 'prepend'
+            contents:
+              - 'version("v", "from-deepest")'
+        ---
+        contents:
+          - block: 'create("libs")'
+            contents:
+              - 'version("v", "from-middle")'
+        ---
+        contents:
+          - block: 'create("libs")'
+            contents:
+              - 'version("v", "from-leaf")'
+        """, gradle: """
+        create("libs") {
+            version("v", "from-leaf")
+            version("v", "from-middle")
+            version("v", "from-deepest")
+        }
+        """)
+    }
+
 #if canImport(SkipDriveExternal)
     /// Verify detection and `--fix` removal of AGP-incompatible settings in an app's build.gradle.kts.
     func testAppBuildGradleAGPIssues() throws {

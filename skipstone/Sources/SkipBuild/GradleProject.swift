@@ -28,6 +28,20 @@ struct GradleBlock : Equatable, Codable {
     var export: Bool?
     /// A set of contents to remove if they are set
     var remove: Set<String>?
+    /// How this block's `contents` should be combined when merged with another block of the
+    /// same name. Defaults to `.append` (later-encountered contents are appended after earlier
+    /// ones). Set to `.prepend` for blocks whose underlying DSL uses *first-call-wins*
+    /// semantics — most notably `versionCatalogs.create("libs") { version(...); library(...) }` —
+    /// so that a leaf module's overrides (which are merged in later) end up emitted *before* the
+    /// dependent module's defaults and therefore take precedence. The flag is sticky: once any
+    /// side of a merge requests `.prepend`, the merged result keeps that mode for subsequent
+    /// merges in the chain.
+    var merge: MergeMode?
+
+    enum MergeMode : String, Equatable, Codable {
+        case append
+        case prepend
+    }
 
     typealias BlockOrCommand = Either<String>.Or<GradleBlock>
 
@@ -114,7 +128,18 @@ struct GradleBlock : Equatable, Codable {
                 if let index = mergedBlocks.firstIndex(where: { $0.0 == block.block }) {
                     if var fromBlock = mergedBlocks[index].boc.infer() as GradleBlock? {
                         // clear any contents we have explicitly removed from a later block
-                        fromBlock.contents = (fromBlock.filteredContents(remove: block.remove)) + (block.filteredContents(remove: block.remove))
+                        let fromContents = fromBlock.filteredContents(remove: block.remove)
+                        let newContents = block.filteredContents(remove: block.remove)
+                        // honor `merge: prepend` on either side so first-wins DSLs (e.g. version
+                        // catalogs) get the leaf module's overrides emitted before the dependent's
+                        // defaults; the flag is sticky across the merge chain
+                        let shouldPrepend = fromBlock.merge == .prepend || block.merge == .prepend
+                        if shouldPrepend {
+                            fromBlock.contents = newContents + fromContents
+                            fromBlock.merge = .prepend
+                        } else {
+                            fromBlock.contents = fromContents + newContents
+                        }
                         mergedBlocks[index].boc = .init(fromBlock)
                     }
                 } else {
