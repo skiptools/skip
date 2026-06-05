@@ -667,5 +667,162 @@ final class SkipBuildTests: XCTestCase {
         let androidDev63SDKs = try await SwiftSDKOpenAPI.fetchSDKs(sdkName: "android", forDevelVersion: "6.3")
         XCTAssertTrue(androidDev63SDKs.contains(where: { $0.downloadURL.absoluteString == androidDev63DownloadURL }), "missing expected path in: \(androidDev63SDKs)")
     }
+
+    // MARK: - iOS AppIcon Discovery
+
+    func testFilenameLooksLikeMacIcon() {
+        // legacy "~mac" idiom suffix and explicit macOS markers
+        XCTAssertTrue(MetaIndexCommand.filenameLooksLikeMacIcon("AppIcon~mac.png"))
+        XCTAssertTrue(MetaIndexCommand.filenameLooksLikeMacIcon("AppIcon-mac.png"))
+        XCTAssertTrue(MetaIndexCommand.filenameLooksLikeMacIcon("AppIcon-mac-1024.png"))
+        XCTAssertTrue(MetaIndexCommand.filenameLooksLikeMacIcon("AppIcon-mac@2x.png"))
+        XCTAssertTrue(MetaIndexCommand.filenameLooksLikeMacIcon("appicon-mac-1024x1024@2x.png"))
+        XCTAssertTrue(MetaIndexCommand.filenameLooksLikeMacIcon("AppIcon-macOS.png"))
+        XCTAssertTrue(MetaIndexCommand.filenameLooksLikeMacIcon("appicon-macos-1024.png"))
+        XCTAssertTrue(MetaIndexCommand.filenameLooksLikeMacIcon("AppIcon_mac_512.png"))
+
+        // genuine iOS icon filenames must NOT be classified as macOS
+        XCTAssertFalse(MetaIndexCommand.filenameLooksLikeMacIcon("AppIcon~ios-marketing.png"))
+        XCTAssertFalse(MetaIndexCommand.filenameLooksLikeMacIcon("AppIcon~ipad.png"))
+        XCTAssertFalse(MetaIndexCommand.filenameLooksLikeMacIcon("AppIcon-83.5@2x~ipad.png"))
+        XCTAssertFalse(MetaIndexCommand.filenameLooksLikeMacIcon("AppIcon-20@2x.png"))
+        XCTAssertFalse(MetaIndexCommand.filenameLooksLikeMacIcon("AppIcon@3x.png"))
+        XCTAssertFalse(MetaIndexCommand.filenameLooksLikeMacIcon("appicon-ios-marketing-1024x1024@1x.png"))
+        // false-positive guard: bare substring "mac" should not match
+        XCTAssertFalse(MetaIndexCommand.filenameLooksLikeMacIcon("imacolor.png"))
+        XCTAssertFalse(MetaIndexCommand.filenameLooksLikeMacIcon("macaron.png"))
+    }
+
+    func testFilenameLooksLikeIOSMarketingIcon() {
+        XCTAssertTrue(MetaIndexCommand.filenameLooksLikeIOSMarketingIcon("AppIcon~ios-marketing.png"))
+        XCTAssertTrue(MetaIndexCommand.filenameLooksLikeIOSMarketingIcon("appicon-ios-marketing-1024x1024@1x.png"))
+        XCTAssertTrue(MetaIndexCommand.filenameLooksLikeIOSMarketingIcon("AppIcon-iOS-Marketing.png"))
+        XCTAssertFalse(MetaIndexCommand.filenameLooksLikeIOSMarketingIcon("AppIcon-20@2x.png"))
+        XCTAssertFalse(MetaIndexCommand.filenameLooksLikeIOSMarketingIcon("AppIcon~ipad.png"))
+        XCTAssertFalse(MetaIndexCommand.filenameLooksLikeIOSMarketingIcon("AppIcon-mac-1024.png"))
+    }
+
+    func testParseAssetSizeField() {
+        XCTAssertEqual(1024, MetaIndexCommand.parseAssetSizeField("1024x1024"))
+        XCTAssertEqual(60, MetaIndexCommand.parseAssetSizeField("60x60"))
+        XCTAssertEqual(83, MetaIndexCommand.parseAssetSizeField("83.5x83.5")) // truncates decimals
+        XCTAssertEqual(0, MetaIndexCommand.parseAssetSizeField(nil))
+        XCTAssertEqual(0, MetaIndexCommand.parseAssetSizeField(""))
+        XCTAssertEqual(0, MetaIndexCommand.parseAssetSizeField("garbage"))
+    }
+
+    func testFindIOSAppIconPrefersMarketingFromContentsJSON() throws {
+        let tmp = try makeAppIconSet(named: "PreferMarketing")
+        defer { try? FileManager.default.removeItem(at: tmp.root) }
+
+        // Multiple iOS entries; the marketing one is NOT the largest by file size,
+        // but should still be picked because its idiom is "ios-marketing".
+        try writeFakePNG(tmp.folder.appendingPathComponent("AppIcon-60@3x.png"), width: 180, height: 180, padBytes: 10_000)
+        try writeFakePNG(tmp.folder.appendingPathComponent("AppIcon~ios-marketing.png"), width: 1024, height: 1024, padBytes: 1_000)
+        try writeContents(folder: tmp.folder, images: [
+            ["filename": "AppIcon-60@3x.png", "idiom": "iphone", "scale": "3x", "size": "60x60"],
+            ["filename": "AppIcon~ios-marketing.png", "idiom": "ios-marketing", "scale": "1x", "size": "1024x1024"],
+        ])
+
+        let cmd = MetaIndexCommand()
+        let ref = try XCTUnwrap(cmd.findIOSAppIcon(in: tmp.folder, relativeTo: tmp.root))
+        XCTAssertEqual(1024, ref.width)
+        XCTAssertEqual(1024, ref.height)
+        XCTAssertTrue(ref.location.hasSuffix("AppIcon~ios-marketing.png"), "got: \(ref.location)")
+    }
+
+    func testFindIOSAppIconExcludesMacEntryEvenWhenLarger() throws {
+        let tmp = try makeAppIconSet(named: "ExcludeMacIdiom")
+        defer { try? FileManager.default.removeItem(at: tmp.root) }
+
+        // A macOS-idiom 1024 entry is larger than the iOS 60×60 entry, but must be
+        // excluded — Contents.json marks it as macOS-only.
+        try writeFakePNG(tmp.folder.appendingPathComponent("AppIcon-mac-1024.png"), width: 1024, height: 1024, padBytes: 50_000)
+        try writeFakePNG(tmp.folder.appendingPathComponent("AppIcon-60@3x.png"), width: 180, height: 180, padBytes: 500)
+        try writeContents(folder: tmp.folder, images: [
+            ["filename": "AppIcon-mac-1024.png", "idiom": "mac", "scale": "1x", "size": "1024x1024"],
+            ["filename": "AppIcon-60@3x.png", "idiom": "iphone", "scale": "3x", "size": "60x60"],
+        ])
+
+        let cmd = MetaIndexCommand()
+        let ref = try XCTUnwrap(cmd.findIOSAppIcon(in: tmp.folder, relativeTo: tmp.root))
+        XCTAssertEqual(180, ref.width)
+        XCTAssertTrue(ref.location.hasSuffix("AppIcon-60@3x.png"), "got: \(ref.location)")
+    }
+
+    func testFindIOSAppIconFallbackPrefersMarketingByFilename() throws {
+        let tmp = try makeAppIconSet(named: "FallbackByFilename")
+        defer { try? FileManager.default.removeItem(at: tmp.root) }
+
+        // No Contents.json — we should still prefer the file whose name identifies
+        // it as the iOS marketing icon over a larger non-marketing PNG.
+        try writeFakePNG(tmp.folder.appendingPathComponent("AppIcon-60@3x.png"), width: 180, height: 180, padBytes: 50_000)
+        try writeFakePNG(tmp.folder.appendingPathComponent("appicon-ios-marketing-1024x1024@1x.png"), width: 1024, height: 1024, padBytes: 1_000)
+
+        let cmd = MetaIndexCommand()
+        let ref = try XCTUnwrap(cmd.findIOSAppIcon(in: tmp.folder, relativeTo: tmp.root))
+        XCTAssertTrue(ref.location.hasSuffix("appicon-ios-marketing-1024x1024@1x.png"), "got: \(ref.location)")
+    }
+
+    func testFindIOSAppIconFallbackExcludesMacFilenames() throws {
+        let tmp = try makeAppIconSet(named: "FallbackExcludesMac")
+        defer { try? FileManager.default.removeItem(at: tmp.root) }
+
+        // No Contents.json. A macOS-style filename is the largest PNG on disk; the
+        // selection must skip it and fall back to the next-largest non-mac PNG.
+        try writeFakePNG(tmp.folder.appendingPathComponent("AppIcon-mac-1024.png"), width: 1024, height: 1024, padBytes: 50_000)
+        try writeFakePNG(tmp.folder.appendingPathComponent("AppIcon-60@3x.png"), width: 180, height: 180, padBytes: 500)
+
+        let cmd = MetaIndexCommand()
+        let ref = try XCTUnwrap(cmd.findIOSAppIcon(in: tmp.folder, relativeTo: tmp.root))
+        XCTAssertTrue(ref.location.hasSuffix("AppIcon-60@3x.png"), "got: \(ref.location)")
+    }
+
+    func testFindIOSAppIconReturnsNilForEmptyOrMissingFolder() {
+        let cmd = MetaIndexCommand()
+        let missing = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        XCTAssertNil(cmd.findIOSAppIcon(in: missing, relativeTo: missing))
+    }
+
+    // MARK: - Helpers for AppIcon discovery tests
+
+    private struct TmpAppIconSet { let root: URL; let folder: URL }
+
+    private func makeAppIconSet(named name: String) throws -> TmpAppIconSet {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(name)-\(UUID().uuidString)")
+        let folder = root.appendingPathComponent("Assets.xcassets/AppIcon.appiconset")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return TmpAppIconSet(root: root, folder: folder)
+    }
+
+    private func writeContents(folder: URL, images: [[String: String]]) throws {
+        let payload: [String: Any] = ["images": images, "info": ["version": 1, "author": "test"]]
+        let data = try JSONSerialization.data(withJSONObject: payload, options: [])
+        try data.write(to: folder.appendingPathComponent("Contents.json"))
+    }
+
+    /// Write a minimal PNG-shaped file with the given IHDR width/height and optional
+    /// padding bytes (used to make file-size comparisons meaningful in tests).
+    private func writeFakePNG(_ url: URL, width: Int, height: Int, padBytes: Int) throws {
+        var data = Data([137, 80, 78, 71, 13, 10, 26, 10]) // PNG signature
+        data.append(contentsOf: [0, 0, 0, 13])             // IHDR length = 13
+        data.append(contentsOf: [0x49, 0x48, 0x44, 0x52])  // "IHDR"
+        // width (big-endian)
+        data.append(UInt8((width >> 24) & 0xFF))
+        data.append(UInt8((width >> 16) & 0xFF))
+        data.append(UInt8((width >> 8) & 0xFF))
+        data.append(UInt8(width & 0xFF))
+        // height (big-endian)
+        data.append(UInt8((height >> 24) & 0xFF))
+        data.append(UInt8((height >> 16) & 0xFF))
+        data.append(UInt8((height >> 8) & 0xFF))
+        data.append(UInt8(height & 0xFF))
+        // bit_depth, color_type, compression, filter, interlace + 4 byte CRC placeholder
+        data.append(contentsOf: [8, 6, 0, 0, 0, 0, 0, 0, 0])
+        if padBytes > 0 {
+            data.append(contentsOf: [UInt8](repeating: 0, count: padBytes))
+        }
+        try data.write(to: url)
+    }
 }
 

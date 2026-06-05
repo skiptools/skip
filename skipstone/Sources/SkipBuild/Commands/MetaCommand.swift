@@ -266,7 +266,7 @@ The output uses Android/Play Store locale codes (e.g. "zh-CN" instead of Apple's
 
         // Assets: icon, screenshots
         var assets: [String: Any] = [:]
-        if let iconRef = findLargestPNG(in: appProject.darwinAppIconFolder, relativeTo: projectRoot) {
+        if let iconRef = findIOSAppIcon(in: appProject.darwinAppIconFolder, relativeTo: projectRoot) {
             assets["icon"] = iconRef.asDictionary
         }
         let screenshotDir = appProject.darwinFastlaneFolder.appendingPathComponent("screenshots")
@@ -781,14 +781,41 @@ extension MetaIndexCommand {
 
     // MARK: - Icon Discovery
 
-    /// Find the largest PNG file in a directory (used for iOS AppIcon.appiconset).
-    func findLargestPNG(in folder: URL, relativeTo root: URL) -> ImageResourceRef? {
+    /// Pick the iOS app icon from an `AppIcon.appiconset`, preferring the 1024×1024
+    /// `ios-marketing` entry and excluding any macOS-targeted images that an app
+    /// supporting both iOS and macOS may include in the same asset catalog.
+    ///
+    /// Selection order:
+    ///   1. The `Contents.json` entry whose `idiom` is `"ios-marketing"` (the canonical
+    ///      1024×1024 App Store icon), or — failing that — the largest iOS-compatible
+    ///      entry from `Contents.json`, with all macOS entries filtered out.
+    ///   2. If `Contents.json` is missing or unusable, a filename whose name identifies
+    ///      it as the iOS marketing icon (e.g. `AppIcon~ios-marketing.png`,
+    ///      `appicon-ios-marketing-1024x1024@1x.png`).
+    ///   3. Failing that, the largest PNG on disk whose filename does NOT look macOS
+    ///      specific — the legacy fallback behavior, with macOS filenames excluded.
+    func findIOSAppIcon(in folder: URL, relativeTo root: URL) -> ImageResourceRef? {
         let fm = FileManager.default
         guard fm.fileExists(atPath: folder.path) else { return nil }
-        guard let files = try? fm.contentsOfDirectory(atPath: folder.path) else { return nil }
 
+        // 1. Drive selection from Contents.json when present.
+        if let ref = pickIOSIconFromAssetCatalog(folder: folder, relativeTo: root) {
+            return ref
+        }
+
+        // 2/3. Fall back to scanning files on disk, never choosing a macOS-style filename.
+        guard let files = try? fm.contentsOfDirectory(atPath: folder.path) else { return nil }
+        let pngs = files.filter { $0.hasSuffix(".png") && !Self.filenameLooksLikeMacIcon($0) }
+
+        // 2. Prefer a filename that identifies itself as the iOS marketing icon.
+        if let marketing = pngs.first(where: { Self.filenameLooksLikeIOSMarketingIcon($0) }),
+           let ref = ImageResourceRef.from(pngURL: folder.appendingPathComponent(marketing), relativeTo: root) {
+            return ref
+        }
+
+        // 3. Largest non-macOS PNG by file size.
         var largest: (url: URL, size: Int64)? = nil
-        for file in files where file.hasSuffix(".png") {
+        for file in pngs {
             let fileURL = folder.appendingPathComponent(file)
             guard let attrs = try? fm.attributesOfItem(atPath: fileURL.path),
                   let fileSize = attrs[.size] as? Int64 else { continue }
@@ -796,9 +823,84 @@ extension MetaIndexCommand {
                 largest = (fileURL, fileSize)
             }
         }
-
         guard let best = largest else { return nil }
         return ImageResourceRef.from(pngURL: best.url, relativeTo: root)
+    }
+
+    /// Pick an iOS-targeted icon by parsing the `AppIcon.appiconset` `Contents.json`
+    /// catalog, preferring the `ios-marketing` idiom and excluding macOS entries
+    /// (both by `idiom` and by the file's name).
+    func pickIOSIconFromAssetCatalog(folder: URL, relativeTo root: URL) -> ImageResourceRef? {
+        let contentsURL = folder.appendingPathComponent("Contents.json", isDirectory: false)
+        guard FileManager.default.fileExists(atPath: contentsURL.path),
+              let data = try? Data(contentsOf: contentsURL),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let images = json["images"] as? [[String: Any]] else {
+            return nil
+        }
+
+        var candidates: [(filename: String, dim: Int, isMarketing: Bool)] = []
+        for image in images {
+            guard let filename = image["filename"] as? String, !filename.isEmpty else { continue }
+            let idiom = (image["idiom"] as? String) ?? ""
+            let platform = (image["platform"] as? String)?.lowercased() ?? ""
+            // Exclude macOS-targeted entries by Contents.json metadata…
+            if idiom == "mac" || idiom.hasPrefix("mac-") || platform == "macos" || platform == "mac" {
+                continue
+            }
+            // …and as a defense in depth, by filename.
+            if Self.filenameLooksLikeMacIcon(filename) { continue }
+            candidates.append((filename, Self.parseAssetSizeField(image["size"] as? String), idiom == "ios-marketing"))
+        }
+
+        // 1. Explicit ios-marketing entry wins.
+        if let m = candidates.first(where: { $0.isMarketing }),
+           let ref = ImageResourceRef.from(pngURL: folder.appendingPathComponent(m.filename), relativeTo: root) {
+            return ref
+        }
+
+        // 2. Otherwise pick the largest declared size among the iOS candidates.
+        for candidate in candidates.sorted(by: { $0.dim > $1.dim }) {
+            if let ref = ImageResourceRef.from(pngURL: folder.appendingPathComponent(candidate.filename), relativeTo: root) {
+                return ref
+            }
+        }
+        return nil
+    }
+
+    /// Parse the `"size"` field of an asset catalog image entry (e.g. `"1024x1024"`
+    /// or `"83.5x83.5"`) into a comparable integer dimension. Unparseable values
+    /// return 0 so they sort last when choosing the largest entry.
+    static func parseAssetSizeField(_ size: String?) -> Int {
+        guard let size, let first = size.split(separator: "x").first, let value = Double(first) else { return 0 }
+        return Int(value)
+    }
+
+    /// Identify filenames that target the iOS App Store marketing slot — the
+    /// canonical 1024×1024 icon. Recognizes both the legacy `AppIcon~ios-marketing.png`
+    /// suffix and Xcode 14+ kebab-case forms like `appicon-ios-marketing-1024x1024@1x.png`.
+    static func filenameLooksLikeIOSMarketingIcon(_ filename: String) -> Bool {
+        filename.lowercased().contains("ios-marketing")
+    }
+
+    /// Identify icon filenames that look macOS-specific (e.g. `AppIcon~mac.png`,
+    /// `AppIcon-mac-1024.png`, `appicon-mac-1024x1024@2x.png`, `AppIcon-macOS.png`).
+    /// Multiplatform apps that build for both iOS and macOS may pack macOS variants
+    /// into the same `AppIcon.appiconset`, and we never want one chosen as the iOS icon.
+    static func filenameLooksLikeMacIcon(_ filename: String) -> Bool {
+        let lower = filename.lowercased()
+        if lower.contains("macos") { return true }
+        // Match "mac" as its own token bracketed by the separators Apple uses in
+        // icon idiom suffixes (`~mac`, `-mac-`, `_mac_`) and terminator forms
+        // (`-mac.png`, `-mac@2x.png`). This avoids false positives like "imacolor".
+        for sep in ["~", "-", "_"] {
+            if lower.contains("\(sep)mac\(sep)")
+                || lower.contains("\(sep)mac.")
+                || lower.contains("\(sep)mac@") {
+                return true
+            }
+        }
+        return false
     }
 
     // MARK: - Localized Image Discovery
