@@ -1202,6 +1202,16 @@ extension Array where Element == Statement {
         }
     }
 
+    /// Parse import statements for imports marked `@_exported`.
+    var exportedImportedModulePaths: [[String]] {
+        return compactMap { statement in
+            guard statement.type == .importDeclaration, let importDeclaration = statement as? ImportDeclaration, importDeclaration.isExported else {
+                return nil
+            }
+            return importDeclaration.modulePath
+        }
+    }
+
     /// Whether these statements include a declaration of the given type (no extensions).
     func containsDeclaration(of signature: TypeSignature) -> Bool {
         let name = signature.name

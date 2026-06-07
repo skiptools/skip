@@ -1244,9 +1244,12 @@ final class FunctionDeclaration: Statement {
 /// `import Module`
 final class ImportDeclaration: Statement {
     let modulePath: [String]
+    /// Whether the import is marked `@_exported`, meaning Swift will re-export the imported module's API as part of the importing module.
+    let isExported: Bool
 
-    init(modulePath: [String], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+    init(modulePath: [String], isExported: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
         self.modulePath = modulePath
+        self.isExported = isExported
         super.init(type: .importDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
     }
 
@@ -1255,12 +1258,20 @@ final class ImportDeclaration: Statement {
             return nil
         }
         let modulePath = importDecl.path.map { $0.name.text }
-        let statement = ImportDeclaration(modulePath: modulePath, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        let isExported = importDecl.attributes.contains(where: { element in
+            guard let attribute = element.as(AttributeSyntax.self) else { return false }
+            return attribute.attributeName.description.trimmingCharacters(in: .whitespaces) == "_exported"
+        })
+        let statement = ImportDeclaration(modulePath: modulePath, isExported: isExported, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
         return [statement]
     }
 
     override var prettyPrintAttributes: [PrettyPrintTree] {
-        return [PrettyPrintTree(root: modulePath.joined(separator: "."))]
+        var label = modulePath.joined(separator: ".")
+        if isExported {
+            label = "@_exported " + label
+        }
+        return [PrettyPrintTree(root: label)]
     }
 }
 

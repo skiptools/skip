@@ -24,6 +24,12 @@ public final class CodebaseInfo {
         }
     }
 
+    /// Names of modules this codebase re-exports via `@_exported import` declarations.
+    ///
+    /// When another module depends on this one, the transpiler will additionally emit imports
+    /// for these modules so that names re-exported in Swift remain visible in Kotlin.
+    public internal(set) var exportedModuleNames: [String] = []
+
     /// Map between a Swift module and the equivalent Skip module(s).
     ///
     /// When a Swift module transitively imports other modules - e.g.`SwiftUI` imports `Foundation` - put the corresponding Skip module first
@@ -62,6 +68,17 @@ public final class CodebaseInfo {
     func gather(from syntaxTree: SyntaxTree) {
         assert(!isInUse)
         let importedModuleNames = syntaxTree.root.statements.importedModulePaths.compactMap(\.moduleName)
+        for exportedModuleName in syntaxTree.root.statements.exportedImportedModulePaths.compactMap(\.moduleName) {
+            // Only record `@_exported` targets that are themselves Skip modules — i.e. ones we either have
+            // a `ModuleExport` for (transpiled by Skip in this build), or that map onto a Skip module via
+            // the built-in framework name table. Native-only Swift modules (e.g. `SwiftJNI`) must not be
+            // propagated, since the transpiler would otherwise emit a Kotlin import for a package that
+            // does not exist on the JVM side.
+            guard isSkipModuleName(exportedModuleName) else { continue }
+            if !exportedModuleNames.contains(exportedModuleName) {
+                exportedModuleNames.append(exportedModuleName)
+            }
+        }
         var needsVariableTypeInference = false
         for statement in syntaxTree.root.statements {
             switch statement.type {
@@ -125,7 +142,50 @@ public final class CodebaseInfo {
 
     private func context(importedModuleNames: [String], sourceFile: Source.FilePath?, cache: ContextCache) -> Context {
         let mappedModuleNames = importedModuleNames.flatMap { Self.moduleNameMap[$0] ?? [$0] }
-        return Context(global: self, importedModuleNames: Set(mappedModuleNames), sourceFile: sourceFile, cache: cache)
+        let expandedModuleNames = expandWithExportedImports(in: mappedModuleNames)
+        return Context(global: self, importedModuleNames: expandedModuleNames, sourceFile: sourceFile, cache: cache)
+    }
+
+    /// Whether the given Swift module name refers to a Skip-transpiled module — either one transpiled in
+    /// this build (present in `dependentModules`) or a Swift framework that maps to a Skip module via
+    /// `moduleNameMap`. Used to filter `@_exported import` targets so that re-exports of native-only
+    /// Swift modules (e.g. `SwiftJNI`) do not become spurious Kotlin imports.
+    private func isSkipModuleName(_ moduleName: String) -> Bool {
+        if Self.moduleNameMap[moduleName] != nil {
+            return true
+        }
+        return dependentModules.contains(where: { $0.moduleName == moduleName })
+    }
+
+    /// Expand the given module names to include modules they transitively re-export via `@_exported import`.
+    ///
+    /// When a file imports a module that re-exports others, the imported names must be visible during type
+    /// inference as if those modules were imported directly.
+    private func expandWithExportedImports(in moduleNames: [String]) -> Set<String> {
+        var result = Set(moduleNames)
+        var queue = Array(moduleNames)
+        // Build a name -> exports map, including the current module so source files that import it pick up its re-exports
+        var exportsByModule: [String: [String]] = [:]
+        for dependentModule in dependentModules {
+            if let name = dependentModule.moduleName, let exports = dependentModule.exportedModuleNames, !exports.isEmpty {
+                exportsByModule[name] = exports
+            }
+        }
+        if let name = moduleName, !exportedModuleNames.isEmpty {
+            exportsByModule[name] = exportedModuleNames
+        }
+        while let next = queue.popLast() {
+            guard let exported = exportsByModule[next] else { continue }
+            for exportedName in exported {
+                // Re-exported names may themselves be Swift framework names that map to Skip modules
+                for mapped in Self.moduleNameMap[exportedName] ?? [exportedName] {
+                    if result.insert(mapped).inserted {
+                        queue.append(mapped)
+                    }
+                }
+            }
+        }
+        return result
     }
 
     /// The items for the given name.
@@ -1392,6 +1452,14 @@ public final class CodebaseInfo {
         public let moduleName: String?
         public let packageName: String?
 
+        /// Names of modules this module re-exports via `@_exported import`.
+        ///
+        /// Declared optional so the auto-synthesized `Codable` conformance treats the field as a
+        /// backwards-compatible addition: `skipcode.json` files produced by older versions of
+        /// skipstone simply omit the key, and modules with no `@_exported import`s store `nil`
+        /// here so they also omit the key on encode.
+        public let exportedModuleNames: [String]?
+
         // Default visibility for testing
         var rootTypes: [TypeInfo] = []
         var rootTypealiases: [TypealiasInfo] = []
@@ -1412,18 +1480,23 @@ public final class CodebaseInfo {
             case rootFunctions = "f"
             case rootExtensions = "e"
             case sourceFileTable = "stable"
+            case exportedModuleNames = "x"
         }
 
         public init(of codebaseInfo: CodebaseInfo) {
             self.moduleName = codebaseInfo.moduleName
             self.packageName = codebaseInfo.kotlin?.packageName
+            // Store `nil` (not an empty array) when the module has no `@_exported import`s so the
+            // synthesized encoder omits the key entirely, matching `skipcode.json` files produced
+            // by older skipstone versions byte-for-byte.
+            self.exportedModuleNames = codebaseInfo.exportedModuleNames.isEmpty ? nil : codebaseInfo.exportedModuleNames
 
             // We want to always produce the same encoded output for the same input, because new output from one module might be a signal
             // that modules depending on it have to re-transpile. Sort for stability. API within a file will always have been added in the
             // same order, so we only need to sort by file
             let sortBy: (CodebaseInfoItem, CodebaseInfoItem) -> Bool = { ($0.sourceFile?.path ?? "") < ($1.sourceFile?.path ?? "") }
             let filter: (CodebaseInfoItem) -> Bool = { $0.modifiers.visibility == .public || $0.modifiers.visibility == .open || $0.declarationType == .extensionDeclaration }
-            
+
             // Sort types before applying `export` so that the source file table that export builds is in stable order
             self.rootTypes = codebaseInfo.rootTypes.sorted(by: sortBy).compactMap { export(typeInfo: $0, filter: filter) }
             self.rootTypealiases = codebaseInfo.rootTypealiases.sorted(by: sortBy).filter(filter).map { replaceSourceFile(for: $0) }

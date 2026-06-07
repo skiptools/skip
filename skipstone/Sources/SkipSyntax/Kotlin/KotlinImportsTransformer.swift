@@ -6,9 +6,11 @@
 final class KotlinImportsTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
         // There's no point in running this transformer in the symbol gathering phase
-        guard translator.codebaseInfo != nil else {
+        guard let codebaseInfoContext = translator.codebaseInfo else {
             return []
         }
+
+        let exportedModuleNamesByModuleName = exportedModuleNamesByModuleName(in: codebaseInfoContext.global)
 
         // Translate imports and remove redundancies
         var importPaths: Set<[String]> = []
@@ -48,6 +50,26 @@ final class KotlinImportsTransformer: KotlinTransformer {
                 }
             }
         }
+
+        // For every imported module that re-exports other modules via `@_exported import`, also emit those imports.
+        // We walk transitively so that re-exports of re-exports are followed.
+        let allModulePaths = importPaths
+        var queue: [[String]] = Array(allModulePaths)
+        while let modulePath = queue.popLast() {
+            guard modulePath.count == 1, let exportedModuleNames = exportedModuleNamesByModuleName[modulePath[0]] else {
+                continue
+            }
+            for exportedModuleName in exportedModuleNames {
+                let exportedModulePaths = translateImport(modulePath: [exportedModuleName])
+                for exportedModulePath in exportedModulePaths {
+                    if importPaths.insert(exportedModulePath).inserted {
+                        additionalImportDeclarations.append(KotlinImportDeclaration(modulePath: exportedModulePath, unmappedModulePath: [exportedModuleName]))
+                        queue.append(exportedModulePath)
+                    }
+                }
+            }
+        }
+
         syntaxTree.root.insert(statements: additionalImportDeclarations, after: lastImportDeclaration)
         return []
     }
@@ -57,5 +79,20 @@ final class KotlinImportsTransformer: KotlinTransformer {
             return skipModuleNames.map { [$0] }
         }
         return [modulePath]
+    }
+
+    /// Build a lookup from the importable module name (the post-mapping module name, e.g., `SkipSQL`) to the list of modules it re-exports.
+    private func exportedModuleNamesByModuleName(in codebaseInfo: CodebaseInfo) -> [String: [String]] {
+        var result: [String: [String]] = [:]
+        for dependentModule in codebaseInfo.dependentModules {
+            if let moduleName = dependentModule.moduleName, let exports = dependentModule.exportedModuleNames, !exports.isEmpty {
+                result[moduleName] = exports
+            }
+        }
+        // The current module's own `@_exported import`s should also propagate when source files re-import the current module under a different name in tests.
+        if let moduleName = codebaseInfo.moduleName, !codebaseInfo.exportedModuleNames.isEmpty {
+            result[moduleName] = codebaseInfo.exportedModuleNames
+        }
+        return result
     }
 }
