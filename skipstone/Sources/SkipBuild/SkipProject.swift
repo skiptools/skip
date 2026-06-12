@@ -2326,6 +2326,8 @@ lane :release do |options|
   upload_to_app_store(
     api_key_path: "fastlane/apikey.json",
     app_rating_config_path: "fastlane/metadata/rating.json",
+    skip_metadata: false,
+    overwrite_screenshots: true,
     release_notes: { default: "Fixes and improvements." }
   )
 end
