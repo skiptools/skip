@@ -644,7 +644,13 @@ final class KotlinBridgeToSwiftVisitor {
                 swift.append(indentation.inc(), "f_continuation.resume()")
             } else if !isThrows {
                 swift.append(indentation, "let f_return_callback: @Sendable \(callbackType) = { f_return in")
-                swift.append(indentation.inc(), "f_continuation.resume(returning: f_return)")
+                // The bridged return value may be non-Sendable (e.g. a `BridgedFromKotlin`
+                // projection wrapping a JNI handle). It is delivered exactly once by the JNI
+                // completion callback and handed straight to the continuation, so transferring
+                // it across the `sending` boundary of `resume(returning:)` is safe even under
+                // Swift 6 region-based isolation. `nonisolated(unsafe)` asserts that.
+                swift.append(indentation.inc(), "nonisolated(unsafe) let f_return_value = f_return")
+                swift.append(indentation.inc(), "f_continuation.resume(returning: f_return_value)")
             } else {
                 if callbackType.parameters.count == 1 {
                     swift.append(indentation, "let f_return_callback: @Sendable \(callbackType) = { f_error in")
@@ -658,9 +664,16 @@ final class KotlinBridgeToSwiftVisitor {
                 if callbackType.parameters.count == 1 {
                     swift.append(indentation.inc(), "f_continuation.resume()")
                 } else if bridgable.return.type.isOptional {
-                    swift.append(indentation.inc(), "f_continuation.resume(returning: f_return)")
+                    // The bridged return value may be non-Sendable (e.g. a `BridgedFromKotlin`
+                // projection wrapping a JNI handle). It is delivered exactly once by the JNI
+                // completion callback and handed straight to the continuation, so transferring
+                // it across the `sending` boundary of `resume(returning:)` is safe even under
+                // Swift 6 region-based isolation. `nonisolated(unsafe)` asserts that.
+                swift.append(indentation.inc(), "nonisolated(unsafe) let f_return_value = f_return")
+                swift.append(indentation.inc(), "f_continuation.resume(returning: f_return_value)")
                 } else {
-                    swift.append(indentation.inc(), "f_continuation.resume(returning: f_return!)")
+                    swift.append(indentation.inc(), "nonisolated(unsafe) let f_return_value = f_return!")
+                    swift.append(indentation.inc(), "f_continuation.resume(returning: f_return_value)")
                 }
                 swift.append(indentation, "}")
                 indentation = indentation.dec()
