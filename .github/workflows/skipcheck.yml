@@ -30,7 +30,7 @@ jobs:
       # larger projects sometimes yield: Unhandled exception. System.IO.IOException: No space left on device : '/Users/runner/runners/…
       - name: Free Disk Space
         run: sudo rm -rf /Applications/Xcode_14*.app /Applications/Xcode_15*.app /Applications/Xcode_16.app /Applications/Xcode_16.1.app /Applications/Xcode_16_2.app /Applications/Xcode_16.3.app
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: current
           add-job-summary: never
