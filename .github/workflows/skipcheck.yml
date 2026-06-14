@@ -53,6 +53,9 @@ jobs:
       - run: skip init --transpiled-app --appid=xyz.skip.Demo demo-app DemoApp DemoModule
       - run: skip init --transpiled-app --appfair demo-appfair DemoFairApp
 
+      # needed or else: Error: Refusing to load cask skiptools/skip/swift-host-toolchain@6.2.3 from untrusted tap skiptools/skip.
+      - run: brew trust skiptools/skip
+
       # setup Android SDK and emulator
       - run: skip android sdk install --version ${{ matrix.android-sdk }} --verbose
 
