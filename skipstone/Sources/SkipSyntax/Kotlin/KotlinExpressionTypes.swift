@@ -194,6 +194,9 @@ final class KotlinBinaryOperator: KotlinExpression, KotlinSingleStatementVetoing
     var lhs: KotlinExpression
     var rhs: KotlinExpression
     var mayBeSharedMutableStruct = false
+    /// The inferred result type of the operator expression, used e.g. to decide whether a statement-level
+    /// operator that produces a View (such as `Text + Text`) needs a Compose tail call.
+    var inferredType: TypeSignature = .none
 
     static func translate(expression: BinaryOperator, translator: KotlinTranslator) -> KotlinExpression {
         // Special case when assigning to _
@@ -209,6 +212,7 @@ final class KotlinBinaryOperator: KotlinExpression, KotlinSingleStatementVetoing
 
         let kexpression = KotlinBinaryOperator(expression: expression, lhs: klhs, rhs: krhs)
         kexpression.mayBeSharedMutableStruct = expression.inferredType.kotlinMayBeSharedMutableStruct(codebaseInfo: translator.codebaseInfo)
+        kexpression.inferredType = expression.inferredType.resolvingSelf(in: expression)
 
         switch expression.op.symbol {
         case "<<=", ">>=", "&=", "|=", "^=", "~=":

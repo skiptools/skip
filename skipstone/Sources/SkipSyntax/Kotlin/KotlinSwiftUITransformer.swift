@@ -720,6 +720,22 @@ private final class TranslateVisitor {
                 } else {
                     return .recurse(nil)
                 }
+            } else if let binaryOperator = node as? KotlinBinaryOperator {
+                var parent = node.parent
+                if parent is KotlinSRef {
+                    parent = parent?.parent
+                }
+                // A statement-level operator expression that evaluates to a View — most notably
+                // `Text + Text` concatenation — is built into the TupleView like any other view and
+                // must get a Compose tail call. Wrap it in parentheses so `.Compose` applies to the
+                // whole operator result rather than binding to its right-hand operand.
+                if let expressionStatement = parent as? KotlinExpressionStatement, !isInAssignmentExpression(expressionStatement, in: codeBlock),
+                    isSwiftUIType(named: "View", type: binaryOperator.inferredType, codebaseInfo: translator.codebaseInfo) {
+                    addComposeTailCall(to: KotlinParenthesized(content: binaryOperator), statement: expressionStatement)
+                    return .skip
+                } else {
+                    return .recurse(nil)
+                }
             } else {
                 return .recurse(nil)
             }

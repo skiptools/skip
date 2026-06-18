@@ -2884,4 +2884,46 @@ final class SwiftUITests: XCTestCase {
         }
         """)
     }
+
+    func testViewProducingOperatorTailCall() async throws {
+        // A statement-level operator expression that evaluates to a View (e.g. `Text + Text`
+        // concatenation) must get a Compose tail call, wrapped in parentheses so `.Compose`
+        // applies to the whole operator result rather than its right-hand operand.
+        let supportingSwift = baseSupportingSwift + """
+        extension Text {
+            // SKIP DECLARE: operator fun plus(other: Text): Text
+            func plus(other: Text) -> Text {
+            }
+        }
+        """
+
+        try await check(supportingSwift: supportingSwift, swift: """
+        import SwiftUI
+        func f() {
+            VStack {
+                Text("a") + Text("b")
+            }
+        }
+        """, kotlin: """
+        import androidx.compose.runtime.Composable
+        import androidx.compose.runtime.getValue
+        import androidx.compose.runtime.mutableStateOf
+        import androidx.compose.runtime.remember
+        import androidx.compose.runtime.saveable.Saver
+        import androidx.compose.runtime.saveable.rememberSaveable
+        import androidx.compose.runtime.setValue
+
+        import skip.ui.*
+        import skip.foundation.*
+        import skip.model.*
+        internal fun f() {
+            VStack { ->
+                ComposeBuilder { composectx: ComposeContext ->
+                    (Text("a") + Text("b")).Compose(composectx)
+                    ComposeResult.ok
+                }
+            }
+        }
+        """)
+    }
 }
