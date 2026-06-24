@@ -13,6 +13,12 @@ fileprivate let testCommandEnabled = true
 fileprivate let testCommandEnabled = false
 #endif
 
+/// The format for `skip test` result output: a human-readable `table` (default) or structured `json`.
+enum TestOutputFormat: String, CaseIterable, ExpressibleByArgument {
+    case table
+    case json
+}
+
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 struct TestCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
     typealias Output = MessageBlock
@@ -80,6 +86,12 @@ struct TestCommand: SkipCommand, StreamingCommand, ToolOptionsCommand {
 
     @Option(name: [.long], help: ArgumentHelp("Output summary table", valueName: "path"))
     var summaryFile: String?
+
+    @Option(name: [.long], help: ArgumentHelp("Test result output format: table (default) or json", valueName: "format"))
+    var testOutput: TestOutputFormat = .table
+
+    @Option(name: [.long], help: ArgumentHelp("Write the test result output to this file instead of standard out", valueName: "path"))
+    var testOutputFile: String?
 
     @Option(help: ArgumentHelp("Android device or emulator serial for instrumented tests (omit for local Robolectric testing)", valueName: "ANDROID_SERIAL"))
     var androidSerial: String?
@@ -195,6 +207,10 @@ extension TestCommand {
         let skipModuleTests = xunitCasesAll.filter({ $0.name == "testSkipModule" })
         let xunitCases = xunitCasesAll.filter({ $0.name != "testSkipModule" })
 
+        // A `mode: native` Swift Testing test module is a CONVENTIONAL Skip test module (skipstone plugin
+        // + `SkipTest`), so it always produces a `testSkipModule` harness case and is driven through the
+        // Gradle path below (connectedDebugAndroidTest on device / testDebug on Robolectric) — see the
+        // generated runners + gradle blocks in SwiftTestingHarness.swift.
         if skipModuleTests.isEmpty {
             throw SkipDriveError(errorDescription: "Could not find Skip test testSkipModule in: \(xunitCases.map(\.name))")
         }
@@ -207,6 +223,9 @@ extension TestCommand {
 
         var allXunitStats: [Stats] = []
         var allJunitStats: [Stats] = []
+
+        // per-module matched results, rendered together (table or json) after the loop
+        var moduleResults: [(module: String, darwin: String, android: String, cases: [(xunit: TestCaseInfo, junit: TestCaseInfo?)])] = []
 
         // load the junit result folders
         for skipModule in skipModules {
@@ -221,7 +240,14 @@ extension TestCommand {
                 let buildFolderBase = try AbsolutePath(validating: ".build", relativeTo: AbsolutePath(validating: project, relativeTo: AbsolutePath(validating: FileManager.default.currentDirectoryPath)))
                 let testOutputBase = try buildPluginOutputFolder(forModule: skipModule + "Tests", inBuildFolder: buildFolderBase)
 
-                let testOutput = testOutputBase.appending(components: [skipModule.description, ".build", skipModule.description, "test-results", "test\(configuration.capitalized)UnitTest"])
+                // connectedAndroidTest (emulator/device) writes results under outputs/androidTest-results/connected/<config>;
+                // testDebugUnitTest (Robolectric, no device) writes under test-results/test<Config>UnitTest.
+                let testOutput: AbsolutePath
+                if additionalEnv["ANDROID_SERIAL"] != nil {
+                    testOutput = testOutputBase.appending(components: [skipModule.description, ".build", skipModule.description, "outputs", "androidTest-results", "connected", configuration])
+                } else {
+                    testOutput = testOutputBase.appending(components: [skipModule.description, ".build", skipModule.description, "test-results", "test\(configuration.capitalized)UnitTest"])
+                }
 
                 junitFolder = testOutput.asURL
             }
@@ -246,6 +272,15 @@ extension TestCommand {
 
                 junitCases.append(contentsOf: junitResults.flatMap(\.testCases))
             }
+
+            // A `mode: native` module runs its whole Swift Testing suite inside one JUnit case
+            // (`SwiftTestRunner.nativeSwiftTests`), so Gradle only reports that aggregate. The native test
+            // harness additionally writes the swt ABI-v0 event stream to `swt-events.jsonl` in the junit
+            // output dir; recover per-test results from it so each test is reported individually (matched
+            // against its host/Darwin counterpart) and the aggregate row is dropped.
+            let swtEventsURL = junitFolder.appendingPathComponent("swt-events.jsonl")
+            let nativeCases = FileManager.default.fileExists(atPath: swtEventsURL.path) ? parseNativeSwtEvents(swtEventsURL) : []
+            junitCases.append(contentsOf: nativeCases.map { $0 as TestCaseInfo })
 
             // now we have all the test cases; for each xunit test, check for an equivalent JUnit test
             // note that xunit: classname="SkipZipTests.SkipZipTests" name="testDeflateInflate"
@@ -284,15 +319,36 @@ extension TestCommand {
                 matchedCases.append((xunit: xunitCase, junit: cases.first))
             }
 
-            let (testsTable, xunit, junit) = createTestSummaryTable(columnLength: maxColumnLength, matchedCases, testNameComparison)
+            // When per-test native results were recovered (above), they're matched individually, so the
+            // aggregate `SwiftTestRunner.nativeSwiftTests` case is redundant. Only fall back to reporting it
+            // directly (paired with itself) when no per-test stream was available, so its pass/fail still
+            // shows rather than being silently dropped.
+            if nativeCases.isEmpty {
+                let matchedJunitNames = Set(matchedCases.compactMap(\.junit).map(\.name))
+                for junitCase in junitCases where junitCase.classname.hasSuffix(".SwiftTestRunner") && !matchedJunitNames.contains(junitCase.name) {
+                    matchedCases.append((xunit: junitCase, junit: junitCase))
+                }
+            }
+
+            // Descriptive column titles: the host (XUnit) column is always Darwin/macOS; the Gradle (JUnit)
+            // column reflects the Android build mode — Fuse-compiled native (the run produced a
+            // SwiftTestRunner harness case) vs Lite-transpiled — and where it ran (a connected
+            // device/emulator named by ANDROID_SERIAL, else Robolectric on the host JVM).
+            let darwinTitle = "Darwin (macOS)"
+            let androidMode = (junitCases.contains(where: { $0.classname.hasSuffix(".SwiftTestRunner") }) || !nativeCases.isEmpty) ? "Fuse" : "Lite"
+            let androidTarget = additionalEnv["ANDROID_SERIAL"] ?? "Robolectric"
+            let androidTitle = "Android (\(androidMode) \(androidTarget))"
+
+            let (xunit, junit) = computeStats(matchedCases)
             allXunitStats.append(xunit)
             allJunitStats.append(junit)
-            await out.write(status: nil, testsTable)
+            // collect for the post-loop render (table or json); the in-loop CI summary file stays markdown
+            moduleResults.append((module: String(skipModule), darwin: darwinTitle, android: androidTitle, cases: matchedCases))
 
             // when we are running in CI, the "GITHUB_STEP_SUMMARY" contains the path of a file that can be used to write a markdown summary of the tests
             // https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary
             if let summaryFile = self.summaryFile ?? ProcessInfo.processInfo.environment["GITHUB_STEP_SUMMARY"] ?? ProcessInfo.processInfo.environment["CI_STEP_SUMMARY"], !summaryFile.isEmpty {
-                let (summaryTable, _, _) = createTestSummaryTable(columnLength: 1024, matchedCases, testNameComparison)
+                let (summaryTable, _, _) = createTestSummaryTable(columnLength: 1024, darwinTitle: darwinTitle, androidTitle: androidTitle, matchedCases, testNameComparison)
 
                 if !FileManager.default.fileExists(atPath: summaryFile) {
                     _ = FileManager.default.createFile(atPath: summaryFile, contents: nil, attributes: nil)
@@ -304,6 +360,21 @@ extension TestCommand {
                     try? handle.write(contentsOf: (summaryTable + "\n").utf8Data)
                 }
             }
+        }
+
+        // render the collected results in the requested format and route them to a file or standard out
+        let outputText: String
+        switch testOutput {
+        case .table:
+            outputText = moduleResults.map { createTestSummaryTable(columnLength: maxColumnLength, darwinTitle: $0.darwin, androidTitle: $0.android, $0.cases, testNameComparison).table }.joined(separator: "\n")
+        case .json:
+            outputText = try renderJSONReport(moduleResults, testNameComparison)
+        }
+        if let testOutputFile = self.testOutputFile, !testOutputFile.isEmpty {
+            try outputText.write(toFile: testOutputFile, atomically: true, encoding: .utf8)
+            await out.write(status: nil, "Wrote \(testOutput.rawValue) test results to \(testOutputFile)")
+        } else {
+            await out.write(status: nil, outputText)
         }
 
         let exitCode = try? testResult?.get().exitCode
@@ -335,7 +406,98 @@ extension TestCommand {
         #endif
     }
 
-    private func createTestSummaryTable(columnLength: Int, _ matchedCases: [(xunit: TestCaseInfo, junit: TestCaseInfo?)], _ testNameComparison: (TestCaseInfo, TestCaseInfo) -> Bool) -> (table: String, xunit: Stats, junit: Stats) {
+    /// Parse the native test harness's swt ABI-v0 JSON event stream (`swt-events.jsonl`, one record per
+    /// line) into per-test results. The `kind:"test"`/`kind:"function"` records catalog each test's
+    /// function-style `name` and its `id` (`<Module.Suite>/<fn()>/<file>:<line>:<col>`); the
+    /// `kind:"event"` `testEnded`/`issueRecorded`/`testSkipped` records (keyed by `testID`) give pass/
+    /// fail/skip. Returns one `NativeTestCase` per function that ran, with `classname` = the suite id
+    /// (so it matches the host xunit case for the same test) and `name` = the function name.
+    private func parseNativeSwtEvents(_ url: URL) -> [NativeTestCase] {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
+        struct State { var failed = false; var skipped = false; var ran = false; var started: Double? = nil; var ended: Double? = nil }
+        var names: [String: String] = [:]    // function id -> "demoFramework()"
+        var suites: [String: String] = [:]   // function id -> "Module.Suite"
+        var states: [String: State] = [:]
+        func instant(_ payload: [String: Any]) -> Double? { (payload["instant"] as? [String: Any])?["absolute"] as? Double }
+        for line in text.split(separator: "\n") {
+            // Tolerate any leading text before the JSON object: the connected (device) path recovers the
+            // stream from logcat, where some records arrive raw and others carry a "Test line: " prefix.
+            guard let brace = line.firstIndex(of: "{") else { continue }
+            guard let obj = try? JSONSerialization.jsonObject(with: Data(line[brace...].utf8)) as? [String: Any],
+                  let payload = obj["payload"] as? [String: Any] else { continue }
+            switch obj["kind"] as? String {
+            case "test":
+                if (payload["kind"] as? String) == "function",
+                   let id = payload["id"] as? String, let name = payload["name"] as? String {
+                    names[id] = name
+                    suites[id] = String(id.prefix(while: { $0 != "/" }))   // "Module.Suite" before the first '/'
+                }
+            case "event":
+                guard let testID = payload["testID"] as? String, names[testID] != nil else { break }
+                switch payload["kind"] as? String {
+                case "testStarted":
+                    states[testID, default: State()].started = instant(payload)
+                case "issueRecorded":
+                    if let issue = payload["issue"] as? [String: Any], (issue["isFailure"] as? Bool) == true {
+                        states[testID, default: State()].failed = true
+                    }
+                case "testSkipped":
+                    states[testID, default: State()].skipped = true
+                    states[testID, default: State()].ran = true
+                case "testEnded":
+                    let symbol = (payload["messages"] as? [[String: Any]])?.first?["symbol"] as? String
+                    if symbol == "fail" { states[testID, default: State()].failed = true }
+                    states[testID, default: State()].ended = instant(payload)
+                    states[testID, default: State()].ran = true
+                default: break
+                }
+            default: break
+            }
+        }
+        return names.compactMap { id, name in
+            guard let state = states[id], state.ran else { return nil }   // only tests that actually ran
+            // duration from the testStarted/testEnded monotonic `absolute` instants (0 = unknown)
+            let duration: TimeInterval
+            if let started = state.started, let ended = state.ended { duration = max(0, ended - started) } else { duration = 0 }
+            return NativeTestCase(name: name, classname: suites[id] ?? "", time: duration, skipped: state.skipped, hasFailures: state.failed)
+        }
+    }
+
+    /// The Darwin (xunit) and Android (junit) pass/fail/skip/missing tallies for a module's matched cases.
+    private func computeStats(_ matchedCases: [(xunit: TestCaseInfo, junit: TestCaseInfo?)]) -> (xunit: Stats, junit: Stats) {
+        var (xunitStats, junitStats) = (Stats(), Stats())
+        for (xunit, junit) in matchedCases {
+            xunitStats.update(xunit)
+            junitStats.update(junit)
+        }
+        return (xunitStats, junitStats)
+    }
+
+    /// Render the matched results across all modules as a structured JSON document (per-test status +
+    /// duration for each platform, plus per-platform tallies). Slashes are left unescaped for readability.
+    private func renderJSONReport(_ moduleResults: [(module: String, darwin: String, android: String, cases: [(xunit: TestCaseInfo, junit: TestCaseInfo?)])], _ testNameComparison: (TestCaseInfo, TestCaseInfo) -> Bool) throws -> String {
+        func result(_ test: TestCaseInfo?) -> TestReport.Result? {
+            guard let test = test else { return nil }   // unmatched on this platform
+            let status = test.skipped ? "skip" : test.hasFailures ? "fail" : "pass"
+            return TestReport.Result(status: status, time: test.time > 0 ? test.time : nil)
+        }
+        var (allXunit, allJunit) = (Stats(), Stats())
+        let modules: [TestReport.Module] = moduleResults.map { mr in
+            let cases: [TestReport.Case] = mr.cases.sorted(by: { testNameComparison($0.xunit, $1.xunit) }).map { (xunit, junit) in
+                allXunit.update(xunit)
+                allJunit.update(junit)
+                return TestReport.Case(suite: xunit.classname.split(separator: ".").last?.description ?? xunit.classname, name: xunit.name, darwin: result(xunit), android: result(junit))
+            }
+            return TestReport.Module(module: mr.module, darwin: mr.darwin, android: mr.android, cases: cases)
+        }
+        func counts(_ s: Stats) -> TestReport.Counts { TestReport.Counts(passed: s.passed, failed: s.failed, skipped: s.skipped, missing: s.missing) }
+        let report = TestReport(modules: modules, summary: TestReport.Summary(darwin: counts(allXunit), android: counts(allJunit)))
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        return String(decoding: try encoder.encode(report), as: UTF8.self)
+    }
+
+    private func createTestSummaryTable(columnLength: Int, darwinTitle: String, androidTitle: String, _ matchedCases: [(xunit: TestCaseInfo, junit: TestCaseInfo?)], _ testNameComparison: (TestCaseInfo, TestCaseInfo) -> Bool) -> (table: String, xunit: Stats, junit: Stats) {
         // now output all of the test cases
         var outputColumns: [[String]] = [[], [], [], []]
 
@@ -349,7 +511,7 @@ extension TestCommand {
         }
 
         //addSeparator()
-        addRow(["Test", "Case", "Swift", "Kotlin"])
+        addRow(["Test", "Case", darwinTitle, androidTitle])
         addSeparator()
 
         var (xunitStats, junitStats) = (Stats(), Stats())
@@ -365,10 +527,12 @@ extension TestCommand {
                 guard let test = test else {
                     return "????" // unmatched
                 }
-                let result = (test.skipped == true ? "SKIP" : test.hasFailures ? "FAIL" : "PASS")
-                //result += " (" + ((round(test.time * 1000) / 1000).description) + ")"
+                var result = (test.skipped == true ? "SKIP" : test.hasFailures ? "FAIL" : "PASS")
+                // append the per-test duration when known (0 = unknown, e.g. an unmatched/aggregate case)
+                if test.time > 0 {
+                    result += String(format: " (%.2fs)", test.time)
+                }
                 return result
-
             }
 
             outputColumns[2].append(desc(xunit))
@@ -383,7 +547,10 @@ extension TestCommand {
         // pad all the columns for nice output
         let lengths = outputColumns.map({ $0.reduce(0, { max($0, $1.count) })})
         for (index, length) in lengths.enumerated() {
-            outputColumns[index] = outputColumns[index].map { $0.pad(min(length, columnLength), paddingCharacter: $0 == "-" ? "-" : " ") }
+            // Cap the variable-length Test/Case columns at columnLength; let the fixed Darwin/Android
+            // result-column headers size to their full width so the mode/device labels aren't truncated.
+            let width = index <= 1 ? min(length, columnLength) : length
+            outputColumns[index] = outputColumns[index].map { $0.pad(width, paddingCharacter: $0 == "-" ? "-" : " ") }
         }
 
         let rowCount = outputColumns.map({ $0.count }).min() ?? 0
@@ -411,6 +578,40 @@ extension TestCommand {
     }
 }
 
+/// The structured `skip test` results emitted by `--test-output=json`: per-test status and duration on
+/// each platform, plus per-platform tallies. A `null` per-platform result means the test was unmatched
+/// there; a `null`/omitted `time` means the duration is unknown (e.g. an aggregate or unmatched case).
+struct TestReport: Encodable {
+    struct Result: Encodable {
+        let status: String          // "pass" / "fail" / "skip"
+        let time: TimeInterval?     // seconds; omitted when unknown
+    }
+    struct Case: Encodable {
+        let suite: String
+        let name: String
+        let darwin: Result?
+        let android: Result?
+    }
+    struct Module: Encodable {
+        let module: String
+        let darwin: String          // Darwin column title
+        let android: String         // Android column title
+        let cases: [Case]
+    }
+    struct Counts: Encodable {
+        let passed: Int
+        let failed: Int
+        let skipped: Int
+        let missing: Int
+    }
+    struct Summary: Encodable {
+        let darwin: Counts
+        let android: Counts
+    }
+    let modules: [Module]
+    let summary: Summary
+}
+
 protocol TestCaseInfo {
     /// e.g.: someTestCaseThatAlwaysFails()
     var name: String { get }
@@ -422,6 +623,16 @@ protocol TestCaseInfo {
     var skipped: Bool { get }
     /// The failures, if any
     var hasFailures: Bool { get }
+}
+
+/// A per-test result synthesized from a `mode: native` module's swt event stream, so each native Swift
+/// Testing case can be reported (and matched against its host/Darwin counterpart) individually.
+struct NativeTestCase: TestCaseInfo {
+    var name: String
+    var classname: String
+    var time: TimeInterval
+    var skipped: Bool
+    var hasFailures: Bool
 }
 
 #if canImport(SkipDriveExternal) // needed for GradleDriver.TestCase

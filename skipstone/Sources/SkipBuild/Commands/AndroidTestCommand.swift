@@ -72,6 +72,12 @@ struct AndroidTestCommand: AndroidOperationCommand {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Package and run tests as an Android APK"))
     var apk: Bool = false
 
+    @Option(help: ArgumentHelp("Build the native Swift Testing bundle + JNI harness into <dir>/<abi> (jniLibs layout) instead of running them; used by the Gradle connectedAndroidTest path for `mode: native` test modules", valueName: "dir"))
+    var buildTestLibs: String? = nil
+
+    @Flag(help: ArgumentHelp("With --build-test-libs, build the test bundle + harness for the HOST (Robolectric / `testDebug`, no device) instead of Android"))
+    var robolectric: Bool = false
+
     @Option(help: ArgumentHelp("Path to write the JSON event stream output", valueName: "path"))
     var eventStreamOutputPath: String? = nil
 
@@ -80,7 +86,13 @@ struct AndroidTestCommand: AndroidOperationCommand {
     var args: [String] = []
 
     func performCommand(with out: MessageQueue) async throws {
-        if apk {
+        if let buildTestLibs = buildTestLibs {
+            if robolectric {
+                try await buildLocalTestLibs(outputDir: buildTestLibs, with: out)
+            } else {
+                try await buildNativeTestLibs(outputDir: buildTestLibs, with: out)
+            }
+        } else if apk {
             try await runSwiftPMAsAPK(cleanup: cleanup, eventStreamOutputPath: eventStreamOutputPath, with: out)
         } else {
             try await runSwiftPM(cleanup: cleanup, commandEnvironment: env, defaultArch: .current, remoteFolder: remoteFolder, copy: copy, testingLibrary: testingLibrary, with: out)
@@ -192,6 +204,28 @@ fileprivate extension AndroidOperationCommand {
         ], env: env, with: out)
 
         return signedAPK
+    }
+
+    /// Build the native Swift Testing bundle + the Android JNI harness (`libtest_harness.so`) into
+    /// `<outputDir>/<abi>` (jniLibs layout) for the Gradle `connectedAndroidTest` path. The on-device
+    /// `org.swift.test.SwiftTestRunner` then `System.loadLibrary("test_harness")` and runs swt.
+    func buildNativeTestLibs(outputDir: String, with out: MessageQueue) async throws {
+        #if !canImport(SkipDriveExternal)
+        throw ToolLaunchError(errorDescription: "Cannot launch android command without SkipDriveExternal")
+        #else
+        try await stageTestLibs(try await androidTestLibsTarget(with: out), outputDir: outputDir, with: out)
+        #endif
+    }
+
+    /// Build the native Swift Testing bundle + a pure-Swift host JNI harness (`libtest_harness.dylib`)
+    /// into `<outputDir>` (plus a `dyld-env.txt`) for the Robolectric (`testDebug`, no device) path. The
+    /// host `org.swift.test.SwiftTestRunner` then `System.load`s the harness and runs swt.
+    func buildLocalTestLibs(outputDir: String, with out: MessageQueue) async throws {
+        #if !canImport(SkipDriveExternal)
+        throw ToolLaunchError(errorDescription: "Cannot launch android command without SkipDriveExternal")
+        #else
+        try await stageTestLibs(try await hostTestLibsTarget(with: out), outputDir: outputDir, with: out)
+        #endif
     }
 
     /// Build Swift tests as a shared library, package into an APK with an Instrumentation runner,
@@ -592,242 +626,225 @@ fileprivate extension AndroidOperationCommand {
     }
 }
 
-private let testHarnessLib = "test_harness"
-private let testPackage = "org.swift.test"
-private let testClassName = "SwiftTestRunner"
-private let testFullClass = "\(testPackage).\(testClassName)"
 
-/// Package.swift for the generated Swift test harness package.
-/// Defines a dynamic library target that produces `libtest_harness.so`
-private let harnessPackageSwift: String = """
-// swift-tools-version: 6.0
-import PackageDescription
+// MARK: - Shared native test-libs staging (Android jniLibs / Darwin Robolectric)
 
-let package = Package(
-    name: "test-harness",
-    products: [
-        .library(name: "\(testHarnessLib)", type: .dynamic, targets: ["TestHarness"])
-    ],
-    targets: [
-        .target(
-            name: "TestHarness",
-            linkerSettings: [
-                .linkedLibrary("log"),
-                .linkedLibrary("dl"),
-            ]
-        ),
-    ]
-)
-"""
+#if canImport(SkipDriveExternal)
 
-/// Java source for the Android Instrumentation test runner.
-/// Loads `libtest_harness.so`, calls `runTests()` via JNI, and uses
-/// `sendStatus()`/`finish()` for structured output back to the host.
-private let instrumentationJavaSource: String = """
-package \(testPackage);
+/// The platform-varying parts of building + staging the native Swift Testing bundle and its JNI harness.
+/// `stageTestLibs` drives the shared pipeline; `androidTestLibsTarget` / `hostTestLibsTarget` supply the
+/// Android-vs-Darwin specifics (toolchain build vs host `swift build`, `.so` vs `.dylib`, bundle layout,
+/// dependency set, per-ABI vs flat staging, the harness package/source, and any post-staging).
+fileprivate struct TestLibsTarget {
+    /// The Swift driver used to parse the package and build the harness.
+    let swiftCommand: String
+    /// The dynamic-library extension for staged artifacts (`so` / `dylib`).
+    let dylibExtension: String
+    /// Build the test bundle; returns its build-output dir, the environment for the harness build, and
+    /// any extra `swift build` arguments for the harness build (e.g. `--swift-sdk` on Android).
+    let buildTestBundle: () async throws -> (binDir: URL, harnessEnv: [String: String], harnessExtraArgs: [String])
+    /// The loadable Mach-O within the build output (the `.so` itself on Android; the bundle's inner
+    /// executable on Darwin).
+    let loadableTestBundle: (_ binDir: URL, _ packageName: String) -> URL
+    /// The dynamic libraries to stage alongside the test bundle.
+    let dependencyLibraries: (_ binDir: URL) throws -> [URL]
+    /// The directory to stage the libraries into (per-ABI on Android, flat on Darwin).
+    let stagingDirectory: (_ outputDir: String) -> URL
+    /// The harness `Package.swift`, and its Swift source given the staged test-lib base name.
+    let harnessPackage: String
+    let harnessSource: (_ testLibBaseName: String) -> String
+    /// Fallback harness build-output dir if `swift build --show-bin-path` yields nothing (Android computes
+    /// it from the triple); `nil` to require `--show-bin-path`.
+    let harnessBinFallback: (_ harnessDir: URL) -> URL?
+    /// Any extra staging once the libraries are in place (Darwin writes `dyld-env.txt`).
+    let postStage: (_ libDir: URL) async throws -> Void
+}
 
-import android.app.Instrumentation;
-import android.os.Bundle;
-
-public class \(testClassName) extends Instrumentation {
-    static {
-        android.util.Log.i("SwiftTest", "loading harness");
-        System.loadLibrary("\(testHarnessLib)");
-        android.util.Log.i("SwiftTest", "loaded harness");
-    }
-    private native int runTests();
-
-    @Override
-    public void onCreate(Bundle arguments) {
-        android.util.Log.i("SwiftTest", "onCreate");
-        super.onCreate(arguments);
-        // This triggers onStart() in a separate thread
-        start();
-        android.util.Log.i("SwiftTest", "onCreate: started");
-    }
-
-    @Override
-    public void onStart() {
-        super.onStart();
-        Bundle result = new Bundle();
-        try {
-            android.util.Log.i("SwiftTest", "onStart");
-            super.onStart();
-            android.util.Log.i("SwiftTest", "runTests");
-            int exitCode = runTests();
-            android.util.Log.i("SwiftTest", "runTests done");
-            result.putString("status", exitCode == 0 ? "passed" : "failed");
-            finish(exitCode == 0 ? -1 : exitCode, result);
-        } catch (Throwable t) {
-            android.util.Log.e("SwiftTest", "Test error", t);
-            finish(1, result);
+fileprivate extension AndroidOperationCommand {
+    /// The last non-empty stdout line of a tool invocation (used for `--show-bin-path` / `xcode-select`).
+    func captureLine(_ tool: String, _ arguments: [String], env: [String: String]) async throws -> String {
+        guard let stream = try? await launchTool(tool, arguments: arguments, env: env) else { return "" }
+        var lines: [String] = []
+        for try await line in stream {
+            let trimmed = line.line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { lines.append(trimmed) }
         }
+        return lines.last ?? ""
     }
 
-    public void reportTestOutput(String line) {
-        Bundle b = new Bundle();
-        b.putString("stream", line + "\\n");
-        sendStatus(0, b);
-    }
-}
-"""
+    /// Shared pipeline: build the test bundle, stage it + its dependency libraries + the JNI harness into
+    /// the target's library directory (jniLibs/`<abi>` or flat), then run any per-target post-staging.
+    func stageTestLibs(_ target: TestLibsTarget, outputDir: String, with out: MessageQueue) async throws {
+        let buildConfig = toolchainOptions.configuration ?? BuildConfiguration.fromEnvironment() ?? .debug
+        let packageDir = toolchainOptions.packagePath ?? "."
 
-/// Swift source for the test harness. Implements JNI_OnLoad and the native `runTests` method.
-/// Loads the test library via dlopen, invokes the Swift Testing entry point, and reports
-/// test output back through JNI to the Java Instrumentation runner.
-private func testHarnessSwiftSource(testLibName: String) -> String {
-    return """
-import Android
-import Dispatch
+        // 1. Build the test bundle (Android toolchain build, or host `swift build`).
+        let (binDir, harnessEnv, harnessExtraArgs) = try await target.buildTestBundle()
+        let packageName = try await parseSwiftPackage(with: out, at: packageDir, swift: target.swiftCommand).name
 
-// MARK: - JNI type aliases
+        // 2. Locate the loadable test bundle and the directory to stage into.
+        let loadable = target.loadableTestBundle(binDir, packageName)
+        guard FileManager.default.fileExists(atPath: loadable.path) else {
+            throw AndroidError(errorDescription: "Could not find native test bundle at: \(loadable.path)")
+        }
+        let libDir = target.stagingDirectory(outputDir)
+        try? FileManager.default.removeItem(at: libDir)
+        try FileManager.default.createDirectory(at: libDir, withIntermediateDirectories: true)
 
-typealias JNIEnvironment = UnsafeMutablePointer<JNIEnv?>
+        // 3. Stage the test bundle (renamed to a loadable lib) + its dependency libraries.
+        let testLibName = "lib\(packageName)Test"
+        try FileManager.default.copyItem(at: loadable, to: libDir.appendingPathComponent("\(testLibName).\(target.dylibExtension)", isDirectory: false))
+        for lib in try target.dependencyLibraries(binDir) {
+            let dest = libDir.appendingPathComponent(lib.lastPathComponent, isDirectory: false)
+            try? FileManager.default.removeItem(at: dest)
+            try FileManager.default.copyItem(at: lib, to: dest)
+        }
 
-// MARK: - Global state
+        // 4. Build the JNI harness that dlopens the test bundle + drives swt, and stage it.
+        let stagingDir = try createTempDir()
+        defer { try? FileManager.default.removeItem(at: stagingDir) }
+        let harnessDir = stagingDir.appendingPathComponent("harness", isDirectory: true)
+        let harnessSourceDir = harnessDir.appendingPathComponent("Sources/TestHarness", isDirectory: true)
+        try FileManager.default.createDirectory(at: harnessSourceDir, withIntermediateDirectories: true)
+        try target.harnessPackage.write(to: harnessDir.appendingPathComponent("Package.swift", isDirectory: false), atomically: true, encoding: .utf8)
+        try target.harnessSource(testLibName).write(to: harnessSourceDir.appendingPathComponent("TestRunner.swift", isDirectory: false), atomically: true, encoding: .utf8)
 
-nonisolated(unsafe) var g_jvm: UnsafeMutablePointer<JavaVM?>? = nil
+        let harnessPkgArgs = ["--package-path", harnessDir.path, "--configuration", buildConfig.rawValue]
+        try await runCommand(command: [target.swiftCommand, "build"] + harnessPkgArgs + harnessExtraArgs, env: harnessEnv, with: out)
 
-private func androidLog(_ priority: android_LogPriority, _ tag: String, _ message: String) {
-    __android_log_write(Int32(priority.rawValue), tag, message)
-}
+        let harnessBinOutput = try await captureLine(target.swiftCommand, ["build", "--show-bin-path"] + harnessPkgArgs + harnessExtraArgs, env: harnessEnv)
+        let harnessBinDir: URL
+        if !harnessBinOutput.isEmpty {
+            harnessBinDir = URL(fileURLWithPath: harnessBinOutput)
+        } else if let fallback = target.harnessBinFallback(harnessDir) {
+            harnessBinDir = fallback
+        } else {
+            throw AndroidError(errorDescription: "Could not resolve test harness build output path")
+        }
+        let harnessLibName = "lib\(testHarnessLib).\(target.dylibExtension)"
+        let harnessLib = harnessBinDir.appendingPathComponent(harnessLibName, isDirectory: false)
+        guard FileManager.default.fileExists(atPath: harnessLib.path) else {
+            throw AndroidError(errorDescription: "Expected test harness library at: \(harnessLib.path)")
+        }
+        try FileManager.default.copyItem(at: harnessLib, to: libDir.appendingPathComponent(harnessLibName, isDirectory: false))
 
-// MARK: - JNI_OnLoad
-
-@_cdecl("JNI_OnLoad")
-func JNI_OnLoad(_ vm: UnsafeMutablePointer<JavaVM?>?, _ reserved: UnsafeMutableRawPointer?) -> jint {
-    g_jvm = vm
-    androidLog(ANDROID_LOG_INFO, "SwiftTest", "JNI_OnLoad")
-    return jint(JNI_VERSION_1_6)
-}
-
-// MARK: - Entry point type (ST-0002 JSON ABI)
-
-typealias EntryPoint = @convention(thin) @Sendable (
-    _ configurationJSON: UnsafeRawBufferPointer?,
-    _ recordHandler: @escaping @Sendable (_ recordJSON: UnsafeRawBufferPointer) -> Void
-) async throws -> Bool
-
-// MARK: - JNI native method
-
-@_cdecl("Java_\(testFullClass.replacingOccurrences(of: ".", with: "_"))_runTests")
-func runTests(_ env: JNIEnvironment, _ thisObj: jobject) -> jint {
-    let jni: JNINativeInterface = env.pointee!.pointee
-
-    // Keep a global ref to the Instrumentation object for use from other threads
-    guard let globalThis: jobject = jni.NewGlobalRef(env, thisObj) else {
-        androidLog(ANDROID_LOG_ERROR, "SwiftTest", "Failed to create global ref")
-        return 1
-    }
-    defer { jni.DeleteGlobalRef(env, globalThis) }
-
-    // Load test library
-    androidLog(ANDROID_LOG_INFO, "SwiftTest", "Loading test library: \(testLibName)")
-    guard let handle = dlopen("\(testLibName)", RTLD_NOW) else {
-        let err = dlerror().flatMap({ String(cString: $0) }) ?? ""
-        androidLog(ANDROID_LOG_ERROR, "SwiftTest", "dlopen failed: \\(err)")
-        return 1
+        // 5. Per-target post-staging (Darwin writes the dynamic-loader env).
+        try await target.postStage(libDir)
     }
 
-    // Look up swt_abiv0_getEntryPoint
-    guard let sym = dlsym(handle, "swt_abiv0_getEntryPoint") else {
-        androidLog(ANDROID_LOG_ERROR, "SwiftTest", "swt_abiv0_getEntryPoint not found")
-        return 1
-    }
-    typealias GetEntryPointFn = @convention(c) () -> UnsafeRawPointer?
-    let getEntryPoint = unsafeBitCast(sym, to: GetEntryPointFn.self)
+    /// Android target: builds via the Swift Android SDK toolchain and stages into `<outputDir>/<abi>`
+    /// with the Swift-runtime / NDK `.so` dependencies the androidTest APK must carry.
+    func androidTestLibsTarget(with out: MessageQueue) async throws -> TestLibsTarget {
+        let buildConfig = toolchainOptions.configuration ?? BuildConfiguration.fromEnvironment() ?? .debug
+        let packageDir = toolchainOptions.packagePath ?? "."
+        let archs = !toolchainOptions.arch.isEmpty ? toolchainOptions.arch : [AndroidArchArgument.current]
+        let architectures = archs.flatMap({ $0.architectures(configuration: buildConfig) }).uniqueElements()
+        guard let arch = architectures.first else {
+            throw AndroidError(errorDescription: "No target architecture specified")
+        }
+        let apiLevel = toolchainOptions.androidAPILevel
+        let tc = try buildToolchainConfiguration(for: arch)
+        let swiftCmd = tc.toolchainPath.appendingPathComponent("usr/bin/swift", isDirectory: false).path
+        let scratch = toolchainOptions.scratchPath ?? (packageDir + "/.build")
+        let buildSystemArgs = args
 
-    guard let rawEntryPoint = getEntryPoint() else {
-        androidLog(ANDROID_LOG_ERROR, "SwiftTest", "swt_abiv0_getEntryPoint returned NULL")
-        return 1
-    }
-    let entryPoint = unsafeBitCast(rawEntryPoint, to: EntryPoint.self)
-
-    androidLog(ANDROID_LOG_INFO, "SwiftTest", "Running Swift Testing...")
-
-    // wrap the jobject in a Sendable so it can be passed into the Task
-    struct SendableJobject: @unchecked Sendable {
-        let value: jobject
-    }
-
-    let gThis = SendableJobject(value: globalThis)
-    // Record handler: report each JSON record back through JNI
-    let recordHandler: @Sendable (UnsafeRawBufferPointer) -> Void = { recordJSON in
-        guard let base = recordJSON.baseAddress, recordJSON.count > 0 else { return }
-        let json = String(
-            decoding: UnsafeBufferPointer(start: base.assumingMemoryBound(to: UInt8.self), count: recordJSON.count),
-            as: UTF8.self
+        return TestLibsTarget(
+            swiftCommand: swiftCmd,
+            dylibExtension: "so",
+            buildTestBundle: {
+                let (_, env, binPath) = try await self.runToolchainCommand(tc, executable: nil, testMode: .sharedObject, with: out)
+                let binDir: String
+                if let binPath = binPath, !binPath.isEmpty {
+                    binDir = binPath
+                } else {
+                    binDir = [scratch, arch.tripleKey(api: apiLevel, sdkVersion: tc.swiftSDKVersion), buildConfig.rawValue].joined(separator: "/")
+                }
+                var harnessExtra: [String] = []
+                if let sdkName = tc.sdkName { harnessExtra += ["--swift-sdk", sdkName] }
+                if let bsIndex = buildSystemArgs.firstIndex(of: "--build-system"), bsIndex + 1 < buildSystemArgs.count {
+                    harnessExtra += ["--build-system", buildSystemArgs[bsIndex + 1]]
+                }
+                return (URL(fileURLWithPath: binDir), env, harnessExtra)
+            },
+            loadableTestBundle: { binDir, packageName in
+                binDir.appendingPathComponent("\(packageName)PackageTests.xctest", isDirectory: false)
+            },
+            dependencyLibraries: { binDir in
+                let buildOutputLibraries = try self.files(at: binDir).filter({ $0.lastPathComponent.contains(".so") })
+                let sdkLibraries = try self.files(at: tc.libPathDynamic, allowLinks: true)
+                    .filter({ $0.lastPathComponent.contains(".so") })
+                    .filter({ !builtinLibraries.contains($0.lastPathComponent) })
+                let cppShared = try self.files(at: tc.libSysrootArch, allowLinks: true)
+                    .filter({ $0.lastPathComponent == "libc++_shared.so" })
+                return buildOutputLibraries + sdkLibraries + cppShared
+            },
+            stagingDirectory: { outputDir in
+                URL(fileURLWithPath: outputDir).appendingPathComponent(arch.abi, isDirectory: true)
+            },
+            harnessPackage: harnessPackageSwift,
+            harnessSource: { testLibBaseName in testHarnessSwiftSource(testLibName: "\(testLibBaseName).so") },
+            harnessBinFallback: { harnessDir in
+                URL(fileURLWithPath: [harnessDir.path + "/.build", arch.tripleKey(api: apiLevel, sdkVersion: tc.swiftSDKVersion), buildConfig.rawValue].joined(separator: "/"))
+            },
+            postStage: { _ in }
         )
-        reportToJava(globalRef: gThis.value, line: json)
     }
 
-    // Bridge sync → async via DispatchSemaphore
-    let semaphore = DispatchSemaphore(value: 0)
-    nonisolated(unsafe) var testSuccess = false
-    Task {
-        defer { semaphore.signal() }
-        do {
-            testSuccess = try await entryPoint(nil, recordHandler)
-        } catch {
-            androidLog(ANDROID_LOG_ERROR, "SwiftTest", "Entry point threw error: \\(error)")
-        }
-    }
-    semaphore.wait()
+    /// Host target: builds the test bundle + a pure-Swift harness for the host (macOS) and stages them
+    /// flat with the Swift-runtime/bridge dylibs and a `dyld-env.txt` for the forked Robolectric JVM.
+    func hostTestLibsTarget(with out: MessageQueue) async throws -> TestLibsTarget {
+        let buildConfig = toolchainOptions.configuration ?? BuildConfiguration.fromEnvironment() ?? .debug
+        let packageDir = toolchainOptions.packagePath ?? "."
+        let scratch = toolchainOptions.scratchPath ?? (packageDir + "/.build")
+        let dylibSuffix = "dylib" // host build is currently macOS-only
 
-    let exitCode: Int32 = testSuccess ? 0 : 1
-    return jint(exitCode)
-}
+        var buildEnv = ProcessInfo.processInfo.environment
+        buildEnv["SKIP_BRIDGE"] = "1"
+        let env = buildEnv
 
-// MARK: - JNI callback to Java
+        var resolvedSwift = try await captureLine("/usr/bin/xcrun", ["--find", "swift"], env: env)
+        if resolvedSwift.isEmpty { resolvedSwift = "swift" }
+        let swift = resolvedSwift
 
-/// Calls `\(testClassName).reportTestOutput(String)` via JNI.
-/// Handles thread attachment for cooperative pool threads.
-private func reportToJava(globalRef: jobject, line: String) {
-    androidLog(ANDROID_LOG_INFO, "SwiftTest", "Test line: \\(line)")
+        // -DROBOLECTRIC selects the host bridge code paths; -DSKIP_BRIDGE + SKIP_BRIDGE=1 keep bridged
+        // library products dynamic so they resolve at load time.
+        let testFlags = ["-Xcc", "-fPIC", "-Xswiftc", "-DSKIP_BRIDGE", "-Xswiftc", "-DROBOLECTRIC"]
+        let pkgArgs = ["--package-path", packageDir, "--scratch-path", scratch, "-c", buildConfig.rawValue]
 
-    guard let jvm = g_jvm else { return }
-    let jii: JNIInvokeInterface = jvm.pointee!.pointee
-
-    var envPtr: UnsafeMutableRawPointer? = nil
-    let getResult = jii.GetEnv(jvm, &envPtr, jint(JNI_VERSION_1_6))
-
-    var needsDetach = false
-    if getResult == JNI_EDETACHED {
-        var attachedPtr: UnsafeMutablePointer<JNIEnv?>? = nil
-        guard jii.AttachCurrentThread(jvm, &attachedPtr, nil) == JNI_OK else {
-            return
-        }
-        if let attachedPtr {
-            envPtr = UnsafeMutableRawPointer(attachedPtr)
-        }
-        needsDetach = true
-    } else if getResult != JNI_OK {
-        return
-    }
-    defer { if needsDetach { _ = jii.DetachCurrentThread(jvm) } }
-
-    guard let rawEnv = envPtr else { return }
-    let env = rawEnv.assumingMemoryBound(to: JNIEnv?.self)
-    let jni: JNINativeInterface = env.pointee!.pointee
-
-    guard let cls: jclass = jni.GetObjectClass(env, globalRef) else { return }
-
-    let methodName = "reportTestOutput"
-    let methodSig = "(Ljava/lang/String;)V"
-    guard let mid: jmethodID = methodName.withCString({ name in
-        methodSig.withCString({ sig in
-            jni.GetMethodID(env, cls, name, sig)
-        })
-    }) else { return }
-
-    guard let jstr = line.withCString({ cstr in
-        jni.NewStringUTF(env, cstr)
-    }) else { return }
-
-    let args = [jvalue(l: jstr)]
-    args.withUnsafeBufferPointer { buf in
-        jni.CallVoidMethodA(env, globalRef, mid, buf.baseAddress)
+        return TestLibsTarget(
+            swiftCommand: swift,
+            dylibExtension: dylibSuffix,
+            buildTestBundle: {
+                try await self.runCommand(command: [swift, "build", "--build-tests"] + pkgArgs + testFlags, env: env, with: out)
+                let binPath = try await self.captureLine(swift, ["build", "--show-bin-path", "--build-tests"] + pkgArgs + testFlags, env: env)
+                guard !binPath.isEmpty else {
+                    throw AndroidError(errorDescription: "Could not resolve host test build bin path")
+                }
+                return (URL(fileURLWithPath: binPath), env, [])
+            },
+            loadableTestBundle: { binDir, packageName in
+                binDir.appendingPathComponent("\(packageName)PackageTests.xctest/Contents/MacOS/\(packageName)PackageTests", isDirectory: false)
+            },
+            dependencyLibraries: { binDir in
+                try self.files(at: binDir).filter({ $0.pathExtension == dylibSuffix })
+            },
+            stagingDirectory: { outputDir in URL(fileURLWithPath: outputDir) },
+            harnessPackage: hostHarnessPackageSwift,
+            harnessSource: { testLibBaseName in hostTestHarnessSwiftSource(testLibName: testLibBaseName) },
+            harnessBinFallback: { _ in nil },
+            postStage: { libDir in
+                // Stage the dynamic-loader env so the forked test JVM resolves Testing.framework + the
+                // Swift runtime when the harness dlopens the test bundle (linked via @rpath).
+                let developerDir = try await self.captureLine("/usr/bin/xcode-select", ["-p"], env: env)
+                let platformDev = developerDir + "/Platforms/MacOSX.platform/Developer"
+                let dyldEnv = """
+                DYLD_FRAMEWORK_PATH=\(platformDev)/Library/Frameworks:\(platformDev)/Library/PrivateFrameworks
+                DYLD_LIBRARY_PATH=\(platformDev)/usr/lib:\(libDir.path)
+                """
+                try dyldEnv.write(to: libDir.appendingPathComponent("dyld-env.txt", isDirectory: false), atomically: true, encoding: .utf8)
+            }
+        )
     }
 }
-"""
-}
+
+#endif

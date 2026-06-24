@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         swift:
-          - '6.3.1'
+          - '6.3.2'
         os:
           - 'ubuntu-latest'
           #- 'macos-latest'
@@ -24,7 +24,7 @@ jobs:
           - 'macos-14'
     steps:
       - name: Checkout skipstone.git
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # skip.git submodule needed for SkipDriveExternal
           submodules: true
@@ -127,6 +127,16 @@ jobs:
     steps:
       - uses: Homebrew/actions/setup-homebrew@main
 
+      # The transpiled (Lite) and Fuse framework `swift test` runs execute the Kotlin suite under
+      # Robolectric, and recent Android SDK levels (e.g. SDK 36) require Java 21. The runners default to
+      # Java 17, so without this the Robolectric run fails with:
+      #   "Failed to create a Robolectric sandbox: Android SDK 36 requires Java 21 (have Java 17)".
+      - name: "Set up Java 21 (required by Robolectric for recent Android SDKs)"
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
       - name: "Install Host Toolchain prerequisites"
         if: runner.os == 'Linux'
         run: |
@@ -175,7 +185,8 @@ jobs:
           # perform an export of the app
           skip export --appindex --validate-export --show-tree --project some-app
 
-      - run: |
+      - name: "Install Swift SDK for Android"
+        run: |
           sdk_arg=""
           if [[ "${{ matrix.android-sdk }}" != "" ]]; then
             sdk_arg="--version ${{ matrix.android-sdk }}"
@@ -263,22 +274,35 @@ jobs:
           ! skip android test --apk --arch ${{ matrix.android-arch }}
 
       - name: "Test new Skip Lite framework on emulator"
-        # Disabled on Linux:
-        # /home/runner/work/_temp/demo-lite-framework/Tests/DemoFrameworkTests/DemoFrameworkTests.swift:2:8: error: no such module 'OSLog'
-        if: runner.os != 'Linux'
         working-directory: ${{ runner.temp }}
         run: |
           skip init --no-build --transpiled-model --module-tests demo-lite-framework DemoFramework
           cd demo-lite-framework
+          # Robolectric test
+          swift test
+          # Emulator test
           ANDROID_SERIAL=emulator-5554 swift test
 
       - name: "Test new Skip Fuse framework on emulator"
-        # Disabled due to build error on Linux:
-        # /home/runner/work/_temp/demo-fuse-framework/.build/checkouts/skip-android-bridge/Sources/SkipAndroidBridge/AndroidBundle.swift:6:12: error: cannot inherit from class 'Bundle' (compiled with Swift 6.2.4) because it has overridable members that could not be loaded in Swift 5.10
+        # compile errors on Linux with skip-android-bridge
         if: runner.os != 'Linux'
         working-directory: ${{ runner.temp }}
         run: |
           skip init --no-build --native-model --bridged --module-tests demo-fuse-framework DemoFramework
           cd demo-fuse-framework
+          # Robolectric test
+          swift test
+          # Emulator test
           ANDROID_SERIAL=emulator-5554 swift test
+
+          # now add a failing test to make sure it actually fails
+          echo '#if os(Android)' >> Tests/DemoFrameworkTests/DemoFrameworkTests.swift
+          echo '@Test func shouldFailOnAndroid() { #expect(1+1 == 3, "Test should fail on Android") }' >> Tests/DemoFrameworkTests/DemoFrameworkTests.swift
+          echo '#endif' >> Tests/DemoFrameworkTests/DemoFrameworkTests.swift
+
+          swift build --build-tests
+          # Robolectric should still pass
+          swift test
+          # Emulator test should fail
+          ! ANDROID_SERIAL=emulator-5554 swift test
 

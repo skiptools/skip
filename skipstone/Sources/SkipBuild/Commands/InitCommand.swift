@@ -152,8 +152,10 @@ This command will create a conventional Skip app or library project.
         let isApp = appid != nil || self.projectOptions.projectMode.contains(.nativeApp) || self.projectOptions.projectMode.contains(.transpiledApp)
         let moduleMode = self.moduleMode
         let nativeMode = self.nativeMode
-        // for now we default to creating tests only when non-native
-        let createTests = self.createOptions.moduleTests ?? nativeMode.isEmpty
+        // Default to creating a test module for both transpiled and native libraries: native test
+        // modules run their Swift Testing cases natively on Android via the generated JNI harness.
+        // (Native app targets still skip tests via the createTestModule guard in createSkipLibrary.)
+        let createTests = self.createOptions.moduleTests ?? true
 
         let options = createOptions.projectOptionValues(projectName: self.projectName)
 
