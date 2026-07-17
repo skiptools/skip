@@ -133,14 +133,22 @@ import PackagePlugin
             throw SkipPluginError(errorDescription: "Peer target «\(peerTarget.name)» was not a source module")
         }
 
+        var visitedPackageIDs: Set<String> = []
         func recursivePackageDependencies(for package: Package) -> [PackageDependency] {
-            return package.dependencies + package.dependencies.flatMap({ recursivePackageDependencies(for: $0.package) })
+            package.dependencies.flatMap { dependency in
+                guard visitedPackageIDs.insert(dependency.package.id).inserted else {
+                    return [] as [PackageDependency]
+                }
+                return [dependency] + recursivePackageDependencies(for: dependency.package)
+            }
         }
+
+        let packageDeps = recursivePackageDependencies(for: context.package)
 
         // create a lookup table from the (arbitrary but unique) product ID to the owning package
         // this is needed to find the package ID associated with a given product ID
         var productIDPackages: [Product.ID?: Package] = [:]
-        for targetPackage in recursivePackageDependencies(for: context.package) {
+        for targetPackage in packageDeps {
             for product in targetPackage.package.products {
                 productIDPackages[product.id] = targetPackage.package
             }
@@ -152,11 +160,9 @@ import PackagePlugin
         let sourcehashOutputPath = Path(outputURL.appendingPathComponent(sourceHashDot + peerTarget.name + sourcehashExtension, isDirectory: false).path)
         //Diagnostics.warning("add sourcehash output for \(target.name): \(sourcehashOutputPath)", file: sourcehashOutputPath.string)
 
-        struct Dep : Identifiable {
+        struct Dep {
             let package: Package
             let target: Target
-
-            var id: String { target.id }
         }
 
         var buildModuleArgs: [String] = [
@@ -189,6 +195,7 @@ import PackagePlugin
             return targetLink
         }
 
+        var visitedTargetIDs = Set<String>()
         func dependencies(for targetDependencies: [TargetDependency], in package: Package) -> [Dep] {
             return targetDependencies.flatMap { dep in
                 switch dep {
@@ -200,13 +207,13 @@ import PackagePlugin
 
                     return product.targets.flatMap { target in
                         // stop at any external targets
-                        if skipRootTargetNames.contains(target.name) {
+                        if skipRootTargetNames.contains(target.name) || !visitedTargetIDs.insert(target.id).inserted {
                             return [] as [Dep]
                         }
                         return [Dep(package: productPackage, target: target)] + dependencies(for: target.dependencies, in: productPackage)
                     }
                 case .target(let target):
-                    if skipRootTargetNames.contains(target.name) {
+                    if skipRootTargetNames.contains(target.name) || !visitedTargetIDs.insert(target.id).inserted {
                         return [] as [Dep]
                     }
                     return [Dep(package: package, target: target)] + dependencies(for: target.dependencies, in: package)
@@ -216,8 +223,7 @@ import PackagePlugin
             }
         }
 
-        var deps = dependencies(for: target.dependencies, in: context.package)
-        deps = makeUniqueById(deps)
+        let deps = dependencies(for: target.dependencies, in: context.package)
 
         var outputFiles: [Path] = [sourcehashOutputPath]
 
@@ -291,8 +297,6 @@ import PackagePlugin
 
             buildArguments += args
         }
-
-        let packageDeps = recursivePackageDependencies(for: context.package)
 
         // create a map from [target ID: package] for all known targets
         let targetsToPackage = Dictionary(packageDeps.flatMap({ packageDep in
@@ -388,15 +392,4 @@ extension Path {
         outputFileName += suffix
         return outputDir.appending(subpath: "." + outputFileName)
     }
-}
-
-func makeUniqueById<T: Identifiable>(_ items: [T]) -> [T] {
-    var uniqueItems = Set<T.ID>()
-    var result = [T]()
-    for item in items {
-        if uniqueItems.insert(item.id).inserted {
-            result.append(item)
-        }
-    }
-    return result
 }
