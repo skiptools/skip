@@ -192,6 +192,8 @@ struct Attributes: Hashable, PrettyPrintable, Codable {
                 apiFlags.options.insert(.concurrent)
             case .escaping:
                 attributes.append(attribute)
+            case .sendable:
+                attributes.append(attribute)
             case .mainActor:
                 apiFlags.options.insert(.mainActor)
             case .viewBuilder, .toolbarContentBuilder:
@@ -340,6 +342,7 @@ struct Attribute: Hashable, Codable {
         case observedObject
         case published
         case scaledMetric
+        case sendable
         case state
         case stateObject
         case suite
@@ -420,6 +423,8 @@ struct Attribute: Hashable, Codable {
             return .published
         case "ScaledMetric":
             return .scaledMetric
+        case "Sendable":
+            return .sendable
         case "State":
             return .state
         case "StateObject":

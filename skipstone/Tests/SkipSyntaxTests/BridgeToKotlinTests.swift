@@ -1349,6 +1349,130 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testSendableClosureFunction() async throws {
+        try await check(swiftBridge: """
+        public func f(c: @Sendable (Int) -> Void) -> Int? {
+            return nil
+        }
+        """, kotlin: """
+        fun f(c: (Int) -> Unit): Int? = Swift_f_0(c)
+        private external fun Swift_f_0(c: (Int) -> Unit): Int?
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1f_10")
+        public func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaObjectPointer) -> JavaObjectPointer? {
+            let p_0_swift = SwiftClosure1.closure(forJavaObject: p_0, options: [])! as @Sendable (Int) -> Void
+            let f_return_swift = f(c: p_0_swift)
+            return f_return_swift.toJavaObject(options: [])
+        }
+        """, transformers: transformers)
+    }
+    
+    func testStructWithSendableClosures() async throws {
+        try await check(swiftBridge: """
+        public struct V: Sendable {
+            private let _firstClosure: @Sendable () async -> [String]
+            private let _secondClosure: @Sendable () -> [Int]
+            private let _thirdClosure: @Sendable ([String: String]) async -> Void
+        
+            public init(firstClosure: @Sendable @escaping () async -> [String],
+                        secondClosure: @Sendable @escaping () -> [Int],
+                        thirdClosure: @Sendable @escaping ([String: String]) -> Void = { _ in })
+            {
+                _firstClosure = firstClosure
+                _secondClosure = secondClosure
+                _thirdClosure = thirdClosure
+            }
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        class V: skip.bridge.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.SwiftObjectPointer = skip.bridge.SwiftObjectNil
+
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
+
+            override fun Swift_peer(): skip.bridge.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_peer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            constructor(firstClosure: suspend () -> Array<String>, secondClosure: () -> Array<Int>, thirdClosure: (Dictionary<String, String>) -> Unit = { _ ->  }) {
+                Swift_peer = Swift_constructor_0(firstClosure, secondClosure, thirdClosure)
+            }
+            private external fun Swift_constructor_0(firstClosure: suspend () -> Array<String>, secondClosure: () -> Array<Int>, thirdClosure: (Dictionary<String, String>) -> Unit): skip.bridge.SwiftObjectPointer
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        """, swiftBridgeSupport: """
+        extension V: BridgedToKotlin {
+            nonisolated private static let Java_class = try! JClass(name: "V")
+            nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                let box: SwiftValueTypeBox<Self> = ptr.pointee()!
+                return box.value
+            }
+            nonisolated public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let box = SwiftValueTypeBox(self)
+                let Swift_peer = SwiftObjectPointer.pointer(to: box, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            nonisolated private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+        }
+        @_cdecl("Java_V_Swift_1release")
+        public func V_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: SwiftValueTypeBox<V>.self)
+        }
+        @_cdecl("Java_V_Swift_1constructor_10")
+        public func V_Swift_constructor_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaObjectPointer, _ p_1: JavaObjectPointer, _ p_2: JavaObjectPointer) -> SwiftObjectPointer {
+            let p_0_swift = SwiftAsyncClosure0.closure(forJavaObject: p_0, options: [])! as @Sendable () async -> [String]
+            let p_1_swift = SwiftClosure0.closure(forJavaObject: p_1, options: [])! as @Sendable () -> [Int]
+            let p_2_swift = SwiftClosure1.closure(forJavaObject: p_2, options: [])! as @Sendable ([String: String]) -> Void
+            let f_return_swift = SwiftValueTypeBox(V(firstClosure: p_0_swift, secondClosure: p_1_swift, thirdClosure: p_2_swift))
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_V_Swift_1projectionImpl")
+        public func V_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = V.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
+    func testSendableMainActorClosureFunction() async throws {
+        try await check(swiftBridge: """
+        public func f(c: @Sendable @MainActor (Int) -> Void) -> Int? {
+            return nil
+        }
+        """, kotlin: """
+        fun f(c: (Int) -> Unit): Int? = Swift_f_0(c)
+        private external fun Swift_f_0(c: (Int) -> Unit): Int?
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1f_10")
+        public func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaObjectPointer) -> JavaObjectPointer? {
+            let p_0_swift = SwiftClosure1.closure(forJavaObject: p_0, options: [])! as @Sendable @MainActor (Int) -> Void
+            let f_return_swift = f(c: p_0_swift)
+            return f_return_swift.toJavaObject(options: [])
+        }
+        """, transformers: transformers)
+    }
+
     func testNestedClosureFunction() async throws {
         // A function-typed parameter whose own parameter is itself a function type. The bridge
         // emits explicit per-parameter conversions via `invokeJava:` so each value is converted

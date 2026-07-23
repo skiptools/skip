@@ -2037,6 +2037,9 @@ indirect enum TypeSignature: CustomStringConvertible, Hashable, Codable {
             }
             var attributesString = ""
 
+            if attributes?.contains(.sendable) == true {
+                attributesString += "@Sendable "
+            }
             if apiFlags.options.contains(.mainActor) == true {
                 attributesString += "@MainActor "
             }
