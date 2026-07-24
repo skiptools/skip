@@ -223,8 +223,12 @@ struct CDeclFunction {
         } else {
             var file = translator.syntaxTree.source.file
             file.extension = ""
-            typeName = file.name + "Kt"
-            cdeclTypeName = typeName
+            // The JNI symbol side (`cdeclTypeName`) is escaped via `cdeclEscaped` at
+            // the return below. The Swift-identifier side (`typeName`) must be escaped
+            // here too, since a file name like `Foo+Bar.swift` yields `Foo+BarKt`, and
+            // the raw `+` produces an invalid Swift function name (issue #63).
+            cdeclTypeName = file.name + "Kt"
+            typeName = cdeclTypeName.cdeclEscaped
         }
         return (cdeclPrefix + cdeclTypeName.cdeclEscaped + "_" + name.cdeclEscaped, typeName + "_" + name)
     }

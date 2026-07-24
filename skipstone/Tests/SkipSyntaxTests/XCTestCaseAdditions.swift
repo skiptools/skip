@@ -32,7 +32,7 @@ extension XCTestCase {
     ///   - swiftBridgeSupports: multiple expected bridging swift outputs
     ///   - file: the file of the call site, expected to be `#file`
     ///   - line: the line of the call site, expected to be `#line`
-    public func check(expectFailure: Bool = false, expectMessages: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], dependentModules: [CodebaseInfo.ModuleExport] = [], supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, swiftBridge: String? = nil, kotlin: String? = nil, kotlins: [String] = [], fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, kotlinPackageSupport: String? = nil, swiftBridgeSupport: String? = nil, swiftBridgeSupports: [String] = [], bridgeDecodeLevel: DecodeLevel = .api, preprocessorSymbols: Set<String> = [], transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
+    public func check(expectFailure: Bool = false, expectMessages: Bool = false, compiler: String? = ProcessInfo.processInfo.environment["KOTLINC"], dependentModules: [CodebaseInfo.ModuleExport] = [], supportingSwift: String? = nil, swift: StaticString? = nil, swiftCode: (() throws -> String?)? = nil, swiftBridge: String? = nil, swiftBridgeFileName: String = "Bridge.swift", kotlin: String? = nil, kotlins: [String] = [], fixup fixupKotlinBlock: ((String) -> (String)) = { $0 }, kotlinPackageSupport: String? = nil, swiftBridgeSupport: String? = nil, swiftBridgeSupports: [String] = [], bridgeDecodeLevel: DecodeLevel = .api, preprocessorSymbols: Set<String> = [], transformers: [KotlinTransformer] = builtinKotlinTransformers(), file: StaticString = #file, line: UInt = #line) async throws {
 
         func fixup(code: String) -> String {
             var code = fixupKotlinBlock(code)
@@ -93,7 +93,7 @@ extension XCTestCase {
         }
         var bridgeFiles: [Source.FilePath] = []
         if !swiftBridgeString.isEmpty {
-            let srcFile = try tmpFile(named: "Bridge.swift", contents: swiftBridgeString)
+            let srcFile = try tmpFile(named: swiftBridgeFileName, contents: swiftBridgeString)
             bridgeFiles.append(Source.FilePath(path: srcFile.path))
         }
         if let supportingSwift, !supportingSwift.isEmpty {
