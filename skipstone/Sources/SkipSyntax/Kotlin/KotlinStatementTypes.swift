@@ -2156,10 +2156,14 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
             if i > 0 {
                 output.append(", ")
             }
+            // Variadic parameters are declared as `vararg` and must be forwarded
+            // to the companion implementation with the spread ("*") operator, else
+            // Kotlin sees the Array type rather than the individual elements.
+            let spread = parameter.isVariadic ? "*" : ""
             if let label = parameter.externalLabel {
-                output.append(label).append(" = ").append(label)
+                output.append(label).append(" = ").append(spread).append(label)
             } else {
-                output.append(parameter.internalLabel)
+                output.append(spread).append(parameter.internalLabel)
             }
         }
         output.append(")\n")

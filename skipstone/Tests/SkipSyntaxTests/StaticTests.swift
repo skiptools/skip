@@ -733,6 +733,34 @@ final class StaticTests: XCTestCase {
         """)
     }
 
+    func testStaticVariadicSpread() async throws {
+        // A static function with a variadic parameter delegates to its companion
+        // implementation, which must forward the parameter with the spread ("*")
+        // operator; otherwise Kotlin sees the Array type and fails to compile.
+        try await check(swift: """
+        public class A {
+            public static func initBridge(context: Int, _ libraryNames: String...) {
+            }
+            public static func withLabel(names labels: Int...) {
+            }
+        }
+        """, kotlin: """
+        import skip.lib.Array
+
+        open class A {
+
+            companion object: CompanionClass() {
+                override fun initBridge(context: Int, vararg libraryNames: String) = Unit
+                override fun withLabel(vararg names: Int) = Unit
+            }
+            open class CompanionClass {
+                open fun initBridge(context: Int, vararg libraryNames: String) = A.initBridge(context = context, *libraryNames)
+                open fun withLabel(vararg names: Int) = A.withLabel(names = *names)
+            }
+        }
+        """)
+    }
+
     private func codebaseInfo(moduleName: String, swift: String) throws -> CodebaseInfo {
         let srcFile = try tmpFile(named: "Source_\(moduleName).swift", contents: swift)
         let source = Source(file: Source.FilePath(path: srcFile.path), content: swift)
