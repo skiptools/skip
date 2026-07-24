@@ -1109,6 +1109,23 @@ extension KotlinFunctionDeclaration {
             messages.append(.kotlinBridgeUnsupportedFeature(self, feature: "optional inits", source: translator.syntaxTree.source))
             return nil
         }
+        // A generic `@inline(__always)` function is emitted as a Kotlin `inline fun <reified T>` (see
+        // KotlinStatementTypes isInline / the extension-function form used for reified generics of a
+        // virtual type). An inline reified function has no JVM-callable method, so a JNI getMethodID
+        // lookup for it returns nil and the generated bridge's force-unwrap traps at class load for
+        // native-Swift Android callers (skiptools/skip-firebase#81, #91). Do not JNI-bridge it —
+        // native-Swift callers use the @inline(__always) Swift body directly (inlined).
+        guard !(attributes.contains(.inlineAlways) && !generics.isEmpty) else {
+            return nil
+        }
+        // The same JVM-uncallable `inline fun <reified T>` can also be hand-authored via a
+        // `// SKIP DECLARE: ... inline fun <reified T> ...` override, which carries no structured
+        // attribute for the guard above to see (e.g. skip-firebase's FirestoreDecoder.decode(from:),
+        // reached through DocumentSnapshot.decoded() — so #91 is not fully closed by the attribute
+        // guard alone). Bail out for that override shape too.
+        if let declaration = extras?.declaration, declaration.contains("inline fun"), declaration.contains("reified") {
+            return nil
+        }
         if direction == .toKotlin {
             guard isEqualImplementation || isLessThanImplementation || checkNonStaticGenericTypeMember(self, in: parent, modifiers: modifiers, translator: translator) else {
                 return nil
