@@ -223,12 +223,11 @@ struct CDeclFunction {
         } else {
             var file = translator.syntaxTree.source.file
             file.extension = ""
-            // The JNI symbol side (`cdeclTypeName`) is escaped via `cdeclEscaped` at
-            // the return below. The Swift-identifier side (`typeName`) must be escaped
-            // here too, since a file name like `Foo+Bar.swift` yields `Foo+BarKt`, and
-            // the raw `+` produces an invalid Swift function name (issue #63).
+            // The JNI symbol (`cdeclTypeName`) uses `cdeclEscaped`; the Swift `@_cdecl`
+            // function name needs Swift-identifier escaping instead — e.g. `Foo+Bar.swift`
+            // must not leak `+` or `.` into the generated func name (issue #63).
             cdeclTypeName = file.name + "Kt"
-            typeName = cdeclTypeName.cdeclEscaped
+            typeName = cdeclTypeName.swiftIdentifierEscaped
         }
         return (cdeclPrefix + cdeclTypeName.cdeclEscaped + "_" + name.cdeclEscaped, typeName + "_" + name)
     }
@@ -286,13 +285,14 @@ extension String {
         return Self.backtickEscapingIdentifiers.contains(self) ? "`\(self)`" : self
     }
 
-    /// Escape special characters for use in a `@_cdecl` declaration.
+    /// Escape special characters for use in the JNI symbol of a `@_cdecl` declaration.
     ///
     /// As documented at https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/design.html#resolving_native_method_names
     /// - `_` → `_1`
-    /// - `.` and `/` → `_` (package/class separator)
+    /// - `/` → `_` (package/class separator)
     /// - `;` → `_2`
     /// - `[` → `_3`
+    /// - `.` → `.` (preserved; callers replace the separator as needed)
     /// - Non-ASCII → `_0XXXX` (UTF-16 hex)
     var cdeclEscaped: String {
         self.compactMap { ch -> String in
@@ -310,6 +310,22 @@ extension String {
                 } else {
                     fatalError("Invalid JNI character: \(ch)")
                 }
+            }
+        }.joined()
+    }
+
+    /// Escape characters that are invalid in a Swift identifier, leaving ASCII
+    /// alphanumerics and `_` untouched. Unlike `cdeclEscaped` (JNI symbol), this
+    /// keeps `_` as-is and escapes `.`, since a `.` is invalid in a Swift `@_cdecl`
+    /// function name (issue #63).
+    var swiftIdentifierEscaped: String {
+        self.compactMap { ch -> String in
+            if ch == "_" || (ch.isASCII && (ch.isLetter || ch.isNumber)) {
+                return String(ch)
+            } else {
+                // Escape every UTF-16 code unit, so characters outside the BMP
+                // (encoded as a surrogate pair) are fully represented, not truncated.
+                return ch.utf16.map { "_0\(String(format: "%04x", $0))" }.joined()
             }
         }.joined()
     }
