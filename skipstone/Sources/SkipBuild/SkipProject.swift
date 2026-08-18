@@ -232,7 +232,7 @@ class FrameworkProjectLayout {
         """
 
         var packageDependencies: [String] = [
-            ".package(url: \"https://source.skip.tools/skip.git\", from: \"\(skipPackageVersion)\")"
+            ".package(url: \"https://github.com/skiptools/skip.git\", from: \"\(skipPackageVersion)\")"
         ]
 
         for moduleIndex in modules.indices {
@@ -1347,7 +1347,7 @@ struct TestData : Codable, Hashable {
             var skipModuleDeps: [String] = []
             for modDep in modDeps {
                 if let repoName = modDep.repositoryName {
-                    let repoURL = modDep.organizationName != nil ? "https://github.com/\(modDep.organizationName!)" : "https://source.skip.tools"
+                    let repoURL = modDep.organizationName != nil ? "https://github.com/\(modDep.organizationName!)" : "https://github.com/skiptools"
                     var packDep = ".package(url: \"\(repoURL)/\(repoName).git\", "
 
                     var depVersion = modDep.repositoryVersion ?? "1.0.0" // "1.2.3"..<"1.2.6"
@@ -1441,7 +1441,7 @@ struct TestData : Codable, Hashable {
             packageSource += """
 
             if Context.environment["SKIP_BRIDGE"] ?? "0" != "0" {
-                package.dependencies += [.package(url: "https://source.skip.tools/skip-bridge.git", "0.0.0"..<"2.0.0")]
+                package.dependencies += [.package(url: "https://github.com/skiptools/skip-bridge.git", "0.0.0"..<"2.0.0")]
                 package.targets.forEach({ target in
                     target.dependencies += [.product(name: "SkipBridge", package: "skip-bridge")]
                 })
@@ -1483,7 +1483,7 @@ struct TestData : Codable, Hashable {
                 // remove the Skip package dependencies
                 package.dependencies.removeAll(where: { dependency in
                     if case .sourceControl(_, let url, _) = dependency.kind {
-                        return url.hasPrefix("https://source.skip.dev/") || url.hasPrefix("https://source.skip.tools/")
+                        return url.hasPrefix("https://source.skip.dev/") || url.hasPrefix("https://source.skip.tools/") || url.hasPrefix("https://github.com/skiptools/")
                     } else {
                         return false
                     }

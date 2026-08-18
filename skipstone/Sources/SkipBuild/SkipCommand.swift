@@ -1300,7 +1300,7 @@ public struct PackageResolved : Hashable, Decodable {
      {
            "identity" : "skip",
            "kind" : "remoteSourceControl",
-           "location" : "https://source.skip.tools/skip.git",
+           "location" : "https://github.com/skiptools/skip.git",
            "state" : {
              "revision" : "18aba366924bf622d047b97f3249560e1471cc25",
              "version" : "1.5.21"

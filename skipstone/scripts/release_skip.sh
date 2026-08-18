@@ -128,16 +128,16 @@ PLUGIN_LINUX_CHECKSUM=$(shasum -a 256 ${RELSTAGING}/${PLUGIN_LINUX_ZIP} | cut -f
 # make a release of the skip command
 cd ${SKIPPKGDIR}
 
-ARTIFACT_MACOS_URL="https://source.skip.tools/skip/releases/download/${SKIP_VERSION}/${PLUGIN_MACOS_ZIP}"
+ARTIFACT_MACOS_URL="https://github.com/skiptools/skip/releases/download/${SKIP_VERSION}/${PLUGIN_MACOS_ZIP}"
 sed -I '' 's;.binaryTarget(name: "'${ARTIFACT}'", url:.*'${PLUGIN_MACOS_ZIP}'.*);.binaryTarget(name: "'${ARTIFACT}'", url: "'${ARTIFACT_MACOS_URL}'", checksum: "'${PLUGIN_MACOS_CHECKSUM}'");g' ${SKIPPKG}
 
-ARTIFACT_LINUX_URL="https://source.skip.tools/skip/releases/download/${SKIP_VERSION}/${PLUGIN_LINUX_ZIP}"
+ARTIFACT_LINUX_URL="https://github.com/skiptools/skip/releases/download/${SKIP_VERSION}/${PLUGIN_LINUX_ZIP}"
 sed -I '' 's;.binaryTarget(name: "'${ARTIFACT}'", url:.*'${PLUGIN_LINUX_ZIP}'.*);.binaryTarget(name: "'${ARTIFACT}'", url: "'${ARTIFACT_LINUX_URL}'", checksum: "'${PLUGIN_LINUX_CHECKSUM}'");g' ${SKIPPKG}
 
-# package(url: "https://source.skip.tools/skipstone.git", exact: "1.6.12")
-sed -I '' 's;.package(url: "https://.*/skipstone.git", exact: ".*");.package(url: "https://source.skip.tools/skipstone.git", exact: "'${SKIP_VERSION}'");g' ${SKIPPKG}
+# package(url: "https://github.com/skiptools/skipstone.git", exact: "1.6.12")
+sed -I '' 's;.package(url: "https://.*/skipstone.git", exact: ".*");.package(url: "https://github.com/skiptools/skipstone.git", exact: "'${SKIP_VERSION}'");g' ${SKIPPKG}
 
-sed -I '' 's;.package(url: "https://.*/skip.git", from: ".*");.package(url: "https://source.skip.tools/skip.git", from: "'${SKIP_VERSION}'");g' "README.md"
+sed -I '' 's;.package(url: "https://.*/skip.git", from: ".*");.package(url: "https://github.com/skiptools/skip.git", from: "'${SKIP_VERSION}'");g' "README.md"
 
 if [[ "${DRY_RUN:-'0'}" == "1" ]]; then
     echo "DRY RUN: EXITING"

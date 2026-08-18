@@ -51,12 +51,12 @@ struct UpgradeCommand: MessageCommand, ToolOptionsCommand {
 }
 
 extension SkipCommand {
-    /// Checks the https://source.skip.tools/skip/releases.atom page and returns the semantic version contained in the title of the first entry (i.e., the latest release of Skip)
+    /// Checks the https://github.com/skiptools/skip/releases.atom page and returns the semantic version contained in the title of the first entry (i.e., the latest release of Skip)
     func checkSkipUpdates(with out: MessageQueue) async -> String? {
         try? await outputOptions.monitor(with: out, "Check Skip Updates", resultHandler: { result in
             (result, MessageBlock(status: result?.messageStatusAny, "Check Skip Updates: \((try? result?.get()) ?? "?")"))
         }) { loggingHandler in
-            try await fetchLatestRelease(from: URL(string: "https://source.skip.tools/skip/releases.atom")!)
+            try await fetchLatestRelease(from: URL(string: "https://github.com/skiptools/skip/releases.atom")!)
         }.get()
     }
 

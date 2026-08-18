@@ -60,8 +60,8 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
+                .package(url: "https://github.com/skiptools/skip.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "SomeModule", dependencies: [
@@ -99,7 +99,7 @@ final class SkipCommandTests: XCTestCase {
             // remove the Skip package dependencies
             package.dependencies.removeAll(where: { dependency in
                 if case .sourceControl(_, let url, _) = dependency.kind {
-                    return url.hasPrefix("https://source.skip.dev/") || url.hasPrefix("https://source.skip.tools/")
+                    return url.hasPrefix("https://source.skip.dev/") || url.hasPrefix("https://source.skip.tools/") || url.hasPrefix("https://github.com/skiptools/")
                 } else {
                     return false
                 }
@@ -141,8 +141,8 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "TeenyModule", type: .dynamic, targets: ["TeenyModule"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
+                .package(url: "https://github.com/skiptools/skip.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "TeenyModule", dependencies: [
@@ -229,8 +229,8 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
+                .package(url: "https://github.com/skiptools/skip.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "SomeModule", dependencies: [
@@ -292,8 +292,8 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "FreeModule", type: .dynamic, targets: ["FreeModule"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
+                .package(url: "https://github.com/skiptools/skip.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "FreeModule", dependencies: [
@@ -360,8 +360,8 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "BridgedModule", type: .dynamic, targets: ["BridgedModule"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
+                .package(url: "https://github.com/skiptools/skip.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "BridgedModule", dependencies: [
@@ -375,7 +375,7 @@ final class SkipCommandTests: XCTestCase {
         )
 
         if Context.environment["SKIP_BRIDGE"] ?? "0" != "0" {
-            package.dependencies += [.package(url: "https://source.skip.tools/skip-bridge.git", "0.0.0"..<"2.0.0")]
+            package.dependencies += [.package(url: "https://github.com/skiptools/skip-bridge.git", "0.0.0"..<"2.0.0")]
             package.targets.forEach({ target in
                 target.dependencies += [.product(name: "SkipBridge", package: "skip-bridge")]
             })
@@ -797,8 +797,8 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-fuse.git", from: "1.0.0")
+                .package(url: "https://github.com/skiptools/skip.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-fuse.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "SomeModule", dependencies: [
@@ -894,8 +894,8 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "SomeModule", type: .dynamic, targets: ["SomeModule"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-fuse.git", from: "1.0.0")
+                .package(url: "https://github.com/skiptools/skip.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-fuse.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "SomeModule", dependencies: [
@@ -1065,10 +1065,10 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "ModelModule", type: .dynamic, targets: ["ModelModule"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-ui.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-fuse.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-model.git", from: "1.0.0")
+                .package(url: "https://github.com/skiptools/skip.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-ui.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-fuse.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-model.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "AppModule", dependencies: [
@@ -1240,10 +1240,10 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "ModelModule", type: .dynamic, targets: ["ModelModule"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-fuse-ui.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-fuse.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-model.git", from: "1.0.0")
+                .package(url: "https://github.com/skiptools/skip.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-fuse-ui.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-fuse.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-model.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "AppModule", dependencies: [
@@ -1355,8 +1355,8 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "AppModule", type: .dynamic, targets: ["AppModule"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-fuse-ui.git", from: "1.0.0")
+                .package(url: "https://github.com/skiptools/skip.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-fuse-ui.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "AppModule", dependencies: [
@@ -1488,10 +1488,10 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "FreeAppModel", type: .dynamic, targets: ["FreeAppModel"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip.git", from: "1.0.0"),
                 .package(url: "https://github.com/appfair/appfair-app.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-model.git", from: "1.0.0")
+                .package(url: "https://github.com/skiptools/skip-foundation.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-model.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "FreeApp", dependencies: [
@@ -1626,10 +1626,10 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "BottomModule", type: .dynamic, targets: ["BottomModule"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-ui.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-model.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
+                .package(url: "https://github.com/skiptools/skip.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-ui.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-model.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "TopModule", dependencies: [
@@ -1683,7 +1683,7 @@ final class SkipCommandTests: XCTestCase {
             // remove the Skip package dependencies
             package.dependencies.removeAll(where: { dependency in
                 if case .sourceControl(_, let url, _) = dependency.kind {
-                    return url.hasPrefix("https://source.skip.dev/") || url.hasPrefix("https://source.skip.tools/")
+                    return url.hasPrefix("https://source.skip.dev/") || url.hasPrefix("https://source.skip.tools/") || url.hasPrefix("https://github.com/skiptools/")
                 } else {
                     return false
                 }
@@ -1792,10 +1792,10 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "M5", type: .dynamic, targets: ["M5"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-ui.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-model.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-foundation.git", from: "1.0.0")
+                .package(url: "https://github.com/skiptools/skip.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-ui.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-model.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-foundation.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "M1", dependencies: [
@@ -1927,10 +1927,10 @@ final class SkipCommandTests: XCTestCase {
                 .library(name: "M5", type: .dynamic, targets: ["M5"]),
             ],
             dependencies: [
-                .package(url: "https://source.skip.tools/skip.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-ui.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-model.git", from: "1.0.0"),
-                .package(url: "https://source.skip.tools/skip-fuse.git", from: "1.0.0")
+                .package(url: "https://github.com/skiptools/skip.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-ui.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-model.git", from: "1.0.0"),
+                .package(url: "https://github.com/skiptools/skip-fuse.git", from: "1.0.0")
             ],
             targets: [
                 .target(name: "M1", dependencies: [

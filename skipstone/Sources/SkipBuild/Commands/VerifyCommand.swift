@@ -151,6 +151,12 @@ struct VerifyCommand: SkipCommand, StreamingCommand, ProjectCommand, ToolOptions
 }
 
 
+/// The host and organization for Skip repositories, to which package dependency URLs should refer.
+let skipRepositoryHost = "github.com/skiptools"
+
+/// The legacy Skip repository host, which redirects to `skipRepositoryHost`.
+let legacySkipRepositoryHost = "source.skip.tools"
+
 struct NoResultOutputError : LocalizedError {
     var errorDescription: String?
 }
@@ -224,6 +230,22 @@ extension ToolOptionsCommand where Self : StreamingCommand {
                 }
 
                 return CheckStatus(status: .pass, message: message ?? "Verify file: \(fileFragment)")
+            }
+        }
+
+        // check that the Package.swift references the current Skip repository host rather than the legacy redirecting host
+        let packageSwiftURL = URL(fileURLWithPath: "Package.swift", isDirectory: false, relativeTo: projectFolderURL)
+        await verifyFile(packageSwiftURL, title: "Check Skip repository URLs") { title, url in
+            let contents = try String(contentsOf: url, encoding: .utf8)
+            if !contents.contains(legacySkipRepositoryHost) {
+                return CheckStatus(status: .pass, message: title)
+            }
+            if autofix {
+                let updated = contents.replacingOccurrences(of: legacySkipRepositoryHost, with: skipRepositoryHost)
+                try updated.write(to: url, atomically: false, encoding: .utf8)
+                return CheckStatus(status: .warn, message: "\(title): updated \(legacySkipRepositoryHost) references to \(skipRepositoryHost)")
+            } else {
+                return CheckStatus(status: .fail, message: "\(title): Package.swift references \(legacySkipRepositoryHost), which should be \(skipRepositoryHost): run skip verify --fix")
             }
         }
 
