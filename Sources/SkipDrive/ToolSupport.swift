@@ -112,7 +112,7 @@ extension Process {
 extension ProcessInfo {
     /// True when the current architecture is ARM
     public static let isARM = {
-        #if os(macOS)
+        #if os(macOS) || targetEnvironment(macCatalyst)
         var size: size_t = 0
         sysctlbyname("hw.machine", nil, &size, nil, 0)
         var machine = [CChar](repeating: 0, count: size)
@@ -986,8 +986,8 @@ fileprivate final class PendingResultBox: @unchecked Sendable {
             // we could do something like this:
             // https://github.com/swiftlang/swift-tools-support-core/pull/113/changes
             //
-            // but for now we simple ignore workingDirectory flag on Linux
-            #if !os(Linux)
+            // but for now we simply ignore workingDirectory flag on Linux and Mac Catalyst.
+            #if !os(Linux) && !targetEnvironment(macCatalyst)
             posix_spawn_file_actions_addchdir_np(&fileActions, workingDirectory)
             #endif
         }

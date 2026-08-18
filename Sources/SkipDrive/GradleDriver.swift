@@ -715,7 +715,7 @@ extension ProcessInfo {
         }
 
         // “The script installs Homebrew to its default, supported, best prefix (/opt/homebrew for Apple Silicon, /usr/local for macOS Intel and /home/linuxbrew/.linuxbrew for Linux)” — https://docs.brew.sh/Installation
-        #if os(macOS) || os(macCatalyst)
+        #if os(macOS) || targetEnvironment(macCatalyst)
         return ProcessInfo.isARM ? "/opt/homebrew" : "/usr/local"
         #else
         // Linux
@@ -728,7 +728,7 @@ extension ProcessInfo {
         var env = self.environment
         let ANDROID_HOME = "ANDROID_HOME"
         if (env[ANDROID_HOME] ?? "").isEmpty {
-            #if os(macOS)
+            #if os(macOS) || targetEnvironment(macCatalyst)
             env[ANDROID_HOME] = ("~/Library/Android/sdk" as NSString).expandingTildeInPath
             #elseif os(Windows)
             env[ANDROID_HOME] = ("~/AppData/Local/Android/Sdk" as NSString).expandingTildeInPath
@@ -745,7 +745,7 @@ extension ProcessInfo {
 
         let JAVA_HOME = "JAVA_HOME"
         if (env[JAVA_HOME] ?? "").isEmpty {
-            #if os(macOS)
+            #if os(macOS) || targetEnvironment(macCatalyst)
             // default if JAVA_HOME is unset: /opt/homebrew/opt/java -> ../Cellar/openjdk/21.0.1
             env[JAVA_HOME] = "\(Self.homebrewRoot)/opt/java"
             #endif
