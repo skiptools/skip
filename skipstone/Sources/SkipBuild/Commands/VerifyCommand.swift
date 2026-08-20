@@ -245,7 +245,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
                 try updated.write(to: url, atomically: false, encoding: .utf8)
                 return CheckStatus(status: .warn, message: "\(title): updated \(legacySkipRepositoryHost) references to \(skipRepositoryHost)")
             } else {
-                return CheckStatus(status: .fail, message: "\(title): Package.swift references \(legacySkipRepositoryHost), which should be \(skipRepositoryHost): run skip verify --fix")
+                return CheckStatus(status: .warn, message: "\(title): Package.swift references \(legacySkipRepositoryHost), which should be \(skipRepositoryHost): run skip verify --fix")
             }
         }
 

@@ -99,7 +99,7 @@ final class SkipCommandTests: XCTestCase {
             // remove the Skip package dependencies
             package.dependencies.removeAll(where: { dependency in
                 if case .sourceControl(_, let url, _) = dependency.kind {
-                    return url.hasPrefix("https://source.skip.dev/") || url.hasPrefix("https://source.skip.tools/") || url.hasPrefix("https://github.com/skiptools/")
+                    return url.hasPrefix("https://github.com/skiptools/")
                 } else {
                     return false
                 }
@@ -1683,7 +1683,7 @@ final class SkipCommandTests: XCTestCase {
             // remove the Skip package dependencies
             package.dependencies.removeAll(where: { dependency in
                 if case .sourceControl(_, let url, _) = dependency.kind {
-                    return url.hasPrefix("https://source.skip.dev/") || url.hasPrefix("https://source.skip.tools/") || url.hasPrefix("https://github.com/skiptools/")
+                    return url.hasPrefix("https://github.com/skiptools/")
                 } else {
                     return false
                 }
