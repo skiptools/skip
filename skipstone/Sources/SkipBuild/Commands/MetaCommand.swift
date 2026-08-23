@@ -1030,7 +1030,7 @@ enum AppIndexGenerator {
         if includeSBOM {
             #if canImport(SkipDriveExternal)
             let outputDir = try AbsolutePath(validating: NSTemporaryDirectory())
-            let sbomFiles = try await SBOMGenerator.generateSBOMFiles(generateIOS: true, generateAndroid: true, projectPath: projectURL.path, packageName: packageJSON.name, packageJSON: packageJSON, outputDirAbsolute: outputDir, command: command, out: out)
+            let sbomFiles = try await SBOMGenerator.generateSBOMFiles(generateIOS: true, generateAndroid: true, projectPath: projectURL.path, packageName: packageJSON.name, packageJSON: packageJSON, outputDirAbsolute: outputDir, lenient: true, command: command, out: out)
             for file in sbomFiles {
                 let data = try Data(contentsOf: file)
                 let json = try JSONSerialization.jsonObject(with: data)

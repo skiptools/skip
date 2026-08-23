@@ -687,7 +687,7 @@ enum SBOMGenerator {
     /// Generate the Android SBOM by running the spdx-gradle-plugin on the project's Android build.
     /// Uses a Gradle init script to inject the plugin into the existing Android project without
     /// modifying any project files.
-    static func generateAndroidSBOM<C: StreamingCommand & OutputOptionsCommand>(projectPath: String, packageName: String, outputFile: AbsolutePath, command: C, out: MessageQueue) async throws {
+    static func generateAndroidSBOM<C: StreamingCommand & OutputOptionsCommand>(projectPath: String, packageName: String, outputFile: AbsolutePath, lenient: Bool = false, command: C, out: MessageQueue) async throws {
         let fs = localFileSystem
         let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths
 
@@ -730,8 +730,10 @@ enum SBOMGenerator {
         try initScriptContent.write(toFile: initScript.pathString, atomically: true, encoding: .utf8)
         defer { try? fs.removeFileTree(initScript) }
 
-        // Run spdxSbomForRelease on the real Android project with the init script
-        try await command.run(with: out, "Generate Android SBOM", ["gradle", ":app:spdxSbomForRelease", "--init-script", initScript.pathString, "--project-dir", androidFolderAbsolute.pathString, "--console=plain"], environment: env)
+        // Run spdxSbomForRelease on the real Android project with the init script.
+        // When lenient, permit the gradle command to fail without recording a fatal error
+        // message; the missing output file check below will detect and report the failure.
+        let runResult = try await command.run(with: out, "Generate Android SBOM", ["gradle", ":app:spdxSbomForRelease", "--init-script", initScript.pathString, "--project-dir", androidFolderAbsolute.pathString, "--console=plain"], environment: env, permitFailure: lenient)
 
         // The spdx plugin writes output to {app.buildDir}/spdx/release.spdx.json.
         // The Skip build plugin sets buildDir to {projectPath}/.build/Android/app
@@ -742,7 +744,21 @@ enum SBOMGenerator {
         guard fs.isDirectory(spdxOutputDir),
               let spdxFiles = try? fs.getDirectoryContents(spdxOutputDir),
               let spdxFileName = spdxFiles.first(where: { $0.hasSuffix(".spdx.json") }) else {
-            throw SBOMError(message: "Gradle SPDX plugin did not produce output in \(spdxOutputDir.pathString)")
+            var message = "Gradle SPDX plugin did not produce output in \(spdxOutputDir.pathString)"
+            // surface the underlying gradle failure reason (reported on stderr),
+            // which is otherwise only visible in the output log file
+            if let output = try? runResult.get() {
+                let gradleOutput = output.stderr + "\n" + output.stdout
+                if let problemRange = gradleOutput.range(of: "* What went wrong:") {
+                    let problem = gradleOutput[problemRange.upperBound...]
+                        .prefix(while: { $0 != "*" })
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !problem.isEmpty {
+                        message += ": \(problem)"
+                    }
+                }
+            }
+            throw SBOMError(message: message)
         }
 
         let spdxFile = spdxOutputDir.appending(component: spdxFileName)
@@ -756,7 +772,7 @@ enum SBOMGenerator {
     /// Generate SBOM files for the specified platforms, writing them to the output directory.
     /// Returns the URLs of the generated files. Used by both `skip sbom create` and `skip export --sbom`.
     @discardableResult
-    static func generateSBOMFiles<C: StreamingCommand & OutputOptionsCommand>(generateIOS: Bool, generateAndroid: Bool, projectPath: String, packageName: String, packageJSON: PackageManifest, outputDirAbsolute: AbsolutePath, command: C, out: MessageQueue) async throws -> [URL] {
+    static func generateSBOMFiles<C: StreamingCommand & OutputOptionsCommand>(generateIOS: Bool, generateAndroid: Bool, projectPath: String, packageName: String, packageJSON: PackageManifest, outputDirAbsolute: AbsolutePath, lenient: Bool = false, command: C, out: MessageQueue) async throws -> [URL] {
         let fs = localFileSystem
         try fs.createDirectory(outputDirAbsolute, recursive: true)
         var generatedFiles: [URL] = []
@@ -783,8 +799,18 @@ enum SBOMGenerator {
 
         if generateAndroid {
             let androidFile = outputDirAbsolute.appending(component: androidFilename)
-            try await generateAndroidSBOM(projectPath: projectPath, packageName: packageName, outputFile: androidFile, command: command, out: out)
-            generatedFiles.append(androidFile.asURL)
+            do {
+                try await generateAndroidSBOM(projectPath: projectPath, packageName: packageName, outputFile: androidFile, lenient: lenient, command: command, out: out)
+                generatedFiles.append(androidFile.asURL)
+            } catch where lenient {
+                // The spdx-gradle-plugin performs strict Maven effective-POM resolution, which can
+                // fail for third-party artifacts whose published POMs cannot be modeled, such as
+                // BOM-managed dependencies with mismatched dependency types (e.g., the
+                // androidx.media3 1.11.0 POMs declare versionless type=aar dependencies that the
+                // imported compose-bom only manages as type=jar). Such failures should not block
+                // metadata generation or app exports, so tolerate them with a warning.
+                await out.write(status: .warn, "Skipping Android SBOM due to generation failure: \(error)")
+            }
         }
 
         return generatedFiles
