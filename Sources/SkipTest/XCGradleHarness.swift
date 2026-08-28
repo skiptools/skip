@@ -2,7 +2,7 @@
 #if !SKIP
 #if canImport(SkipDrive)
 import SkipDrive
-#if os(macOS) || os(Linux)
+#if os(macOS) || targetEnvironment(macCatalyst) || os(Linux)
 @_exported import XCTest
 
 /// A `XCTestCase` that invokes the `gradle` process.
@@ -42,7 +42,7 @@ extension XCGradleHarness where Self : XCTestCase {
                 }
                 return raw.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
             }()
-            try await invokeGradle(actions: [testAction], info: info, deviceID: device, testFilters: testFilters)
+            try await invokeGradle(actions: [testAction], info: info, deviceID: device, testFilters: testFilters, fromSourceFileRelativeToPackageRoot: file)
             print("Completed gradle test run for \(device ?? "local")")
         } catch {
             XCTFail("\((error as? LocalizedError)?.localizedDescription ?? error.localizedDescription)", file: file, line: line)
@@ -99,6 +99,21 @@ extension XCGradleHarness where Self : XCTestCase {
                 var testProcessResult: ProcessResult? = nil
 
                 var env: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths
+                #if targetEnvironment(macCatalyst)
+                if let packageRootURL = sourcePath.flatMap(packageBaseFolder(forSourceFile:)) {
+                    // Robolectric runs in a macOS JVM, so build host dylibs instead of loading Catalyst frameworks.
+                    let configuration = actions.contains(where: { $0.localizedCaseInsensitiveContains("release") }) ? "release" : "debug"
+                    let swiftBuildArgs = ["/usr/bin/xcrun", "swift", "build", "--package-path", packageRootURL.path, "--target", baseModuleName, "--configuration", configuration, "--disable-sandbox"]
+                    try await Process.checkNonZeroExit(arguments: swiftBuildArgs, environment: env)
+                    let arch = ProcessInfo.isARM ? "arm64-apple-macosx" : "x86_64-apple-macosx"
+                    env["SKIP_FFI_LIBRARY_PATH"] = packageRootURL
+                        .appendingPathComponent(".build", isDirectory: true)
+                        .appendingPathComponent(arch, isDirectory: true)
+                        .appendingPathComponent(configuration, isDirectory: true)
+                        .path
+                }
+                #endif
+
                 if let deviceID = deviceID, !deviceID.isEmpty {
                     env["ANDROID_SERIAL"] = deviceID
                 }
@@ -576,6 +591,6 @@ extension XCTestCase {
 #endif
 
 
-#endif // os(macOS) || os(Linux)
+#endif // os(macOS) || targetEnvironment(macCatalyst) || os(Linux)
 #endif // canImport(SkipDrive)
 #endif // !SKIP
