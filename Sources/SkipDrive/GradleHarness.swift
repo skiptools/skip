@@ -371,15 +371,18 @@ extension GradleHarness {
     public func gradleExec(in projectFolder: URL?, moduleName: String?, packageName: String?, arguments: [String]) async throws {
         preprocessGradleArguments(in: projectFolder, arguments: arguments)
 
+        let skipQuiet = (ProcessInfo.processInfo.environment["SKIP_QUIET"] ?? "0") != "0"
+
         let driver = try await GradleDriver()
         let acts: [String] = [] // releaseBuild ? ["assembleRelease"] : ["assembleDebug"] // expected in the arguments to the command
 
         var exitCode: ProcessResult.ExitStatus? = nil
-        let (output, _) = try await driver.launchGradleProcess(in: projectFolder, module: moduleName, actions: acts, arguments: arguments, environment: ProcessInfo.processInfo.environmentWithDefaultToolPaths, info: false, rerunTasks: false, exitHandler: { result in
-            print("note: Gradle \(result.resultDescription)")
+        let (output, _) = try await driver.launchGradleProcess(in: projectFolder, module: moduleName, actions: acts, arguments: arguments, environment: ProcessInfo.processInfo.environmentWithDefaultToolPaths, info: false, warn: skipQuiet, rerunTasks: false, exitHandler: { result in
+            if !skipQuiet {
+                print("note: Gradle \(result.resultDescription)")
+            }
             exitCode = result.exitStatus
         })
-
         var lines: [String] = []
         for try await pout in output {
             let line = resolveSymlinksInXcodeIssueOutput(pout.line)
