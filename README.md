@@ -4,10 +4,10 @@
   </a>
 </p>
 
-<h3 align="center">One Swift Codebase. Two Native Platforms.</h3>
+<h3 align="center">One Swift Codebase. Two Native Platforms. Experimental Web/Wasm Host.</h3>
 
 <p align="center">
-  Write your app in Swift and SwiftUI. Skip compiles it natively for iOS and produces real Jetpack Compose for Android.
+  Write your app in Swift and SwiftUI. Skip compiles it natively for iOS and produces real Jetpack Compose for Android, with an experimental browser/Wasm host available on this branch.
 </p>
 
 <p align="center">
@@ -145,7 +145,7 @@ Skip provides a suite of open-source libraries that implement standard Apple fra
 | [skip-firebase](https://github.com/skiptools/skip-firebase) | Firebase (Auth, Firestore, Messaging, Analytics, etc.) |
 | [skip-sql](https://github.com/skiptools/skip-sql) | SQLite database access |
 | [skip-keychain](https://github.com/skiptools/skip-keychain) | Keychain / EncryptedSharedPreferences |
-| [skip-web](https://github.com/skiptools/skip-web) | WKWebView / android.webkit.WebView |
+| [skip-web](https://github.com/skiptools/skip-web) | WKWebView / android.webkit.WebView; experimental browser DOM host via `SkipWebWasm` |
 | [skip-av](https://github.com/skiptools/skip-av) | AVKit / ExoPlayer |
 | [skip-device](https://github.com/skiptools/skip-device) | Network, Location, Sensors |
 | [skip-motion](https://github.com/skiptools/skip-motion) | Lottie animations |
@@ -156,6 +156,10 @@ See the full module documentation at [skip.dev/docs/modules](https://skip.dev/do
 ## Architecture
 
 The [skip](https://github.com/skiptools/skip) repository hosts the Skip SwiftPM build plugin, which integrates with Xcode and Swift Package Manager to drive the Android build alongside your normal iOS build. It works together with [skipstone](https://github.com/skiptools/skipstone), the binary that powers both the `skip` CLI and the plugin.
+
+On this branch, `skip web` generates the browser host files used by the experimental `SkipWebWasm`
+product. It provides the web entry-point contract and DOM runtime foundation; SwiftUI-to-DOM
+translation and a production Wasm SDK integration remain follow-up work.
 
 For more on how Skip projects are structured, see:
 
