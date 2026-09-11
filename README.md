@@ -158,8 +158,9 @@ See the full module documentation at [skip.dev/docs/modules](https://skip.dev/do
 The [skip](https://github.com/skiptools/skip) repository hosts the Skip SwiftPM build plugin, which integrates with Xcode and Swift Package Manager to drive the Android build alongside your normal iOS build. It works together with [skipstone](https://github.com/skiptools/skipstone), the binary that powers both the `skip` CLI and the plugin.
 
 On this branch, `skip web` generates the browser host files used by the experimental `SkipWebWasm`
-product. It provides the web entry-point contract and DOM runtime foundation; SwiftUI-to-DOM
-translation and a production Wasm SDK integration remain follow-up work.
+product. Build the generated `index.js` with JavaScriptKit's existing PackageToJS command. The
+web entry-point contract and DOM runtime foundation are included; SwiftUI-to-DOM translation and
+a production Wasm SDK integration remain follow-up work.
 
 For more on how Skip projects are structured, see:
 
