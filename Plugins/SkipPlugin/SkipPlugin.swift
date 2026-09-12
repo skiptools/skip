@@ -41,6 +41,10 @@ import PackagePlugin
     let skipQuiet = (ProcessInfo.processInfo.environment["SKIP_QUIET"] ?? "0") != "0"
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
+        if ProcessInfo.processInfo.environment["SKIP_WEB"] == "1" {
+            Diagnostics.remark("Skip plugin elided for Skip WebAssembly build")
+            return []
+        }
         if skipDisabled {
             Diagnostics.remark("Skip plugin disabled through SKIP_PLUGIN_DISABLED environment variable")
             return []
