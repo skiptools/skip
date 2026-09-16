@@ -19,7 +19,12 @@ ARTIFACTBUNDLE="${ARTIFACT}.artifactbundle"
 PLUGIN_ZIP="${ARTIFACT}-linux.zip"
 ARTIFACT_BUILD_DIR=.build/artifactbundle-linux
 
-SWIFT_VERSION=${SWIFT_VERSION:-"6.3.1"}
+# The compiler has to match the Linux static SDK that is installed, or the build fails with
+# "module compiled with Swift X cannot be imported by the Swift Y compiler". Leave SWIFT_VERSION
+# unset to build with whatever toolchain swiftly currently has selected — CI installs the
+# toolchain and the matching SDK together (`swiftly install --use <version>`), so following its
+# selection keeps the two in step. A hard-coded default silently drifts out of date instead.
+SWIFT_VERSION=${SWIFT_VERSION:-""}
 USE_SWIFTLY=${USE_SWIFTLY:-"1"}
 
 # Parse --arch flags; defaults to both x86_64 and aarch64
@@ -41,7 +46,11 @@ if [[ ${#ARCHS[@]} -eq 0 ]]; then
 fi
 
 if [[ "${USE_SWIFTLY}" == "1" ]]; then
-    swiftly install "${SWIFT_VERSION}"
+    if [[ -n "${SWIFT_VERSION}" ]]; then
+        swiftly install "${SWIFT_VERSION}"
+    fi
+    # report the compiler that will be used, so any mismatch with the installed SDK is visible
+    swiftly run swift --version ${SWIFT_VERSION:+"+${SWIFT_VERSION}"}
 fi
 
 mv -vf "${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}" "${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}.bk.$(date +%s)" || true
@@ -49,15 +58,35 @@ mv -vf "${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}" "${ARTIFACT_BUILD_DIR}/${ARTIFA
 for ARCH in "${ARCHS[@]}"; do
     SDK="${ARCH}-swift-linux-musl"
 
+    BUILD_ARGS=(build --swift-sdk "${SDK}" --configuration "${CONFIGURATION}" --product "${PRODUCT}")
     if [[ "${USE_SWIFTLY}" == "1" ]]; then
-        swiftly run swift build --swift-sdk "${SDK}" --configuration "${CONFIGURATION}" --product "${PRODUCT}" "+${SWIFT_VERSION}"
+        SWIFT_CMD=(swiftly run swift)
+        # only pin a toolchain when one was explicitly requested; otherwise use swiftly's selection
+        PIN=(${SWIFT_VERSION:+"+${SWIFT_VERSION}"})
     else
         # if swiftly is disabled, just build with the current `swift` version
-        swift build --swift-sdk "${SDK}" --configuration "${CONFIGURATION}" --product "${PRODUCT}"
+        SWIFT_CMD=(swift)
+        PIN=()
+    fi
+
+    "${SWIFT_CMD[@]}" "${BUILD_ARGS[@]}" "${PIN[@]}"
+
+    # Where SwiftPM puts the built product depends on the build system: the `native` engine (the
+    # default through Swift 6.3) and `swiftbuild` (the default from Swift 6.4) use different layouts,
+    # and the swiftbuild path additionally varies by platform and configuration casing. Ask SwiftPM
+    # where it put the product rather than hard-coding either layout. Note that the swiftbuild
+    # path has no architecture component (.build/out/Products/Release-linux), so every arch in
+    # this loop reports the same folder: the copy below must stay inside the loop, right after
+    # the build that produced the binary.
+    BIN_PATH=$("${SWIFT_CMD[@]}" "${BUILD_ARGS[@]}" --show-bin-path "${PIN[@]}" | tail -1)
+    if [[ ! -f "${BIN_PATH}/${PRODUCT}" ]]; then
+        echo "error: ${PRODUCT} not found in the reported build folder: ${BIN_PATH}" >&2
+        ls -la "${BIN_PATH}" >&2 || true
+        exit 1
     fi
 
     mkdir -p "${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}/${SDK}"
-    cp -av .build/${SDK}/${CONFIGURATION}/${PRODUCT} ${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}/${SDK}/${SKIPCMD}
+    cp -av "${BIN_PATH}/${PRODUCT}" "${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}/${SDK}/${SKIPCMD}"
 done
 
 SKIP_VERSION=${SKIP_VERSION:-"0.0.1"}

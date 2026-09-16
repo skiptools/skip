@@ -8,14 +8,27 @@ PLUGIN_ZIP="${ARTIFACT}-macos.zip"
 ARTIFACT_BUILD_DIR=.build/artifactbundle-macos
 
 # now make the final release build for both architectures
-swift build --arch arm64 --arch x86_64 --configuration ${CONFIGURATION} --product ${PRODUCT}
+BUILD_ARGS=(build --arch arm64 --arch x86_64 --configuration "${CONFIGURATION}" --product "${PRODUCT}")
+swift "${BUILD_ARGS[@]}"
+
+# Where SwiftPM puts the built product depends on the build system: the `native` engine (the
+# default through Swift 6.3) and `swiftbuild` (the default from Swift 6.4) use different layouts,
+# and the swiftbuild path additionally varies by platform and configuration casing. Ask SwiftPM
+# where it put the product rather than hard-coding either layout. For a universal build with the
+# secret --arch flags that is .build/apple/Products/Release under 6.3 (the undocumented "apple"
+# folder) but .build/out/Products/Release under 6.4.
+BIN_PATH=$(swift "${BUILD_ARGS[@]}" --show-bin-path | tail -1)
+if [[ ! -f "${BIN_PATH}/${PRODUCT}" ]]; then
+    echo "error: ${PRODUCT} not found in the reported build folder: ${BIN_PATH}" >&2
+    ls -la "${BIN_PATH}" >&2 || true
+    exit 1
+fi
 
 # try to back up any old artifactbundle folder
 mv -f ${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE} ${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}.bk.`date +%s` || true
 mkdir -p ${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}/macos
 
-# the secret --arch flag emits to the (undocumented) "apple" build folder
-cp -av .build/apple/Products/${CONFIGURATION}/${PRODUCT} ${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}/macos/${SKIPCMD}
+cp -av "${BIN_PATH}/${PRODUCT}" "${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}/macos/${SKIPCMD}"
 
 cd ${ARTIFACT_BUILD_DIR}
 

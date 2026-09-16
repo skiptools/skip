@@ -16,7 +16,8 @@ jobs:
       fail-fast: false
       matrix:
         swift:
-          - '6.3.2'
+          #- '6.3.2'
+          - '6.4.0'
         os:
           - 'ubuntu-latest'
           #- 'macos-latest'
@@ -46,7 +47,7 @@ jobs:
           swiftly install --assume-yes --use ${{ matrix.swift }}
           swiftly run swift --version
 
-          # https://download.swift.org/swift-6.3-release/static-sdk/swift-6.3-RELEASE/swift-6.3-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz
+          # https://download.swift.org/swift-6.4-release/static-sdk/swift-6.4-RELEASE/swift-6.4-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz
           curl -fsSL --retry 5 -o 'swift-static-linux-sdk.tar.gz' 'https://download.swift.org/swift-${{ matrix.swift }}-release/static-sdk/swift-${{ matrix.swift }}-RELEASE/swift-${{ matrix.swift }}-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz'
 
           swiftly run swift sdk install 'swift-static-linux-sdk.tar.gz'
@@ -60,6 +61,11 @@ jobs:
 
       - run: swift test --parallel
 
+      # On Linux the plugin is cross-compiled with the static Linux SDK installed above, and the
+      # compiler that builds it is the one `swiftly install --use ${{ matrix.swift }}` selected in
+      # that step. Keep the `--use`: build_linux_plugin.sh intentionally does not pin a toolchain
+      # of its own, so that the compiler and the SDK cannot drift apart into
+      # "module compiled with Swift X cannot be imported by the Swift Y compiler".
       - name: "Build ${{ runner.os }} plugin"
         shell: bash
         run: |
@@ -104,19 +110,21 @@ jobs:
         os:
           - 'ubuntu-24.04'
           - 'macos-15-intel'
+          - 'macos-26-intel'
         swift:
           - '6.3'
+          - '6.4'
         android-api:
           - '28'
           #- '34'
         android-arch:
           - 'x86_64'
         android-sdk:
-          # blank will use the latest official release (e.g., 6.3)
+          # blank will use the latest official release (e.g., 6.4)
           - ''
           #- '6.3'
           #- 'nightly-6.3'
-          - 'nightly-main'
+          #- 'nightly-main'
         android-ndk:
           # blank will use the default
           - ''

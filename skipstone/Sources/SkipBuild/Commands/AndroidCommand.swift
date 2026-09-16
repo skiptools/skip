@@ -331,7 +331,9 @@ extension ToolchainOptionsCommand {
 
 @available(macOS 13, iOS 16, tvOS 16, watchOS 8, *)
 extension ToolchainOptionsCommand where Self : StreamingCommand {
-    func installAndroidSDK(sdkName: String = "android", version: String, ndkVersion: String, reinstall: Bool, selfTest: Bool, with out: MessageQueue) async throws {
+    /// Installs the Swift SDK for Android, along with the NDK it is built against.
+    /// A `nil` `ndkVersion` selects the NDK matching the Swift version being installed.
+    func installAndroidSDK(sdkName: String = "android", version: String, ndkVersion: String? = nil, reinstall: Bool, selfTest: Bool, with out: MessageQueue) async throws {
         if version.hasPrefix("5.") || version.hasPrefix("6.0") || version.hasPrefix("6.1") || version.hasPrefix("6.2") || version.hasPrefix("nightly-6.2") {
             try await installAndroidSDKLegacy(version: version, reinstall: reinstall, with: out)
         } else {
@@ -376,7 +378,8 @@ extension ToolchainOptionsCommand where Self : StreamingCommand {
                 throw AndroidError(errorDescription: "Android SDK setup script was not found at \(ndkInstallScript.path)")
             }
 
-            // Download and unpack NDK
+            // Download and unpack the NDK that this Swift version's SDK is built against
+            let ndkVersion = ndkVersion ?? AndroidSDKInstallCommand.defaultAndroidNDKVersion(forSwiftVersion: version)
             let ndkFolder = try await downloadAndroidNDK(ndkVersion: ndkVersion, targetPath: swiftAndroidRoot, with: out)
 
             // Run link script for NDK
@@ -437,13 +440,50 @@ struct AndroidSDKInstallCommand: MessageCommand, ToolchainOptionsCommand {
         shouldDisplay: true,
         aliases: ["upgrade"])
 
-    static let defaultAndroidNDKVersion = "r27d"
+    /// The NDK used by Swift Android SDKs before 6.4.
+    static let legacyAndroidNDKVersion = "r27d"
+
+    /// The NDK used by the Swift Android SDK as of Swift 6.4.
+    static let currentAndroidNDKVersion = "r30"
+
+    /// The NDK that the Swift Android SDK for the given Swift version is built against.
+    ///
+    /// The SDK's sysroot is linked against the NDK it was built with, so the two have to match:
+    /// Swift 6.4 moved to NDK 30, while earlier versions need the older NDK.
+    static func defaultAndroidNDKVersion(forSwiftVersion swiftVersion: String) -> String {
+        swiftVersionIsAtLeast64(swiftVersion) ? currentAndroidNDKVersion : legacyAndroidNDKVersion
+    }
+
+    /// Whether the given Swift Android SDK version is 6.4 or later.
+    ///
+    /// Handles every shape that reaches `skip android sdk install`: releases ("6.4.0", "6.3.3"),
+    /// nightlies ("nightly-main", "nightly-6.4") and snapshots
+    /// ("swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-09-04-a", "swift-DEVELOPMENT-SNAPSHOT-2025-12-19-a").
+    /// Development builds of `main`, and anything whose version cannot be parsed, are treated as
+    /// newer than any release branch, since those track the most recent toolchain.
+    static func swiftVersionIsAtLeast64(_ swiftVersion: String) -> Bool {
+        var name = swiftVersion
+        for prefix in ["nightly-", "swift-"] where name.hasPrefix(prefix) {
+            name = String(name.dropFirst(prefix.count))
+        }
+        if name.hasPrefix("main") || name.hasPrefix("DEVELOPMENT-SNAPSHOT") {
+            return true
+        }
+        // take the leading numeric components, so "6.4.x-DEVELOPMENT-SNAPSHOT-…" yields 6.4
+        let components = name.prefix(while: { $0.isNumber || $0 == "." })
+            .split(separator: ".")
+            .compactMap({ Int($0) })
+        guard let major = components.first else {
+            return true
+        }
+        return (major, components.dropFirst().first ?? 0) >= (6, 4)
+    }
 
     @Option(help: ArgumentHelp("Version of the Swift Android SDK to install (defaults to latest release)", valueName: "version"))
     var version: String?
 
-    @Option(help: ArgumentHelp("Version of the Android NDK to link to the toolchain", valueName: "ndk"))
-    var ndkVersion: String = Self.defaultAndroidNDKVersion
+    @Option(help: ArgumentHelp("Version of the Android NDK to link to the toolchain (defaults to \(Self.currentAndroidNDKVersion) for Swift 6.4 and later, \(Self.legacyAndroidNDKVersion) for earlier versions)", valueName: "ndk"))
+    var ndkVersion: String?
 
     @OptionGroup(title: "Output Options")
     var outputOptions: OutputOptions

@@ -261,7 +261,8 @@ struct CreateCommand: StreamingCommand, ToolchainOptionsCommand, CreateOptionsCo
             guard let latestSDK = sdks.first else {
                 throw AndroidError(errorDescription: "No released Android SDK versions found")
             }
-            try await installAndroidSDK(version: latestSDK.version, ndkVersion: AndroidSDKInstallCommand.defaultAndroidNDKVersion, reinstall: false, selfTest: false, with: out)
+            // ndkVersion is left unset so the NDK matching latestSDK.version is chosen
+            try await installAndroidSDK(version: latestSDK.version, reinstall: false, selfTest: false, with: out)
         }
 
         let dir = URL(fileURLWithPath: self.createOptions.dir ?? projectName, isDirectory: true)
