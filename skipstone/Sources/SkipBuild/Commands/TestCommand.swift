@@ -166,7 +166,9 @@ extension TestCommand {
 
         var testResult: Result<ProcessOutput, Error>? = nil
         if test == true {
-            var testArgs = ["swift", "test", "--parallel", "-c", configuration, "--enable-code-coverage", "--xunit-output", xunit, "--package-path", project]
+            // see HostSwiftBuild for why the environment and build system are set here
+            additionalEnv.merge(HostSwiftBuild.environment, uniquingKeysWith: { $1 })
+            var testArgs = ["swift", "test", "--parallel", "-c", configuration, "--enable-code-coverage", "--xunit-output", xunit, "--package-path", project] + (await HostSwiftBuild.buildSystemArguments())
             for pattern in filter {
                 testArgs += ["--filter", pattern]
             }
@@ -647,14 +649,16 @@ extension GradleDriver.TestCase : TestCaseInfo {
 extension ToolOptionsCommand where Self : OutputOptionsCommand & StreamingCommand  {
 
     func runSkipTests(in projectFolderURL: URL, configuration: String, swift: Bool, kotlin: Bool, separateModule: String? = "testSkipModule", with out: MessageQueue) async throws {
-        let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths // an environment with a default ANDROID_HOME
+        // an environment with a default ANDROID_HOME; see HostSwiftBuild for the rest
+        let env = ProcessInfo.processInfo.environmentWithDefaultToolPaths.merging(HostSwiftBuild.environment, uniquingKeysWith: { $1 })
+        let buildSystem = await HostSwiftBuild.buildSystemArguments()
         if let separateModule = separateModule {
-            try await run(with: out, "Test Swift", ["swift", "test", "--verbose", "--configuration", configuration, "--skip", separateModule, "--package-path", projectFolderURL.path], environment: env)
+            try await run(with: out, "Test Swift", ["swift", "test", "--verbose", "--configuration", configuration, "--skip", separateModule, "--package-path", projectFolderURL.path] + buildSystem, environment: env)
 
-            try await run(with: out, "Test Kotlin", ["swift", "test", "--verbose", "--configuration", configuration, "--filter", "testSkipModule", "--package-path", projectFolderURL.path], environment: env)
+            try await run(with: out, "Test Kotlin", ["swift", "test", "--verbose", "--configuration", configuration, "--filter", "testSkipModule", "--package-path", projectFolderURL.path] + buildSystem, environment: env)
         } else {
             // run Swift and Kotlin tests at the same time
-            try await run(with: out, "Test Project", ["swift", "test", "--verbose", "--configuration", configuration, "--package-path", projectFolderURL.path], environment: env)
+            try await run(with: out, "Test Project", ["swift", "test", "--verbose", "--configuration", configuration, "--package-path", projectFolderURL.path] + buildSystem, environment: env)
         }
     }
 }
