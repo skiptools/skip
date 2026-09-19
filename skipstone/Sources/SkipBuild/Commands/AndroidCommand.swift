@@ -1149,9 +1149,11 @@ extension AndroidOperationCommand {
                 }
             }
 
-            // add any resource folders used by the tests (e.g., "swift-corelibs-foundation_TestFoundation.resources")
+            // add any resource folders used by the tests: the native build system emits
+            // "<package>_<target>.resources", swiftbuild emits "<package>_<target>.bundle"
+            // (e.g., "swift-corelibs-foundation_TestFoundation.resources")
             let resources = try dirs(at: buildOutputFolderURL)
-                .filter({ $0.pathExtension == "resources" })
+                .filter({ $0.pathExtension == "resources" || $0.pathExtension == "bundle" })
 
             transferFiles += resources
             transferFiles.append(contentsOf: try dependencySharedObjectFiles())
