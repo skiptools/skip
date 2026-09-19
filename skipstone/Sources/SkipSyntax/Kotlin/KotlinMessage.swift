@@ -232,7 +232,7 @@ extension Message {
     }
 
     static func kotlinExtensionUsingFileprivateAPI(_ sourceDerived: SourceDerived, source: Source) -> Message {
-        return Message(kind: .warning, message: "This extension will be moved into its extended type definition when translated to Kotlin. It will not be able to access this file's private types or fileprivate members", sourceDerived: sourceDerived, source: source)
+        return Message(kind: .warning, message: "This extension will be moved into its extended type definition when translated to Kotlin. It will not be able to access this file's private types or fileprivate members", sourceDerived: sourceDerived, source: source, diagnosticID: .extensionMerging)
     }
 
     static func kotlinExtensionImplementMember(_ sourceDerived: SourceDerived, extensionPlacement: KotlinExtensionPlacement, source: Source) -> Message? {

@@ -27,6 +27,7 @@ class Statement: SyntaxNode {
             // Filter out our own messages and any child Expression messages, but leave child statements
             return children.filter { $0 is Statement }.flatMap { $0.subtreeMessages }
         } else {
+            let messages = messages.filter { !(extras?.suppresses($0) ?? false) }
             return messages + children.flatMap { $0.subtreeMessages }
         }
     }

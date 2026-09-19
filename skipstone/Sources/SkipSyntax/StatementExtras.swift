@@ -17,6 +17,8 @@ struct StatementExtras {
         case declaration(String)
         /// Mute warnings and errors for this syntax.
         case nowarn
+        /// Mute only diagnostics with one of the given identifiers for this syntax.
+        case nowarnSpecific(Set<Message.DiagnosticID>)
         /// Marker for a function that is implemented elsewhere, e.g. in a C library.
         case external
         /// Encountered an invalid directive.
@@ -168,8 +170,28 @@ struct StatementExtras {
                 } else if trimmedLine.hasPrefix(attributesPrefixOld) {
                     directive = .attributes([])
                     directiveLines.append(String(trimmedLine.dropFirst(attributesPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
-                } else if trimmedLine.hasPrefix(noWarnPrefix) {
+                } else if trimmedLine == noWarnPrefix {
                     directives.append(.nowarn)
+                    isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
+                } else if trimmedLine.hasPrefix(noWarnPrefix + "(") {
+                    let argument = String(trimmedLine.dropFirst(noWarnPrefix.count))
+                    if argument.hasSuffix(")") {
+                        let tagString = String(argument.dropFirst().dropLast())
+                        let tags = tagString.split(separator: ",", omittingEmptySubsequences: false).map {
+                            String($0).trimmingCharacters(in: .whitespacesAndNewlines)
+                        }
+                        let diagnosticIDs = tags.compactMap(Message.DiagnosticID.init(rawValue:))
+                        if !tags.isEmpty, !tags.contains(where: \.isEmpty), diagnosticIDs.count == tags.count {
+                            directives.append(.nowarnSpecific(Set(diagnosticIDs)))
+                        } else {
+                            directives.append(.invalid(trimmedLine))
+                        }
+                    } else {
+                        directives.append(.invalid(trimmedLine))
+                    }
+                    isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
+                } else if trimmedLine.hasPrefix(noWarnPrefix) {
+                    directives.append(.invalid(trimmedLine))
                     isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
                 } else if trimmedLine.hasPrefix(externalPrefix) {
                     directives.append(.external)
@@ -254,6 +276,18 @@ struct StatementExtras {
     var suppressMessages: Bool {
         for directive in directives {
             if case .nowarn = directive {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Whether to suppress a specific message on this statement.
+    func suppresses(_ message: Message) -> Bool {
+        for directive in directives {
+            if case .nowarnSpecific(let diagnosticIDs) = directive,
+               let diagnosticID = message.diagnosticID,
+               diagnosticIDs.contains(diagnosticID) {
                 return true
             }
         }

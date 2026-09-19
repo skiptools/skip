@@ -2,7 +2,7 @@
 // Licensed under the GNU Affero General Public License v3.0
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import SkipSyntax
+@testable import SkipSyntax
 import XCTest
 
 final class BridgeToKotlinTests: XCTestCase {
@@ -1688,6 +1688,28 @@ final class BridgeToKotlinTests: XCTestCase {
             return SwiftClosure0.javaObject(for: factory, options: [])!
         }
         """, transformers: transformers)
+    }
+
+    func testSpecificNoWarn() async throws {
+        let sourceFile = try tmpFile(named: "Source.swift", contents: """
+        struct S {
+        }
+        """)
+        let supportingFile = try tmpFile(named: "Support.swift", contents: """
+        // SKIP NOWARN(EXTENSION_MERGING)
+        extension S {
+            func f() {
+            }
+            func g(values: Int..., _ other: String) {
+            }
+        }
+        private class T {
+        }
+        """)
+
+        let messages = try await transpile(preflight: true, files: [sourceFile, supportingFile])
+        XCTAssertFalse(messages.contains { $0.diagnosticID == .extensionMerging })
+        XCTAssertTrue(messages.contains { $0.message.contains("Add an external label") }, messages.map(\.message).joined(separator: "\n"))
     }
 
     func testMainActorFunction() async throws {

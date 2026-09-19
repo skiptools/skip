@@ -1362,11 +1362,18 @@ final class KotlinBridgeToKotlinVisitor {
         guard let extras else {
             return nil
         }
-        // We currently only carry over .nowarn so that bridged types can suppress warnings
-        guard extras.directives.contains(.nowarn) else {
+        let nowarnDirectives = extras.directives.filter {
+            switch $0 {
+            case .nowarn, .nowarnSpecific:
+                return true
+            default:
+                return false
+            }
+        }
+        guard !nowarnDirectives.isEmpty else {
             return nil
         }
-        return StatementExtras(directives: [.nowarn], leadingTrivia: [], trailingTrivia: [])
+        return StatementExtras(directives: nowarnDirectives, leadingTrivia: [], trailingTrivia: [])
     }
 
     private func typeErasedPeerSwift(for classDeclaration: KotlinClassDeclaration, variableDeclarations: [KotlinVariableDeclaration], functionDeclarations: [(KotlinFunctionDeclaration, uniquifier: Int?)], stateVariables: [(String, Attributes, Modifiers)], visibility: Modifiers.Visibility) -> SwiftDefinition {

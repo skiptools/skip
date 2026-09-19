@@ -6,6 +6,10 @@ import SwiftSyntax
 
 /// An Xcode-formatted message for the user.
 public struct Message: Error, Codable {
+    enum DiagnosticID: String, Codable, Hashable {
+        case extensionMerging = "EXTENSION_MERGING"
+    }
+
     public enum Kind: String, Codable, Equatable {
         /// A trace-level statement that will only be emitted in debug mode
         case trace
@@ -18,12 +22,14 @@ public struct Message: Error, Codable {
     public let message: String
     public let sourceFile: Source.FilePath?
     public let sourceRange: Source.Range?
+    let diagnosticID: DiagnosticID?
 
-    init(kind: Kind, message: String, source: Source? = nil, sourceRange: Source.Range? = nil) {
+    init(kind: Kind, message: String, source: Source? = nil, sourceRange: Source.Range? = nil, diagnosticID: DiagnosticID? = nil) {
         self.kind = kind
         self.message = Self.messageWithSource(for: message, in: source, range: sourceRange)
         self.sourceFile = source?.file
         self.sourceRange = sourceRange
+        self.diagnosticID = diagnosticID
     }
 
     public init(kind: Kind, message: String, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil) {
@@ -31,13 +37,36 @@ public struct Message: Error, Codable {
         self.message = Self.messageWithSource(for: message, in: nil, range: sourceRange)
         self.sourceFile = sourceFile
         self.sourceRange = sourceRange
+        self.diagnosticID = nil
     }
 
-    init(kind: Kind, message: String, sourceDerived: SourceDerived, source: Source? = nil) {
+    init(kind: Kind, message: String, sourceDerived: SourceDerived, source: Source? = nil, diagnosticID: DiagnosticID? = nil) {
         self.kind = kind
         self.message = Self.messageWithSource(for: message, in: source, range: sourceDerived.messageSourceRange)
         self.sourceFile = sourceDerived.sourceFile ?? source?.file
         self.sourceRange = sourceDerived.messageSourceRange ?? sourceDerived.sourceRange
+        self.diagnosticID = diagnosticID
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case kind, message, sourceFile, sourceRange
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try container.decode(Kind.self, forKey: .kind)
+        message = try container.decode(String.self, forKey: .message)
+        sourceFile = try container.decodeIfPresent(Source.FilePath.self, forKey: .sourceFile)
+        sourceRange = try container.decodeIfPresent(Source.Range.self, forKey: .sourceRange)
+        diagnosticID = nil
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(kind, forKey: .kind)
+        try container.encode(message, forKey: .message)
+        try container.encodeIfPresent(sourceFile, forKey: .sourceFile)
+        try container.encodeIfPresent(sourceRange, forKey: .sourceRange)
     }
 
     /// The message with the source path and line number in a way that when output to the Xcode console it will be handled in the report navigator
