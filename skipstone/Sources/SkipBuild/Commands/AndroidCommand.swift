@@ -799,6 +799,18 @@ extension AndroidOperationCommand {
         // https://github.com/finagolfin/swift-android-sdk/issues/207
         env["ANDROID_NDK_ROOT"] = nil
 
+        // swiftbuild (the Swift 6.4 default engine) takes its Android sysroot from ANDROID_NDK_HOME,
+        // else from the NDKs under ANDROID_HOME, never from the Swift SDK's sdkRootPath. Unless the
+        // caller chose an NDK, hand it the one `skip android sdk install` placed next to the SDK's
+        // sysroot; otherwise it links against a foreign NDK's libc++ (e.g. NDK 28 lacks
+        // std::__hash_memory, which the Swift 6.4 SDK's NDK r30 headers reference).
+        if (env["ANDROID_NDK_HOME"] ?? "").isEmpty {
+            let swiftAndroidRoot = tc.sysrootDir.deletingLastPathComponent()
+            if let bundledNDK = try dirs(at: swiftAndroidRoot).first(where: { $0.lastPathComponent.hasPrefix("android-ndk-") }) {
+                env["ANDROID_NDK_HOME"] = bundledNDK.path
+            }
+        }
+
         // We also need to clear out any environment variables that may change between runs (like LLBUILD_BUILD_ID='4288622949' LLBUILD_LANE_ID='9' LLBUILD_TASK_ID='31650009000f'), since those will prevent incremental builds from happening and force a complete rebuild each time
         if env["XCODE_VERSION_MAJOR"] != nil {
             let permittedEnvironment: Set<String> = [
