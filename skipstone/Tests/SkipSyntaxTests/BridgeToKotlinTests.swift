@@ -4792,7 +4792,7 @@ final class BridgeToKotlinTests: XCTestCase {
                         if let f_error {
                             f_continuation.resume(throwing: JThrowable.toError(f_error, options: [.kotlincompat])!)
                         } else {
-                            nonisolated(unsafe) let f_return_value = f_return!
+                            let f_return_value = f_return!
                             f_continuation.resume(returning: f_return_value)
                         }
                     }
@@ -5958,7 +5958,7 @@ final class BridgeToKotlinTests: XCTestCase {
                         if let f_error {
                             f_continuation.resume(throwing: JThrowable.toError(f_error, options: [.kotlincompat])!)
                         } else {
-                            nonisolated(unsafe) let f_return_value = f_return!
+                            let f_return_value = f_return!
                             f_continuation.resume(returning: f_return_value)
                         }
                     }

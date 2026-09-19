@@ -565,7 +565,7 @@ final class BridgeToSwiftTests: XCTestCase {
             get async {
                 return await withCheckedContinuation { f_continuation in
                     let f_return_callback: @Sendable (Int) -> Void = { f_return in
-                        nonisolated(unsafe) let f_return_value = f_return
+                        let f_return_value = f_return
                         f_continuation.resume(returning: f_return_value)
                     }
                     jniContext {
@@ -610,7 +610,7 @@ final class BridgeToSwiftTests: XCTestCase {
                         if let f_error {
                             f_continuation.resume(throwing: JThrowable.toError(f_error, options: [])!)
                         } else {
-                            nonisolated(unsafe) let f_return_value = f_return!
+                            let f_return_value = f_return!
                             f_continuation.resume(returning: f_return_value)
                         }
                     }
@@ -1409,7 +1409,7 @@ final class BridgeToSwiftTests: XCTestCase {
         public func f(i p_0: Int) async -> Int {
             return await withCheckedContinuation { f_continuation in
                 let f_return_callback: @Sendable (Int) -> Void = { f_return in
-                    nonisolated(unsafe) let f_return_value = f_return
+                    let f_return_value = f_return
                     f_continuation.resume(returning: f_return_value)
                 }
                 jniContext {
@@ -1445,7 +1445,7 @@ final class BridgeToSwiftTests: XCTestCase {
         public func f(i p_0: Int) async -> Int {
             return await withCheckedContinuation { f_continuation in
                 let f_return_callback: @Sendable (Int) -> Void = { f_return in
-                    nonisolated(unsafe) let f_return_value = f_return
+                    let f_return_value = f_return
                     f_continuation.resume(returning: f_return_value)
                 }
                 jniContext {
@@ -1518,7 +1518,7 @@ final class BridgeToSwiftTests: XCTestCase {
                     if let f_error {
                         f_continuation.resume(throwing: JThrowable.toError(f_error, options: [])!)
                     } else {
-                        nonisolated(unsafe) let f_return_value = f_return!
+                        let f_return_value = f_return!
                         f_continuation.resume(returning: f_return_value)
                     }
                 }
@@ -2297,7 +2297,7 @@ final class BridgeToSwiftTests: XCTestCase {
             public func add() async -> Int {
                 return await withCheckedContinuation { f_continuation in
                     let f_return_callback: @Sendable (Int) -> Void = { f_return in
-                        nonisolated(unsafe) let f_return_value = f_return
+                        let f_return_value = f_return
                         f_continuation.resume(returning: f_return_value)
                     }
                     jniContext {
@@ -4503,7 +4503,7 @@ final class BridgeToSwiftTests: XCTestCase {
                 get async {
                     return await withCheckedContinuation { f_continuation in
                         let f_return_callback: @Sendable (Int) -> Void = { f_return in
-                            nonisolated(unsafe) let f_return_value = f_return
+                            let f_return_value = f_return
                             f_continuation.resume(returning: f_return_value)
                         }
                         jniContext {
@@ -4535,7 +4535,7 @@ final class BridgeToSwiftTests: XCTestCase {
             public func f(i p_0: Int) async -> String {
                 return await withCheckedContinuation { f_continuation in
                     let f_return_callback: @Sendable (String) -> Void = { f_return in
-                        nonisolated(unsafe) let f_return_value = f_return
+                        let f_return_value = f_return
                         f_continuation.resume(returning: f_return_value)
                     }
                     jniContext {
