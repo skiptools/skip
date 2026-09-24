@@ -2,13 +2,41 @@
 import Foundation
 import PackagePlugin
 
+private enum SkipEnvironmentFlag: String {
+    case enabled = "1"
+}
+
+private func skipEnvironmentIsEnabled(_ variable: String) -> Bool {
+    SkipEnvironmentFlag(rawValue: ProcessInfo.processInfo.environment[variable] ?? "") == .enabled
+}
+
+private enum SkipConfiguration: String {
+    case skippy = "Skippy"
+}
+
 /// Build plugin that unifies the preflight linter and the transpiler in a single plugin.
 @main struct SkipPlugin: BuildToolPlugin {
     /// The suffix that is requires
     let testSuffix = "Tests"
 
-    /// The root of target dependencies that are don't have any skipcode output
-    let skipRootTargetNames: Set<String> = ["SkipDrive", "SkipTest"]
+    /// Targets that are infrastructure-only and do not have skipcode output.
+    enum RootTarget: String {
+        case skipDrive = "SkipDrive"
+        case skipTest = "SkipTest"
+
+        static func isInfrastructure(_ name: String) -> Bool {
+            switch Self(rawValue: name) {
+            case .skipDrive, .skipTest:
+                true
+            case nil:
+                false
+            }
+        }
+    }
+
+    enum SourceFile: String {
+        case testHarness = "XCSkipTests.swift"
+    }
 
     /// The name of the plug-in's output folder is the same as the target name for the transpiler, which matches the ".plugin(name)" in the Package.swift
     let pluginFolderName = "skipstone"
@@ -29,24 +57,28 @@ import PackagePlugin
     let skippyOuptputExtension = ".skippy"
 
     /// Whether we should run in Skippy or full-transpile mode
-    let skippyOnly = ProcessInfo.processInfo.environment["CONFIGURATION"] == "Skippy"
+    let skippyOnly = SkipConfiguration(rawValue: ProcessInfo.processInfo.environment["CONFIGURATION"] ?? "") == .skippy
 
     /// Whether to turn off the Skip plugin manually
-    let skipDisabled = (ProcessInfo.processInfo.environment["SKIP_PLUGIN_DISABLED"] ?? "0") != "0"
+    let skipDisabled = skipEnvironmentIsEnabled("SKIP_PLUGIN_DISABLED")
 
     /// Whether we are in SkipBridge generation mode
-    let skipBridgeMode = (ProcessInfo.processInfo.environment["SKIP_BRIDGE"] ?? "0") != "0"
+    let skipBridgeMode = skipEnvironmentIsEnabled("SKIP_BRIDGE")
 
     /// When set, pass `--quiet` to skip
-    let skipQuiet = (ProcessInfo.processInfo.environment["SKIP_QUIET"] ?? "0") != "0"
+    let skipQuiet = skipEnvironmentIsEnabled("SKIP_QUIET")
 
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
+        if skipEnvironmentIsEnabled("SKIP_WEB") {
+            Diagnostics.remark("Skip plugin elided for Skip WebAssembly build")
+            return []
+        }
         if skipDisabled {
             Diagnostics.remark("Skip plugin disabled through SKIP_PLUGIN_DISABLED environment variable")
             return []
         }
 
-        if skipRootTargetNames.contains(target.name) {
+        if RootTarget.isInfrastructure(target.name) {
             Diagnostics.remark("Skip eliding target name \(target.name)")
             return []
         }
@@ -207,13 +239,13 @@ import PackagePlugin
 
                     return product.targets.flatMap { target in
                         // stop at any external targets
-                        if skipRootTargetNames.contains(target.name) || !visitedTargetIDs.insert(target.id).inserted {
+                        if RootTarget.isInfrastructure(target.name) || !visitedTargetIDs.insert(target.id).inserted {
                             return [] as [Dep]
                         }
                         return [Dep(package: productPackage, target: target)] + dependencies(for: target.dependencies, in: productPackage)
                     }
                 case .target(let target):
-                    if skipRootTargetNames.contains(target.name) || !visitedTargetIDs.insert(target.id).inserted {
+                    if RootTarget.isInfrastructure(target.name) || !visitedTargetIDs.insert(target.id).inserted {
                         return [] as [Dep]
                     }
                     return [Dep(package: package, target: target)] + dependencies(for: target.dependencies, in: package)
@@ -237,7 +269,7 @@ import PackagePlugin
                 continue
             }
 
-            if skipRootTargetNames.contains(depTarget.name) {
+            if RootTarget.isInfrastructure(depTarget.name) {
                 continue
             }
 
@@ -329,7 +361,7 @@ import PackagePlugin
             }
         }
 
-        if skipBridgeMode && inputFiles.contains(where: { path in path.string.hasSuffix(".swift") }) {
+        if skipBridgeMode && inputFiles.first(where: { path in path.string.hasSuffix(".swift") }) != nil {
             // when we are running with SKIP_BRIDGE, we also output NAME_Bridge.swift files for each Swift file that contains bridging information
             // note that we only add these if the input files have at least one .swift file, in order to exclude modules that contain only C/C++ files
             let skipBridgeOutputDir = outputFolder.appending(subpath: "SkipBridgeGenerated")
@@ -356,7 +388,9 @@ import PackagePlugin
 
         // auto-generate XCSkipTests.swift test harness for test targets that don't already have one
         if isTest {
-            let hasTestHarness = target.sourceFiles(withSuffix: "swift").contains(where: { $0.path.lastComponent == "XCSkipTests.swift" })
+            let hasTestHarness = target.sourceFiles(withSuffix: "swift").first(where: {
+                SourceFile(rawValue: $0.path.lastComponent) == .testHarness
+            }) != nil
             if !hasTestHarness {
                 let testHarnessOutputDir = outputFolder.appending(subpath: "SkipTestHarness")
                 let testHarnessPath = testHarnessOutputDir.appending(subpath: "XCSkipTests.swift")
