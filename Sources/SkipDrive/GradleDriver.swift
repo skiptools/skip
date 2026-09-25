@@ -95,7 +95,10 @@ public struct GradleDriver {
         // java -Xmx64m -Xms64m -Dorg.gradle.appname=gradle -classpath /opt/homebrew/Cellar/gradle/8.0.2/libexec/lib/gradle-launcher-8.0.2.jar org.gradle.launcher.GradleMain info
         #if DEBUG
         // output the launch message in a format that makes it easy to copy and paste the result into the terminal
-        print("execGradle:", (gradleArgs + args).joined(separator: " "))
+        let skipQuiet = (ProcessInfo.processInfo.environment["SKIP_QUIET"] ?? "0") != "0"
+        if !skipQuiet {
+            print("execGradle:", (gradleArgs + args).joined(separator: " "))
+        }
         #endif
 
         return Process.streamLines(command: gradleArgs + args, environment: env, workingDirectory: workingDirectory, includeStdErr: true, onExit: onExit)
@@ -110,6 +113,7 @@ public struct GradleDriver {
     ///   - actions: the gradle actions to run, such as `["test"]`
     ///   - arguments: additional arguments to specify
     ///   - daemon: whether the enable the forking of a persistent gradle daemon that will make subsequent runs faster (e.g., 5 secs vs. 15 secs)
+    ///   - warn: when `true` (and `quiet` is `false`), passes `--warn` to set Gradle log level to warnings and errors only
     ///   - failFast: whether to pass the "--fail-fast" flag
     ///   - continue: whether to permit failing tests to complete with the "--continue" flag
     ///   - offline: whether to pass the "--offline" flag
@@ -117,7 +121,7 @@ public struct GradleDriver {
     ///   - exitHandler: the exit handler, which may want to permit a process failure in order to have time to parse the tests
     /// - Returns: an array of parsed test suites containing information about the test run
     @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
-    public func launchGradleProcess(in workingDirectory: URL?, buildFolder: String = ".build", module: String?, actions: [String], arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, daemon enableDaemon: Bool = true, info infoFlag: Bool = false, quiet quietFlag: Bool = false, plain plainFlag: Bool = true, maxMemory: UInt64? = nil, failFast failFastFlag: Bool = false, noBuildCache noBuildCacheFlag: Bool = false, continue continueFlag: Bool = false, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true, exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: AsyncLineOutput, result: () throws -> ParsedTestResults) {
+    public func launchGradleProcess(in workingDirectory: URL?, buildFolder: String = ".build", module: String?, actions: [String], arguments: [String], environment: [String: String] = ProcessInfo.processInfo.environmentWithDefaultToolPaths, daemon enableDaemon: Bool = true, info infoFlag: Bool = false, quiet quietFlag: Bool = false, warn warnFlag: Bool = false, plain plainFlag: Bool = true, maxMemory: UInt64? = nil, failFast failFastFlag: Bool = false, noBuildCache noBuildCacheFlag: Bool = false, continue continueFlag: Bool = false, offline offlineFlag: Bool = false, rerunTasks rerunTasksFlag: Bool = true, exitHandler: @escaping (ProcessResult) throws -> ()) async throws -> (output: AsyncLineOutput, result: () throws -> ParsedTestResults) {
 
 
         var args = actions + arguments
@@ -179,6 +183,9 @@ public struct GradleDriver {
 
         if quietFlag {
             args += ["--quiet"]
+        } else if warnFlag {
+            // Log level WARN: errors and warnings only; less lifecycle noise than default (e.g. used with SKIP_QUIET when invoking Gradle from Xcode).
+            args += ["--warn"]
         }
 
         if plainFlag {
