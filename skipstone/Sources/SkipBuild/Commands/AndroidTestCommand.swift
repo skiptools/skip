@@ -372,7 +372,7 @@ fileprivate extension AndroidOperationCommand {
         if let bsIdx = args.firstIndex(of: "--build-system"), bsIdx + 1 < args.count {
             harnessCmd += ["--build-system", args[bsIdx + 1]]
         }
-        try await runCommand(command: harnessCmd, env: env, with: out)
+        try await runAndroidSwiftBuild(command: harnessCmd, env: env, with: out)
 
         // Locate the built .so using --show-bin-path
         var harnessBinPathCmd: [String] = [swiftCmd, "build", "--show-bin-path"]
@@ -710,7 +710,7 @@ fileprivate extension AndroidOperationCommand {
         try target.harnessSource(testLibName).write(to: harnessSourceDir.appendingPathComponent("TestRunner.swift", isDirectory: false), atomically: true, encoding: .utf8)
 
         let harnessPkgArgs = ["--package-path", harnessDir.path, "--configuration", buildConfig.rawValue]
-        try await runCommand(command: [target.swiftCommand, "build"] + harnessPkgArgs + harnessExtraArgs, env: harnessEnv, with: out)
+        try await runAndroidSwiftBuild(command: [target.swiftCommand, "build"] + harnessPkgArgs + harnessExtraArgs, env: harnessEnv, with: out)
 
         let harnessBinOutput = try await captureLine(target.swiftCommand, ["build", "--show-bin-path"] + harnessPkgArgs + harnessExtraArgs, env: harnessEnv)
         let harnessBinDir: URL

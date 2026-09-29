@@ -736,7 +736,37 @@ extension AndroidOperationCommand {
         try await waitForDeviceBoot(adb: adb, additionalEnvironment: additionalEnvironment, timeout: androidRuntimeOptions.androidConnectTimeout, with: out)
     }
 
-    func runCommand(command: [String], env: [String: String], with out: MessageQueue) async throws {
+    /// Runs a `swift build` for Android, retrying transient failures of the build system.
+    ///
+    /// swiftbuild's Android platform plugin keeps the discovered NDK only in an evictable NSCache that it
+    /// later reads without recomputing, so under system memory pressure the build can intermittently fail
+    /// during planning (before anything is compiled) claiming that no NDK is installed; retry that failure.
+    func runAndroidSwiftBuild(command: [String], env: [String: String], with out: MessageQueue) async throws {
+        try await runCommand(command: command, env: env, retryingOn: ["No Android NDK is installed at any of the standard locations"], attempts: 5, with: out)
+    }
+
+    func runCommand(command: [String], env: [String: String], retryingOn transientErrors: [String] = [], attempts: Int = 1, with out: MessageQueue) async throws {
+        for attempt in 1...max(1, attempts) {
+            var sawTransientError = false
+            do {
+                try await runCommandOnce(command: command, env: env, onLine: { line in
+                    if transientErrors.contains(where: { line.contains($0) }) {
+                        sawTransientError = true
+                    }
+                }, with: out)
+                return
+            } catch {
+                // only retry failures that were accompanied by one of the known transient error messages
+                guard sawTransientError && attempt < attempts else {
+                    throw error
+                }
+                print("warning: retrying transient failure (attempt \(attempt + 1) of \(attempts)): \(command.first ?? "")", to: &TSCBasic.stderrStream)
+                TSCBasic.stderrStream.flush()
+            }
+        }
+    }
+
+    private func runCommandOnce(command: [String], env: [String: String], onLine: (String) -> Void, with out: MessageQueue) async throws {
         #if !canImport(SkipDriveExternal)
         throw ToolLaunchError(errorDescription: "Cannot launch android command without SkipDriveExternal")
         #else
@@ -752,6 +782,7 @@ extension AndroidOperationCommand {
             }
         }) {
             //print(outputLine.line)
+            onLine(outputLine.line)
 
             // squelch common warnings in non-verbose output mode
             if outputLine.err {
@@ -942,7 +973,7 @@ extension AndroidOperationCommand {
             cmd += args
         }
 
-        try await runCommand(command: cmd, env: env, with: out)
+        try await runAndroidSwiftBuild(command: cmd, env: env, with: out)
 
         // Query the actual binary output path using --show-bin-path.
         // This accommodates different build systems (native vs swiftbuild)

@@ -135,10 +135,12 @@ For Android, the spdx-gradle-plugin is used to analyze Gradle dependencies.
             for fileURL in generatedFiles {
                 let linkPath = resourcesFolder.appendingPathComponent(fileURL.lastPathComponent).path
                 try? FileManager.default.removeItem(atPath: linkPath)
-                // Create a relative symlink from the Resources folder to the SBOM file
-                let relativePath = relativePath(from: resourcesFolder.path, to: fileURL.path)
-                try FileManager.default.createSymbolicLink(atPath: linkPath, withDestinationPath: relativePath)
-                await out.write(status: .pass, "Linked \(fileURL.lastPathComponent) -> \(relativePath)")
+                // Link the Resources folder to the SBOM file with an absolute destination: the Android build
+                // reaches it through skipstone's mirrored package, where swiftbuild would resolve a relative
+                // destination's ".." against the mirrored path rather than the real one
+                let destinationPath = fileURL.standardizedFileURL.path
+                try FileManager.default.createSymbolicLink(atPath: linkPath, withDestinationPath: destinationPath)
+                await out.write(status: .pass, "Linked \(fileURL.lastPathComponent) -> \(destinationPath)")
             }
         }
 

@@ -9462,6 +9462,23 @@ final class BridgeToKotlinTests: XCTestCase {
             }
         }
 
+        #if os(Android)
+        // Interceptor for the Bundle(for:) probe in the synthesized Bundle.module property of the swiftbuild
+        // build system, which resolves this module's bundle through the path-based module bundle mapping so that
+        // the subsequent Bundle(url:) probe for <package-name>_<module-name>.bundle forwards the bundle access
+        // up to the Android asset manager (this only uses API that is also present in older SkipAndroidBridge
+        // versions, where AndroidBundle.init(for:) is an exact match that takes precedence over this interceptor)
+        extension AndroidBundle {
+            convenience init(for aClass: AnyClass, unusedp_0: Void? = nil) {
+                // without a JVM there is no Kotlin module bundle, so back the bundle with the native main bundle
+                let path = isJNIInitialized ? AndroidBundle.main.bundlePath + "/_.resources" : Foundation.Bundle.main.bundlePath
+                self.init(path: path, moduleName: "", moduleBundle: {
+                    try! AnyDynamicObject(className: ".module._ModuleBundleAccessor_").moduleBundle!
+                })!
+            }
+        }
+        #endif
+
         let NSLocalizedString = AndroidLocalizedString()
         """, transformers: transformers)
     }

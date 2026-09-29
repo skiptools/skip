@@ -1162,9 +1162,12 @@ enum AppIndexGenerator {
 
             let linkPath = resourcesFolder.appendingPathComponent(appIndexFilename).path
             try? FileManager.default.removeItem(atPath: linkPath)
-            let relPath = relativePath(from: resourcesFolder.path, to: outputURL.path)
-            try FileManager.default.createSymbolicLink(atPath: linkPath, withDestinationPath: relPath)
-            await out.write(status: .pass, "Linked \(appIndexFilename) -> \(relPath)")
+            // Use an absolute destination: the Android build reaches this resource through skipstone's mirrored
+            // package, whose Sources folder is a symlink, and swiftbuild resolves a relative link's ".." against
+            // that mirrored path rather than the real one, so a relative destination is not found there
+            let destinationPath = outputURL.standardizedFileURL.path
+            try FileManager.default.createSymbolicLink(atPath: linkPath, withDestinationPath: destinationPath)
+            await out.write(status: .pass, "Linked \(appIndexFilename) -> \(destinationPath)")
         }
 
         return outputURL
