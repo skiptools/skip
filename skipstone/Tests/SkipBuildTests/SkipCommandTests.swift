@@ -2034,6 +2034,36 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
+    /// Symlinks at the package root are mirrored into src/main/swift, but must not be removed from the root itself
+    func testSkipstoneNativeModuleKeepsRootSymlinks() async throws {
+        let fs = localFileSystem
+        let root = try AbsolutePath(validating: NSTemporaryDirectory()).appending(components: "testSkipstoneRootSymlinks", UUID().uuidString)
+        let projectFolder = root.appending(components: "Sources", "SomeModule")
+        let skipFolder = projectFolder.appending(component: "Skip")
+        try fs.createDirectory(skipFolder, recursive: true)
+        try fs.writeFileContents(root.appending(component: "Package.swift"), bytes: "// swift-tools-version: 6.1\n")
+        try fs.writeFileContents(root.appending(component: "README.md"), bytes: "# SomeModule\n")
+        try fs.createSymbolicLink(root.appending(component: "AGENTS.md"), pointingAt: root.appending(component: "README.md"), relative: true)
+        try fs.writeFileContents(projectFolder.appending(component: "SomeModule.swift"), bytes: "public let someValue = 1\n")
+        try fs.writeFileContents(skipFolder.appending(component: "skip.yml"), bytes: "skip:\n  mode: 'native'\n")
+
+        let moduleRoot = root.appending(components: ".build", "plugins", "outputs", "SomeModule")
+        let outputFolder = moduleRoot.appending(components: "src", "main")
+        _ = try await skipstone([
+            "skipstone",
+            "--project", projectFolder.pathString,
+            "--skip-folder", skipFolder.pathString,
+            "--sourcehash", moduleRoot.appending(component: ".sourcehash").pathString,
+            "--output-folder", outputFolder.pathString,
+            "--module-root", moduleRoot.pathString,
+            "--module", "SomeModule:" + projectFolder.pathString,
+        ])
+
+        XCTAssertTrue(fs.isSymlink(root.appending(component: "AGENTS.md")), "root symlink should not be removed")
+        XCTAssertEqual("# SomeModule\n", try fs.readFileContents(root.appending(component: "AGENTS.md")).description)
+        XCTAssertEqual("# SomeModule\n", try fs.readFileContents(outputFolder.appending(components: "swift", "AGENTS.md")).description)
+    }
+
     /// Default arguments for `skip init` tests
     let initTestArgs = ["-jA", "--no-build", "--no-test", "--show-tree"]
 

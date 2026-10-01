@@ -231,12 +231,8 @@ struct SkipstoneCommand: BuildPluginOptionsCommand, StreamingCommand {
 
         // always touch the sourcehash file with the most recent source hashes in order to update the output file time
         /// Create a link from the source to the destination; this is used for resources and custom Kotlin files in order to permit edits to target file and have them reflected in the original source
-        func addLink(_ linkSource: AbsolutePath, pointingAt destPath: AbsolutePath, relative: Bool, replace: Bool = true, copyReadOnlyFiles: Bool = true) throws {
+        func addLink(_ linkSource: AbsolutePath, pointingAt destPath: AbsolutePath, relative: Bool, copyReadOnlyFiles: Bool = true) throws {
             msg(.trace, "linking: \(linkSource) to: \(destPath)")
-
-            if replace && fs.isSymlink(destPath) {
-                removePath(destPath) // clear any pre-existing symlink
-            }
 
             if let existingSymlinkDestination = try? FileManager.default.destinationOfSymbolicLink(atPath: linkSource.pathString) {
                 if existingSymlinkDestination == destPath.pathString {
