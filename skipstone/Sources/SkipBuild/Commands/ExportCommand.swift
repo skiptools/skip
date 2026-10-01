@@ -137,15 +137,13 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
                 return try await run(with: out, "Getting SDK Path", "xcrun --sdk iphoneos --show-sdk-path".split(separator: " ").map(\.description), watch: false).get().stdout.trimmingCharacters(in: .whitespacesAndNewlines)
             }
 
-            // see HostSwiftBuild for why the environment and build system are set here
+            // see HostSwiftBuild for why the environment is set here
             if let sdk = try? await fetchSDKPath(), sdk != "legacy" {
-                let buildSystem = await HostSwiftBuild.buildSystemArguments(swiftCommand: ["xcrun", "swift"])
-                try await run(with: out, "Build project \(packageName)", ["xcrun", "swift", "build", "-v", "--package-path", project, "--triple", "arm64-apple-ios", "--sdk", sdk] + buildSystem, additionalEnvironment: HostSwiftBuild.environment)
+                try await run(with: out, "Build project \(packageName)", ["xcrun", "swift", "build", "-v", "--package-path", project, "--triple", "arm64-apple-ios", "--sdk", sdk], additionalEnvironment: HostSwiftBuild.environment)
             } else {
                 // fallback to plain "swift build" for legacy build, which has the down-side that it will build against macOS (and thereby fail when there are iOS-only API calls): "Basics/Triple+Basics.swift:149: Fatal error: Cannot create dynamic libraries for os "ios".", also @availability annotations are required for everything
                 // however, it permits us to build and export against macOS-13/Xcode 15.2 (which is the OS version needed for GitHub CI to be able to run tests against the Android Emulator using the reactivecircus/android-emulator-runner action),
-                let buildSystem = await HostSwiftBuild.buildSystemArguments()
-                try await run(with: out, "Build project \(packageName)", ["swift", "build", "-v", "--package-path", project] + buildSystem, additionalEnvironment: HostSwiftBuild.environment)
+                try await run(with: out, "Build project \(packageName)", ["swift", "build", "-v", "--package-path", project], additionalEnvironment: HostSwiftBuild.environment)
             }
         } else {
             try await run(with: out, "Resolve dependencies", ["swift", "package", "resolve", "-v", "--package-path", project])

@@ -220,7 +220,7 @@ struct ProcessOutput {
     /// Scan for common error patterns in the stderr and stdout
     func scanErrorLine() -> String? {
         let lines = (stdout + "\n" + stderr).split(separator: "\n")
-        let errors = lines.compactMap { line -> String? in
+        var errors = lines.compactMap { line -> String? in
             let l = line.lowercased()
             if l.hasPrefix("error: ")
                 || l.hasPrefix("e: ") // Gradle error message
@@ -238,9 +238,16 @@ struct ProcessOutput {
         if errors.isEmpty {
             return nil // no error found
         }
+        if errors.contains(where: { $0.contains("is linked as a static library by") && $0.contains("product 'Skip") }) {
+            errors.append(Self.duplicatedSkipLibrariesHint)
+        }
 
         return errors.joined(separator: "\n")
     }
+
+    /// Swift 6.4's default `swiftbuild` build system rejects the statically duplicated Skip libraries that older Skip
+    /// framework releases produce, which the `SKIP_DYNAMIC_LIBRARIES` support in newer releases avoids (see HostSwiftBuild)
+    static let duplicatedSkipLibrariesHint = "Swift 6.4 builds with the swiftbuild build system, which needs Skip framework releases that build shared libraries dynamically (skip-lib 1.4.2, skip-unit 1.7.2, skip-foundation 1.4.5, skip-model 1.7.10 or later): update your Skip dependencies (e.g. with `swift package update`) and try again. See https://github.com/skiptools/skip/issues/714"
 
     struct ProcessFailureError: LocalizedError {
         let code: Int32

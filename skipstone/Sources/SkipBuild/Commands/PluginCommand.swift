@@ -69,8 +69,7 @@ struct PluginCommand: MessageCommand, ToolOptionsCommand {
             if let packagePath = packagePath {
                 prebuildCommand += ["--package-path", packagePath]
             }
-            // see HostSwiftBuild for why the environment and build system are set here
-            prebuildCommand += await HostSwiftBuild.buildSystemArguments(swiftCommand: ["xcrun", "swift"])
+            // see HostSwiftBuild for why the environment is set here
 
             try outputOptions.writeOutput(PluginOutput(line: "running pre-build command: \(prebuildCommand.joined(separator: " "))"), error: false)
             let buildOutput = try await launchTool("xcrun", arguments: prebuildCommand, env: ProcessInfo.processInfo.environment.merging(HostSwiftBuild.environment, uniquingKeysWith: { $1 }))
