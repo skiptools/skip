@@ -884,6 +884,8 @@ extension AndroidOperationCommand {
         if let packagePath = toolchainOptions.packagePath {
             cmd += ["--package-path", packagePath]
         }
+        // resolve every generated manifest's local dependencies against the root Packages/ links, so each package has one path and re-plans stay incremental
+        env["SKIP_LOCAL_PACKAGES_PATH"] = URL(fileURLWithPath: toolchainOptions.packagePath ?? ".").appendingPathComponent("Packages", isDirectory: true).standardizedFileURL.path
         // pass-through the "--scratch-path" flag to the underlying build command
         if let scratchPath = toolchainOptions.scratchPath {
             cmd += ["--scratch-path", scratchPath]

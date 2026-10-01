@@ -606,7 +606,7 @@ struct SkipstoneCommand: BuildPluginOptionsCommand, StreamingCommand {
             func useLocalPackage(named packageName: String, id packageID: String, dependencies: inout [Package.Dependency]) {
                 func localDependency(name: String?, location: String) -> Package.Dependency? {
                     if name == packageID || location.hasSuffix("/" + packageID) || location.hasSuffix("/" + packageID + ".git") {
-                        return Package.Dependency.package(path: "Packages/" + packageID)
+                        return Package.Dependency.package(path: (Context.environment["SKIP_LOCAL_PACKAGES_PATH"] ?? "Packages") + "/" + packageID)
                     } else {
                         return nil
                     }
