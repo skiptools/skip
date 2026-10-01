@@ -121,6 +121,24 @@ final class BridgeSendabilityTests: XCTestCase {
         assertReturnIsolation(bridge, unsafe: true)
     }
 
+    /// The index just past the `}` closing the first `{` at or after `index`.
+    private static func closingBraceIndex(after index: String.Index, in text: String) -> String.Index {
+        var depth = 0
+        var i = index
+        while i < text.endIndex {
+            if text[i] == "{" {
+                depth += 1
+            } else if text[i] == "}" {
+                depth -= 1
+                if depth == 0 {
+                    return text.index(after: i)
+                }
+            }
+            i = text.index(after: i)
+        }
+        return text.endIndex
+    }
+
     func testGeneratedContinuationCompilesWithoutWarnings() async throws {
         #if compiler(<6.0)
         throw XCTSkip("This regression check requires Swift 6 language mode.")
@@ -140,8 +158,10 @@ final class BridgeSendabilityTests: XCTestCase {
                     """
                     let bridge = try await generateBridge(swift: declarations, native: true)
                     let start = try XCTUnwrap(bridge.range(of: "public func fetch()"))
-                    let end = try XCTUnwrap(bridge.range(of: "jniContext {", range: start.lowerBound..<bridge.endIndex))
-                    let continuation = String(bridge[start.lowerBound..<end.lowerBound])
+                    let function = String(bridge[start.lowerBound..<Self.closingBraceIndex(after: start.lowerBound, in: bridge)])
+                    let dispatch = try XCTUnwrap(function.range(of: "jniContext {"))
+                    let dispatchEnd = Self.closingBraceIndex(after: dispatch.lowerBound, in: function)
+                    let continuation = function.replacingCharacters(in: dispatch.upperBound..<function.index(before: dispatchEnd), with: " _ = f_return_callback ")
                     let source = """
                     \(component)
                     typealias JavaObjectPointer = OpaquePointer
@@ -151,10 +171,13 @@ final class BridgeSendabilityTests: XCTestCase {
                             BridgeTestError.failure
                         }
                     }
-                    \(continuation)
-                            _ = f_return_callback
-                        }
+                    final class BridgedJob: Sendable {
+                        func attach(_ job: JavaObjectPointer) {}
+                        func cancel() {}
+                        func error(_ throwable: JavaObjectPointer, options: [Int]) -> any Error { BridgeTestError.failure }
                     }
+                    func jniContext<T>(_ block: () throws -> T) rethrows -> T { try block() }
+                    \(continuation)
                     """
                     let file = try tmpFile(named: "Continuation.swift", contents: source)
                     let process = Process()

@@ -4708,14 +4708,17 @@ final class BridgeToKotlinTests: XCTestCase {
         """, kotlins: ["""
         interface P {
             suspend fun f(url: java.net.URI): Int
-            fun callback_f(url: java.net.URI, f_return_callback: (Int?, Throwable?) -> Unit) {
+            fun callback_f(url: java.net.URI, f_return_callback: (Int?, Throwable?) -> Unit): kotlinx.coroutines.Job {
+                val f_job = kotlinx.coroutines.Job()
                 Task {
                     try {
-                        f_return_callback(f(url = url), null)
+                        val f_return = kotlinx.coroutines.withContext(f_job) { f(url = url) }
+                        f_return_callback(f_return, null)
                     } catch(t: Throwable) {
                         f_return_callback(null, t)
                     }
                 }
+                return f_job
             }
         }
         class C: P, skip.bridge.SwiftPeerBridged, skip.lib.SwiftProjecting {
@@ -4787,23 +4790,29 @@ final class BridgeToKotlinTests: XCTestCase {
                 Java_peer = JObject(Java_ptr)
             }
             public func f(url p_0: URL) async throws -> Int {
-                return try await withCheckedThrowingContinuation { f_continuation in
-                    let f_return_callback: @Sendable (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
-                        if let f_error {
-                            f_continuation.resume(throwing: JThrowable.toError(f_error, options: [.kotlincompat])!)
-                        } else {
-                            let f_return_value = f_return!
-                            f_continuation.resume(returning: f_return_value)
+                let f_job = BridgedJob()
+                return try await withTaskCancellationHandler {
+                    try await withCheckedThrowingContinuation { f_continuation in
+                        let f_return_callback: @Sendable (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
+                            if let f_error {
+                                f_continuation.resume(throwing: f_job.error(f_error, options: [.kotlincompat]))
+                            } else {
+                                let f_return_value = f_return!
+                                f_continuation.resume(returning: f_return_value)
+                            }
+                        }
+                        jniContext {
+                            let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback, options: [.kotlincompat]).toJavaParameter(options: [.kotlincompat])
+                            let p_0_java = p_0.toJavaObject(options: [.kotlincompat])!.toJavaParameter(options: [.kotlincompat])
+                            let f_job_java: JavaObjectPointer = try! Java_peer.call(method: Self.Java_f_0_methodID, options: [.kotlincompat], args: [p_0_java, f_return_callback_java])
+                            f_job.attach(f_job_java)
                         }
                     }
-                    jniContext {
-                        let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback, options: [.kotlincompat]).toJavaParameter(options: [.kotlincompat])
-                        let p_0_java = p_0.toJavaObject(options: [.kotlincompat])!.toJavaParameter(options: [.kotlincompat])
-                        try! Java_peer.call(method: Self.Java_f_0_methodID, options: [.kotlincompat], args: [p_0_java, f_return_callback_java])
-                    }
+                } onCancel: {
+                    f_job.cancel()
                 }
             }
-            nonisolated private static let Java_f_0_methodID = Java_class.getMethodID(name: "callback_f", sig: "(Ljava/net/URI;Lkotlin/jvm/functions/Function2;)V")!
+            nonisolated private static let Java_f_0_methodID = Java_class.getMethodID(name: "callback_f", sig: "(Ljava/net/URI;Lkotlin/jvm/functions/Function2;)Lkotlinx/coroutines/Job;")!
             nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }
@@ -5931,15 +5940,18 @@ final class BridgeToKotlinTests: XCTestCase {
         """, kotlins: ["""
         interface FooAPIClientNetworkFetcher {
             suspend fun fetchData(with: java.net.URI, method: String, httpHeaders: kotlin.collections.Map<String, String>, body: String?): String
-            fun callback_fetchData(with: java.net.URI, method: String, httpHeaders: kotlin.collections.Map<String, String>, body: String?, f_return_callback: (String?, Throwable?) -> Unit) {
+            fun callback_fetchData(with: java.net.URI, method: String, httpHeaders: kotlin.collections.Map<String, String>, body: String?, f_return_callback: (String?, Throwable?) -> Unit): kotlinx.coroutines.Job {
                 val url = with
+                val f_job = kotlinx.coroutines.Job()
                 Task {
                     try {
-                        f_return_callback(fetchData(with = with, method = method, httpHeaders = httpHeaders, body = body), null)
+                        val f_return = kotlinx.coroutines.withContext(f_job) { fetchData(with = with, method = method, httpHeaders = httpHeaders, body = body) }
+                        f_return_callback(f_return, null)
                     } catch(t: Throwable) {
                         f_return_callback(null, t)
                     }
                 }
+                return f_job
             }
         }
         """, """
@@ -5953,26 +5965,32 @@ final class BridgeToKotlinTests: XCTestCase {
                 Java_peer = JObject(Java_ptr)
             }
             public func fetchData(with p_0: URL, method p_1: String, httpHeaders p_2: [String: String], body p_3: String?) async throws -> String {
-                return try await withCheckedThrowingContinuation { f_continuation in
-                    let f_return_callback: @Sendable (String?, JavaObjectPointer?) -> Void = { f_return, f_error in
-                        if let f_error {
-                            f_continuation.resume(throwing: JThrowable.toError(f_error, options: [.kotlincompat])!)
-                        } else {
-                            let f_return_value = f_return!
-                            f_continuation.resume(returning: f_return_value)
+                let f_job = BridgedJob()
+                return try await withTaskCancellationHandler {
+                    try await withCheckedThrowingContinuation { f_continuation in
+                        let f_return_callback: @Sendable (String?, JavaObjectPointer?) -> Void = { f_return, f_error in
+                            if let f_error {
+                                f_continuation.resume(throwing: f_job.error(f_error, options: [.kotlincompat]))
+                            } else {
+                                let f_return_value = f_return!
+                                f_continuation.resume(returning: f_return_value)
+                            }
+                        }
+                        jniContext {
+                            let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback, options: [.kotlincompat]).toJavaParameter(options: [.kotlincompat])
+                            let p_0_java = p_0.toJavaObject(options: [.kotlincompat])!.toJavaParameter(options: [.kotlincompat])
+                            let p_1_java = p_1.toJavaParameter(options: [.kotlincompat])
+                            let p_2_java = p_2.toJavaObject(options: [.kotlincompat])!.toJavaParameter(options: [.kotlincompat])
+                            let p_3_java = p_3.toJavaParameter(options: [.kotlincompat])
+                            let f_job_java: JavaObjectPointer = try! Java_peer.call(method: Self.Java_fetchData_0_methodID, options: [.kotlincompat], args: [p_0_java, p_1_java, p_2_java, p_3_java, f_return_callback_java])
+                            f_job.attach(f_job_java)
                         }
                     }
-                    jniContext {
-                        let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback, options: [.kotlincompat]).toJavaParameter(options: [.kotlincompat])
-                        let p_0_java = p_0.toJavaObject(options: [.kotlincompat])!.toJavaParameter(options: [.kotlincompat])
-                        let p_1_java = p_1.toJavaParameter(options: [.kotlincompat])
-                        let p_2_java = p_2.toJavaObject(options: [.kotlincompat])!.toJavaParameter(options: [.kotlincompat])
-                        let p_3_java = p_3.toJavaParameter(options: [.kotlincompat])
-                        try! Java_peer.call(method: Self.Java_fetchData_0_methodID, options: [.kotlincompat], args: [p_0_java, p_1_java, p_2_java, p_3_java, f_return_callback_java])
-                    }
+                } onCancel: {
+                    f_job.cancel()
                 }
             }
-            nonisolated private static let Java_fetchData_0_methodID = Java_class.getMethodID(name: "callback_fetchData", sig: "(Ljava/net/URI;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Lkotlin/jvm/functions/Function2;)V")!
+            nonisolated private static let Java_fetchData_0_methodID = Java_class.getMethodID(name: "callback_fetchData", sig: "(Ljava/net/URI;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Lkotlin/jvm/functions/Function2;)Lkotlinx/coroutines/Job;")!
             nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
                 return .init(Java_ptr: obj!)
             }

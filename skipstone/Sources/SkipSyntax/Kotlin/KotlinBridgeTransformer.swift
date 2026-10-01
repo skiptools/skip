@@ -380,6 +380,8 @@ extension TypeSignature {
         return kotlin ? .named("skip.bridge.SwiftObjectPointer", []) : .named("SwiftObjectPointer", [])
     }
     static let nothing: TypeSignature = .named("Nothing", [])
+    /// The `kotlinx.coroutines.Job` a throwing async `callback_` function returns.
+    static let kotlinJob: TypeSignature = .module("kotlinx.coroutines", .named("Job", []))
     static func javaVoid(kotlin: Bool) -> TypeSignature {
         return kotlin ? .module("java.lang", .named("Void", [])) : .void
     }

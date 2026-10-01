@@ -592,36 +592,45 @@ final class BridgeToSwiftTests: XCTestCase {
         suspend fun i(): Int = Async.run l@{
             return@l 0
         }
-        fun callback_i(f_return_callback: (Int?, Throwable?) -> Unit) {
+        fun callback_i(f_return_callback: (Int?, Throwable?) -> Unit): kotlinx.coroutines.Job {
+            val f_job = kotlinx.coroutines.Job()
             Task {
                 try {
-                    f_return_callback(i(), null)
+                    val f_return = kotlinx.coroutines.withContext(f_job) { i() }
+                    f_return_callback(f_return, null)
                 } catch(t: Throwable) {
                     f_return_callback(null, t)
                 }
             }
+            return f_job
         }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public var i: Int {
             get async throws {
-                return try await withCheckedThrowingContinuation { f_continuation in
-                    let f_return_callback: @Sendable (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
-                        if let f_error {
-                            f_continuation.resume(throwing: JThrowable.toError(f_error, options: [])!)
-                        } else {
-                            let f_return_value = f_return!
-                            f_continuation.resume(returning: f_return_value)
+                let f_job = BridgedJob()
+                return try await withTaskCancellationHandler {
+                    try await withCheckedThrowingContinuation { f_continuation in
+                        let f_return_callback: @Sendable (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
+                            if let f_error {
+                                f_continuation.resume(throwing: f_job.error(f_error, options: []))
+                            } else {
+                                let f_return_value = f_return!
+                                f_continuation.resume(returning: f_return_value)
+                            }
+                        }
+                        jniContext {
+                            let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
+                            let f_job_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_i_methodID, options: [], args: [f_return_callback_java])
+                            f_job.attach(f_job_java)
                         }
                     }
-                    jniContext {
-                        let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
-                        try! Java_SourceKt.callStatic(method: Java_i_methodID, options: [], args: [f_return_callback_java])
-                    }
+                } onCancel: {
+                    f_job.cancel()
                 }
             }
         }
-        private let Java_i_methodID = Java_SourceKt.getStaticMethodID(name: "callback_i", sig: "(Lkotlin/jvm/functions/Function2;)V")!
+        private let Java_i_methodID = Java_SourceKt.getStaticMethodID(name: "callback_i", sig: "(Lkotlin/jvm/functions/Function2;)Lkotlinx/coroutines/Job;")!
         """, transformers: transformers)
     }
 
@@ -1501,34 +1510,43 @@ final class BridgeToSwiftTests: XCTestCase {
         suspend fun f(): Int = Async.run l@{
             return@l 1
         }
-        fun callback_f(f_return_callback: (Int?, Throwable?) -> Unit) {
+        fun callback_f(f_return_callback: (Int?, Throwable?) -> Unit): kotlinx.coroutines.Job {
+            val f_job = kotlinx.coroutines.Job()
             Task {
                 try {
-                    f_return_callback(f(), null)
+                    val f_return = kotlinx.coroutines.withContext(f_job) { f() }
+                    f_return_callback(f_return, null)
                 } catch(t: Throwable) {
                     f_return_callback(null, t)
                 }
             }
+            return f_job
         }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public func f() async throws -> Int {
-            return try await withCheckedThrowingContinuation { f_continuation in
-                let f_return_callback: @Sendable (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
-                    if let f_error {
-                        f_continuation.resume(throwing: JThrowable.toError(f_error, options: [])!)
-                    } else {
-                        let f_return_value = f_return!
-                        f_continuation.resume(returning: f_return_value)
+            let f_job = BridgedJob()
+            return try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { f_continuation in
+                    let f_return_callback: @Sendable (Int?, JavaObjectPointer?) -> Void = { f_return, f_error in
+                        if let f_error {
+                            f_continuation.resume(throwing: f_job.error(f_error, options: []))
+                        } else {
+                            let f_return_value = f_return!
+                            f_continuation.resume(returning: f_return_value)
+                        }
+                    }
+                    jniContext {
+                        let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
+                        let f_job_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_f_0_methodID, options: [], args: [f_return_callback_java])
+                        f_job.attach(f_job_java)
                     }
                 }
-                jniContext {
-                    let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
-                    try! Java_SourceKt.callStatic(method: Java_f_0_methodID, options: [], args: [f_return_callback_java])
-                }
+            } onCancel: {
+                f_job.cancel()
             }
         }
-        private let Java_f_0_methodID = Java_SourceKt.getStaticMethodID(name: "callback_f", sig: "(Lkotlin/jvm/functions/Function2;)V")!
+        private let Java_f_0_methodID = Java_SourceKt.getStaticMethodID(name: "callback_f", sig: "(Lkotlin/jvm/functions/Function2;)Lkotlinx/coroutines/Job;")!
         """, transformers: transformers)
     }
 
@@ -1540,35 +1558,43 @@ final class BridgeToSwiftTests: XCTestCase {
         #endif
         """, kotlin: """
         suspend fun f(i: Int): Unit = Unit
-        fun callback_f(i: Int, f_return_callback: (Throwable?) -> Unit) {
+        fun callback_f(i: Int, f_return_callback: (Throwable?) -> Unit): kotlinx.coroutines.Job {
+            val f_job = kotlinx.coroutines.Job()
             Task {
                 try {
-                    f(i = i)
+                    kotlinx.coroutines.withContext(f_job) { f(i = i) }
                     f_return_callback(null)
                 } catch(t: Throwable) {
                     f_return_callback(t)
                 }
             }
+            return f_job
         }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public func f(i p_0: Int) async throws {
-            return try await withCheckedThrowingContinuation { f_continuation in
-                let f_return_callback: @Sendable (JavaObjectPointer?) -> Void = { f_error in
-                    if let f_error {
-                        f_continuation.resume(throwing: JThrowable.toError(f_error, options: [])!)
-                    } else {
-                        f_continuation.resume()
+            let f_job = BridgedJob()
+            return try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { f_continuation in
+                    let f_return_callback: @Sendable (JavaObjectPointer?) -> Void = { f_error in
+                        if let f_error {
+                            f_continuation.resume(throwing: f_job.error(f_error, options: []))
+                        } else {
+                            f_continuation.resume()
+                        }
+                    }
+                    jniContext {
+                        let f_return_callback_java = SwiftClosure1.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
+                        let p_0_java = Int32(p_0).toJavaParameter(options: [])
+                        let f_job_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_f_0_methodID, options: [], args: [p_0_java, f_return_callback_java])
+                        f_job.attach(f_job_java)
                     }
                 }
-                jniContext {
-                    let f_return_callback_java = SwiftClosure1.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
-                    let p_0_java = Int32(p_0).toJavaParameter(options: [])
-                    try! Java_SourceKt.callStatic(method: Java_f_0_methodID, options: [], args: [p_0_java, f_return_callback_java])
-                }
+            } onCancel: {
+                f_job.cancel()
             }
         }
-        private let Java_f_0_methodID = Java_SourceKt.getStaticMethodID(name: "callback_f", sig: "(ILkotlin/jvm/functions/Function1;)V")!
+        private let Java_f_0_methodID = Java_SourceKt.getStaticMethodID(name: "callback_f", sig: "(ILkotlin/jvm/functions/Function1;)Lkotlinx/coroutines/Job;")!
         """, transformers: transformers)
     }
 
@@ -5388,35 +5414,44 @@ final class BridgeToSwiftTests: XCTestCase {
         suspend fun <T> f(p: T): T = Async.run l@{
             return@l p.sref()
         }
-        fun <T> callback_f(p: T, f_return_callback: (T?, Throwable?) -> Unit) {
+        fun <T> callback_f(p: T, f_return_callback: (T?, Throwable?) -> Unit): kotlinx.coroutines.Job {
+            val f_job = kotlinx.coroutines.Job()
             Task {
                 try {
-                    f_return_callback(f(p = p), null)
+                    val f_return = kotlinx.coroutines.withContext(f_job) { f(p = p) }
+                    f_return_callback(f_return, null)
                 } catch(t: Throwable) {
                     f_return_callback(null, t)
                 }
             }
+            return f_job
         }
         """, swiftBridgeSupport: """
         private let Java_SourceKt = try! JClass(name: "SourceKt")
         public func f<T>(p p_0: T) async throws -> T {
-            return try await withCheckedThrowingContinuation { f_continuation in
-                let f_return_callback: @Sendable (T?, JavaObjectPointer?) -> Void = { f_return, f_error in
-                    if let f_error {
-                        f_continuation.resume(throwing: JThrowable.toError(f_error, options: [])!)
-                    } else {
-                        nonisolated(unsafe) let f_return_value = f_return!
-                        f_continuation.resume(returning: f_return_value)
+            let f_job = BridgedJob()
+            return try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { f_continuation in
+                    let f_return_callback: @Sendable (T?, JavaObjectPointer?) -> Void = { f_return, f_error in
+                        if let f_error {
+                            f_continuation.resume(throwing: f_job.error(f_error, options: []))
+                        } else {
+                            nonisolated(unsafe) let f_return_value = f_return!
+                            f_continuation.resume(returning: f_return_value)
+                        }
+                    }
+                    jniContext {
+                        let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
+                        let p_0_java = AnyBridging.toJavaObject(p_0, options: [])!.toJavaParameter(options: [])
+                        let f_job_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_f_0_methodID, options: [], args: [p_0_java, f_return_callback_java])
+                        f_job.attach(f_job_java)
                     }
                 }
-                jniContext {
-                    let f_return_callback_java = SwiftClosure2.javaObject(for: f_return_callback, options: []).toJavaParameter(options: [])
-                    let p_0_java = AnyBridging.toJavaObject(p_0, options: [])!.toJavaParameter(options: [])
-                    try! Java_SourceKt.callStatic(method: Java_f_0_methodID, options: [], args: [p_0_java, f_return_callback_java])
-                }
+            } onCancel: {
+                f_job.cancel()
             }
         }
-        private let Java_f_0_methodID = Java_SourceKt.getStaticMethodID(name: "callback_f", sig: "(Ljava/lang/Object;Lkotlin/jvm/functions/Function2;)V")!
+        private let Java_f_0_methodID = Java_SourceKt.getStaticMethodID(name: "callback_f", sig: "(Ljava/lang/Object;Lkotlin/jvm/functions/Function2;)Lkotlinx/coroutines/Job;")!
         """, transformers: transformers)
     }
 

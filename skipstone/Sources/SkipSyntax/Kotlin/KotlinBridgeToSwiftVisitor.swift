@@ -476,17 +476,14 @@ final class KotlinBridgeToSwiftVisitor {
         callbackFunction.isGenerated = true
 
         var taskSourceCode: [String] = []
-        taskSourceCode.append("Task {")
         if variableDeclaration.apiFlags.throwsType == .none {
+            taskSourceCode.append("Task {")
             taskSourceCode.append(1, "f_return_callback(\(variableDeclaration.propertyName)())")
+            taskSourceCode.append("}")
         } else {
-            taskSourceCode.append(1, "try {")
-            taskSourceCode.append(2, "f_return_callback(\(variableDeclaration.propertyName)(), null)")
-            taskSourceCode.append(1, "} catch(t: Throwable) {")
-            taskSourceCode.append(2, "f_return_callback(null, t)")
-            taskSourceCode.append(1, "}")
+            callbackFunction.returnType = .kotlinJob
+            taskSourceCode = cancellableTaskSourceCode(invocation: "\(variableDeclaration.propertyName)()", isVoid: false)
         }
-        taskSourceCode.append("}")
         callbackFunction.body = KotlinCodeBlock(statements: taskSourceCode.map { KotlinRawStatement(sourceCode: $0) })
         (variableDeclaration.parent as? KotlinStatement)?.insert(statements: [callbackFunction], after: variableDeclaration)
     }
@@ -631,9 +628,16 @@ final class KotlinBridgeToSwiftVisitor {
         if isDeclaredByVariable {
             indentation = indentation.inc()
         }
+        var cancellationHandlerLevel: Int? = nil
         if isAsync {
             if isThrows {
-                swift.append(indentation, returnCallString + "await withCheckedThrowingContinuation { f_continuation in")
+                // The Kotlin callback function returns the Job running the call; cancelling the awaiting
+                // Swift task cancels it through the handler
+                swift.append(indentation, "let f_job = BridgedJob()")
+                swift.append(indentation, returnCallString + "await withTaskCancellationHandler {")
+                cancellationHandlerLevel = indentation.level
+                indentation = indentation.inc()
+                swift.append(indentation, "try await withCheckedThrowingContinuation { f_continuation in")
             } else {
                 swift.append(indentation, returnCallString + "await withCheckedContinuation { f_continuation in")
             }
@@ -658,7 +662,7 @@ final class KotlinBridgeToSwiftVisitor {
                 }
                 indentation = indentation.inc()
                 swift.append(indentation, "if let f_error {")
-                swift.append(indentation.inc(), "f_continuation.resume(throwing: JThrowable.toError(f_error, options: \(optionsString))!)")
+                swift.append(indentation.inc(), "f_continuation.resume(throwing: f_job.error(f_error, options: \(optionsString)))")
                 swift.append(indentation, "} else {")
                 if callbackType.parameters.count == 1 {
                     swift.append(indentation.inc(), "f_continuation.resume()")
@@ -735,7 +739,12 @@ final class KotlinBridgeToSwiftVisitor {
             }
             argumentsString += "f_return_callback_java"
             let call = "\(tryType) \(targetIdentifier).\(callType)(method: \(callMethod), options: \(optionsString), args: [\(argumentsString)])"
-            swift.append(indentation, call)
+            if isThrows {
+                swift.append(indentation, "let f_job_java: JavaObjectPointer = " + call)
+                swift.append(indentation, "f_job.attach(f_job_java)")
+            } else {
+                swift.append(indentation, call)
+            }
         } else {
             let callType = inType == nil ? "callStatic" : "call"
             let callMethod = inType == nil || modifiers.isStatic ? methodIdentifier : "Self." + methodIdentifier
@@ -764,6 +773,10 @@ final class KotlinBridgeToSwiftVisitor {
                 swift.append(1, "super.init(Java_peer: Java_peer)")
             }
             indentation = indentation.dec()
+            if indentation.level == cancellationHandlerLevel {
+                swift.append(indentation, "} onCancel: {")
+                swift.append(indentation.inc(), "f_job.cancel()")
+            }
             swift.append(indentation, "}")
         }
         return swift
@@ -795,7 +808,7 @@ final class KotlinBridgeToSwiftVisitor {
             functionName = "callback_" + preEscapedName
             let callbackType = bridgable.return.isGenericEntry ? TypeSignature.any.asOptional(bridgable.return.kotlinType.isOptional) : bridgable.return.kotlinType
             kotlinParameters.append(TypeSignature.Parameter(type: callbackType.callbackClosureType(apiFlags: apiFlags, kotlin: true)))
-            kotlinReturnType = .void
+            kotlinReturnType = apiFlags.throwsType == .none ? .void : .kotlinJob
         } else {
             functionName = name
             kotlinReturnType = bridgable.return.isGenericEntry ? TypeSignature.any.asOptional(bridgable.return.kotlinType.isOptional) : bridgable.return.kotlinType
@@ -822,33 +835,47 @@ final class KotlinBridgeToSwiftVisitor {
 
         let invocationSourceCode = invocationSourceCode(for: functionDeclaration)
         var taskSourceCode: [String] = []
-        taskSourceCode.append("Task {")
         if functionDeclaration.apiFlags.throwsType == .none {
+            taskSourceCode.append("Task {")
             if callbackType.parameters.isEmpty {
                 taskSourceCode.append(1, invocationSourceCode)
                 taskSourceCode.append(1, "f_return_callback()")
             } else {
                 taskSourceCode.append(1, "f_return_callback(\(invocationSourceCode))")
             }
+            taskSourceCode.append("}")
         } else {
-            taskSourceCode.append(1, "try {")
-            if callbackType.parameters.count == 1 {
-                taskSourceCode.append(2, invocationSourceCode)
-                taskSourceCode.append(2, "f_return_callback(null)")
-            } else {
-                taskSourceCode.append(2, "f_return_callback(\(invocationSourceCode), null)")
-            }
-            taskSourceCode.append(1, "} catch(t: Throwable) {")
-            if callbackType.parameters.count == 1 {
-                taskSourceCode.append(2, "f_return_callback(t)")
-            } else {
-                taskSourceCode.append(2, "f_return_callback(null, t)")
-            }
-            taskSourceCode.append(1, "}")
+            callbackFunction.returnType = .kotlinJob
+            taskSourceCode = cancellableTaskSourceCode(invocation: invocationSourceCode, isVoid: callbackType.parameters.count == 1)
         }
-        taskSourceCode.append("}")
         callbackFunction.body = KotlinCodeBlock(statements: taskSourceCode.map { KotlinRawStatement(sourceCode: $0) })
         (functionDeclaration.parent as? KotlinStatement)?.insert(statements: [callbackFunction], after: functionDeclaration)
+    }
+
+    /// The body of the `callback_` function for a throwing async API.
+    ///
+    /// The call runs under its own `Job`, which is returned to Swift: cancelling the awaiting Swift
+    /// task cancels the job, so a Kotlin implementation suspended in e.g. `suspendCancellableCoroutine`
+    /// observes the cancellation instead of running to completion. Cancelling the job before the
+    /// call starts makes `withContext` throw, so the callback always fires exactly once.
+    private static func cancellableTaskSourceCode(invocation: String, isVoid: Bool) -> [String] {
+        var source: [String] = []
+        source.append("val f_job = kotlinx.coroutines.Job()")
+        source.append("Task {")
+        source.append(1, "try {")
+        if isVoid {
+            source.append(2, "kotlinx.coroutines.withContext(f_job) { \(invocation) }")
+            source.append(2, "f_return_callback(null)")
+        } else {
+            source.append(2, "val f_return = kotlinx.coroutines.withContext(f_job) { \(invocation) }")
+            source.append(2, "f_return_callback(f_return, null)")
+        }
+        source.append(1, "} catch(t: Throwable) {")
+        source.append(2, isVoid ? "f_return_callback(t)" : "f_return_callback(null, t)")
+        source.append(1, "}")
+        source.append("}")
+        source.append("return f_job")
+        return source
     }
 
     private static func invocationSourceCode(for functionDeclaration: KotlinFunctionDeclaration) -> String {
