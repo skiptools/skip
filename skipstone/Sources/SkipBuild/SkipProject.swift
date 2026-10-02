@@ -54,7 +54,6 @@ struct ProjectOptionValues {
     var macOSMinVersion: Double?
     var chain: Bool
     var gitRepo: Bool
-    var appfair: Bool
     var free: Bool
     var zero: Bool
     var github: Bool
@@ -77,8 +76,6 @@ func isValidProjectName(_ name: String) -> String? {
     if name.count < 2 { return invalidDesc }
 
     // Define a character set with valid characters (letters, numbers, dash).
-    // Case is no longer constrained, so e.g. "Sun-Bow" is accepted; the
-    // app-fair path downstream lowercases the name where it needs to.
     let validCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-"))
 
     // Check if the name contains only valid characters
@@ -1553,23 +1550,11 @@ struct TestData : Codable, Hashable {
             }
         }
 
-        let appStoreLinks = options.appfair ? """
-        <!-- TODO: fill in details when releasing to app/play store
-        <div align="center">
-          <a href="https://play.google.com/store/apps/details?id=ANDROID_APP_ID" style="display: inline-block;"><img src="https://appfair.org/assets/badges/google-play-store.svg" alt="Download on the Google Play Store" style="height: 60px; vertical-align: middle; object-fit: contain;" /></a>
-          <a href="https://apps.apple.com/us/app/APPLE_APP_NAME/idAPPLE_APP_ID" style="display: inline-block;"><img src="https://appfair.org/assets/badges/apple-app-store.svg" alt="Download on the Apple App Store" style="height: 60px; vertical-align: middle; object-fit: contain;" /></a>
-        </div>
-        -->
-        
-
-        """ : ""
-
         var appREADME = """
         # \(primaryModuleName)
 
-        This is a \(options.free ? "free and open-source " : "")[Skip](https://skip.dev) dual-platform app project\(options.appfair ? " distributed through the [App Fair](https://appfair.org)" : "").
+        This is a \(options.free ? "free and open-source " : "")[Skip](https://skip.dev) dual-platform app project.
 
-        \(appStoreLinks)
         <!-- TODO: add iOS screenshots to fastlane metadata
         ## iPhone Screenshots
 
@@ -2617,12 +2602,8 @@ let logger: Logger = Logger(subsystem: "\(appid)", category: "\(primaryModuleNam
         try FileManager.default.createDirectory(at: appModuleApplicationStubFileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try appExtContents.write(to: appModuleApplicationStubFileURL, atomically: false, encoding: .utf8)
 
-        let secondImport = options.appfair == true ? "\nimport AppFairUI" : ""
-        let thirdImport = secondModule.flatMap({ "\nimport \($0.moduleName)" }) ?? ""
-        let appOrg = appid.split(separator: ".").last?.description ?? appid
-        let appLink = options.appfair == true ? "https://github.com/\(appOrg)/\(appOrg)" : "https://skip.dev"
-        let settingsFormView = options.appfair == true ? "AppFairSettings" : "Form"
-        let demoSettingsCode = options.appfair == true ? "" : """
+        let secondImport = secondModule.flatMap({ "\nimport \($0.moduleName)" }) ?? ""
+        let demoSettingsCode = """
 
             if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
                let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
@@ -2676,7 +2657,7 @@ struct PlatformHeartView : View {
 """
 
         // the platform-specific view is different between a native app module and a transpiled module
-        let platformHeartView = options.appfair == true ? "" : isNativeAppModule ? nativeAppModulePlatformView : transpiledAppModulePlatformView
+        let platformHeartView = isNativeAppModule ? nativeAppModulePlatformView : transpiledAppModulePlatformView
 
         let contentViewTabBodyContents: String
         if options.iOSMinVersion >= 18.0 {
@@ -2730,7 +2711,7 @@ struct PlatformHeartView : View {
 
         // Sources/Playground/PlaygroundApp.swift
         let contentViewContents = """
-\(sourceHeader)\(swiftUIImport)\(secondImport)\(thirdImport)
+\(sourceHeader)\(swiftUIImport)\(secondImport)
 
 enum ContentTab: String, Hashable {
     case welcome, home, settings
@@ -2755,7 +2736,7 @@ struct WelcomeView : View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Text("Hello [\\(welcomeName)](\(appLink))!")
+            Text("Hello [\\(welcomeName)](https://skip.dev)!")
                 .padding()
             Image(systemName: "heart.fill")
                 .foregroundStyle(.red)
@@ -2850,7 +2831,7 @@ struct SettingsView : View {
     @Binding var welcomeName: String
 
     var body: some View {
-        \(settingsFormView) {
+        Form {
             TextField("Name", text: $welcomeName)
             Picker("Appearance", selection: $appearance) {
                 Text("System").tag("")

@@ -142,7 +142,7 @@ This command will create a conventional Skip app or library project.
     }
 
     func runInit(with out: MessageQueue) async throws {
-        await out.yield(MessageBlock(status: nil, "Initializing Skip \(appid == nil && !createOptions.appfair ? "library" : "application") \(self.projectName)"))
+        await out.yield(MessageBlock(status: nil, "Initializing Skip \(appid == nil ? "library" : "application") \(self.projectName)"))
 
         let dir = URL(fileURLWithPath: self.createOptions.dir ?? self.projectName, isDirectory: true)
 
@@ -409,23 +409,11 @@ extension ToolOptionsCommand where Self : StreamingCommand {
     }
 
     func initSkipProject(options: ProjectOptionValues, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, verify: Bool, configuration: BuildConfiguration, build: Bool, test: Bool, returnHashes: Bool, messagePrefix: String? = nil, showTree: Bool, app isApp: Bool, appid: String?, appModuleName: String = "app", icon: IconParameters?, version: String?, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests: Bool, validatePackage: Bool, packageResolved packageResolvedURL: URL? = nil, apk: Bool, ipa: Bool, with out: MessageQueue) async throws -> (projectURL: URL, project: AppProjectLayout, artifacts: [URL: String?]) {
-        var options = options
-        let baseName = options.projectName
-
         // the initial build/test is done with debug configuration regardless of the configuration setting; this is because unit tests don't always run correctly in release mode
         let debugConfiguration = "debug"
         let re = messagePrefix ?? ""
-        let free = options.appfair == true ? true : options.free
-
-        // the `appfair` flag changed the meaning of `baseName` to be the base name of the project and modules: "Sun-Bow" creates the modules "SunBow" and "SubBowModel" and the appid "io.github.Sun-Bow" and the project name "sun-bow-app"
-        var modules = modules
-
-        if options.appfair == true, !modules.isEmpty {
-            modules[0].dependencies += [PackageModule(organizationName: "appfair", repositoryName: "appfair-app", repositoryVersion: "1.0.0", moduleName: "AppFairUI")]
-        }
-
-        let projectName = options.appfair == true ? baseName.lowercased() + "-app" : baseName
-        options.projectName = projectName
+        let free = options.free
+        let projectName = options.projectName
 
         let primaryModuleName = modules.first?.moduleName ?? "Module"
 

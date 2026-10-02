@@ -1368,160 +1368,6 @@ final class SkipCommandTests: XCTestCase {
         """)
     }
 
-    func testLibInitAppFair() async throws {
-        let (projectURL, projectTree) = try await skipInit(projectName: "Free-App", free: false, appfair: true, mode: [.transpiledApp], moduleNames: "FreeApp", "FreeAppModel") // appfair should override free
-        XCTAssertEqual(projectTree ?? "", """
-        .
-        ├─ Android
-        │  ├─ app
-        │  │  ├─ build.gradle.kts
-        │  │  ├─ proguard-rules.pro
-        │  │  └─ src
-        │  │     └─ main
-        │  │        ├─ AndroidManifest.xml
-        │  │        └─ kotlin
-        │  │           └─ Main.kt
-        │  ├─ fastlane
-        │  │  ├─ Appfile
-        │  │  ├─ Fastfile
-        │  │  ├─ README.md
-        │  │  └─ metadata
-        │  │     └─ android
-        │  │        └─ en-US
-        │  │           ├─ full_description.txt
-        │  │           ├─ short_description.txt
-        │  │           └─ title.txt
-        │  ├─ gradle
-        │  │  └─ wrapper
-        │  │     └─ gradle-wrapper.properties
-        │  ├─ gradle.properties
-        │  └─ settings.gradle.kts
-        ├─ Darwin
-        │  ├─ Assets.xcassets
-        │  │  ├─ AccentColor.colorset
-        │  │  │  └─ Contents.json
-        │  │  ├─ AppIcon.appiconset
-        │  │  │  └─ Contents.json
-        │  │  └─ Contents.json
-        │  ├─ Entitlements.plist
-        │  ├─ FreeApp.xcconfig
-        │  ├─ FreeApp.xcodeproj
-        │  │  ├─ project.pbxproj
-        │  │  └─ xcshareddata
-        │  │     └─ xcschemes
-        │  │        └─ FreeApp App.xcscheme
-        │  ├─ Info.plist
-        │  ├─ InfoPlist.xcstrings
-        │  ├─ Sources
-        │  │  └─ Main.swift
-        │  └─ fastlane
-        │     ├─ AppStore.xcconfig
-        │     ├─ Appfile
-        │     ├─ Deliverfile
-        │     ├─ Fastfile
-        │     ├─ README.md
-        │     └─ metadata
-        │        ├─ app_privacy_details.json
-        │        ├─ en-US
-        │        │  ├─ description.txt
-        │        │  ├─ keywords.txt
-        │        │  ├─ privacy_url.txt
-        │        │  ├─ release_notes.txt
-        │        │  ├─ software_url.txt
-        │        │  ├─ subtitle.txt
-        │        │  ├─ support_url.txt
-        │        │  ├─ title.txt
-        │        │  └─ version_whats_new.txt
-        │        └─ rating.json
-        ├─ LICENSE.txt
-        ├─ Package.swift
-        ├─ Project.xcworkspace
-        │  └─ contents.xcworkspacedata
-        ├─ README.md
-        ├─ Skip.env
-        ├─ Sources
-        │  ├─ FreeApp
-        │  │  ├─ ContentView.swift
-        │  │  ├─ FreeAppApp.swift
-        │  │  ├─ Resources
-        │  │  │  ├─ Localizable.xcstrings
-        │  │  │  └─ Module.xcassets
-        │  │  │     └─ Contents.json
-        │  │  └─ Skip
-        │  │     └─ skip.yml
-        │  └─ FreeAppModel
-        │     ├─ Resources
-        │     │  └─ Localizable.xcstrings
-        │     ├─ Skip
-        │     │  └─ skip.yml
-        │     └─ ViewModel.swift
-        └─ Tests
-           ├─ FreeAppModelTests
-           │  ├─ FreeAppModelTests.swift
-           │  ├─ Resources
-           │  │  └─ TestData.json
-           │  └─ Skip
-           │     └─ skip.yml
-           └─ FreeAppTests
-              ├─ FreeAppTests.swift
-              ├─ Resources
-              │  └─ TestData.json
-              └─ Skip
-                 └─ skip.yml
-
-        """)
-
-        let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
-
-        let PackageSwift = try load("Package.swift")
-        XCTAssertEqual(PackageSwift, """
-        // swift-tools-version: 6.1
-        // This is a Skip (https://skip.dev) package.
-        import PackageDescription
-
-        let package = Package(
-            name: "free-app-app",
-            defaultLocalization: "en",
-            platforms: [.iOS(.v17), .macOS(.v14)],
-            products: [
-                .library(name: "FreeApp", type: .dynamic, targets: ["FreeApp"]),
-                .library(name: "FreeAppModel", type: .dynamic, targets: ["FreeAppModel"]),
-            ],
-            dependencies: [
-                .package(url: "https://github.com/skiptools/skip.git", from: "1.0.0"),
-                .package(url: "https://github.com/appfair/appfair-app.git", from: "1.0.0"),
-                .package(url: "https://github.com/skiptools/skip-foundation.git", from: "1.0.0"),
-                .package(url: "https://github.com/skiptools/skip-model.git", from: "1.0.0")
-            ],
-            targets: [
-                .target(name: "FreeApp", dependencies: [
-                    "FreeAppModel",
-                    .product(name: "AppFairUI", package: "appfair-app")
-                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .testTarget(name: "FreeAppTests", dependencies: [
-                    "FreeApp",
-                    .product(name: "SkipTest", package: "skip")
-                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .target(name: "FreeAppModel", dependencies: [
-                    .product(name: "SkipFoundation", package: "skip-foundation"),
-                    .product(name: "SkipModel", package: "skip-model")
-                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
-                .testTarget(name: "FreeAppModelTests", dependencies: [
-                    "FreeAppModel",
-                    .product(name: "SkipTest", package: "skip")
-                ], resources: [.process("Resources")], plugins: [.plugin(name: "skipstone", package: "skip")]),
-            ]
-        )
-
-        """)
-
-        //let fastlaneSoftwareUrliOS = try load("Darwin/fastlane/metadata/en-US/software_url.txt")
-        //XCTAssertEqual(fastlaneSoftwareUrliOS, "https://github.com/\(projectName)/\(projectName)")
-
-        //let fastlaneSupportUrliOS = try load("Darwin/fastlane/metadata/en-US/support_url.txt")
-        //XCTAssertEqual(fastlaneSupportUrliOS, "https://github.com/\(projectName)/\(projectName)/issues")
-    }
-
     func testLibInitApp3ModuleCommand() async throws {
         let (projectURL, projectTree) = try await skipInit(projectName: "cool-app", zero: true, mode: [.transpiledModel], tests: true, fastlane: false, appid: "some.cool.app", moduleNames: "TopModule", "MiddleModule", "BottomModule")
         XCTAssertEqual(projectTree ?? "", """
@@ -2067,7 +1913,7 @@ final class SkipCommandTests: XCTestCase {
     /// Default arguments for `skip init` tests
     let initTestArgs = ["-jA", "--no-build", "--no-test", "--show-tree"]
 
-    func skipInit(projectName: String, documented: Bool = false, free: Bool? = nil, zero: Bool? = nil, bridged: Bool? = nil, appfair: Bool? = nil, mode: [ProjectMode], kotlincompat: Bool = false, tests moduleTests: Bool? = nil, testCaseMode: TestCaseMode? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, swiftPackageVersion: String? = nil, resourcePath: String? = "Resources", backgroundColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
+    func skipInit(projectName: String, documented: Bool = false, free: Bool? = nil, zero: Bool? = nil, bridged: Bool? = nil, mode: [ProjectMode], kotlincompat: Bool = false, tests moduleTests: Bool? = nil, testCaseMode: TestCaseMode? = nil, fastlane: Bool? = nil, validatePackage: Bool? = true, appid: String? = nil, swiftPackageVersion: String? = nil, resourcePath: String? = "Resources", backgroundColor: String? = nil, moduleNames: String...) async throws -> (projectURL: URL, projectTree: String?) {
         let tmpDir = URL(fileURLWithPath: UUID().uuidString, isDirectory: true, relativeTo: URL(fileURLWithPath: NSTemporaryDirectory() + "/testLibInitCommand/", isDirectory: true))
         try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
         var cmd = ["init"] + initTestArgs
@@ -2094,11 +1940,6 @@ final class SkipCommandTests: XCTestCase {
         }
 
         // conventional Skip apps
-        if appfair == true {
-            cmd += ["--appfair"]
-        } else if appfair == false {
-            cmd += ["--no-appfair"]
-        }
 
         if mode.contains(.nativeApp) {
             cmd += ["--native-app"]
@@ -2164,7 +2005,7 @@ final class SkipCommandTests: XCTestCase {
         }
 
         let created = try await skipstone(cmd).json()
-        XCTAssertEqual(created.array?.first, ["msg": .string("Initializing Skip \(appid == nil && appfair != true ? "library" : "application") \(projectName)")])
+        XCTAssertEqual(created.array?.first, ["msg": .string("Initializing Skip \(appid == nil ? "library" : "application") \(projectName)")])
         // return the tree output, which is in the 2nd-to-last message
        return (projectURL: tmpDir.appendingPathComponent(projectName, isDirectory: true), projectTree: created.array?.dropLast(2).last?["msg"]?.string)
     }

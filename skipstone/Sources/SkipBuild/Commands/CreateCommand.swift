@@ -212,26 +212,9 @@ struct CreateCommand: StreamingCommand, ToolchainOptionsCommand, CreateOptionsCo
             }
         }
 
-        // When `--appfair` is passed on the command line, the four prompts
-        // below are pre-answered "yes" without bothering the user: open-source
-        // license, app-fair project, git init, and fastlane init are all part
-        // of the standard App Fair workflow.
-        let appfairFlag = createOptions.appfair
-        let freeProject: Bool
-        let appFairProject: Bool
-        let gitRepo: Bool
-        let fastlane: Bool
-        if appfairFlag {
-            freeProject = true
-            appFairProject = isApp
-            gitRepo = true
-            fastlane = isApp
-        } else {
-            freeProject = prompt("Create an open-source \(isApp ? "app" : "library")?", defaultValue: createOptions.free)
-            appFairProject = !isApp || !freeProject ? false : prompt("Create an App Fair Project?", defaultValue: createOptions.appfair)
-            gitRepo = prompt("Initialize git repository for the project?", defaultValue: createOptions.gitRepo)
-            fastlane = isApp ? prompt("Initialize a Fastlane configuration for the project?", defaultValue: createOptions.fastlane) : false
-        }
+        let freeProject = prompt("Create an open-source \(isApp ? "app" : "library")?", defaultValue: createOptions.free)
+        let gitRepo = prompt("Initialize git repository for the project?", defaultValue: createOptions.gitRepo)
+        let fastlane = isApp ? prompt("Initialize a Fastlane configuration for the project?", defaultValue: createOptions.fastlane) : false
 
         let buildProject = prompt("Pre-build the project?", defaultValue: true)
 
@@ -271,7 +254,6 @@ struct CreateCommand: StreamingCommand, ToolchainOptionsCommand, CreateOptionsCo
         // override with options specified interactively
         options.gitRepo = gitRepo
         options.free = freeProject
-        options.appfair = appFairProject
         options.fastlane = fastlane
 
         await withLogStream(with: out) {

@@ -234,6 +234,9 @@ struct SkipstoneCommand: BuildPluginOptionsCommand, StreamingCommand {
         func addLink(_ linkSource: AbsolutePath, pointingAt destPath: AbsolutePath, relative: Bool, copyReadOnlyFiles: Bool = true) throws {
             msg(.trace, "linking: \(linkSource) to: \(destPath)")
 
+            // note that destPath may itself be a symlink (e.g., a resource that links to a generated file),
+            // so it must be left in place; any pre-existing link at linkSource is replaced below
+
             if let existingSymlinkDestination = try? FileManager.default.destinationOfSymbolicLink(atPath: linkSource.pathString) {
                 if existingSymlinkDestination == destPath.pathString {
                     msg(.trace, "retaining existing link from \(destPath.pathString) to \(existingSymlinkDestination)")

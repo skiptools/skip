@@ -52,34 +52,12 @@ struct VerifyCommand: SkipCommand, StreamingCommand, ProjectCommand, ToolOptions
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Attempt to automatically fix issues"))
     var fix: Bool = false
 
-    @Flag(help: ArgumentHelp("Verify SBOM dependency licenses (uses FLOSS policy when --free is set)"))
-    var sbom: Bool = false
-
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Verify source file license headers match the project license"))
     var licenses: Bool? = nil
 
     func performCommand(with out: MessageQueue) async {
         await withLogStream(with: out) {
             try await performVerifyCommand(project: project, autofix: fix, free: free, fastlane: fastlane, with: out)
-
-            if sbom {
-                let projectURL = URL(fileURLWithPath: project).standardized
-                let packageJSON = try await parseSwiftPackage(with: out, at: project)
-
-                if free == true {
-                    let violations = try await SBOMGenerator.verifyFLOSSLicenses(
-                        projectPath: projectURL.path,
-                        packageName: packageJSON.name,
-                        packageJSON: packageJSON,
-                        command: self,
-                        out: out
-                    )
-
-                    if violations > 0 {
-                        throw error("SBOM license verification failed")
-                    }
-                }
-            }
 
             // Verify source file license headers when --licenses is specified,
             // or auto-detect when --free is set and a license file is present

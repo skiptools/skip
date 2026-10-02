@@ -85,7 +85,6 @@ public struct SkipRunnerExecutor: SkipCommandExecutor {
             ADBCommand.self,
             AndroidCommand.self,
             ExportCommand.self,
-            MetaCommand.self,
             DevicesCommand.self,
             TestCommand.self,
 

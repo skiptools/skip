@@ -89,9 +89,6 @@ struct CreateOptions : ParsableArguments {
     @Flag(help: ArgumentHelp("Create package with free software license", valueName: "free"))
     var free: Bool = false
 
-    @Flag(help: ArgumentHelp("Create a standard app fair project", visibility: .hidden))
-    var appfair: Bool = false
-
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary of the new files", valueName: "show"))
     var showTree: Bool = false
 
@@ -153,7 +150,7 @@ struct CreateOptions : ParsableArguments {
     }
 
     func projectOptionValues(projectName: String) -> ProjectOptionValues {
-        ProjectOptionValues(projectName: projectName, swiftPackageVersion: self.swiftPackageVersion, iOSMinVersion: self.iosMinVersion, macOSMinVersion: self.macosMinVersion, chain: self.chain, gitRepo: self.gitRepo, appfair: self.appfair, free: self.free || self.appfair, zero: self.zero, github: self.github, fastlane: self.fastlane, testCaseMode: self.testCaseMode)
+        ProjectOptionValues(projectName: projectName, swiftPackageVersion: self.swiftPackageVersion, iOSMinVersion: self.iosMinVersion, macOSMinVersion: self.macosMinVersion, chain: self.chain, gitRepo: self.gitRepo, free: self.free, zero: self.zero, github: self.github, fastlane: self.fastlane, testCaseMode: self.testCaseMode)
     }
 }
 
