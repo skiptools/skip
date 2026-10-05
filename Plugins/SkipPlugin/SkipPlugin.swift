@@ -200,6 +200,7 @@ import PackagePlugin
             } else {
                 destFolder = hasDestinationFolder ? "destination/" + pluginFolderName : pluginFolderName
             }
+
             let parentLink = (isXcodeBuild || hasDestinationFolder) ? "../" : "" // the extra folder means we need to link one more level up
 
             if let packageID = packageID { // go further up to the external package name
