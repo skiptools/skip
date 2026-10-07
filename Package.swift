@@ -14,12 +14,14 @@ let package = Package(
     products: [
         .plugin(name: "skipstone", targets: ["skipstone"]),
         .plugin(name: "skiplink", targets: ["Create SkipLink"]),
+        .plugin(name: "skiptranspile", targets: ["Skip Transpile"]),
         .library(name: "SkipDrive", targets: ["SkipDrive"]),
         .library(name: "SkipTest", targets: ["SkipTest"]),
     ],
     targets: [
         .plugin(name: "skipstone", capability: .buildTool(), dependencies: ["skip"], path: "Plugins/SkipPlugin"),
         .plugin(name: "Create SkipLink", capability: .command(intent: .custom(verb: "SkipLink", description: "Create local links to transpiled output"), permissions: [.writeToPackageDirectory(reason: "This command will create local links to the skipstone output for the specified package(s), enabling access to the transpiled Kotlin")]), dependencies: ["skip"], path: "Plugins/SkipLink"),
+        .plugin(name: "Skip Transpile", capability: .command(intent: .custom(verb: "skip-transpile", description: "Transpile the Skip modules without building them"), permissions: [.writeToPackageDirectory(reason: "This command writes the transpiled output to the package's .build/plugins/outputs folder")]), dependencies: ["skip"], path: "Plugins/SkipTranspile"),
         .target(name: "SkipDrive", dependencies: ["skipstone", .target(name: "skip")]),
         .target(name: "SkipTest", dependencies: [.target(name: "SkipDrive", condition: .when(platforms: [.macOS, .macCatalyst, .linux]))]),
         .testTarget(name: "SkipTestTests", dependencies: ["SkipTest"]),
