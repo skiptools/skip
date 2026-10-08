@@ -895,6 +895,15 @@ extension AndroidOperationCommand {
             cmd += ["--configuration", configuration.rawValue]
         }
 
+        // Nothing debugs Swift on Android, so in debug builds full debug info (type DWARF, plus every module's AST embedded for LLDB) only makes the native libraries slower to build and package.
+        // Line tables keep files and lines in crash backtraces. Release builds keep full debug info, since crash reporters use it to name inlined frames.
+        // Passing any -Xswiftc -g… flag opts out.
+        if toolchainOptions.configuration != .release && !xswiftc.contains(where: { $0.hasPrefix("-g") }) {
+            cmd += ["-debug-info-format", "none"]
+            xswiftc += ["-gline-tables-only"]
+            xcc += ["-gline-tables-only"]
+        }
+
         if toolchainOptions.bridge {
             xswiftc += ["-DSKIP_BRIDGE"]
             // set the SKIP_BRIDGE flag, which is transferred through to a build #define in SkipBridge and can be used to check whether the current build mode is targetting JNI
