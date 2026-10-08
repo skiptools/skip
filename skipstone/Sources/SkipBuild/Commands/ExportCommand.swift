@@ -26,6 +26,9 @@ skip export --debug
 
 # export just the "ModuleName" module
 skip export --module ModuleName
+
+# export the debug archives faster, with only line tables as the debug info of the native libraries
+skip export --debug --line-tables-only
 """,
         discussion: """
 Build and export the Skip modules defined in the Package.swift, with libraries exported as .aar files and the app exported as an .apk and .adb file suitable for distribution.
@@ -92,6 +95,9 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
 
     @Option(help: ArgumentHelp("Destination architectures for native libraries", valueName: "arch"))
     var arch: [AndroidArchArgument] = []
+
+    @Flag(help: ArgumentHelp("Build the debug native libraries with only line tables as debug info, which is faster to build and package; release libraries keep full debug info"))
+    var lineTablesOnly: Bool = false
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Unpack the exported app project zip into a temp folder and run `gradle assembleDebug` there to confirm the export builds standalone without Skip installed"))
     var validateExport: Bool = false
@@ -166,6 +172,11 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
         if !arch.isEmpty {
             // take the arch flag(s) and set them in the `SKIP_EXPORT_ARCHS` environment, which will be processed by the AndroidCommand when it sees the SkipBridge `--arch automatic` setting
             env[AndroidArchArgument.exportArchsEnvironment] = arch.map(\.rawValue).joined(separator: ",")
+        }
+
+        if lineTablesOnly {
+            // like the arch flags, passed through the gradle process to the AndroidCommand that builds the native libraries
+            env[ToolchainOptions.exportLineTablesOnlyEnvironment] = "1"
         }
 
         let assembleAction = variants == [.debug] ? "assembleDebug" : variants == [.release] ? "assembleRelease" : "assemble"
