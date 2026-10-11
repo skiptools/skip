@@ -546,7 +546,8 @@ extension TypeSignature {
             if let filtered = attributes?.attributes.filter({ $0.kind != .escaping }) {
                 attributes = Attributes(attributes: filtered)
             }
-            return "\(converted)\(isOptional ? "" : "!") as \(TypeSignature.function(parameters, signature, apiFlags, attributes))"
+            let functionType = TypeSignature.function(parameters, signature, apiFlags, attributes)
+            return isOptional ? "\(converted) as (\(functionType))?" : "\(converted)! as \(functionType)"
         case .int:
             if isOptional {
                 return "Int?.fromJavaObject(\(value), options: \(options.jconvertibleOptions))"

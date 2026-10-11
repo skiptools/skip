@@ -65,6 +65,20 @@ struct SkipstoneCommand: BuildPluginOptionsCommand, StreamingCommand {
         let v = skipVersion
         #endif
 
+        if skipstoneOptions.buildPlatform == "watchos" || skipstoneOptions.buildPlatform == "watchsimulator" {
+            // The native watchOS build needs no Android output. Still produce all
+            // declared files, including empty Swift bridge/test harness sources,
+            // and refresh their timestamps so incremental builds can skip this task.
+            let outputPaths = Set(skipstoneOptions.pluginOutputs + [skipstoneOptions.sourcehash])
+            for outputPath in outputPaths {
+                let outputURL = try AbsolutePath(validating: outputPath).asURL
+                try FileManager.default.createDirectory(at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Data().write(to: outputURL, options: .atomic)
+            }
+            info("Skip \(v): skipping Android generation for \(skipstoneOptions.buildPlatform)")
+            return
+        }
+
         if Self.enablePreviews == true {
             info("Skip \(v): skipstone plugin not running for ENABLE_PREVIEWS=YES")
             return
@@ -1441,6 +1455,12 @@ struct SkipstoneCommand: BuildPluginOptionsCommand, StreamingCommand {
 }
 
 struct SkipstoneCommandOptions: ParsableArguments {
+    @Option(help: ArgumentHelp("Destination platform supplied by the build plugin", valueName: "platform"))
+    var buildPlatform: String = ""
+
+    @Option(name: [.customLong("plugin-output")], help: ArgumentHelp("Declared plugin output to create when Android generation is skipped", valueName: "path"))
+    var pluginOutputs: [String] = []
+
     @Option(name: [.customLong("project"), .long], help: ArgumentHelp("The project folder to transpile", valueName: "folder"))
     var projectFolder: String // --project
 

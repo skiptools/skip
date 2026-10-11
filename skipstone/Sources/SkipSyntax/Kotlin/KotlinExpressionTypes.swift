@@ -41,6 +41,15 @@ final class KotlinArrayLiteral: KotlinExpression, KotlinUsableAsTypeLiteral {
     var inferredType: TypeSignature = .none
     var isOptionSet = false
     var useMultilineFormatting = false
+    /// Emit a Kotlin stdlib collection rather than a Skip collection, e.g. for `kotlincompat` bridged default values
+    var isKotlinCollection = false {
+        didSet {
+            for element in elements {
+                (element as? KotlinArrayLiteral)?.isKotlinCollection = isKotlinCollection
+                (element as? KotlinDictionaryLiteral)?.isKotlinCollection = isKotlinCollection
+            }
+        }
+    }
 
     static func translate(expression: ArrayLiteral, translator: KotlinTranslator) -> KotlinArrayLiteral {
         let kexpression = KotlinArrayLiteral(expression: expression)
@@ -111,6 +120,12 @@ final class KotlinArrayLiteral: KotlinExpression, KotlinUsableAsTypeLiteral {
     private func appendAsValue(to output: OutputGenerator, indentation: Indentation) {
         if isOptionSet {
             output.append("\(inferredType.elementType.kotlin).of(")
+        } else if isKotlinCollection {
+            if case .set = inferredType {
+                output.append("kotlin.collections.setOf(")
+            } else {
+                output.append("kotlin.collections.listOf(")
+            }
         } else if case .set = inferredType {
             output.append("setOf(")
         } else {
@@ -835,6 +850,15 @@ final class KotlinClosure: KotlinExpression, KotlinMainActorTargeting {
 final class KotlinDictionaryLiteral: KotlinExpression, KotlinUsableAsTypeLiteral {
     var entries: [(key: KotlinExpression, value: KotlinExpression)] = []
     var useMultilineFormatting = false
+    /// Emit a Kotlin stdlib map rather than a Skip dictionary, e.g. for `kotlincompat` bridged default values
+    var isKotlinCollection = false {
+        didSet {
+            for entry in entries {
+                (entry.value as? KotlinArrayLiteral)?.isKotlinCollection = isKotlinCollection
+                (entry.value as? KotlinDictionaryLiteral)?.isKotlinCollection = isKotlinCollection
+            }
+        }
+    }
 
     static func translate(expression: DictionaryLiteral, translator: KotlinTranslator) -> KotlinDictionaryLiteral {
         let kexpression = KotlinDictionaryLiteral(expression: expression)
@@ -892,14 +916,14 @@ final class KotlinDictionaryLiteral: KotlinExpression, KotlinUsableAsTypeLiteral
     }
 
     private func appendAsValue(to output: OutputGenerator, indentation: Indentation) {
-        output.append("dictionaryOf(")
+        output.append(isKotlinCollection ? "kotlin.collections.mapOf(" : "dictionaryOf(")
         let entryIndentation = useMultilineFormatting ? indentation.inc() : indentation
         for (index, entry) in entries.enumerated() {
             if (useMultilineFormatting) {
                 output.append("\n").append(entryIndentation)
             }
             // No need to sref() because the dictionary already does
-            output.append("Tuple2(")
+            output.append(isKotlinCollection ? "Pair(" : "Tuple2(")
             output.append(entry.key, indentation: entryIndentation)
             output.append(", ")
             output.append(entry.value, indentation: entryIndentation)
