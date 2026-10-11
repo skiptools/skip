@@ -58,7 +58,11 @@ mv -vf "${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}" "${ARTIFACT_BUILD_DIR}/${ARTIFA
 for ARCH in "${ARCHS[@]}"; do
     SDK="${ARCH}-swift-linux-musl"
 
-    BUILD_ARGS=(build --swift-sdk "${SDK}" --configuration "${CONFIGURATION}" --product "${PRODUCT}")
+    # musl gives every thread but the main one a 128 KiB stack, too small for SwiftParser on deeply
+    # nested code (SkipUI segfaults on a DispatchWorker thread); musl takes the default from
+    # PT_GNU_STACK, so raise it to glibc's usual 8 MiB (musl's maximum).
+    BUILD_ARGS=(build --swift-sdk "${SDK}" --configuration "${CONFIGURATION}" --product "${PRODUCT}"
+        -Xlinker -z -Xlinker stack-size=8388608)
     if [[ "${USE_SWIFTLY}" == "1" ]]; then
         SWIFT_CMD=(swiftly run swift)
         # only pin a toolchain when one was explicitly requested; otherwise use swiftly's selection
