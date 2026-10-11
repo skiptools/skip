@@ -707,28 +707,45 @@ final class KotlinBridgeToKotlinVisitor {
     private func updateEqualsDeclaration(_ functionDeclaration: KotlinFunctionDeclaration, in classDeclaration: KotlinClassDeclaration) {
         functionDeclaration.extras = Self.bridgeExtras(functionDeclaration.extras)
         let classWithAnyGenerics = classDeclaration.signature.withGenerics(of: .any)
+        let classType = ClassType(classDeclaration)
+        // Value and reference peers compare their Swift_peer pointers directly, avoiding a call back into Java per operand to look up each peer
+        let comparesPeers = classType == .value || classType == .reference
         let bodySourceCode: [String]
         if functionDeclaration.isKotlinEqualImplementation {
             // equals(other:)
             bodySourceCode = [
                 "if (other === this) return true",
                 "if (other !is \(classWithAnyGenerics.kotlin)) return false",
-                "return Swift_isequal(this, other)"
+                comparesPeers ? "return Swift_isequal(Swift_peer, other.Swift_peer)" : "return Swift_isequal(this, other)"
             ]
         } else {
             // ==(lhs:, rhs:)
-            bodySourceCode = ["return Swift_isequal(lhs, rhs)"]
+            bodySourceCode = [comparesPeers ? "return Swift_isequal(lhs.Swift_peer, rhs.Swift_peer)" : "return Swift_isequal(lhs, rhs)"]
         }
         functionDeclaration.body = KotlinCodeBlock(statements: bodySourceCode.map { KotlinRawStatement(sourceCode: $0) })
 
-        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_isequal(lhs: \(classWithAnyGenerics), rhs: \(classWithAnyGenerics)): Boolean")
+        let operandType = comparesPeers ? "skip.bridge.SwiftObjectPointer" : classWithAnyGenerics.kotlin
+        let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_isequal(lhs: \(operandType), rhs: \(operandType)): Boolean")
         classDeclaration.insert(statements: [externalFunctionDeclaration], after: functionDeclaration)
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: functionDeclaration, isCompanion: false, name: "Swift_isequal", translator: translator)
-        let cdeclType: TypeSignature = .function([TypeSignature.Parameter(label: "lhs", type: .javaObjectPointer), TypeSignature.Parameter(label: "rhs", type: .javaObjectPointer)], .bool, APIFlags(), nil)
+        let operandSignature: TypeSignature = comparesPeers ? .swiftObjectPointer(kotlin: false) : .javaObjectPointer
+        let cdeclType: TypeSignature = .function([TypeSignature.Parameter(label: "lhs", type: operandSignature), TypeSignature.Parameter(label: "rhs", type: operandSignature)], .bool, APIFlags(), nil)
         var cdeclBody: [String]
         let retString: String
-        if !classDeclaration.generics.isEmpty {
+        if classType == .value {
+            cdeclBody = [
+                "let lhs_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = lhs.pointee()!",
+                "let rhs_swift: SwiftValueTypeBox<\(classDeclaration.signature)> = rhs.pointee()!"
+            ]
+            retString = "return lhs_swift.value == rhs_swift.value"
+        } else if classType == .reference {
+            cdeclBody = [
+                "let lhs_swift: \(classDeclaration.signature) = lhs.pointee()!",
+                "let rhs_swift: \(classDeclaration.signature) = rhs.pointee()!"
+            ]
+            retString = "return lhs_swift == rhs_swift"
+        } else if !classDeclaration.generics.isEmpty {
             cdeclBody = [
                 "let lhs_swift: \(classDeclaration.signature.typeErasedClass) = lhs.pointee()!",
                 "let rhs_swift: \(classDeclaration.signature.typeErasedClass) = rhs.pointee()!"

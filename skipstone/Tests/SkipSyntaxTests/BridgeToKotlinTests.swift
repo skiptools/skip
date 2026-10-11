@@ -3377,9 +3377,9 @@ final class BridgeToKotlinTests: XCTestCase {
                 }
                 val lhs = this
                 val rhs = other
-                return Swift_isequal(lhs, rhs)
+                return Swift_isequal(lhs.Swift_peer, rhs.Swift_peer)
             }
-            private external fun Swift_isequal(lhs: C, rhs: C): Boolean
+            private external fun Swift_isequal(lhs: skip.bridge.SwiftObjectPointer, rhs: skip.bridge.SwiftObjectPointer): Boolean
             override fun hashCode(): Int {
                 var hasher = Hasher()
                 hash(into = InOut<Hasher>({ hasher }, { hasher = it }))
@@ -3438,9 +3438,9 @@ final class BridgeToKotlinTests: XCTestCase {
             peer_swift.i = Int(value)
         }
         @_cdecl("Java_C_Swift_1isequal")
-        public func C_Swift_isequal(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ lhs: JavaObjectPointer, _ rhs: JavaObjectPointer) -> Bool {
-            let lhs_swift = C.fromJavaObject(lhs, options: [])
-            let rhs_swift = C.fromJavaObject(rhs, options: [])
+        public func C_Swift_isequal(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ lhs: SwiftObjectPointer, _ rhs: SwiftObjectPointer) -> Bool {
+            let lhs_swift: C = lhs.pointee()!
+            let rhs_swift: C = rhs.pointee()!
             return lhs_swift == rhs_swift
         }
         @_cdecl("Java_C_Swift_1hashvalue")
@@ -4231,9 +4231,9 @@ final class BridgeToKotlinTests: XCTestCase {
             override fun equals(other: Any?): Boolean {
                 if (other === this) return true
                 if (other !is S) return false
-                return Swift_isequal(this, other)
+                return Swift_isequal(Swift_peer, other.Swift_peer)
             }
-            private external fun Swift_isequal(lhs: S, rhs: S): Boolean
+            private external fun Swift_isequal(lhs: skip.bridge.SwiftObjectPointer, rhs: skip.bridge.SwiftObjectPointer): Boolean
             override fun hashCode(): Int = Swift_hashvalue(Swift_peer).hashCode()
             private external fun Swift_hashvalue(Swift_peer: skip.bridge.SwiftObjectPointer): Long
 
@@ -4285,10 +4285,10 @@ final class BridgeToKotlinTests: XCTestCase {
             return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
         }
         @_cdecl("Java_S_Swift_1isequal")
-        public func S_Swift_isequal(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ lhs: JavaObjectPointer, _ rhs: JavaObjectPointer) -> Bool {
-            let lhs_swift = S.fromJavaObject(lhs, options: [])
-            let rhs_swift = S.fromJavaObject(rhs, options: [])
-            return lhs_swift == rhs_swift
+        public func S_Swift_isequal(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ lhs: SwiftObjectPointer, _ rhs: SwiftObjectPointer) -> Bool {
+            let lhs_swift: SwiftValueTypeBox<S> = lhs.pointee()!
+            let rhs_swift: SwiftValueTypeBox<S> = rhs.pointee()!
+            return lhs_swift.value == rhs_swift.value
         }
         @_cdecl("Java_S_Swift_1hashvalue")
         public func S_Swift_hashvalue(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> Int64 {
