@@ -471,6 +471,19 @@ class SkipSettingsPlugin : Plugin<Settings> {
                         .resolve("destination")
                         .resolve("skipstone")
                 }
+
+                if (skipOutput != null) {
+                    val configuration = System.getenv("CONFIGURATION")
+                    val effectivePlatform = System.getenv("EFFECTIVE_PLATFORM_NAME") ?: ""
+                    val variant = if (configuration != null) configuration + effectivePlatform else File(skipOutput).name
+                    val scopedProjectDir = projectDir.resolve("xcode-" + variant)
+                    if (scopedProjectDir.isDirectory) {
+                        projectDir = scopedProjectDir
+                    } else if (projectDir.listFiles()?.any { it.isDirectory && it.name.startsWith("xcode-") } == true) {
+                        error("No Skip output for Xcode build variant ${variant} in ${projectDir}. Build this destination before running Gradle.")
+                    }
+                }
+
                 if (!projectDir.exists()) {
                     error("The folder at ${projectDir} does not exist. This may mean that the Skip project was not transpiled successfully, or the name of the project module is not unique in the packages that were created. Check the gradle log for details and see https://skip.dev/docs/faq/ for troubleshooting.")
                 }

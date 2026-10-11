@@ -275,11 +275,9 @@ fileprivate extension AndroidOperationCommand {
         // Discover the test library: native uses .xctest, swiftbuild uses .so
         let xctestName = packageName + "PackageTests.xctest"
         let xctestPath = buildOutputFolderURL.appendingPathComponent(xctestName)
-        let testLibName: String
         let testLibPath: URL
 
         if FileManager.default.fileExists(atPath: xctestPath.path) {
-            testLibName = xctestName
             testLibPath = xctestPath
         } else {
             // swiftbuild: look for {Module}Tests.so
@@ -294,7 +292,6 @@ fileprivate extension AndroidOperationCommand {
                 }
             }
             if let lib = foundLib {
-                testLibName = lib
                 testLibPath = buildOutputFolderURL.appendingPathComponent(lib)
             } else {
                 throw AndroidError(errorDescription: "Could not find test library in: \(buildOutputFolderURL.path). Expected \(xctestName) (native) or a *Tests.so file (swiftbuild)")
