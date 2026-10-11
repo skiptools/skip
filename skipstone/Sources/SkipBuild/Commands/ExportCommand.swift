@@ -26,6 +26,9 @@ skip export --debug
 
 # export just the "ModuleName" module
 skip export --module ModuleName
+
+# compile the project for the host before exporting, rather than only transpiling it
+skip export --host-build full
 """,
         discussion: """
 Build and export the Skip modules defined in the Package.swift, with libraries exported as .aar files and the app exported as an .apk and .adb file suitable for distribution.
@@ -55,6 +58,9 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Build the Swift project before exporting"))
     var build: Bool = true
+
+    @Option(help: ArgumentHelp("How to build the Swift project before exporting: transpile only runs the Skip transpiler; full also compiles the project for the host (falls back to full when the skip package has no skip-transpile plugin)", valueName: "mode"))
+    var hostBuild: HostBuildMode = .transpile
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary", valueName: "show"))
     var showTree: Bool = false
@@ -144,8 +150,12 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
             }
         }
 
-        // Only the skipstone plugin's output is exported (the Kotlin comes from the transpiled sources and the native libraries from the Android build that Gradle runs), so the host build is just the fallback for older skip packages
-        if build == true, try await transpileProject() == false {
+        // Only the skipstone plugin's output is exported (the Kotlin comes from the transpiled sources and the native libraries from the Android build that Gradle runs), so by default the host build is just the fallback for older skip packages; `--host-build full` restores it
+        var needsHostBuild = build == true && hostBuild == .full
+        if build == true && hostBuild == .transpile {
+            needsHostBuild = try await transpileProject() == false
+        }
+        if needsHostBuild {
 
             // This builds for macOS
             // await run(with: out, "Build project \(packageName)", ["swift", "build", "-v", "--package-path", project, "-Xswiftc", "-target", "-Xswiftc", "arm64-apple-ios"])
@@ -752,4 +762,12 @@ extension FileManager {
             }
         }
     }
+}
+
+/// How `skip export` builds the Swift project before exporting
+enum HostBuildMode: String, ExpressibleByArgument, CaseIterable {
+    /// Run only the Skip transpiler through the skip-transpile command plugin
+    case transpile
+    /// Compile the whole project for the host, which also runs the transpiler
+    case full
 }
