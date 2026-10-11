@@ -28,7 +28,7 @@ skip export --debug
 skip export --module ModuleName
 
 # export the debug archives faster, with only line tables as the debug info of the native libraries
-skip export --debug --line-tables-only
+skip export --debug --debug-info line-tables
 """,
         discussion: """
 Build and export the Skip modules defined in the Package.swift, with libraries exported as .aar files and the app exported as an .apk and .adb file suitable for distribution.
@@ -96,8 +96,8 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
     @Option(help: ArgumentHelp("Destination architectures for native libraries", valueName: "arch"))
     var arch: [AndroidArchArgument] = []
 
-    @Flag(help: ArgumentHelp("Build the debug native libraries with only line tables as debug info, which is faster to build and package; release libraries keep full debug info"))
-    var lineTablesOnly: Bool = false
+    @Option(help: ArgumentHelp("Debug info of the debug native libraries: line-tables is faster to build and package; release libraries keep full debug info", valueName: "level"))
+    var debugInfo: AndroidDebugInfoArgument = .full
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Unpack the exported app project zip into a temp folder and run `gradle assembleDebug` there to confirm the export builds standalone without Skip installed"))
     var validateExport: Bool = false
@@ -174,9 +174,9 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
             env[AndroidArchArgument.exportArchsEnvironment] = arch.map(\.rawValue).joined(separator: ",")
         }
 
-        if lineTablesOnly {
+        if debugInfo != .full {
             // like the arch flags, passed through the gradle process to the AndroidCommand that builds the native libraries
-            env[ToolchainOptions.exportLineTablesOnlyEnvironment] = "1"
+            env[AndroidDebugInfoArgument.exportDebugInfoEnvironment] = debugInfo.rawValue
         }
 
         let assembleAction = variants == [.debug] ? "assembleDebug" : variants == [.release] ? "assembleRelease" : "assemble"
