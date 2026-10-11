@@ -402,6 +402,11 @@ final class KotlinBridgeToKotlinVisitor {
         functionDeclaration.parameters = functionDeclaration.parameters.enumerated().map { index, parameter in
             var parameter = parameter
             parameter.declaredType = bridgable.parameters[index].kotlinType
+            // kotlincompat bridges collections as Kotlin stdlib collections, so literal defaults must match
+            if options.contains(.kotlincompat) {
+                (parameter.defaultValue as? KotlinArrayLiteral)?.isKotlinCollection = true
+                (parameter.defaultValue as? KotlinDictionaryLiteral)?.isKotlinCollection = true
+            }
             return parameter
         }
         functionDeclaration.generics = functionDeclaration.generics.compactMapBridgable(direction: .toKotlin, options: options, codebaseInfo: codebaseInfo)

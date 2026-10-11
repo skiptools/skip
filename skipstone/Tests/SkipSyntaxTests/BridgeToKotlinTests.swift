@@ -5928,6 +5928,30 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testCollectionDefaultValueKotlinCompatibilityOption() async throws {
+        let transformers = builtinKotlinTransformers() + [KotlinBridgeTransformer(options: .kotlincompat)]
+        try await check(swiftBridge: """
+        public func f(a: [String] = ["a", "b"], e: [Int] = [], o: [[Int]]? = [[1]], d: [String: [Int]] = ["k": [1]], s: Set<Int> = [1]) {
+        }
+        """, kotlin: """
+        import skip.lib.Array
+        import skip.lib.Set
+
+        fun f(a: kotlin.collections.List<String> = kotlin.collections.listOf("a", "b"), e: kotlin.collections.List<Int> = kotlin.collections.listOf(), o: kotlin.collections.List<kotlin.collections.List<Int>>? = kotlin.collections.listOf(kotlin.collections.listOf(1)), d: kotlin.collections.Map<String, kotlin.collections.List<Int>> = kotlin.collections.mapOf(Pair("k", kotlin.collections.listOf(1))), s: kotlin.collections.Set<Int> = kotlin.collections.setOf(1)): Unit = Swift_f_0(a, e, o, d, s)
+        private external fun Swift_f_0(a: kotlin.collections.List<String>, e: kotlin.collections.List<Int>, o: kotlin.collections.List<kotlin.collections.List<Int>>?, d: kotlin.collections.Map<String, kotlin.collections.List<Int>>, s: kotlin.collections.Set<Int>)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1f_10")
+        public func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaObjectPointer, _ p_1: JavaObjectPointer, _ p_2: JavaObjectPointer?, _ p_3: JavaObjectPointer, _ p_4: JavaObjectPointer) {
+            let p_0_swift = [String].fromJavaObject(p_0, options: [.kotlincompat])
+            let p_1_swift = [Int].fromJavaObject(p_1, options: [.kotlincompat])
+            let p_2_swift = [[Int]]?.fromJavaObject(p_2, options: [.kotlincompat])
+            let p_3_swift = [String: [Int]].fromJavaObject(p_3, options: [.kotlincompat])
+            let p_4_swift = Set<Int>.fromJavaObject(p_4, options: [.kotlincompat])
+            f(a: p_0_swift, e: p_1_swift, o: p_2_swift, d: p_3_swift, s: p_4_swift)
+        }
+        """, transformers: transformers)
+    }
+
     func testProtocolKotlinCompatibilityOption() async throws {
         let transformers = builtinKotlinTransformers() + [KotlinBridgeTransformer(options: .kotlincompat)]
         try await check(supportingSwift: """
