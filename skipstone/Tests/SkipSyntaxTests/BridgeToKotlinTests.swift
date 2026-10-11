@@ -1154,6 +1154,23 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testFunctionOptionalClosureParameter() async throws {
+        try await check(swiftBridge: """
+        public func f(a: (@MainActor (Int) -> Void)? = nil, b: ((String) -> Int)? = nil) {
+        }
+        """, kotlin: """
+        fun f(a: ((Int) -> Unit)? = null, b: ((String) -> Int)? = null): Unit = Swift_f_0(a, b)
+        private external fun Swift_f_0(a: ((Int) -> Unit)?, b: ((String) -> Int)?)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1f_10")
+        public func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaObjectPointer?, _ p_1: JavaObjectPointer?) {
+            let p_0_swift = SwiftClosure1.closure(forJavaObject: p_0, options: []) as (@MainActor (Int) -> Void)?
+            let p_1_swift = SwiftClosure1.closure(forJavaObject: p_1, options: []) as ((String) -> Int)?
+            f(a: p_0_swift, b: p_1_swift)
+        }
+        """, transformers: transformers)
+    }
+
     func testFunctionParameterLabelOverload() async throws {
         try await check(swiftBridge: """
         public func f(i: Int) -> Int {
