@@ -842,7 +842,7 @@ final class KotlinBridgeToKotlinVisitor {
         cdeclFunctions.append(cdeclFunction)
     }
 
-    private func defaultHashDeclaration(for classDeclaration: KotlinClassDeclaration) -> ([KotlinStatement], CDeclFunction?) {
+    private func defaultHashDeclaration(for classDeclaration: KotlinClassDeclaration, hasEqualsDeclaration: Bool) -> ([KotlinStatement], CDeclFunction?) {
         let hash = KotlinFunctionDeclaration(name: "hashCode")
         hash.returnType = .int
         hash.modifiers.visibility = .public
@@ -855,7 +855,12 @@ final class KotlinBridgeToKotlinVisitor {
         let statements: [KotlinStatement]
         let sourceCode: [String]
         let cdeclFunction: CDeclFunction?
-        if classType == .generic, classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
+        if hasEqualsDeclaration {
+            // An Equatable type that is not Hashable compares by value in equals(), so a peer-based hash would make equal values hash differently
+            statements = [hash]
+            sourceCode = ["return \"\(classDeclaration.signature.withGenerics(of: .any).kotlin)\".hashCode()"]
+            cdeclFunction = nil
+        } else if classType == .generic, classDeclaration.declarationType == .classDeclaration || classDeclaration.declarationType == .actorDeclaration {
             let externalFunctionDeclaration = KotlinRawStatement(sourceCode: "private external fun Swift_hashvalue(Swift_peer: skip.bridge.SwiftObjectPointer): Long")
             statements = [hash, externalFunctionDeclaration]
             sourceCode = ["return Swift_hashvalue(Swift_peer).hashCode()"]
@@ -1240,7 +1245,7 @@ final class KotlinBridgeToKotlinVisitor {
                 }
             }
             if !hasHashDeclaration {
-                let (hashDeclarations, cdeclFunction) = defaultHashDeclaration(for: classDeclaration)
+                let (hashDeclarations, cdeclFunction) = defaultHashDeclaration(for: classDeclaration, hasEqualsDeclaration: hasEqualsDeclaration)
                 insertStatements += hashDeclarations
                 if let cdeclFunction {
                     cdeclFunctions.append(cdeclFunction)

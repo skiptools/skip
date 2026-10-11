@@ -4193,6 +4193,123 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testStructEquatableNotHashable() async throws {
+        try await check(swiftBridge: """
+        public struct S: Equatable {
+            public var i = 1
+            public func f() -> Int {
+                return i
+            }
+        }
+        """, kotlin: """
+        class S: MutableStruct, skip.bridge.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.SwiftObjectPointer = skip.bridge.SwiftObjectNil
+
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
+
+            override fun Swift_peer(): skip.bridge.SwiftObjectPointer = Swift_peer
+
+            override fun hashCode(): Int = "S".hashCode()
+
+            var i: Int
+                get() = Swift_i(Swift_peer)
+                set(newValue) {
+                    willmutate()
+                    try {
+                        Swift_i_set(Swift_peer, newValue)
+                    } finally {
+                        didmutate()
+                    }
+                }
+            private external fun Swift_i(Swift_peer: skip.bridge.SwiftObjectPointer): Int
+            private external fun Swift_i_set(Swift_peer: skip.bridge.SwiftObjectPointer, value: Int)
+            fun f(): Int = Swift_f_0(Swift_peer)
+            private external fun Swift_f_0(Swift_peer: skip.bridge.SwiftObjectPointer): Int
+            constructor(i: Int = 1) {
+                Swift_peer = Swift_constructor_1(i)
+            }
+            private external fun Swift_constructor_1(i: Int): skip.bridge.SwiftObjectPointer
+
+            override var supdate: ((Any) -> Unit)? = null
+            override var smutatingcount = 0
+            override fun scopy(): MutableStruct = S(i)
+            override fun equals(other: Any?): Boolean {
+                if (other === this) return true
+                if (other !is S) return false
+                return Swift_isequal(this, other)
+            }
+            private external fun Swift_isequal(lhs: S, rhs: S): Boolean
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        """, swiftBridgeSupport: """
+        extension S: BridgedToKotlin {
+            nonisolated private static let Java_class = try! JClass(name: "S")
+            nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                let box: SwiftValueTypeBox<Self> = ptr.pointee()!
+                return box.value
+            }
+            nonisolated public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let box = SwiftValueTypeBox(self)
+                let Swift_peer = SwiftObjectPointer.pointer(to: box, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            nonisolated private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+        }
+        @_cdecl("Java_S_Swift_1release")
+        public func S_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: SwiftValueTypeBox<S>.self)
+        }
+        @_cdecl("Java_S_Swift_1i")
+        public func S_Swift_i(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> Int32 {
+            let peer_swift: SwiftValueTypeBox<S> = Swift_peer.pointee()!
+            return Int32(peer_swift.value.i)
+        }
+        @_cdecl("Java_S_Swift_1i_1set")
+        public func S_Swift_i_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: Int32) {
+            let peer_swift: SwiftValueTypeBox<S> = Swift_peer.pointee()!
+            peer_swift.value.i = Int(value)
+        }
+        @_cdecl("Java_S_Swift_1f_10")
+        public func S_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> Int32 {
+            let peer_swift: SwiftValueTypeBox<S> = Swift_peer.pointee()!
+            let f_return_swift = peer_swift.value.f()
+            return Int32(f_return_swift)
+        }
+        @_cdecl("Java_S_Swift_1constructor_11")
+        public func S_Swift_constructor_1(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: Int32) -> SwiftObjectPointer {
+            let p_0_swift = Int(p_0)
+            let f_return_swift = SwiftValueTypeBox(S(i: p_0_swift))
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_S_Swift_1isequal")
+        public func S_Swift_isequal(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ lhs: JavaObjectPointer, _ rhs: JavaObjectPointer) -> Bool {
+            let lhs_swift = S.fromJavaObject(lhs, options: [])
+            let rhs_swift = S.fromJavaObject(rhs, options: [])
+            return lhs_swift == rhs_swift
+        }
+        @_cdecl("Java_S_Swift_1projectionImpl")
+        public func S_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = S.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
     func testStructCommonProtocols() async throws {
         try await check(swiftBridge: """
         public struct S: Equatable, Hashable, Comparable {
