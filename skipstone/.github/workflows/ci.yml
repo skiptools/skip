@@ -241,22 +241,30 @@ jobs:
           export ANDROID_USER_HOME=$HOME/.android
           export ANDROID_EMULATOR_HOME=$ANDROID_USER_HOME
           export ANDROID_AVD_HOME=$ANDROID_EMULATOR_HOME/avd
-          skip android emulator create --verbose
+          # AOSP image: the google_apis image's Play services overload the guest on the
+          # Intel macOS runners (ANRs, low memory, system_server watchdog restarts), which
+          # surfaces as "Can't find service: package" and similar install failures
+          skip android emulator create --verbose --system-image default
           skip android emulator list --verbose
           # watch the logs for errors
           (sleep 20; ${ANDROID_HOME}/platform-tools/adb logcat) &
 
-          skip android emulator launch --background --android-connect-timeout=300 --verbose
+          skip android emulator launch --background --android-connect-timeout=300 --verbose -- -memory 4096 -no-snapshot -no-audio
 
-          echo "Waiting for device"
+          echo "Waiting for device boot"
           ${ANDROID_HOME}/platform-tools/adb wait-for-device
-          sleep 30
+          # Intel macOS runners can take over 10 minutes to boot
+          for i in $(seq 180); do
+            [[ "$(${ANDROID_HOME}/platform-tools/adb shell getprop sys.boot_completed | tr -d '\r')" == "1" ]] && break
+            sleep 5
+          done
           date
-          echo "echoing PING"
-          ${ANDROID_HOME}/platform-tools/adb shell echo PING
-          echo "running shell getprop sys.boot_completed"
           ${ANDROID_HOME}/platform-tools/adb shell getprop sys.boot_completed
-          date
+
+          # skip package verification and animations, which only add guest load
+          for s in verifier_verify_adb_installs package_verifier_enable window_animation_scale transition_animation_scale animator_duration_scale; do
+            ${ANDROID_HOME}/platform-tools/adb shell settings put global $s 0
+          done
 
       - name: "Test new Swift package on emulator"
         working-directory: ${{ runner.temp }}
