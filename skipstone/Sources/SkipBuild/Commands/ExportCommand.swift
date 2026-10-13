@@ -27,6 +27,9 @@ skip export --debug
 # export just the "ModuleName" module
 skip export --module ModuleName
 
+# compile the project for the host before exporting, rather than only transpiling it
+skip export --host-build full
+
 # export the debug archives faster, with only line tables as the debug info of the native libraries
 skip export --debug --debug-info line-tables
 """,
@@ -58,6 +61,9 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Build the Swift project before exporting"))
     var build: Bool = true
+
+    @Option(help: ArgumentHelp("How to build the Swift project before exporting: transpile only runs the Skip transpiler; full also compiles the project for the host (falls back to full when the skip package has no skip-transpile plugin)", valueName: "mode"))
+    var hostBuild: HostBuildMode = .transpile
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary", valueName: "show"))
     var showTree: Bool = false
@@ -120,7 +126,42 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
         let packageJSON = try await parseSwiftPackage(with: out, at: project)
         let packageName: String = self.package ?? packageJSON.name
 
-        if build == true {
+        let fs = localFileSystem
+
+        // if modules is not specified, use all the modules for targets listed in the Package.swift that have a plugin set (although we should probably make sure the plugin is skipstone, this is difficult because the dependency graph is sometimes a string array and sometimes a JSON object)
+        let moduleNames = !self.module.isEmpty ? self.module : packageJSON.targets.compactMap(\.a).filter({ $0.type == "regular" }).filter({ $0.pluginUsages != nil }).map(\.name)
+
+        // when specified, the output folder; otherwise, relative the the specified project folder's .build folder
+        let buildFolder = self.project + "/.build"
+        let buildFolderAbsolute = try AbsolutePath(validating: buildFolder, relativeTo: fs.currentWorkingDirectory!)
+
+        /// Run the skipstone transpiler without compiling the Swift for the host, returning false when the project's skip package predates the skip-transpile command plugin
+        func transpileProject() async throws -> Bool {
+            let message = "Transpile project \(packageName)"
+            let timingHandler: MessageResultHandler<ProcessOutput> = Self.timingResultHandler(message: message, permitFailure: false)
+            func isMissingPlugin(_ error: Error) -> Bool {
+                error.localizedDescription.contains("Unknown subcommand or plugin name")
+            }
+            do {
+                _ = try await run(with: out, message, ["swift", "package", "--package-path", project, "--disable-sandbox", "--allow-writing-to-package-directory", "skip-transpile", "--outputs", buildFolderAbsolute.appending(components: ["plugins", "outputs"]).pathString] + moduleNames.flatMap({ ["--target", $0] }), additionalEnvironment: HostSwiftBuild.environment, resultHandler: { result in
+                    if case .failure(let error) = result, isMissingPlugin(error) {
+                        // a warning rather than a failure, since the export carries on with the host build
+                        return (result, MessageBlock(status: .warn, "The skip package has no skip-transpile plugin; building the project instead (update the skip package to export without building)"))
+                    }
+                    return timingHandler(result)
+                }).get()
+                return true
+            } catch where isMissingPlugin(error) {
+                return false
+            }
+        }
+
+        // Only the skipstone plugin's output is exported (the Kotlin comes from the transpiled sources and the native libraries from the Android build that Gradle runs), so by default the host build is just the fallback for older skip packages; `--host-build full` restores it
+        var needsHostBuild = build == true && hostBuild == .full
+        if build == true && hostBuild == .transpile {
+            needsHostBuild = try await transpileProject() == false
+        }
+        if needsHostBuild {
 
             // This builds for macOS
             // await run(with: out, "Build project \(packageName)", ["swift", "build", "-v", "--package-path", project, "-Xswiftc", "-target", "-Xswiftc", "arm64-apple-ios"])
@@ -145,24 +186,15 @@ Build and export the Skip modules defined in the Package.swift, with libraries e
                 // however, it permits us to build and export against macOS-13/Xcode 15.2 (which is the OS version needed for GitHub CI to be able to run tests against the Android Emulator using the reactivecircus/android-emulator-runner action),
                 try await run(with: out, "Build project \(packageName)", ["swift", "build", "-v", "--package-path", project], additionalEnvironment: HostSwiftBuild.environment)
             }
-        } else {
+        } else if build == false {
             try await run(with: out, "Resolve dependencies", ["swift", "package", "resolve", "-v", "--package-path", project])
         }
-
-        let fs = localFileSystem
 
         let androidFolder = self.project + "/Android"
         let androidFolderAbsolute = try AbsolutePath(validating: androidFolder, relativeTo: fs.currentWorkingDirectory!)
 
         // when we are in an app project (identified by the presence of a Android/settings.gradle.kts file), then we will build the apk
         let isAppProject = fs.isFile(androidFolderAbsolute.appending(component: "settings.gradle.kts")) && self.module.isEmpty
-
-        // if modules is not specified, use all the modules for targets listed in the Package.swift that have a plugin set (although we should probably make sure the plugin is skipstone, this is difficult because the dependency graph is sometimes a string array and sometimes a JSON object)
-        let moduleNames = !self.module.isEmpty ? self.module : packageJSON.targets.compactMap(\.a).filter({ $0.type == "regular" }).filter({ $0.pluginUsages != nil }).map(\.name)
-
-        // when specified, the output folder; otherwise, relative the the specified project folder's .build folder
-        let buildFolder = self.project + "/.build"
-        let buildFolderAbsolute = try AbsolutePath(validating: buildFolder, relativeTo: fs.currentWorkingDirectory!)
 
         let outputFolder = self.dir ?? "\(buildFolder)/skip-export"
         let outputFolderAbsolute = try AbsolutePath(validating: outputFolder, relativeTo: fs.currentWorkingDirectory!)
@@ -741,4 +773,12 @@ extension FileManager {
             }
         }
     }
+}
+
+/// How `skip export` builds the Swift project before exporting
+enum HostBuildMode: String, ExpressibleByArgument, CaseIterable {
+    /// Run only the Skip transpiler through the skip-transpile command plugin
+    case transpile
+    /// Compile the whole project for the host, which also runs the transpiler
+    case full
 }
