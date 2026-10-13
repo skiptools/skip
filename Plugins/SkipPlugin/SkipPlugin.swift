@@ -66,10 +66,21 @@ import PackagePlugin
         return cmds
     }
 
+    // Xcode specializes a package target for each SDK in the build graph, but gives
+    // all specializations the same pluginWorkDirectory. Build-setting expressions
+    // are expanded later by Xcode, including in command arguments and input/output
+    // paths. Isolate the entire generated tree, not only the sourcehash marker.
+    let xcodeOutputFolder = "xcode-$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)"
+
+    func outputDirectory(_ pluginWorkDirectory: Path) -> Path {
+        let isXcodeBuild = pluginWorkDirectory.removingLastComponent().removingLastComponent().extension == "output"
+        return isXcodeBuild ? pluginWorkDirectory.appending(xcodeOutputFolder) : pluginWorkDirectory
+    }
+
     func createPreflightBuildCommands(context: PluginContext, target: SourceModuleTarget) async throws -> [Command] {
         let runner = try context.tool(named: skipPluginCommandName).path
         let inputPaths = target.sourceFiles(withSuffix: ".swift").map { $0.path }
-        let outputDir = context.pluginWorkDirectory.appending(subpath: skippyOutputFolder)
+        let outputDir = outputDirectory(context.pluginWorkDirectory).appending(subpath: skippyOutputFolder)
         return inputPaths.map { Command.buildCommand(displayName: "Skippy \(target.name): \($0.lastComponent)", executable: runner, arguments: ["skippy", "--output-suffix", skippyOuptputExtension, "-O", outputDir.string, $0.string], inputFiles: [$0], outputFiles: [$0.outputPath(in: outputDir, suffix: skippyOuptputExtension)]) }
     }
 
@@ -79,15 +90,15 @@ import PackagePlugin
         // we need to know the names of peer target folders in order to set up dependency links, so we need to determine the output folder structure
 
         // output named vary dependeding on whether we are running from Xcode/xcodebuild and SwiftPM, and also changed in Swift 6:
-        // xcode:     DERIVED/SourcePackages/plugins/skip-unit.output/SkipUnit/skipstone/SkipUnit.skipcode.json
+        // Xcode:     DERIVED/.../skip-unit.output/SkipUnit/skipstone/xcode-Debug-iphoneos/SkipUnit.skipcode.json
         // SwiftPM 5: PROJECT_HOME/.build/plugins/outputs/skip-unit/SkipUnit/skipstone/SkipUnit.skipcode.json
         // SwiftPM 6: PROJECT_HOME/.build/plugins/outputs/skip-unit/SkipUnit/destination/skipstone/SkipUnit.skipcode.json
-        let outputFolder = context.pluginWorkDirectory
+        let outputFolder = outputDirectory(context.pluginWorkDirectory)
 
-        let outputExt = outputFolder.removingLastComponent().removingLastComponent().extension
+        let outputExt = context.pluginWorkDirectory.removingLastComponent().removingLastComponent().extension
         let pkgext = outputExt.flatMap({ "." + $0 }) ?? ""
         // when run from Xcode, the plugin folder ends with ".output"; when run from CLI `swift build`, there is no output extension
-        let isXcodeBuild = !pkgext.isEmpty
+        let isXcodeBuild = outputExt == "output"
 
         let skip = try context.tool(named: skipPluginCommandName)
         // enable overriding the path to the Skip tool for local development
@@ -183,8 +194,14 @@ import PackagePlugin
             // See: https://forums.swift.org/t/swiftpm-included-with-xcode-16b3-changes-plugin-output-folder-to-destination/73220
             // So check to see if the output folder's parent directory is "destination", and if so, change our assumptions about where the plugins will be output
             let hasDestinationFolder = !isXcodeBuild && outputFolder.removingLastComponent().lastComponent == "destination"
-            let destFolder = !hasDestinationFolder ? pluginFolderName : ("destination/" + pluginFolderName)
-            let parentLink = !hasDestinationFolder ? "" : "../" // the extra folder means we need to link one more level up
+            let destFolder: String
+            if isXcodeBuild {
+                destFolder = pluginFolderName + "/" + xcodeOutputFolder
+            } else {
+                destFolder = hasDestinationFolder ? "destination/" + pluginFolderName : pluginFolderName
+            }
+
+            let parentLink = (isXcodeBuild || hasDestinationFolder) ? "../" : "" // the extra folder means we need to link one more level up
 
             if let packageID = packageID { // go further up to the external package name
                 targetLink = parentLink + "../../../" + packageID + pkgext + "/" + target.name + "/" + destFolder + "/" + targetName
@@ -366,6 +383,16 @@ import PackagePlugin
         }
 
         appendArguments(buildModuleArgs)
+
+        if isXcodeBuild {
+            // Xcode expands the destination platform when executing the command.
+            // Pass every declared output so watchOS can satisfy the build graph
+            // without generating Android code, including in bridge mode.
+            appendArguments(["--build-platform", "$(PLATFORM_NAME)"])
+            for outputFile in outputFiles {
+                appendArguments(["--plugin-output", outputFile.string])
+            }
+        }
 
         //Diagnostics.remark("invoke skip \(buildArguments.joined(separator: " "))")
         return [

@@ -15,6 +15,24 @@ public protocol GradleHarness {
 
 let pluginFolderName = "skipstone"
 
+/// Resolve the exact Xcode build variant. Never fall back to stale legacy output
+/// when this plugin has already started producing variant-specific directories.
+func selectPluginOutputFolder(in root: URL, buildVariant: String) throws -> URL? {
+    let fm = FileManager.default
+    let selected = root.appendingPathComponent("xcode-" + buildVariant, isDirectory: true)
+    if (try? selected.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+        return selected
+    }
+    guard (try? root.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
+        return nil
+    }
+    let children = try fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey])
+    if children.contains(where: { $0.lastPathComponent.hasPrefix("xcode-") && (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }) {
+        return nil
+    }
+    return root
+}
+
 @available(macOS 13, macCatalyst 16, iOS 16, tvOS 16, watchOS 8, *)
 extension GradleHarness {
     /// Returns the URL to the folder that holds the top-level `settings.gradle.kts` file for the destination module.
@@ -46,7 +64,7 @@ extension GradleHarness {
             if !isDir(pluginsFolder) {
                 pluginsFolder = buildBaseFolder.appendingPathComponent("SourcePackages/plugins", isDirectory: true) // Xcode 16.2-
             }
-            return try findModuleFolder(in: pluginsFolder, extension: "output")
+            return try findModuleFolder(in: pluginsFolder, extension: "output", buildVariant: URL(fileURLWithPath: xcodeBuildFolder).lastPathComponent)
         } else {
             // when run from the CLI with a custom --build-path, there seems to be no way to know where the gradle folder was output, so we need to also specify it as an environment variable:
             // SWIFTBUILD=/tmp/swiftbuild swift test --build-path /tmp/swiftbuild
@@ -56,7 +74,7 @@ extension GradleHarness {
         }
 
         /// The only known way to figure out the package name asociated with the test's module is to brute-force search through the plugin output folders.
-        func findModuleFolder(in pluginOutputFolder: URL, extension pathExtension: String) throws -> URL {
+        func findModuleFolder(in pluginOutputFolder: URL, extension pathExtension: String, buildVariant: String? = nil) throws -> URL {
             for outputFolder in try FileManager.default.contentsOfDirectory(at: pluginOutputFolder, includingPropertiesForKeys: [.isDirectoryKey]) {
                 if !pathExtension.isEmpty && !outputFolder.lastPathComponent.hasSuffix("." + pathExtension) {
                     continue // only check known path extensions (e.g., ".output" with running from Xcode, and no extension from SPM)
@@ -70,6 +88,16 @@ extension GradleHarness {
                 if !isDir(pluginModuleOutputFolder) {
                     moduleTranspilerFolder = moduleName + "/skipstone"
                     pluginModuleOutputFolder = URL(fileURLWithPath: moduleTranspilerFolder, isDirectory: true, relativeTo: outputFolder)
+                }
+
+                if let buildVariant = buildVariant {
+                    guard let selectedFolder = try selectPluginOutputFolder(in: pluginModuleOutputFolder, buildVariant: buildVariant) else {
+                        continue
+                    }
+                    if selectedFolder != pluginModuleOutputFolder {
+                        moduleTranspilerFolder += "/" + selectedFolder.lastPathComponent
+                        pluginModuleOutputFolder = selectedFolder
+                    }
                 }
 
                 //print("findModuleFolder: pluginModuleOutputFolder:", pluginModuleOutputFolder)
@@ -311,13 +339,7 @@ extension GradleHarness {
 
         if isXcode || xcodeBuildFolder != nil {
             // Diagnostics.warning("ENVIRONMENT: \(env)")
-            let packageFolderExtension = isXcode ? ".output" : ""
-
-            guard let buildFolder = xcodeBuildFolder else {
-                throw AppLaunchError(errorDescription: "The BUILT_PRODUCTS_DIR environment variable must be set to the output of the build process")
-            }
-
-            return URL(fileURLWithPath: "../../../SourcePackages/plugins/\(packageName)\(packageFolderExtension)/\(moduleName)/\(pluginFolderName)/", isDirectory: true, relativeTo: URL(fileURLWithPath: buildFolder, isDirectory: true))
+            return try pluginOutputFolder(moduleName: moduleName, linkingInto: nil)
         } else {
             // SPM-derived project: .build/plugins/outputs/hello-skip/HelloSkip/skipstone
             // TODO: make it relative to project path
