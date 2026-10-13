@@ -293,6 +293,7 @@ extension ToolOptionsCommand where Self: StreamingCommand {
     func waitForDeviceBoot(adb: String, additionalEnvironment: [String: String], timeout: Int, with out: MessageQueue) async throws {
         guard timeout > 0 else { return }
         let deadline = Date().addingTimeInterval(TimeInterval(timeout))
+        var lastError = ""
         while Date() < deadline {
             do {
                 let result = try await run(with: out, "Waiting for device boot", [adb, "shell", "getprop", "sys.boot_completed"], additionalEnvironment: additionalEnvironment, watch: false, permitFailure: true)
@@ -301,8 +302,9 @@ extension ToolOptionsCommand where Self: StreamingCommand {
                     let stdout = output.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
                     let stderr = output.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
                     await out.write(status: .warn, "success running adb shell: STDOUT=\(stdout) STDERR=\(stderr)")
-                    if output.exitCode == 0 && (stdout == "1" || stdout == "") {
-                        // for some reason on the GitHub CI, this is blank when the emulator has booted successfully
+                    lastError = stderr // adb errors (offline, unauthorized) also leave stdout blank
+                    // blank means the property is not set yet: the device is still booting
+                    if output.exitCode == 0 && stdout == "1" {
                         return
                     }
                 case .failure(let error):
@@ -313,7 +315,7 @@ extension ToolOptionsCommand where Self: StreamingCommand {
             }
             try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
         }
-        throw DevicesCommand.DevicesCommandError(errorDescription: "Timed out after \(timeout)s waiting for Android device to finish booting. Use --android-connect-timeout to increase the wait time, or check that the emulator is running.")
+        throw DevicesCommand.DevicesCommandError(errorDescription: "Timed out after \(timeout)s waiting for Android device to finish booting. Use --android-connect-timeout to increase the wait time, or check that the emulator is running.\(lastError.isEmpty ? "" : " Last adb error: \(lastError)")")
     }
 }
 
