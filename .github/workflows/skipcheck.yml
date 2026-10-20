@@ -19,7 +19,7 @@ jobs:
           #- os: 'macos-14'
             #android-sdk: '6.1'
             #xcode: '16.4'
-          - os: 'macos-15-intel'
+          - os: 'macos-26'
             android-sdk: '6.2'
           - os: 'macos-26'
             android-sdk: 'nightly-6.3'
