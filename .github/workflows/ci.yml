@@ -50,10 +50,19 @@ jobs:
           # need to fetch tags so we know the most recent version
           fetch-tags: true
 
-      - name: Select Xcode
+      - name: Setup Xcode
         if: ${{ startsWith(matrix.os, 'macos-') }}
-        # set only on macOS: on Linux the empty Xcode path makes Swift Build fail to load toolchains
-        run: echo "DEVELOPER_DIR=/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer" >> $GITHUB_ENV
+        run: |
+          # set only on macOS: on Linux the empty Xcode path makes Swift Build fail to load toolchains
+          export DEVELOPER_DIR=/Applications/Xcode_${{ matrix.xcode }}.app/Contents/Developer
+          echo "DEVELOPER_DIR=${DEVELOPER_DIR}" >> $GITHUB_ENV
+
+          # workaround for failure to find iOS 26 simulator
+          # https://github.com/actions/runner-images/issues/12862#issuecomment-3239326872
+          xcrun simctl list || true
+
+          # alternatively https://github.com/actions/runner-images/issues/12904#issuecomment-3245474273
+          xcodebuild -downloadPlatform iOS || true
 
       - name: Setup SKIPLOCAL
         run: |
