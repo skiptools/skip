@@ -17,6 +17,49 @@ final class CodebaseInfoTests: XCTestCase {
         return codebaseInfo.context(importedModuleNames: [], sourceFile: source.file)
     }
 
+    func testInferredAssociatedTypeAcrossModules() async throws {
+        func module(_ name: String, dependencies: [CodebaseInfo.ModuleExport], swift: String) throws -> CodebaseInfo {
+            let srcFile = try tmpFile(named: "Source_\(name).swift", contents: swift)
+            let codebaseInfo = CodebaseInfo(moduleName: name)
+            codebaseInfo.dependentModules = dependencies
+            codebaseInfo.gather(from: SyntaxTree(source: Source(file: Source.FilePath(path: srcFile.path), content: swift)))
+            codebaseInfo.prepareForUse()
+            return codebaseInfo
+        }
+        // Round trip through JSON as the real module export does
+        func export(_ codebaseInfo: CodebaseInfo) throws -> CodebaseInfo.ModuleExport {
+            return try JSONDecoder().decode(CodebaseInfo.ModuleExport.self, from: JSONEncoder().encode(CodebaseInfo.ModuleExport(of: codebaseInfo)))
+        }
+
+        let protocols = try export(module("Protocols", dependencies: [], swift: """
+        public protocol Identifiable {
+            associatedtype ID
+            var id: ID { get }
+        }
+        public protocol Entity: Identifiable {
+        }
+        """))
+        let entities = try module("Entities", dependencies: [protocols], swift: """
+        import Protocols
+        public struct Event: Entity {
+            public var id: String { "" }
+        }
+        """)
+        let eventID: TypeSignature = .member(.named("Event", []), .named("ID", []))
+        XCTAssertEqual(.string, entities.context(importedModuleNames: ["Protocols"], sourceFile: nil).resolveTypealias(for: eventID).asTypealiased(nil))
+        let client = try module("Client", dependencies: [protocols, try export(entities)], swift: "")
+        XCTAssertEqual(.string, client.context(importedModuleNames: ["Protocols", "Entities"], sourceFile: nil).resolveTypealias(for: eventID).asTypealiased(nil))
+
+        // The refining protocol may be unknown, e.g. declared in a module that only exports its bridged API
+        let opaque = try export(module("Opaque", dependencies: [], swift: """
+        public struct Event: UnexportedEntity {
+            public var id: Int { 0 }
+        }
+        """))
+        let opaqueClient = try module("OpaqueClient", dependencies: [opaque], swift: "")
+        XCTAssertEqual(.int, opaqueClient.context(importedModuleNames: ["Opaque"], sourceFile: nil).resolveTypealias(for: eventID).asTypealiased(nil))
+    }
+
     func testIdentifierType() async throws {
         let context = try await setUpContext(swift: """
         var stringVar = "string"
