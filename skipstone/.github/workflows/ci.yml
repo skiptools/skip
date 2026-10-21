@@ -318,8 +318,11 @@ jobs:
         run: |
           skip init --no-build --native-model --bridged --module-tests demo-fuse-framework DemoFramework
           cd demo-fuse-framework
-          # Robolectric test
-          swift test
+          # Robolectric test. Not on Linux, where skip-android-bridge's AndroidBundle can't subclass
+          # swift-corelibs-foundation's Bundle; the macOS leg runs it, and Linux runs the emulator half
+          if [[ "${RUNNER_OS}" != "Linux" ]]; then
+            swift test
+          fi
           # Emulator test
           if [[ "${RUNNER_ARCH}" != "ARM64" ]]; then
             ANDROID_SERIAL=emulator-5554 swift test
@@ -332,7 +335,9 @@ jobs:
 
           swift build --build-tests
           # Robolectric should still pass
-          swift test
+          if [[ "${RUNNER_OS}" != "Linux" ]]; then
+            swift test
+          fi
           # Emulator test should fail
           if [[ "${RUNNER_ARCH}" != "ARM64" ]]; then
             ! ANDROID_SERIAL=emulator-5554 swift test
