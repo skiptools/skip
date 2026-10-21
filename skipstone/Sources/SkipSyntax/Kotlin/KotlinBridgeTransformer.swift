@@ -448,11 +448,8 @@ extension TypeSignature {
     /// Return code that converts the given value of this type to its `@_cdecl` function form.
     func convertToCDecl(value: String, strategy: Bridgable.Strategy, options: KotlinBridgeOptions) -> String {
         switch self.asOptional(false) {
-        case .function(let parameters, _, let apiFlags, _):
-            let closurePrefix = apiFlags.options.contains(.async) ? "SwiftAsyncClosure" : "SwiftClosure"
-            let valueLabel = apiFlags.options.contains(.mainActor) && !apiFlags.options.contains(.async) ? "forMainActor" : "for"
-            let converted = "\(closurePrefix)\(parameters.count).javaObject(\(valueLabel): \(value), options: \(options.jconvertibleOptions))"
-            return isOptional ? converted : converted + "!"
+        case .function:
+            return convertClosureToJava(value: value, optionsString: options.jconvertibleOptions)
         case .int:
             if isOptional {
                 return value + ".toJavaObject(options: \(options.jconvertibleOptions))"
@@ -492,6 +489,66 @@ extension TypeSignature {
         }
     }
 
+    /// Return code that converts the given Java `kotlin.jvm.functions.FunctionN` value to this closure type.
+    private func convertClosureFromCDecl(value: String, optionsString: String) -> String {
+        guard case .function(let parameters, let signature, let apiFlags, var attributes) = self.asOptional(false) else {
+            return value
+        }
+        let closurePrefix = apiFlags.options.contains(.async) ? "SwiftAsyncClosure" : "SwiftClosure"
+        let isAsync = apiFlags.options.contains(.async)
+        let converted: String
+        if !isAsync && parameters.count >= 1 && parameters.count <= 5 && parameters.contains(where: \.type.isFunction) {
+            // Nested function-typed parameter: emit explicit per-parameter bridging so each
+            // parameter is converted to Java using its statically known type. This avoids the
+            // generic `AnyBridging.toJavaObject(Any?)` path, which cannot bridge Swift closures.
+            let paramNames = (0..<parameters.count).map { "p\($0)" }
+            let bridgedArgs = zip(parameters, paramNames).map { (parameter, name) in
+                return parameter.type.isFunction ? parameter.type.convertClosureToJava(value: name, optionsString: optionsString) : "AnyBridging.toJavaObject(\(name), options: \(optionsString))"
+            }
+            let closureBody = "{ _javaClosure, \(paramNames.joined(separator: ", ")) in try _javaClosure.invokeJava(\(bridgedArgs.joined(separator: ", "))) }"
+            converted = "\(closurePrefix)\(parameters.count).closure(forJavaObject: \(value), options: \(optionsString), invokeJava: \(closureBody))"
+        } else {
+            converted = "\(closurePrefix)\(parameters.count).closure(forJavaObject: \(value), options: \(optionsString))"
+        }
+        if let filtered = attributes?.attributes.filter({ $0.kind != .escaping }) {
+            attributes = Attributes(attributes: filtered)
+        }
+        let functionType = TypeSignature.function(parameters, signature, apiFlags, attributes)
+        return isOptional ? "\(converted) as (\(functionType))?" : "\(converted)! as \(functionType)"
+    }
+
+    /// Return code that converts the given Swift closure value of this type to a Java `kotlin.jvm.functions.FunctionN`.
+    ///
+    /// When the closure takes function-typed parameters, it is wrapped in a closure that receives those parameters as
+    /// raw Java objects and converts them using their statically known types, because the generic `AnyBridging`
+    /// conversion applied to closure arguments cannot produce Swift closures from Java functions.
+    func convertClosureToJava(value: String, optionsString: String) -> String {
+        guard case .function(let parameters, _, let apiFlags, _) = self.asOptional(false) else {
+            return value
+        }
+        let isAsync = apiFlags.options.contains(.async)
+        let isMainActor = apiFlags.options.contains(.mainActor) && !isAsync
+        let closurePrefix = isAsync ? "SwiftAsyncClosure" : "SwiftClosure"
+        let valueLabel = isMainActor ? "forMainActor" : "for"
+        var closure = value
+        if !isAsync && parameters.count >= 1 && parameters.count <= 5 && parameters.contains(where: \.type.isFunction) {
+            let paramNames = (0..<parameters.count).map { "p\($0)" }
+            let wrapperParameters = zip(parameters, paramNames).map { (parameter, name) in
+                return parameter.type.isFunction ? "\(name): JavaObjectPointer?" : "\(name): \(parameter.type)"
+            }
+            let wrapperArguments = zip(parameters, paramNames).map { (parameter, name) in
+                return parameter.type.isFunction ? parameter.type.convertClosureFromCDecl(value: name, optionsString: optionsString) : name
+            }
+            // Capture the current closure value rather than re-evaluating the value expression on each call
+            let captureList = isOptional ? "" : "[_closure = \(value)] "
+            let tryPrefix = apiFlags.options.contains(.throws) ? "try " : ""
+            let wrapper = "{ \(isMainActor ? "@MainActor " : "")\(captureList)(\(wrapperParameters.joined(separator: ", "))) in \(tryPrefix)_closure(\(wrapperArguments.joined(separator: ", "))) }"
+            closure = isOptional ? "\(value).map { _closure in \(wrapper) }" : wrapper
+        }
+        let converted = "\(closurePrefix)\(parameters.count).javaObject(\(valueLabel): \(closure), options: \(optionsString))"
+        return isOptional ? converted : converted + "!"
+    }
+
     /// Return code that converts the given value of our `@_cdecl` function type back to this type.
     func convertFromCDecl(value: String, strategy: Bridgable.Strategy, options: KotlinBridgeOptions) -> String {
         switch strategy {
@@ -514,40 +571,8 @@ extension TypeSignature {
         }
 
         switch self.asOptional(false) {
-        case .function(let parameters, let signature, let apiFlags, var attributes):
-            let closurePrefix = apiFlags.options.contains(.async) ? "SwiftAsyncClosure" : "SwiftClosure"
-            let isAsync = apiFlags.options.contains(.async)
-            let hasFunctionTypedParameter = parameters.contains { parameter in
-                if case .function = parameter.type.asOptional(false) { return true }
-                return false
-            }
-
-            let converted: String
-            if hasFunctionTypedParameter && !isAsync && parameters.count >= 1 && parameters.count <= 5 {
-                // Nested function-typed parameter: emit explicit per-parameter bridging so each
-                // parameter is converted to Java using its statically known type. This avoids the
-                // generic `AnyBridging.toJavaObject(Any?)` path, which cannot bridge Swift closures.
-                let paramNames = (0..<parameters.count).map { "p\($0)" }
-                let bridgedArgs = zip(parameters, paramNames).map { (parameter, name) -> String in
-                    switch parameter.type.asOptional(false) {
-                    case .function(let innerParameters, _, let innerFlags, _):
-                        let innerClosurePrefix = innerFlags.options.contains(.async) ? "SwiftAsyncClosure" : "SwiftClosure"
-                        let valueLabel = innerFlags.options.contains(.mainActor) && !innerFlags.options.contains(.async) ? "forMainActor" : "for"
-                        return "\(innerClosurePrefix)\(innerParameters.count).javaObject(\(valueLabel): \(name), options: \(options.jconvertibleOptions))"
-                    default:
-                        return "AnyBridging.toJavaObject(\(name), options: \(options.jconvertibleOptions))"
-                    }
-                }
-                let closureBody = "{ _javaClosure, \(paramNames.joined(separator: ", ")) in try _javaClosure.invokeJava(\(bridgedArgs.joined(separator: ", "))) }"
-                converted = "\(closurePrefix)\(parameters.count).closure(forJavaObject: \(value), options: \(options.jconvertibleOptions), invokeJava: \(closureBody))"
-            } else {
-                converted = "\(closurePrefix)\(parameters.count).closure(forJavaObject: \(value), options: \(options.jconvertibleOptions))"
-            }
-            if let filtered = attributes?.attributes.filter({ $0.kind != .escaping }) {
-                attributes = Attributes(attributes: filtered)
-            }
-            let functionType = TypeSignature.function(parameters, signature, apiFlags, attributes)
-            return isOptional ? "\(converted) as (\(functionType))?" : "\(converted)! as \(functionType)"
+        case .function:
+            return convertClosureFromCDecl(value: value, optionsString: options.jconvertibleOptions)
         case .int:
             if isOptional {
                 return "Int?.fromJavaObject(\(value), options: \(options.jconvertibleOptions))"
@@ -619,11 +644,8 @@ extension TypeSignature {
     /// Return code that converts the given value of this type to its Java form.
     func convertToJava(value: String, strategy: Bridgable.Strategy, optionsString: String) -> String {
         switch self.asOptional(false) {
-        case .function(let parameters, _, let apiFlags, _):
-            let closurePrefix = apiFlags.options.contains(.async) ? "SwiftAsyncClosure" : "SwiftClosure"
-            let valueLabel = apiFlags.options.contains(.mainActor) && !apiFlags.options.contains(.async) ? "forMainActor" : "for"
-            let converted = "\(closurePrefix)\(parameters.count).javaObject(\(valueLabel): \(value), options: \(optionsString))"
-            return isOptional ? converted : converted + "!"
+        case .function:
+            return convertClosureToJava(value: value, optionsString: optionsString)
         case .int:
             return isOptional ? value : "Int32(\(value))"
         case .tuple:
@@ -706,8 +728,12 @@ extension TypeSignature {
     private func convertClosureFromJava(value: String, isOptional: Bool, options: KotlinBridgeOptions) -> String {
         let parametersString = (0..<parameters.count).map { "p\($0)" }.joined(separator: ", ")
         let parametersInString = parametersString.isEmpty ? parametersString : parametersString + " in "
+        // Convert closure arguments using their static types, since the generic `AnyBridging` conversion cannot bridge Swift closures
+        let argumentsString = parameters.enumerated().map { (index, parameter) in
+            return parameter.type.isFunction ? parameter.type.convertClosureToJava(value: "p\(index)", optionsString: options.jconvertibleOptions) : "p\(index)"
+        }.joined(separator: ", ")
         let handleNil = isOptional ? "\(value) == nil ? nil : " : ""
-        return "\(handleNil){ let closure_swift = JavaBackedClosure<\(returnType)>(\(value)\(isOptional ? "!" : ""), options: \(options.jconvertibleOptions)); return { \(parametersInString)try! closure_swift.invoke(\(parametersString)) } }()"
+        return "\(handleNil){ let closure_swift = JavaBackedClosure<\(returnType)>(\(value)\(isOptional ? "!" : ""), options: \(options.jconvertibleOptions)); return { \(parametersInString)try! closure_swift.invoke(\(argumentsString)) } }()"
     }
 
     /// Return the JNI signature of this type.
