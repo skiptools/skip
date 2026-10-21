@@ -312,6 +312,10 @@ jobs:
 
       - name: "Test new Skip Fuse framework on emulator"
         working-directory: ${{ runner.temp }}
+        env:
+          # Under swiftbuild a Fuse package graph links SkipLib and SkipUnit statically into more than
+          # one dynamic product, which is an error; dynamic shared products keep it valid (see HostSwiftBuild)
+          SKIP_DYNAMIC_LIBRARIES: '1'
         run: |
           skip init --no-build --native-model --bridged --module-tests demo-fuse-framework DemoFramework
           cd demo-fuse-framework
