@@ -21,8 +21,7 @@ jobs:
         os:
           - 'ubuntu-latest'
           #- 'macos-latest'
-          # Homebrew bottle builds on macos-14, so we need to as well
-          - 'macos-14'
+          - 'macos-26'
     steps:
       - name: Checkout skipstone.git
         uses: actions/checkout@v7
