@@ -4822,6 +4822,152 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testNestedProtocol() async throws {
+        try await check(swiftBridge: """
+        public enum Outer {
+            public protocol P: AnyObject {
+                var title: String { get }
+            }
+        }
+        """, kotlin: """
+        enum class Outer {
+            ;
+            interface P {
+                val title: String
+            }
+
+            companion object {
+            }
+        }
+        """, swiftBridgeSupport: """
+        extension Outer {
+        }
+        public final class Outer_P_BridgeImpl: Outer.P, BridgedFromKotlin {
+            nonisolated private static let Java_class = try! JClass(name: "Outer$P")
+            nonisolated public let Java_peer: JObject
+            nonisolated public required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            public var title: String {
+                get {
+                    return jniContext {
+                        let value_java: String = try! Java_peer.call(method: Self.Java_get_title_methodID, options: [], args: [])
+                        return value_java
+                    }
+                }
+            }
+            nonisolated private static let Java_get_title_methodID = Java_class.getMethodID(name: "getTitle", sig: "()Ljava/lang/String;")!
+            nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            nonisolated public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+        }
+        """, transformers: transformers)
+    }
+
+    func testNestedProtocolInDependentModule() async throws {
+        let moduleA = try bridgedModuleExport(moduleName: "ModuleA", packageName: "module.a", swift: """
+        public enum Outer {
+            public protocol P: AnyObject {
+                var title: String { get }
+            }
+        }
+        """)
+        XCTAssertEqual(moduleA.rootTypes.first?.types.first?.declarationType, .protocolDeclaration)
+
+        try await check(dependentModules: [moduleA], swiftBridge: """
+        import ModuleA
+
+        public final class C {
+            public var p: (any Outer.P)?
+        }
+        """, kotlin: """
+        import module.a.*
+        class C: skip.bridge.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.SwiftObjectPointer = skip.bridge.SwiftObjectNil
+
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
+
+            constructor() {
+                Swift_peer = Swift_constructor()
+            }
+            private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer
+
+            override fun Swift_peer(): skip.bridge.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_peer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            var p: module.a.Outer.P?
+                get() = Swift_p(Swift_peer)
+                set(newValue) {
+                    Swift_p_set(Swift_peer, newValue)
+                }
+            private external fun Swift_p(Swift_peer: skip.bridge.SwiftObjectPointer): module.a.Outer.P?
+            private external fun Swift_p_set(Swift_peer: skip.bridge.SwiftObjectPointer, value: module.a.Outer.P?)
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        """, swiftBridgeSupport: """
+        import ModuleA
+        extension C: BridgedToKotlin, BridgedFinalClass {
+            nonisolated private static let Java_class = try! JClass(name: "C")
+            nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                return ptr.pointee()!
+            }
+            nonisolated public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            nonisolated private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+        }
+        @_cdecl("Java_C_Swift_1constructor")
+        public func C_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
+            let f_return_swift = C()
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_C_Swift_1release")
+        public func C_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: C.self)
+        }
+        @_cdecl("Java_C_Swift_1p")
+        public func C_Swift_p(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer? {
+            let peer_swift: C = Swift_peer.pointee()!
+            return AnyBridging.toJavaObject(peer_swift.p, options: [])
+        }
+        @_cdecl("Java_C_Swift_1p_1set")
+        public func C_Swift_p_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ value: JavaObjectPointer?) {
+            let peer_swift: C = Swift_peer.pointee()!
+            peer_swift.p = AnyBridging.fromJavaObject(value, options: []) { Outer_P_BridgeImpl?.fromJavaObject(value, options: []) as Any } as! (any Outer.P)?
+        }
+        @_cdecl("Java_C_Swift_1projectionImpl")
+        public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
     func testProtocolAsyncConformance() async throws {
         let transformers = builtinKotlinTransformers() + [KotlinBridgeTransformer(options: .kotlincompat)]
         try await check(supportingSwift: """
@@ -9956,5 +10102,17 @@ final class BridgeToKotlinTests: XCTestCase {
             return SwiftClosure0.javaObject(for: factory, options: [])!
         }
         """, transformers: transformers)
+    }
+
+    private func bridgedModuleExport(moduleName: String, packageName: String, swift: String) throws -> CodebaseInfo.ModuleExport {
+        let srcFile = try tmpFile(named: "Source_\(moduleName).swift", contents: swift)
+        let syntaxTree = SyntaxTree(source: Source(file: Source.FilePath(path: srcFile.path), content: swift), isBridgeFile: true, autoBridge: .public)
+        let codebaseInfo = CodebaseInfo(moduleName: moduleName)
+        codebaseInfo.kotlin = KotlinCodebaseInfo(packageName: packageName)
+        KotlinBridgeTransformer().gather(from: syntaxTree)
+        codebaseInfo.gather(from: syntaxTree)
+        codebaseInfo.prepareForUse()
+        // Round trip through the skipcode.json encoding that dependent modules read
+        return try JSONDecoder().decode(CodebaseInfo.ModuleExport.self, from: JSONEncoder().encode(CodebaseInfo.ModuleExport(of: codebaseInfo)))
     }
 }
