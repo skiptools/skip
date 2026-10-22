@@ -960,6 +960,52 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testNestedClosureVar() async throws {
+        try await check(swiftBridge: """
+        public var c: @MainActor (Int, @escaping @MainActor () -> Void) -> Void = { _, _ in }
+        """, kotlin: """
+        var c: (Int, () -> Unit) -> Unit
+            get() = Swift_c()
+            set(newValue) {
+                Swift_c_set(newValue)
+            }
+        private external fun Swift_c(): (Int, () -> Unit) -> Unit
+        private external fun Swift_c_set(value: (Int, () -> Unit) -> Unit)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1c")
+        public func BridgeKt_Swift_c(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer {
+            return SwiftClosure2.javaObject(forMainActor: { @MainActor [_closure = c] (p0: Int, p1: JavaObjectPointer?) in _closure(p0, SwiftClosure0.closure(forJavaObject: p1, options: [])! as @MainActor () -> Void) }, options: [])!
+        }
+        @_cdecl("Java_BridgeKt_Swift_1c_1set")
+        public func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer) {
+            c = SwiftClosure2.closure(forJavaObject: value, options: [], invokeJava: { _javaClosure, p0, p1 in try _javaClosure.invokeJava(AnyBridging.toJavaObject(p0, options: []), SwiftClosure0.javaObject(forMainActor: p1, options: [])!) })! as @MainActor (Int, @MainActor @escaping () -> Void) -> Void
+        }
+        """, transformers: transformers)
+    }
+
+    func testOptionalNestedClosureVar() async throws {
+        try await check(swiftBridge: """
+        public var c: ((@escaping (String) -> Int) throws -> Void)? = nil
+        """, kotlin: """
+        var c: (((String) -> Int) -> Unit)?
+            get() = Swift_c()
+            set(newValue) {
+                Swift_c_set(newValue)
+            }
+        private external fun Swift_c(): (((String) -> Int) -> Unit)?
+        private external fun Swift_c_set(value: (((String) -> Int) -> Unit)?)
+        """, swiftBridgeSupport: """
+        @_cdecl("Java_BridgeKt_Swift_1c")
+        public func BridgeKt_Swift_c(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> JavaObjectPointer? {
+            return SwiftClosure1.javaObject(for: c.map { _closure in { (p0: JavaObjectPointer?) in try _closure(SwiftClosure1.closure(forJavaObject: p0, options: [])! as (String) -> Int) } }, options: [])
+        }
+        @_cdecl("Java_BridgeKt_Swift_1c_1set")
+        public func BridgeKt_Swift_c_set(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ value: JavaObjectPointer?) {
+            c = SwiftClosure1.closure(forJavaObject: value, options: [], invokeJava: { _javaClosure, p0 in try _javaClosure.invokeJava(SwiftClosure1.javaObject(for: p0, options: [])!) }) as ((@escaping (String) -> Int) throws -> Void)?
+        }
+        """, transformers: transformers)
+    }
+
     func testVoidClosureVar() async throws {
         try await check(swiftBridge: """
         public var c: () -> Void = { }
@@ -1505,7 +1551,7 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1f_10")
         public func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaObjectPointer) -> JavaObjectPointer? {
-            let p_0_swift = SwiftClosure2.closure(forJavaObject: p_0, options: [], invokeJava: { _javaClosure, p0, p1 in try _javaClosure.invokeJava(AnyBridging.toJavaObject(p0, options: []), SwiftClosure1.javaObject(for: p1, options: [])) })! as (Int, @escaping (String) -> Void) -> Bool
+            let p_0_swift = SwiftClosure2.closure(forJavaObject: p_0, options: [], invokeJava: { _javaClosure, p0, p1 in try _javaClosure.invokeJava(AnyBridging.toJavaObject(p0, options: []), SwiftClosure1.javaObject(for: p1, options: [])!) })! as (Int, @escaping (String) -> Void) -> Bool
             let f_return_swift = f(c: p_0_swift)
             return f_return_swift.toJavaObject(options: [])
         }
@@ -1524,7 +1570,7 @@ final class BridgeToKotlinTests: XCTestCase {
         """, swiftBridgeSupport: """
         @_cdecl("Java_BridgeKt_Swift_1f_10")
         public func BridgeKt_Swift_f_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaObjectPointer) -> JavaObjectPointer? {
-            let p_0_swift = SwiftClosure2.closure(forJavaObject: p_0, options: [], invokeJava: { _javaClosure, p0, p1 in try _javaClosure.invokeJava(AnyBridging.toJavaObject(p0, options: []), SwiftClosure1.javaObject(forMainActor: p1, options: [])) })! as (Int, @MainActor @escaping (String) -> Void) -> Bool
+            let p_0_swift = SwiftClosure2.closure(forJavaObject: p_0, options: [], invokeJava: { _javaClosure, p0, p1 in try _javaClosure.invokeJava(AnyBridging.toJavaObject(p0, options: []), SwiftClosure1.javaObject(forMainActor: p1, options: [])!) })! as (Int, @MainActor @escaping (String) -> Void) -> Bool
             let f_return_swift = f(c: p_0_swift)
             return f_return_swift.toJavaObject(options: [])
         }
@@ -6810,6 +6856,329 @@ final class BridgeToKotlinTests: XCTestCase {
 
         typealias IntArray = Array<Int>
         """, swiftBridgeSupport: """
+        """, transformers: transformers)
+    }
+
+    func testInferredAssociatedTypeMember() async throws {
+        try await check(supportingSwift: """
+        protocol Identifiable {
+            associatedtype ID
+            var id: ID { get }
+        }
+        """, swiftBridge: """
+        public struct MessageData: Identifiable {
+            public let id: String
+        }
+        public final class Room {
+            public let id: Int
+        }
+        extension Room: Identifiable {
+        }
+        public func update(messageID: MessageData.ID, roomID: Room.ID) {
+        }
+        """, kotlins: ["""
+        class MessageData: skip.bridge.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.SwiftObjectPointer = skip.bridge.SwiftObjectNil
+
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
+
+            override fun Swift_peer(): skip.bridge.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_peer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            override val id: String
+                get() = Swift_id(Swift_peer)
+            private external fun Swift_id(Swift_peer: skip.bridge.SwiftObjectPointer): String
+            constructor(id: String) {
+                Swift_peer = Swift_constructor_0(id)
+            }
+            private external fun Swift_constructor_0(id: String): skip.bridge.SwiftObjectPointer
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        class Room: skip.bridge.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.SwiftObjectPointer = skip.bridge.SwiftObjectNil
+
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
+
+            constructor() {
+                Swift_peer = Swift_constructor()
+            }
+            private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer
+
+            override fun Swift_peer(): skip.bridge.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_peer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            override val id: Int
+                get() = Swift_id(Swift_peer)
+            private external fun Swift_id(Swift_peer: skip.bridge.SwiftObjectPointer): Int
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        fun update(messageID: String, roomID: Int): Unit = Swift_update_0(messageID, roomID)
+        private external fun Swift_update_0(messageID: String, roomID: Int)
+        """, """
+        internal interface Identifiable<ID> {
+            val id: ID
+        }
+        """], swiftBridgeSupport: """
+        extension MessageData: BridgedToKotlin {
+            nonisolated private static let Java_class = try! JClass(name: "MessageData")
+            nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                let box: SwiftValueTypeBox<Self> = ptr.pointee()!
+                return box.value
+            }
+            nonisolated public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let box = SwiftValueTypeBox(self)
+                let Swift_peer = SwiftObjectPointer.pointer(to: box, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            nonisolated private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+        }
+        extension Room: BridgedToKotlin, BridgedFinalClass {
+            nonisolated private static let Java_class = try! JClass(name: "Room")
+            nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                return ptr.pointee()!
+            }
+            nonisolated public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            nonisolated private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+        }
+        @_cdecl("Java_MessageData_Swift_1release")
+        public func MessageData_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: SwiftValueTypeBox<MessageData>.self)
+        }
+        @_cdecl("Java_MessageData_Swift_1id")
+        public func MessageData_Swift_id(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaString {
+            let peer_swift: SwiftValueTypeBox<MessageData> = Swift_peer.pointee()!
+            return peer_swift.value.id.toJavaObject(options: [])!
+        }
+        @_cdecl("Java_MessageData_Swift_1constructor_10")
+        public func MessageData_Swift_constructor_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaString) -> SwiftObjectPointer {
+            let p_0_swift = String.fromJavaObject(p_0, options: [])
+            let f_return_swift = SwiftValueTypeBox(MessageData(id: p_0_swift))
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_MessageData_Swift_1projectionImpl")
+        public func MessageData_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = MessageData.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        @_cdecl("Java_Room_Swift_1constructor")
+        public func Room_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
+            let f_return_swift = Room()
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_Room_Swift_1release")
+        public func Room_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: Room.self)
+        }
+        @_cdecl("Java_Room_Swift_1id")
+        public func Room_Swift_id(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> Int32 {
+            let peer_swift: Room = Swift_peer.pointee()!
+            return Int32(peer_swift.id)
+        }
+        @_cdecl("Java_Room_Swift_1projectionImpl")
+        public func Room_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = Room.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        @_cdecl("Java_BridgeKt_Swift_1update_10")
+        public func BridgeKt_Swift_update_0(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ p_0: JavaString, _ p_1: Int32) {
+            let p_0_swift = String.fromJavaObject(p_0, options: [])
+            let p_1_swift = Int(p_1)
+            update(messageID: p_0_swift, roomID: p_1_swift)
+        }
+        """, transformers: transformers)
+    }
+
+    func testDeclaredNestedIDTypeMember() async throws {
+        try await check(supportingSwift: """
+        protocol Identifiable {
+            associatedtype ID
+            var id: ID { get }
+        }
+        """, swiftBridge: """
+        public final class Item: Identifiable {
+            public final class ID {
+            }
+            public let id: ID
+        }
+        """, kotlins: ["""
+        class Item: skip.bridge.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.SwiftObjectPointer = skip.bridge.SwiftObjectNil
+
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
+
+            constructor() {
+                Swift_peer = Swift_constructor()
+            }
+            private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer
+
+            override fun Swift_peer(): skip.bridge.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_peer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+            class ID: skip.bridge.SwiftPeerBridged, skip.lib.SwiftProjecting {
+                var Swift_peer: skip.bridge.SwiftObjectPointer = skip.bridge.SwiftObjectNil
+
+                constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                    this.Swift_peer = Swift_peer
+                }
+
+                fun finalize() {
+                    Swift_release(Swift_peer)
+                    Swift_peer = skip.bridge.SwiftObjectNil
+                }
+                private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
+
+                constructor() {
+                    Swift_peer = Swift_constructor()
+                }
+                private external fun Swift_constructor(): skip.bridge.SwiftObjectPointer
+
+                override fun Swift_peer(): skip.bridge.SwiftObjectPointer = Swift_peer
+
+                override fun equals(other: Any?): Boolean {
+                    if (other !is skip.bridge.SwiftPeerBridged) return false
+                    return Swift_peer == other.Swift_peer()
+                }
+
+                override fun hashCode(): Int = Swift_peer.hashCode()
+
+                override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+                private external fun Swift_projectionImpl(options: Int): () -> Any
+
+                companion object {
+                }
+            }
+            override val id: Item.ID
+                get() = Swift_id(Swift_peer)
+            private external fun Swift_id(Swift_peer: skip.bridge.SwiftObjectPointer): Item.ID
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+            }
+        }
+        """, """
+        internal interface Identifiable<ID> {
+            val id: ID
+        }
+        """], swiftBridgeSupport: """
+        extension Item: BridgedToKotlin, BridgedFinalClass {
+            nonisolated private static let Java_class = try! JClass(name: "Item")
+            nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                return ptr.pointee()!
+            }
+            nonisolated public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            nonisolated private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+        }
+        extension Item.ID: BridgedToKotlin, BridgedFinalClass {
+            nonisolated private static let Java_class = try! JClass(name: "Item$ID")
+            nonisolated public static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                return ptr.pointee()!
+            }
+            nonisolated public func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let Swift_peer = SwiftObjectPointer.pointer(to: self, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            nonisolated private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+        }
+        @_cdecl("Java_Item_Swift_1constructor")
+        public func Item_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
+            let f_return_swift = Item()
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_Item_Swift_1release")
+        public func Item_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: Item.self)
+        }
+        @_cdecl("Java_Item_Swift_1id")
+        public func Item_Swift_id(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer {
+            let peer_swift: Item = Swift_peer.pointee()!
+            return peer_swift.id.toJavaObject(options: [])!
+        }
+        @_cdecl("Java_Item_Swift_1projectionImpl")
+        public func Item_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = Item.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        @_cdecl("Java_Item_00024ID_Swift_1constructor")
+        public func Item$ID_Swift_constructor(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer) -> SwiftObjectPointer {
+            let f_return_swift = Item.ID()
+            return SwiftObjectPointer.pointer(to: f_return_swift, retain: true)
+        }
+        @_cdecl("Java_Item_00024ID_Swift_1release")
+        public func Item$ID_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: Item.ID.self)
+        }
+        @_cdecl("Java_Item_00024ID_Swift_1projectionImpl")
+        public func Item$ID_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = Item.ID.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
         """, transformers: transformers)
     }
 

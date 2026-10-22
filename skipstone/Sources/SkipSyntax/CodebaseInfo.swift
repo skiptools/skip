@@ -405,6 +405,9 @@ public final class CodebaseInfo {
                         }
                         return resolveTypealias(for: aliasedSignature, moduleName: nil, recursionDepth: recursionDepth + 1)
                     }
+                    if let associatedType = inferredAssociatedType(for: $0) {
+                        return resolveTypealias(for: associatedType, moduleName: nil, recursionDepth: recursionDepth + 1)
+                    }
                     if let moduleName {
                         return $0.withModuleName(moduleName)
                     } else {
@@ -421,6 +424,33 @@ public final class CodebaseInfo {
             }
             cache.typealiases?[key] = ret
             return ret
+        }
+
+        /// Resolve a member type like `T.ID` whose associated type the compiler infers from `T`'s protocol conformances
+        /// rather than an explicit typealias, e.g. `Identifiable.ID` inferred from an `id` property.
+        private func inferredAssociatedType(for type: TypeSignature) -> TypeSignature? {
+            // A declared nested type, e.g. `enum ID`, wins over inference
+            guard case .member(let base, let member) = type, member.generics.isEmpty, typeInfos(forNamed: type).isEmpty else {
+                return nil
+            }
+            let associatedType: TypeSignature = .named(member.name, [])
+            let baseInfos = typeInfos(forNamed: base)
+            for inherit in baseInfos.flatMap(\.inherits) where !inherit.generics.isEmpty {
+                guard let protocolInfo = primaryTypeInfo(forNamed: inherit), protocolInfo.declarationType == .protocolDeclaration else {
+                    continue
+                }
+                let entries = protocolInfo.generics.entries
+                // Unmapped generics are left as the associated type name itself
+                if entries.count == inherit.generics.count, let index = entries.firstIndex(where: { $0.namedType == associatedType }), inherit.generics[index] != associatedType {
+                    return inherit.generics[index]
+                }
+            }
+            // The Identifiable conformance may come through a protocol we have no info for (e.g. one in a module that only
+            // exports its bridged API), so fall back to the `id` property the compiler infers `ID` from
+            if member.name == "ID", let idVariable = baseInfos.flatMap(\.variables).first(where: { $0.name == "id" && !$0.isStatic }), idVariable.signature != .none {
+                return idVariable.signature
+            }
+            return nil
         }
 
         /// Cross platform library code may create typealiases to unknown types. Return any typealias for the given unknown type.
