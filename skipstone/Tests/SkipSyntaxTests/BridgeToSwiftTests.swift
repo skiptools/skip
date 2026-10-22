@@ -994,6 +994,34 @@ final class BridgeToSwiftTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testNestedClosureVar() async throws {
+        try await check(swift: """
+        #if !SKIP_BRIDGE
+        public var c: (Int, @escaping (String) -> Void) -> Void = { _, _ in }
+        #endif
+        """, kotlin: """
+        var c: (Int, (String) -> Unit) -> Unit = { _, _ ->  }
+        """, swiftBridgeSupport: """
+        private let Java_SourceKt = try! JClass(name: "SourceKt")
+        public var c: (Int, @escaping (String) -> Void) -> Void {
+            get {
+                return jniContext {
+                    let value_java: JavaObjectPointer = try! Java_SourceKt.callStatic(method: Java_get_c_methodID, options: [], args: [])
+                    return { let closure_swift = JavaBackedClosure<Void>(value_java, options: []); return { p0, p1 in try! closure_swift.invoke(p0, SwiftClosure1.javaObject(for: p1, options: [])!) } }()
+                }
+            }
+            set {
+                jniContext {
+                    let value_java = SwiftClosure2.javaObject(for: { [_closure = newValue] (p0: Int, p1: JavaObjectPointer?) in _closure(p0, SwiftClosure1.closure(forJavaObject: p1, options: [])! as (String) -> Void) }, options: [])!.toJavaParameter(options: [])
+                    try! Java_SourceKt.callStatic(method: Java_set_c_methodID, options: [], args: [value_java])
+                }
+            }
+        }
+        private let Java_get_c_methodID = Java_SourceKt.getStaticMethodID(name: "getC", sig: "()Lkotlin/jvm/functions/Function2;")!
+        private let Java_set_c_methodID = Java_SourceKt.getStaticMethodID(name: "setC", sig: "(Lkotlin/jvm/functions/Function2;)V")!
+        """, transformers: transformers)
+    }
+
     func testVoidClosureVar() async throws {
         try await check(swift: """
         #if !SKIP_BRIDGE
