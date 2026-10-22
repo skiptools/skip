@@ -1619,10 +1619,14 @@ class TypeDeclaration: Statement {
         context.memberOf = (.protocolDeclaration, modifiers, decodeFlags)
 
         let name = protocolDecl.name.text.removingBacktickEscaping
-        let (inherits, inheritsMessages) = protocolDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
+        var (inherits, inheritsMessages) = protocolDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
         let associatedTypeDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind == .associatedTypeDecl ? $0.decl.as(AssociatedTypeDeclSyntax.self) : nil }
         let memberDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind != .associatedTypeDecl ? $0.decl : nil }
-        let (generics, genericsMessages) = Generics.for(syntax: nil, associatedTypeSyntax: associatedTypeDecls, where: protocolDecl.genericWhereClause, in: syntaxTree)
+        var (generics, genericsMessages) = Generics.for(syntax: nil, associatedTypeSyntax: associatedTypeDecls, where: protocolDecl.genericWhereClause, in: syntaxTree)
+        // `protocol P where Self: X` is equivalent to `protocol P: X`; don't treat Self as a protocol generic
+        if let selfIndex = generics.entries.firstIndex(where: { $0.name == "Self" && $0.whereEqual == nil }) {
+            inherits += generics.entries.remove(at: selfIndex).inherits
+        }
         let members = memberDecls.flatMap { StatementDecoder.decode(syntax: $0, context: context, in: syntaxTree) }
         let statement = TypeDeclaration(type: .protocolDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: protocolDecl, sourceFile: syntaxTree.source.file, sourceRange: protocolDecl.range(in: syntaxTree.source), extras: extras)
         statement.messages = inheritsMessages + genericsMessages

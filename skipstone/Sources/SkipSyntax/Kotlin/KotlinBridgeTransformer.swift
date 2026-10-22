@@ -1558,7 +1558,9 @@ extension TypeSignature {
             if typeInfo.declarationType == .classDeclaration && !typeInfo.modifiers.isFinal {
                 strategy = .polymorphic
             } else if typeInfo.declarationType == .protocolDeclaration {
-                strategy = .protocol
+                // A protocol with a class requirement has no generated `_BridgeImpl` because it would have to subclass, so
+                // values from Kotlin must be projections of Swift instances
+                strategy = codebaseInfo.isClassConstrained(typeInfo.signature) ? .unknown : .protocol
             } else {
                 strategy = .peer
             }

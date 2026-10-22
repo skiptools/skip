@@ -289,6 +289,23 @@ extension CodebaseInfo.Context {
         return items.contains { $0.declarationType == .functionDeclaration && $0.declaringType?.name == owningType?.name }
     }
 
+    /// Whether values of the given type must be class instances: it is a class, or a protocol whose conforming types must inherit from one, e.g. `protocol P: C`.
+    ///
+    /// Kotlin interfaces cannot extend classes, so these protocols only map to interfaces that the class's Kotlin subclasses implement.
+    func isClassConstrained(_ type: TypeSignature) -> Bool {
+        guard let typeInfo = primaryTypeInfo(forNamed: type) else {
+            return false
+        }
+        switch typeInfo.declarationType {
+        case .classDeclaration:
+            return true
+        case .protocolDeclaration:
+            return typeInfo.inherits.contains { isClassConstrained($0) }
+        default:
+            return false
+        }
+    }
+
     /// The companion object type of the given type.
     func companionType(of type: TypeSignature) -> KotlinCompanionType {
         let typeInfos = typeInfos(forNamed: type)
@@ -313,7 +330,9 @@ extension CodebaseInfo.Context {
             // - Has static members
             // - Has initializer members
             // - Extends a protocol with a companion interface
-            guard hasStaticMembers(typeInfos: typeInfos, includeInits: true) || hasCompanionInherits(interfaceInfo.inherits) else {
+            // Kotlin interfaces do not extend classes, so a class requirement does not contribute a companion
+            let interfaceInherits = interfaceInfo.inherits.filter { primaryTypeInfo(forNamed: $0)?.declarationType != .classDeclaration }
+            guard hasStaticMembers(typeInfos: typeInfos, includeInits: true) || hasCompanionInherits(interfaceInherits) else {
                 return .none
             }
             return .interface(.named(type.name + "Companion", type.generics))

@@ -1504,7 +1504,8 @@ final class KotlinBridgeToSwiftVisitor {
 
     /// Define an anonymous implementation of a bridged protocol.
     static func protocolBridgeImplDefinition(forProtocol type: TypeSignature, inPackage packageName: String?, statement: KotlinStatement?, options: KotlinBridgeOptions, autoBridge: AutoBridge, codebaseInfo: CodebaseInfo.Context) -> SwiftDefinition? {
-        guard let primaryTypeInfo = codebaseInfo.primaryTypeInfo(forNamed: type) else {
+        // A final class cannot satisfy a protocol's class requirement
+        guard let primaryTypeInfo = codebaseInfo.primaryTypeInfo(forNamed: type), !codebaseInfo.isClassConstrained(type) else {
             return nil
         }
         let protocolVisibility = min(primaryTypeInfo.modifiers.visibility, .public)
