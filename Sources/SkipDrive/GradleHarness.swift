@@ -1,5 +1,5 @@
 // Copyright 2023–2026 Skip
-#if !SKIP
+#if !SKIP && !os(Android)
 import Foundation
 
 /// The `GradleHarness` is the interface to launching the `gradle` command and processing the output.

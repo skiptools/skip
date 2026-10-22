@@ -1,5 +1,5 @@
 // Copyright 2023–2026 Skip
-#if !SKIP
+#if !SKIP && !os(Android)
 import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
