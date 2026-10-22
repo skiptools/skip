@@ -21,8 +21,7 @@ jobs:
         os:
           - 'ubuntu-latest'
           #- 'macos-latest'
-          # Homebrew bottle builds on macos-14, so we need to as well
-          - 'macos-14'
+          - 'macos-26'
     steps:
       - name: Checkout skipstone.git
         uses: actions/checkout@v7
@@ -111,11 +110,9 @@ jobs:
           # arm64 macOS runners cannot host the Android emulator (no nested
           # virtualization: HVF fails with HV_UNSUPPORTED), so they run the macOS-only
           # steps and the host and Robolectric halves. The emulator tests run on Linux
-          # (x86_64 + KVM) and on Intel macOS, which is kept because Linux can't build
-          # the Fuse test; it skips the macOS-only steps that the arm runner covers
+          # (x86_64 + KVM)
           - 'ubuntu-24.04'
           - 'macos-26'
-          - 'macos-26-intel'
         swift:
           - '6.3'
           - '6.4'
@@ -247,9 +244,9 @@ jobs:
           export ANDROID_USER_HOME=$HOME/.android
           export ANDROID_EMULATOR_HOME=$ANDROID_USER_HOME
           export ANDROID_AVD_HOME=$ANDROID_EMULATOR_HOME/avd
-          # AOSP image: the google_apis image's Play services overload the guest on the
-          # Intel macOS runners (ANRs, low memory, system_server watchdog restarts), which
-          # surfaces as "Can't find service: package" and similar install failures
+          # AOSP image: the google_apis image's Play services overload the guest (ANRs,
+          # low memory, system_server watchdog restarts), which surfaces as
+          # "Can't find service: package" and similar install failures
           skip android emulator create --verbose --system-image default
           skip android emulator list --verbose
           # watch the logs for errors
@@ -259,7 +256,7 @@ jobs:
 
           echo "Waiting for device boot"
           ${ANDROID_HOME}/platform-tools/adb wait-for-device
-          # Intel macOS runners can take over 10 minutes to boot
+          # slow runners can take over 10 minutes to boot
           for i in $(seq 180); do
             [[ "$(${ANDROID_HOME}/platform-tools/adb shell getprop sys.boot_completed | tr -d '\r')" == "1" ]] && break
             sleep 5
@@ -313,14 +310,19 @@ jobs:
           fi
 
       - name: "Test new Skip Fuse framework on emulator"
-        # compile errors on Linux with skip-android-bridge
-        if: runner.os != 'Linux'
         working-directory: ${{ runner.temp }}
+        env:
+          # Under swiftbuild a Fuse package graph links SkipLib and SkipUnit statically into more than
+          # one dynamic product, which is an error; dynamic shared products keep it valid (see HostSwiftBuild)
+          SKIP_DYNAMIC_LIBRARIES: '1'
         run: |
           skip init --no-build --native-model --bridged --module-tests demo-fuse-framework DemoFramework
           cd demo-fuse-framework
-          # Robolectric test
-          swift test
+          # Robolectric test. Not on Linux, where skip-android-bridge's AndroidBundle can't subclass
+          # swift-corelibs-foundation's Bundle; the macOS leg runs it, and Linux runs the emulator half
+          if [[ "${RUNNER_OS}" != "Linux" ]]; then
+            swift test
+          fi
           # Emulator test
           if [[ "${RUNNER_ARCH}" != "ARM64" ]]; then
             ANDROID_SERIAL=emulator-5554 swift test
@@ -333,7 +335,9 @@ jobs:
 
           swift build --build-tests
           # Robolectric should still pass
-          swift test
+          if [[ "${RUNNER_OS}" != "Linux" ]]; then
+            swift test
+          fi
           # Emulator test should fail
           if [[ "${RUNNER_ARCH}" != "ARM64" ]]; then
             ! ANDROID_SERIAL=emulator-5554 swift test
