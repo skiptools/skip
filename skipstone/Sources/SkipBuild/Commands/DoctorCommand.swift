@@ -62,7 +62,8 @@ extension ToolOptionsCommand where Self : StreamingCommand {
     /// Runs the `skip doctor` command and stream the results to the messenger
     func runDoctor(checkNative: Bool, with out: MessageQueue) async throws {
         /// Invokes the given command and attempts to parse the output against the given regular expression pattern to validate that it is a semantic version string
-        func checkVersion(title: String, cmd: [String], min: Version? = nil, pattern: String, watch: Bool = false, hint: String? = nil) async throws {
+        @discardableResult func checkVersion(title: String, cmd: [String], min: Version? = nil, pattern: String, watch: Bool = false, hint: String? = nil, belowMinStatus: MessageBlock.Status = .warn) async throws -> Version? {
+            var parsed: Version?
 
             func parseVersion(_ result: Result<ProcessOutput, Error>?) -> (result: Result<ProcessOutput, Error>?, message: MessageBlock?) {
                 guard let res = try? result?.get() else {
@@ -90,10 +91,11 @@ extension ToolOptionsCommand where Self : StreamingCommand {
                 guard let semver = Version(versionString) else {
                     return (result: result, message: MessageBlock(status: .fail, title + " could not parse version: \(versionString)"))
                 }
+                parsed = semver
 
                 if let min = min {
                     if semver < min {
-                        return (result: result, message: MessageBlock(status: .warn, "\(title) \(outputVersion) (< \(min))\(hint ?? "")"))
+                        return (result: result, message: MessageBlock(status: belowMinStatus, "\(title) \(outputVersion) (< \(min))\(hint ?? "")"))
                     } else {
                         return (result: result, message: MessageBlock(status: .pass, "\(title) \(outputVersion) (\(semver > min ? ">" : "=") \(min))"))
                     }
@@ -103,6 +105,7 @@ extension ToolOptionsCommand where Self : StreamingCommand {
             }
 
             try await run(with: out, title, cmd, watch: watch, resultHandler: parseVersion)
+            return parsed
         }
 
         /// check for stale Intel Homebrew installations of tools (java, etc.) on ARM (https://github.com/skiptools/skip/issues/97)
@@ -139,12 +142,26 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         }
         try await checkVersion(title: "Swift version", cmd: ["swift", "-version"], min: Version("5.9.0"), pattern: "Swift version ([0-9.]+)")
         try await checkVersion(title: "Swiftly version", cmd: ["swiftly", "--version"], min: Version("1.0.0"), pattern: "([0-9.]+)")
-        if checkNative {
-            try await checkVersion(title: "Swift Android SDK version", cmd: [skipcmd, "android", "toolchain", "version"], min: Version("6.1.0"), pattern: "Swift Package Manager - Swift ([0-9.]+)", hint: " (install with: skip android sdk install)")
-        }
         #if os(macOS)
         // TODO: add advice to run `xcode-select -s /Applications/Xcode.app/Contents/Developer` to work around https://github.com/skiptools/skip/issues/18
-        try await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)", hint: " (install from: https://developer.apple.com/xcode/)")
+        // Xcode 27's MacOSX27 SDK emits `-target-arch-variant`, which Swift 6.3 rejects when
+        // compiling host plugins/manifests. Require the 6.4 Android toolchain in that pairing.
+        let xcodeVersion = try await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)", hint: " (install from: https://developer.apple.com/xcode/)")
+        #endif
+        if checkNative {
+            var androidSDKMin = Version("6.1.0")
+            var androidSDKHint = " (install with: skip android sdk install)"
+            var androidSDKBelowMinStatus = MessageBlock.Status.warn
+            #if os(macOS)
+            if let xcodeVersion, xcodeVersion >= Version("27.0.0") {
+                androidSDKMin = Version("6.4.0")
+                androidSDKHint = " (Xcode 27 needs Android SDK 6.4; install with: skip android sdk install)"
+                androidSDKBelowMinStatus = .fail
+            }
+            #endif
+            try await checkVersion(title: "Swift Android SDK version", cmd: [skipcmd, "android", "toolchain", "version"], min: androidSDKMin, pattern: "Swift Package Manager - Swift ([0-9.]+)", hint: androidSDKHint, belowMinStatus: androidSDKBelowMinStatus)
+        }
+        #if os(macOS)
         await checkXcodeCommandLineTools(with: out)
         try await checkVersion(title: "Homebrew version", cmd: ["brew", "--version"], min: Version("4.1.0"), pattern: "Homebrew ([0-9.]+)", hint: " (install from: https://brew.sh)")
         #endif
