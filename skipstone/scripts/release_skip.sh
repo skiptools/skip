@@ -31,6 +31,8 @@ git pull || true
 # Sources/SkipDriveExternal links into the skip submodule
 git submodule update --init
 swift package update
+# a stale build keeps old #if canImport(SkipDriveExternal) results
+swift package clean
 
 CONFIGURATION=${CONFIGURATION:-"release"}
 
