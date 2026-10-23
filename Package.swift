@@ -35,11 +35,11 @@ if (env["SKIPLOCAL"] != nil || env["PWD"]?.hasSuffix("skipstone") == true) {
     package.targets += [.executableTarget(name: "skip", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
 } else {
     #if os(macOS)
-    package.targets += [.binaryTarget(name: "skip", url: "https://github.com/skiptools/skip/releases/download/1.9.18/skip-macos.zip", checksum: "e4a7cfe94422fdde73c7a7d5c74cdf9e58d6f2543585e3bd4b4267600a534b61")]
+    package.targets += [.binaryTarget(name: "skip", url: "https://github.com/skiptools/skip/releases/download/1.9.19/skip-macos.zip", checksum: "e7337fcbfaf2e39b0a5ad312e83feba35832b09950076524e1ef530ea250579b")]
     #elseif os(Linux)
-    package.targets += [.binaryTarget(name: "skip", url: "https://github.com/skiptools/skip/releases/download/1.9.18/skip-linux.zip", checksum: "eaa9426b3ffa4bc7a40568c52121dc783871fb0d1ce1900d8c40f8aa6315b7ba")]
+    package.targets += [.binaryTarget(name: "skip", url: "https://github.com/skiptools/skip/releases/download/1.9.19/skip-linux.zip", checksum: "2f71b8d865f25815b607ded9e989acebaf4a2bbb7a9d3ef118816fb9a529e790")]
     #else
-    package.dependencies += [.package(url: "https://github.com/skiptools/skipstone.git", exact: "1.9.18")]
+    package.dependencies += [.package(url: "https://github.com/skiptools/skipstone.git", exact: "1.9.19")]
     package.targets += [.executableTarget(name: "skip", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
     #endif
 }
