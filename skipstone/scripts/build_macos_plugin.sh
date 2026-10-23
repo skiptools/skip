@@ -24,8 +24,8 @@ if [[ ! -f "${BIN_PATH}/${PRODUCT}" ]]; then
     exit 1
 fi
 
-if [[ $(nm "${BIN_PATH}/${PRODUCT}" | grep -c SkipDriveExternal) -eq 0 ]]; then
-    echo "error: ${PRODUCT} was built without SkipDriveExternal, so it cannot run skip android commands; run: git submodule update --init" >&2
+if LC_ALL=C grep -q -a -E 'without SkipDriveExternal|SkipDriveExternal not available|SkipDrive not linked' "${BIN_PATH}/${PRODUCT}"; then
+    echo "error: ${PRODUCT} was compiled without SkipDriveExternal, so it cannot run skip android commands; run: git submodule update --init && swift package clean" >&2
     exit 1
 fi
 
