@@ -24,6 +24,11 @@ if [[ ! -f "${BIN_PATH}/${PRODUCT}" ]]; then
     exit 1
 fi
 
+if [[ $(nm "${BIN_PATH}/${PRODUCT}" | grep -c SkipDriveExternal) -eq 0 ]]; then
+    echo "error: ${PRODUCT} was built without SkipDriveExternal, so it cannot run skip android commands; run: git submodule update --init" >&2
+    exit 1
+fi
+
 # try to back up any old artifactbundle folder
 mv -f ${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE} ${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}.bk.`date +%s` || true
 mkdir -p ${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}/macos

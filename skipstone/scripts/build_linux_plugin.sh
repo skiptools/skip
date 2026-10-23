@@ -89,6 +89,11 @@ for ARCH in "${ARCHS[@]}"; do
         exit 1
     fi
 
+    if [[ $(nm "${BIN_PATH}/${PRODUCT}" | grep -c SkipDriveExternal) -eq 0 ]]; then
+        echo "error: ${PRODUCT} was built without SkipDriveExternal, so it cannot run skip android commands; run: git submodule update --init" >&2
+        exit 1
+    fi
+
     mkdir -p "${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}/${SDK}"
     cp -av "${BIN_PATH}/${PRODUCT}" "${ARTIFACT_BUILD_DIR}/${ARTIFACTBUNDLE}/${SDK}/${SKIPCMD}"
 done
