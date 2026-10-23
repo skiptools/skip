@@ -1186,9 +1186,15 @@ public final class CodebaseInfo {
     private func fixupGenericsInfo() {
         // Update protocol info to add any generics to inherited protocols and collect their generic info in the generics object
         var fixedupProtocolNames: Set<String> = []
-        for protocolInfo in rootTypes where protocolInfo.declarationType == .protocolDeclaration {
-            fixupProtocolGenericsInfo(protocolInfo, fixedupProtocolNames: &fixedupProtocolNames)
+        func fixupProtocols(in typeInfos: [TypeInfo]) {
+            for typeInfo in typeInfos {
+                if typeInfo.declarationType == .protocolDeclaration {
+                    fixupProtocolGenericsInfo(typeInfo, fixedupProtocolNames: &fixedupProtocolNames)
+                }
+                fixupProtocols(in: typeInfo.types) // Nested protocols (SE-0404)
+            }
         }
+        fixupProtocols(in: rootTypes)
         // Update extension info so that extensions have the same signature as the extended type, moving any generic info to the generics object
         for extensionInfo in rootExtensions {
             guard let primaryInfo = primaryTypeInfo(forNamed: extensionInfo.signature) else {
@@ -1241,7 +1247,7 @@ public final class CodebaseInfo {
             return inherit.withGenerics(mappings.map { $0.1 ?? $0.0 })
         }
         for member in typeInfo.members {
-            if let memberTypeInfo = member as? TypeInfo {
+            if let memberTypeInfo = member as? TypeInfo, memberTypeInfo.declarationType != .protocolDeclaration {
                 fixupProtocolConformanceGenerics(in: memberTypeInfo)
             }
         }
@@ -1874,7 +1880,7 @@ public final class CodebaseInfo {
         private func addMembers(_ statements: [Statement], codebaseInfo: CodebaseInfo, syntaxTree: SyntaxTree) {
             for statement in statements {
                 switch statement.type {
-                case .actorDeclaration, .classDeclaration, .enumDeclaration, .structDeclaration:
+                case .actorDeclaration, .classDeclaration, .enumDeclaration, .protocolDeclaration, .structDeclaration:
                     types.append(TypeInfo(statement: statement as! TypeDeclaration, in: signature, codebaseInfo: codebaseInfo, syntaxTree: syntaxTree))
                 case .enumCaseDeclaration:
                     cases.append(EnumCaseInfo(statement: statement as! EnumCaseDeclaration, in: signature, codebaseInfo: codebaseInfo, syntaxTree: syntaxTree))

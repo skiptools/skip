@@ -409,7 +409,9 @@ extension TypeSignature {
     /// The generated native type used when bridging a protocol with unknown implementation.
     var protocolBridgeImpl: TypeSignature {
         let moduleName = self.moduleName
-        return withExistentialMode(.none).withModuleName(nil).withName(name.replacing(".", with: "_") + "_BridgeImpl").withModuleName(moduleName)
+        // Always a top-level class, including for nested protocols: Outer.P -> Outer_P_BridgeImpl
+        let type = asOptional(false).withExistentialMode(.none).withModuleName(nil)
+        return TypeSignature.named(type.name.replacing(".", with: "_") + "_BridgeImpl", type.generics).withModuleName(moduleName).asOptional(isOptional)
     }
 
     /// Whether this is a generated native type used when bridging a protocol with unknown implementation.
@@ -1582,7 +1584,9 @@ extension TypeSignature {
             if typeInfo.declarationType == .classDeclaration && !typeInfo.modifiers.isFinal {
                 strategy = .polymorphic
             } else if typeInfo.declarationType == .protocolDeclaration {
-                strategy = .protocol
+                // A protocol with a class requirement has no generated `_BridgeImpl` because it would have to subclass, so
+                // values from Kotlin must be projections of Swift instances
+                strategy = codebaseInfo.isClassConstrained(typeInfo.signature) ? .unknown : .protocol
             } else {
                 strategy = .peer
             }

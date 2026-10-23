@@ -2569,8 +2569,8 @@ final class KotlinInterfaceDeclaration: KotlinStatement {
         if CodebaseInfo.kotlinReservedBuiltinNames.contains(kstatement.name) {
             kstatement.messages.append(.kotlinNameReservedType(kstatement, source: translator.syntaxTree.source, type: kstatement.name))
         }
-        // Kotlin interfaces cannot extend Any
-        kstatement.inherits = kstatement.inherits.filter { $0 != .any && $0 != .anyObject }
+        // Kotlin interfaces cannot extend Any or classes. Swift enforces class requirements, e.g. `protocol P: C`, on conforming types
+        kstatement.inherits = kstatement.inherits.filter { $0 != .any && $0 != .anyObject && codebaseInfo.primaryTypeInfo(forNamed: $0)?.declarationType != .classDeclaration }
         kstatement.companionInherits = kstatement.inherits.compactMap {
             return if case .interface(let signature) = codebaseInfo.companionType(of: $0) {
                 signature
