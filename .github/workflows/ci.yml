@@ -39,7 +39,7 @@ jobs:
         with:
           repository: skiptools/skipstone
           path: skipstone
-          ref: main
+          ref: fix/stale-output-symlinked-paths
           submodules: true
 
       - name: Checkout skip
@@ -67,6 +67,7 @@ jobs:
       - name: Setup SKIPLOCAL
         run: |
           echo "SKIPLOCAL=$PWD/skipstone" >> $GITHUB_ENV
+          echo "SKIP_COMMAND_OVERRIDE=$PWD/skip/.build/debug/skip" >> $GITHUB_ENV
           echo "PATH=$PWD/skip/.build/plugins/tools/debug:$PWD/skip/.build/debug:$PATH" >> $GITHUB_ENV
 
       - name: Build Skip
