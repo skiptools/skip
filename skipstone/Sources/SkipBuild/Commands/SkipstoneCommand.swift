@@ -158,10 +158,13 @@ struct SkipstoneCommand: BuildPluginOptionsCommand, StreamingCommand {
         var skipBridgeTranspilations: [Transpilation] = []
 
         func cleanupStaleOutputFiles() {
-            let staleFiles = Set(outputFilesSnapshot.map(\.path))
-                .subtracting(outputFiles.map(\.pathString))
-            for staleFile in staleFiles.sorted() {
-                let staleFileURL = URL(fileURLWithPath: staleFile, isDirectory: false)
+            // compare with the parent folder's symlinks resolved, since the snapshot may be canonicalized (e.g., /private/var) while the output paths are not (/var)
+            func canonicalPath(_ url: URL) -> String {
+                url.deletingLastPathComponent().resolvingSymlinksInPath().appendingPathComponent(url.lastPathComponent).path
+            }
+            let producedFiles = Set(outputFiles.map({ canonicalPath($0.asURL) }))
+            let staleFileURLs = outputFilesSnapshot.filter({ !producedFiles.contains(canonicalPath($0)) })
+            for staleFileURL in staleFileURLs.sorted(by: { $0.path < $1.path }) {
                 if staleFileURL.lastPathComponent == "Package.resolved" {
                     // Package.resolved is special, because it is output from the native build and removing it would cause an unnecessary rebuild
                     continue
