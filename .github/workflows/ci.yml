@@ -67,6 +67,8 @@ jobs:
       - name: Setup SKIPLOCAL
         run: |
           echo "SKIPLOCAL=$PWD/skipstone" >> $GITHUB_ENV
+          # make projects created by the tests transpile with the skipstone built above, not the released plugin binary
+          echo "SKIP_COMMAND_OVERRIDE=$PWD/skip/.build/debug/skip" >> $GITHUB_ENV
           echo "PATH=$PWD/skip/.build/plugins/tools/debug:$PWD/skip/.build/debug:$PATH" >> $GITHUB_ENV
 
       - name: Build Skip
