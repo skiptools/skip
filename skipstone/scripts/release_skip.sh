@@ -100,6 +100,16 @@ sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SKIP_VERSI
 
 cd '-'
 
+# Sources/SkipDriveExternal links into the skip submodule, so build the SkipDrive this release tags,
+# not whatever the submodule happens to be pinned at
+git -C skip fetch "$(realpath ${SKIPPKGDIR})" HEAD
+git -C skip checkout -f --detach FETCH_HEAD
+cp "${SKIPPKGDIR}/${SKIPDRIVE_VERSION_PATH}" "skip/${SKIPDRIVE_VERSION_PATH}"
+if ! diff -r "${SKIPPKGDIR}/Sources/SkipDrive" skip/Sources/SkipDrive; then
+    echo "error: skip submodule's Sources/SkipDrive differs from ${SKIPPKGDIR}/Sources/SkipDrive, which is what gets tagged; commit or discard the changes in ${SKIPPKGDIR}"
+    exit 1
+fi
+
 # mark the internal version in skipstone/Sources/SkipSyntax/Version.swift
 SKIPSTONE_VERSION_PATH="Sources/SkipSyntax/Version.swift"
 sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SKIP_VERSION}'";g' "${SKIPSTONE_VERSION_PATH}"
@@ -172,7 +182,11 @@ curl --location --fail --retry 10 --retry-all-errors --retry-max-time 120 -o /de
 # jump back and make a corresponding release in skipstone
 cd ${SKIPSTONEDIR}
 
-git add "${SKIPSTONE_VERSION_PATH}"
+# pin the skip submodule to the release just tagged so source builds keep matching it
+git -C skip fetch "$(realpath ${SKIPPKGDIR})" "refs/tags/${SKIP_VERSION}"
+git -C skip checkout -f --detach FETCH_HEAD
+
+git add "${SKIPSTONE_VERSION_PATH}" skip
 git commit --allow-empty --allow-empty-message -m "Release ${SKIP_VERSION}"
 git tag "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
 git push --follow-tags
