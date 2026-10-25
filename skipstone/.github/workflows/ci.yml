@@ -9,6 +9,22 @@ on:
   pull_request:
 
 jobs:
+  # the skip CLI compiles SkipDrive from the skip submodule (Sources/SkipDriveExternal),
+  # so a stale pin silently ships SkipDrive that no skip release contains
+  skipdrive-pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - name: "Check that the skip submodule's SkipDrive matches skip main"
+        run: |
+          git -C skip fetch --depth=1 origin main
+          if ! git -C skip diff --exit-code HEAD FETCH_HEAD -- Sources/SkipDrive; then
+            echo "::error::skip submodule's Sources/SkipDrive is behind skip main; bump it: git -C skip fetch origin main && git -C skip checkout FETCH_HEAD && git add skip"
+            exit 1
+          fi
+
   build-plugin:
     timeout-minutes: 45
     runs-on: ${{ matrix.os }}
