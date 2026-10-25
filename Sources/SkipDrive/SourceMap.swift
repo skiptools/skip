@@ -1,5 +1,5 @@
 // Copyright 2023–2026 Skip
-#if !SKIP
+#if !SKIP && !os(Android)
 import Foundation
 
 /// A line and column in a particular source location.
