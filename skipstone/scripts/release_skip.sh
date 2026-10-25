@@ -108,13 +108,22 @@ sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SKIP_VERSI
 # TODO: need a way to have `skip` forked from checkup use the local build
 #swift run SkipRunner checkup
 
-# make sure both private skipstone/ and public skip/ tests pass
-#swift test --configuration debug --parallel
-
-# note that these sometimes need to be disabled when a framework upate
-# is dependent on a skipstone change; the swift test init tests will
-# fail until there is a new release
-#SKIPLOCAL=${PWD} swift test --configuration debug --package-path ../skip/ 
+# make sure CI passed on exactly what is being released;
+# to ship a fix for a red CI anyway, run: SKIP_RELEASE_IGNORE_CI=1 ./scripts/release_skip.sh
+if [[ "${DRY_RUN:-0}" != "1" && "${SKIP_RELEASE_IGNORE_CI:-0}" != "1" ]]; then
+    SKIPSTONE_CI=$(gh run list -R skiptools/skipstone --workflow ci.yml --commit "${GITREF}" --status completed --limit 1 --json conclusion -q '.[0].conclusion')
+    if [[ "${SKIPSTONE_CI}" != "success" ]]; then
+        echo "error: skipstone CI is '${SKIPSTONE_CI:-missing}' for ${GITREF}; not releasing"
+        exit 1
+    fi
+    # skip CI checks out skipstone main when it starts, so only a run started after this skipstone commit tested it
+    SKIPSTONE_COMMIT_UTC=$(TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ)
+    SKIP_CI=$(gh run list -R skiptools/skip --workflow ci.yml --commit "$(git -C ${SKIPPKGDIR} rev-parse HEAD)" --status completed --limit 20 --json conclusion,createdAt -q "map(select(.createdAt > \"${SKIPSTONE_COMMIT_UTC}\")) | .[0].conclusion")
+    if [[ "${SKIP_CI}" != "success" ]]; then
+        echo "error: skip CI is '${SKIP_CI:-missing}' for skip HEAD since skipstone ${GITREF}; not releasing"
+        exit 1
+    fi
+fi
 
 ARTIFACT_MACOS_BUILD_DIR=.build/artifactbundle-macos
 $(dirname $(realpath $0))/build_macos_plugin.sh
