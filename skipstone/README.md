@@ -96,6 +96,19 @@ This will download and install the `skip` tool itself, as well as the `gradle` a
 - `skip android emulator launch`: Launch an Android emulator
 - `skip android sdk list`: List the installed Swift Android SDKs
 
+## Native Package Mirroring
+
+Native and bridged targets mirror the nearest ancestor containing `Package.swift`.
+Conventional `Sources/<Target>` and `Tests/<TargetTests>` layouts retain the same
+package root. Custom `path:` layouts now use their owning manifest instead of the
+directory two levels above the target: this includes targets at the package root,
+one directory below it, or deeper than the conventional two directories.
+
+When a nested directory contains its own manifest, targets below it mirror that
+nested package rather than the outer package. A target with no ancestor manifest
+fails with a diagnostic. This discovery change does not change source enumeration
+or the native test harness.
+
 ## Local Skip Development
 
 Run `./scripts/skip` to build and run the Skip CLI tool from source. (It runs `swift run SkipRunner`, passing in a `$SKIP_COMMAND_OVERRIDE` environment variable.)
