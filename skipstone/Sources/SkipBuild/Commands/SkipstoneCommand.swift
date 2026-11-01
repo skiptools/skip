@@ -1593,16 +1593,29 @@ extension FileManager {
     public func enumeratedURLs(of folderURL: URL) throws -> [URL] {
         var childFileURLs: [URL] = []
 
-        if let fileURLs = self.enumerator(at: folderURL, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles, .skipsPackageDescendants]) {
+        // A mirrored target can itself be a symlink. Enumerate its destination,
+        // but keep the caller's paths for source hashes and generated-file mappings.
+        let resolvedFolderURL = folderURL.resolvingSymlinksInPath()
+        if let fileURLs = self.enumerator(at: resolvedFolderURL, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles, .skipsPackageDescendants]) {
             for case let fileURL as URL in fileURLs {
                 let attrs = try fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
                 if attrs.isRegularFile == true || attrs.isSymbolicLink == true {
-                    childFileURLs.append(fileURL)
+                    childFileURLs.append(Self.enumeratedURL(fileURL, from: resolvedFolderURL, under: folderURL))
                 }
             }
         }
 
         return childFileURLs
+    }
+
+    static func enumeratedURL(_ fileURL: URL, from resolvedFolderURL: URL, under folderURL: URL) -> URL {
+        // Resolve only the parent, retaining the identity of a symlinked file.
+        // pathRelativeTo compares canonical path components, including Darwin's
+        // /var and /private/var aliases, and returns an absolute path on mismatch.
+        let relativeParent = fileURL.deletingLastPathComponent().pathRelativeTo(root: resolvedFolderURL)
+        guard !relativeParent.hasPrefix("/") else { return fileURL }
+        let parent = relativeParent.isEmpty ? folderURL : folderURL.appendingPathComponent(relativeParent)
+        return parent.appendingPathComponent(fileURL.lastPathComponent)
     }
 }
 
