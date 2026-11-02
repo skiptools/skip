@@ -32,7 +32,9 @@ struct AndroidTestCommand: AndroidOperationCommand {
         Builds Swift tests for Android, pushes them to a device or emulator, and executes them. \
         By default, tests run as a native executable via adb shell. With --apk, tests are \
         packaged as an Android APK and run via instrumentation, which is required for tests \
-        that need an Android application context.
+        that need an Android application context. The bare APK does not package Skip Kotlin \
+        bridge classes or assets. Run bridged Skip tests through a mode: native Skip test \
+        module with Gradle connectedAndroidTest instead.
         """,
         shouldDisplay: true)
 
@@ -515,6 +517,7 @@ fileprivate extension AndroidOperationCommand {
         let instrumentationCodePrefix = "INSTRUMENTATION_CODE: "
         let instrumentationResultPrefix = "INSTRUMENTATION_RESULT: "
         var crashMessage: String? = nil
+        var harnessError: String? = nil
         for try await outputLine in instrumentLines {
             let line = outputLine.line
             //print("RAW OUTPUT: \(line)", to: &TSCBasic.stdoutStream)
@@ -534,6 +537,8 @@ fileprivate extension AndroidOperationCommand {
                 let result = String(line.dropFirst(instrumentationResultPrefix.count))
                 if result.contains("shortMsg=Process crashed") || result.contains("shortMsg=process crashed") {
                     crashMessage = result
+                } else if result.hasPrefix("error=") {
+                    harnessError = String(result.dropFirst("error=".count))
                 }
             } else if line.hasPrefix("INSTRUMENTATION_ABORTED:") || line.contains("Process crashed") {
                 crashMessage = crashMessage ?? line
@@ -556,7 +561,7 @@ fileprivate extension AndroidOperationCommand {
             throw AndroidError(errorDescription: "Instrumentation process crashed: \(crashMessage)")
         }
         if testExitCode != 0 {
-            throw AndroidError(errorDescription: "Test APK exited with code \(testExitCode)")
+            throw AndroidError(errorDescription: harnessError ?? "Test APK exited with code \(testExitCode)")
         }
         #endif
     }
