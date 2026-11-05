@@ -182,8 +182,3 @@ For more on how Skip projects are structured, see:
 - **Slack:** [skip.dev/slack](https://skip.dev/slack/) - Real-time chat with the Skip team and community
 - **Issues:** [github.com/skiptools/skip/issues](https://github.com/skiptools/skip/issues) - Bug reports and feature requests
 - **Mastodon:** [@skiptools@mas.to](https://mas.to/@skiptools)
-
-## License
-
-This software is licensed under the 
-[Mozilla Public License 2.0](https://www.mozilla.org/MPL/).
