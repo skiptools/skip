@@ -1,6 +1,4 @@
 // Copyright (c) 2023 - 2026 Skip
-// Licensed under the GNU Affero General Public License v3.0
-// SPDX-License-Identifier: AGPL-3.0-only
 
 import Foundation
 import ArgumentParser
@@ -86,7 +84,7 @@ struct CreateOptions : ParsableArguments {
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Create a local git repository for the app", valueName: "create"))
     var gitRepo: Bool = false
 
-    @Flag(help: ArgumentHelp("Create package with free software license", valueName: "free"))
+    @Flag(help: ArgumentHelp("Create a free and open-source package", valueName: "free"))
     var free: Bool = false
 
     @Flag(inversion: .prefixedNo, help: ArgumentHelp("Display a file system tree summary of the new files", valueName: "show"))

@@ -206,9 +206,3 @@ before submitting pull requests.
 It is wise to discuss any major intended changes on the
 [discussions](https://github.com/orgs/skiptools/discussions/)
 board before embarking on any big projects.
-
-## License
-
-Distributed under the GNU Affero General Public License v3.0 License.
-See [`LICENSE.txt`](LICENSE.txt) for more information.
-

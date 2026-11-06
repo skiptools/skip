@@ -1,6 +1,4 @@
 // Copyright (c) 2023 - 2026 Skip
-// Licensed under the GNU Affero General Public License v3.0
-// SPDX-License-Identifier: AGPL-3.0-only
 
 import Foundation
 import ArgumentParser
@@ -183,7 +181,6 @@ dependencies {
 /// `SkipGradlePlugins.kt`
 private func skipGradlePluginContent() -> String {
 """
-// SPDX-License-Identifier: MPL-2.0
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project

@@ -1,6 +1,4 @@
 // Copyright (c) 2023 - 2026 Skip
-// Licensed under the GNU Affero General Public License v3.0
-// SPDX-License-Identifier: AGPL-3.0-only
 
 import XCTest
 @testable import SkipBuild
@@ -250,7 +248,6 @@ final class SkipCommandTests: XCTestCase {
         let (projectURL, projectTree) = try await skipInit(projectName: "free-project", free: true, zero: false, mode: [.transpiledModel], tests: true, moduleNames: "FreeModule")
         XCTAssertEqual(projectTree ?? "", """
         .
-        ├─ LICENSE.txt
         ├─ Package.swift
         ├─ README.md
         ├─ Sources
@@ -272,11 +269,20 @@ final class SkipCommandTests: XCTestCase {
 
         let load = { try String(contentsOf: URL(fileURLWithPath: $0, isDirectory: false, relativeTo: projectURL)) }
 
+        // a free project carries no license file, license source header, or README license section
+        let rootFiles = try FileManager.default.contentsOfDirectory(atPath: projectURL.path)
+        XCTAssertEqual([], rootFiles.filter({ $0.lowercased().hasPrefix("licen") || $0.lowercased().hasPrefix("copying") }), "unexpected license file")
+
         let FreeModuleTests = try load("Tests/FreeModuleTests/FreeModuleTests.swift")
-        XCTAssertTrue(FreeModuleTests.hasPrefix(SourceLicense.mpl2.sourceHeader), "bad source license in: \(FreeModuleTests)")
+        XCTAssertTrue(FreeModuleTests.hasPrefix("import "), "unexpected source header in: \(FreeModuleTests)")
+        XCTAssertFalse(FreeModuleTests.localizedCaseInsensitiveContains("licen"), "unexpected license reference in: \(FreeModuleTests)")
 
         let FreeModule = try load("Sources/FreeModule/FreeModule.swift")
-        XCTAssertTrue(FreeModule.hasPrefix(SourceLicense.mpl2.sourceHeader), "bad source license in: \(FreeModule)")
+        XCTAssertTrue(FreeModule.hasPrefix("import "), "unexpected source header in: \(FreeModule)")
+        XCTAssertFalse(FreeModule.localizedCaseInsensitiveContains("licen"), "unexpected license reference in: \(FreeModule)")
+
+        let README = try load("README.md")
+        XCTAssertFalse(README.localizedCaseInsensitiveContains("licen"), "unexpected license reference in: \(README)")
 
         let PackageSwift = try load("Package.swift")
         XCTAssertEqual(PackageSwift, """
@@ -428,7 +434,6 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ InfoPlist.xcstrings
         │  └─ Sources
         │     └─ Main.swift
-        ├─ LICENSE.txt
         ├─ Package.swift
         ├─ Project.xcworkspace
         │  └─ contents.xcworkspacedata
@@ -525,7 +530,6 @@ final class SkipCommandTests: XCTestCase {
         │        │  ├─ title.txt
         │        │  └─ version_whats_new.txt
         │        └─ rating.json
-        ├─ LICENSE.txt
         ├─ Package.swift
         ├─ Project.xcworkspace
         │  └─ contents.xcworkspacedata
@@ -641,7 +645,6 @@ final class SkipCommandTests: XCTestCase {
         │  ├─ InfoPlist.xcstrings
         │  └─ Sources
         │     └─ Main.swift
-        ├─ LICENSE.txt
         ├─ Package.swift
         ├─ Project.xcworkspace
         │  └─ contents.xcworkspacedata

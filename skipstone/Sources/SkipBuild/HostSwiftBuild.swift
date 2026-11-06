@@ -1,5 +1,4 @@
 // Copyright 2026 Skip
-// SPDX-License-Identifier: LGPL-3.0-only WITH LGPL-3.0-linking-exception
 import Foundation
 
 /// How skip runs the Apple-platform `swift build` / `swift test` invocations it drives itself:

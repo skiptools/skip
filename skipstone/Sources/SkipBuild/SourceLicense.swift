@@ -1,23 +1,6 @@
 // Copyright (c) 2023 - 2026 Skip
-// Licensed under the GNU Affero General Public License v3.0
-// SPDX-License-Identifier: AGPL-3.0-only
 
 import Foundation
-
-extension ProjectOptionValues {
-    /// A free app is GPL or EUPL, a free library is LGPL
-    func defaultLicense(app: Bool) -> SourceLicense? {
-        if self.free {
-            if app {
-                return .gpl2
-            } else {
-                return .mpl2
-            }
-        } else {
-            return .none
-        }
-    }
-}
 
 /// Various valid copyleft licenses for a "free" Skip app or library
 enum SourceLicense: Equatable, CaseIterable {
@@ -28,10 +11,6 @@ enum SourceLicense: Equatable, CaseIterable {
     case gpl3
     case osl
     case eupl
-
-    var sourceHeader: String {
-        return "// Licensed under the \(self.spdx.name)\n// SPDX-License-Identifier: \(self.spdx.identifier)"
-    }
 
     var spdx: (name: String, identifier: String, href: String) {
         switch self {
@@ -50,10 +29,6 @@ enum SourceLicense: Equatable, CaseIterable {
         case .eupl:
             return ("European Union Public License 1.2", "EUPL-1.2", "https://spdx.org/licenses/EUPL-1.2.html")
         }
-    }
-
-    var licenseFilename: String {
-        return "LICENSE.txt"
     }
 
     var licenseContents: String {

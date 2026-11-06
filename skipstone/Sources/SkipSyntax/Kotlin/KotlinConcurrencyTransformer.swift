@@ -1,6 +1,4 @@
 // Copyright (c) 2023 - 2026 Skip
-// Licensed under the GNU Affero General Public License v3.0
-// SPDX-License-Identifier: AGPL-3.0-only
 
 /// Update uses of `Task` and main actor information used in `async` calls.
 final class KotlinConcurrencyTransformer: KotlinTransformer {

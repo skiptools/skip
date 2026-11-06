@@ -1,6 +1,4 @@
 // Copyright (c) 2023 - 2026 Skip
-// Licensed under the GNU Affero General Public License v3.0
-// SPDX-License-Identifier: AGPL-3.0-only
 
 /// Kotlin 2 uninitialized variable error types.
 struct Kotlin2UninitializedTypes: OptionSet {

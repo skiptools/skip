@@ -1,6 +1,4 @@
 // Copyright (c) 2023 - 2026 Skip
-// Licensed under the GNU Affero General Public License v3.0
-// SPDX-License-Identifier: AGPL-3.0-only
 
 import Foundation
 import SkipSyntax
@@ -188,9 +186,7 @@ class FrameworkProjectLayout {
 
         let sourcesURL = try projectFolderURL.append(path: "Sources", create: true)
 
-        let license = options.defaultLicense(app: app)
-        var sourceHeader = license?.sourceHeader.appending("\n\n") ?? ""
-        let testSourceHeader = sourceHeader
+        var sourceHeader = ""
         var sourceFooter = ""
         if moduleMode == .transpiledBridged {
             // bridged code needs to be wrapped in a check for SKIP_BRIDGE
@@ -1060,7 +1056,7 @@ public class \(moduleName)Module {
                 // execute XCTest cases, so always scaffold Swift Testing for them regardless of the option.
                 if options.testCaseMode == .testing || isNativeModule {
                     testCaseCode = """
-\(testSourceHeader)import Testing
+import Testing
 import Foundation
 
 """
@@ -1156,7 +1152,7 @@ struct TestData : Codable, Hashable {
                 } else {
                     // XCTest mode (default)
                     testCaseCode = """
-\(testSourceHeader)import XCTest
+import XCTest
 import OSLog
 import Foundation
 
@@ -1504,7 +1500,7 @@ struct TestData : Codable, Hashable {
         let readmeURL = projectFolderURL.appending(path: "README.md")
         let primaryModuleName = modules.first?.moduleName ?? "Module"
 
-        var libREADME = """
+        let libREADME = """
         # \(primaryModuleName)
 
         This is a \(options.free ? "free " : "")[Skip](https://skip.dev) Swift/Kotlin library project containing the following modules:
@@ -1528,29 +1524,7 @@ struct TestData : Codable, Hashable {
 
         """
 
-        if options.free {
-            if SourceLicense.allCases.first == .osl {
-                libREADME += """
-                
-                ## License
-
-                This software is licensed under the
-                [Open Software License version 3.0](https://opensource.org/license/osl-3-0).
-
-                """
-            } else {
-                libREADME += """
-
-                ## License
-
-                This software is licensed under the
-                [Mozilla Public License 2.0](https://www.mozilla.org/MPL/).
-
-                """
-            }
-        }
-
-        var appREADME = """
+        let appREADME = """
         # \(primaryModuleName)
 
         This is a \(options.free ? "free and open-source " : "")[Skip](https://skip.dev) dual-platform app project.
@@ -1603,19 +1577,6 @@ struct TestData : Codable, Hashable {
         which will output a table of the test results for both platforms.
 
         """
-
-        if let license {
-            appREADME += """
-            
-            ## License
-
-            This software is licensed under the [\(license.spdx.name)](\(license.spdx.href)).
-
-            """
-
-            try license.licenseContents
-                .write(to: projectFolderURL.appending(path: license.licenseFilename), atomically: false, encoding: .utf8)
-        }
 
         try (app ? appREADME : libREADME).write(to: readmeURL, atomically: false, encoding: .utf8)
 
@@ -1839,8 +1800,6 @@ class AppProjectLayout : FrameworkProjectLayout {
     }
 
     static func createSkipAppProject(options: ProjectOptionValues, productName: String?, modules: [PackageModule], resourceFolder: String?, dir outputFolder: URL, configuration: BuildConfiguration, build: Bool, test: Bool, app: Bool, appid: String?, icon: IconParameters?, version: String?, nativeMode: NativeMode, moduleMode: ModuleMode, moduleTests: Bool, packageResolved packageResolvedURL: URL? = nil) async throws -> (baseURL: URL, project: AppProjectLayout) {
-        let sourceHeader = options.defaultLicense(app: true)?.sourceHeader.appending("\n\n") ?? ""
-
         let projectName = options.projectName
         if let invalidProjectName = isValidProjectName(projectName) {
             throw InitError(errorDescription: "\(invalidProjectName): \(projectName)")
@@ -2441,7 +2400,7 @@ New features and better performance.
 
         // Darwin/Sources/Main.swift
         let appMainContents = """
-\(sourceHeader)import SwiftUI
+import SwiftUI
 import \(primaryModuleName)
 
 private typealias AppRootView = \(primaryModuleName)RootView
@@ -2533,7 +2492,7 @@ typealias AppType = NSApplication
 
         // Sources/Playground/PlaygroundApp.swift
         let appExtContents = """
-\(sourceHeader)import Foundation
+import Foundation
 \(osLogImport)
 \(swiftUIImport)
 
@@ -2711,7 +2670,7 @@ struct PlatformHeartView : View {
 
         // Sources/Playground/PlaygroundApp.swift
         let contentViewContents = """
-\(sourceHeader)\(swiftUIImport)\(secondImport)
+\(swiftUIImport)\(secondImport)
 
 enum ContentTab: String, Hashable {
     case welcome, home, settings
