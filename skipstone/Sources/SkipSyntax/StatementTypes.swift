@@ -1,0 +1,2064 @@
+// Copyright (c) 2023 - 2026 Skip
+
+import SwiftSyntax
+
+import Foundation
+
+/// Supported Swift statement types.
+///
+/// - Note: `Codable` for use in `CodebaseInfo`.
+enum StatementType: CaseIterable, Codable {
+    case `break`
+    case `continue`
+    case `discard`
+    case `defer`
+    case doCatch
+    case empty
+    case `fallthrough`
+    case forLoop
+    case `guard`
+    case ifDefined
+    case labeled
+    case `return`
+    case `throw`
+    case whileLoop
+
+    case actorDeclaration
+    case classDeclaration
+    case deinitDeclaration
+    case enumCaseDeclaration
+    case enumDeclaration
+    case extensionDeclaration
+    case functionDeclaration
+    case importDeclaration
+    case initDeclaration
+    case protocolDeclaration
+    case structDeclaration
+    case subscriptDeclaration
+    case typealiasDeclaration
+    case unbridgedMemberDeclaration
+    case variableDeclaration
+
+    // Special statements
+    case codeBlock
+    case expression
+    case raw
+    case message
+
+    /// The Swift data type that represents this statement type.
+    var representingType: Statement.Type? {
+        switch self {
+        case .break:
+            return Break.self
+        case .codeBlock:
+            return CodeBlock.self
+        case .continue:
+            return Continue.self
+        case .discard:
+            return Discard.self
+        case .defer:
+            return Defer.self
+        case .doCatch:
+            return DoCatch.self
+        case .empty:
+            return Empty.self
+        case .fallthrough:
+            return Fallthrough.self
+        case .forLoop:
+            return ForLoop.self
+        case .guard:
+            return Guard.self
+        case .ifDefined:
+            return IfDefined.self
+        case .labeled:
+            return LabeledStatement.self
+        case .return:
+            return Return.self
+        case .throw:
+            return Throw.self
+        case .whileLoop:
+            return WhileLoop.self
+
+        case .actorDeclaration:
+            return TypeDeclaration.self
+        case .classDeclaration:
+            return TypeDeclaration.self
+        case .deinitDeclaration:
+            return FunctionDeclaration.self
+        case .enumCaseDeclaration:
+            return EnumCaseDeclaration.self
+        case .enumDeclaration:
+            return TypeDeclaration.self
+        case .extensionDeclaration:
+            return ExtensionDeclaration.self
+        case .functionDeclaration:
+            return FunctionDeclaration.self
+        case .importDeclaration:
+            return ImportDeclaration.self
+        case .initDeclaration:
+            return FunctionDeclaration.self
+        case .protocolDeclaration:
+            return TypeDeclaration.self
+        case .structDeclaration:
+            return TypeDeclaration.self
+        case .subscriptDeclaration:
+            return SubscriptDeclaration.self
+        case .typealiasDeclaration:
+            return TypealiasDeclaration.self
+        case .unbridgedMemberDeclaration:
+            return UnbridgedMemberDeclaration.self
+        case .variableDeclaration:
+            return VariableDeclaration.self
+
+        case .expression:
+            return ExpressionStatement.self
+        case .message:
+            return MessageStatement.self
+        case .raw:
+            return RawStatement.self
+        }
+    }
+}
+
+/// `break`
+final class Break: Statement {
+    let label: String?
+
+    init(label: String? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.label = label
+        super.init(type: .break, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .breakStmt, let breakStmnt = syntax.as(BreakStmtSyntax.self) else {
+            return nil
+        }
+        let label = breakStmnt.label?.text
+        return [Break(label: label, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return label == nil ? [] : [PrettyPrintTree(root: label!)]
+    }
+}
+
+/// A synthetic statement type used to represent a code block of statements.
+final class CodeBlock: Statement {
+    var statements: [Statement]
+
+    init(statements: [Statement]) {
+        self.statements = statements
+        super.init(type: .codeBlock)
+    }
+
+    /// Return the inferred type of the return statements in the block.
+    var returnType: TypeSignature {
+        guard !statements.isEmpty else {
+            return .none
+        }
+        var returnType: TypeSignature = .none
+        var isOptional = false
+        var foundReturn = false
+        visit { node in
+            if node is Closure || node is FunctionDeclaration {
+                return .skip
+            }
+            if let expression = (node as? Return)?.expression {
+                foundReturn = true
+                if expression.type == .nilLiteral {
+                    isOptional = true
+                } else {
+                    returnType = returnType.or(expression.inferredType)
+                }
+            }
+            return .recurse(nil)
+        }
+        if !foundReturn {
+            returnType = statements.last!.inferredType
+        }
+        return returnType.asOptional(isOptional || returnType.isOptional)
+    }
+
+    /// Return the inferred type of the throwing statements in the block.
+    ///
+    /// Returns `.any` for an untyped throws.
+    var throwsType: TypeSignature {
+        guard !statements.isEmpty else {
+            return .none
+        }
+        var throwsType: TypeSignature = .none
+        var foundTry = false
+        visit { node in
+            if node is Closure || node is FunctionDeclaration {
+                return .skip
+            }
+            if let tryExpression = node as? Try {
+                if tryExpression.kind == .default {
+                    foundTry = true
+                    tryExpression.trying.visit {
+                        if let tryThrowsType = ($0 as? APICallExpression)?.apiMatch?.apiFlags.throwsType, tryThrowsType != .none {
+                            if throwsType == .none {
+                                throwsType = tryThrowsType
+                            } else if throwsType != tryThrowsType {
+                                throwsType = .any
+                            }
+                        }
+                        return .recurse(nil)
+                    }
+                }
+                return .skip
+            } else {
+                return .recurse(nil)
+            }
+        }
+        if throwsType == .none {
+            return foundTry ? .any : .none
+        } else {
+            return throwsType
+        }
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        var blockContext = context
+        statements.forEach { blockContext = $0.inferTypes(context: blockContext, expecting: expecting) }
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        return statements
+    }
+}
+
+/// `continue`
+final class Continue: Statement {
+    let label: String?
+
+    init(label: String? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.label = label
+        super.init(type: .continue, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .continueStmt, let continueStmnt = syntax.as(ContinueStmtSyntax.self) else {
+            return nil
+        }
+        let label = continueStmnt.label?.text
+        return [Continue(label: label, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return label == nil ? [] : [PrettyPrintTree(root: label!)]
+    }
+}
+
+/// `defer { ... }`
+final class Defer: Statement {
+    let body: CodeBlock
+
+    init(body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.body = body
+        super.init(type: .defer, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .deferStmt, let deferStmt = syntax.as(DeferStmtSyntax.self) else {
+            return nil
+        }
+        let statements = StatementDecoder.decode(syntaxListContainer: deferStmt.body, context: context, in: syntaxTree)
+        let body = CodeBlock(statements: statements)
+        return [Defer(body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        return body.inferTypes(context: context, expecting: .none)
+    }
+
+    override var children: [SyntaxNode] {
+        return [body]
+    }
+}
+
+/// `discard self`
+final class Discard: ExpressionStatement {
+    init(expression: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        super.init(type: .discard, expression: expression, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .discardStmt, let discardStmnt = syntax.as(DiscardStmtSyntax.self) else {
+            return nil
+        }
+
+        let expression = ExpressionDecoder.decode(syntax: discardStmnt.expression, in: syntaxTree)
+        let statement = Discard(expression: expression, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        return [statement]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return ["discard"] + super.prettyPrintAttributes
+    }
+}
+
+/// `do { ... } [catch...]`
+final class DoCatch: Statement {
+    let body: CodeBlock
+    let catches: [SwitchCase]
+
+    init(body: CodeBlock, catches: [SwitchCase], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.body = body
+        self.catches = catches
+        super.init(type: .doCatch, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .doStmt, let doStmnt = syntax.as(DoStmtSyntax.self) else {
+            return nil
+        }
+        let statements = StatementDecoder.decode(syntaxListContainer: doStmnt.body, context: context, in: syntaxTree)
+        let body = CodeBlock(statements: statements)
+        var catches: [SwitchCase] = []
+        var messages: [Message] = []
+        for catchClause in doStmnt.catchClauses {
+            if let switchCase = ExpressionDecoder.decode(syntax: catchClause, in: syntaxTree) as? SwitchCase {
+                catches.append(switchCase)
+            } else {
+                messages.append(.unsupportedSyntax(doStmnt.catchClauses, source: syntaxTree.source))
+            }
+        }
+        let statement = DoCatch(body: body, catches: catches, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        statement.messages = messages
+        return [statement]
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        let _ = body.inferTypes(context: context, expecting: .none)
+        catches.forEach { let _ = $0.inferTypes(context: context, expecting: .none) }
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        return [body] + catches
+    }
+}
+
+/// Empty statement typically used to hold trivia.
+final class Empty: Statement {
+    init(syntax: SyntaxProtocol, extras: StatementExtras, in syntaxTree: SyntaxTree) {
+        super.init(type: .empty, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+    }
+
+    init(extras: StatementExtras) {
+        super.init(type: .empty, extras: extras)
+    }
+}
+
+/// `fallthrough`
+final class Fallthrough: Statement {
+    init(syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        super.init(type: .fallthrough, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .fallThroughStmt else {
+            return nil
+        }
+        return [Fallthrough(syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+}
+
+/// `for ... in ... { ... }`
+final class ForLoop: Statement {
+    let identifierPatterns: [IdentifierPattern]
+    let declaredType: TypeSignature
+    let isTry: Bool
+    let isAwait: Bool
+    let isNonNilMatch: Bool
+    let sequence: Expression
+    let whereGuard: Expression?
+    let body: CodeBlock
+
+    init(identifierPatterns: [IdentifierPattern], declaredType: TypeSignature = .none, isTry: Bool = false, isAwait: Bool = false, isNonNilMatch: Bool = false, sequence: Expression, whereGuard: Expression? = nil, body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.identifierPatterns = identifierPatterns
+        self.declaredType = declaredType
+        self.isTry = isTry
+        self.isAwait = isAwait
+        self.isNonNilMatch = isNonNilMatch
+        self.sequence = sequence
+        self.whereGuard = whereGuard
+        self.body = body
+        super.init(type: .forLoop, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .forStmt, let forStmnt = syntax.as(ForStmtSyntax.self) else {
+            return nil
+        }
+
+        let identifierPatterns: [IdentifierPattern]?
+        let isNonNilMatch: Bool
+        if forStmnt.caseKeyword != nil {
+            let casePattern = CasePattern(syntax: forStmnt.pattern, in: syntaxTree)
+            identifierPatterns = (casePattern.value as? Binding)?.identifierPatterns
+            isNonNilMatch = casePattern.isNonNilMatch
+        } else {
+            identifierPatterns = forStmnt.pattern.identifierPatterns(in: syntaxTree)
+            isNonNilMatch = false
+        }
+        guard let identifierPatterns else {
+            throw Message.unsupportedSyntax(forStmnt.pattern, source: syntaxTree.source)
+        }
+        var declaredType: TypeSignature = .none
+        if let typeSyntax = forStmnt.typeAnnotation?.type {
+            declaredType = TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
+        }
+        let isTry = forStmnt.tryKeyword != nil
+        let isAwait = forStmnt.awaitKeyword != nil
+        let sequence = ExpressionDecoder.decode(syntax: forStmnt.sequence, in: syntaxTree)
+        var whereGuard: Expression? = nil
+        if let whereSyntax = forStmnt.whereClause?.condition {
+            whereGuard = ExpressionDecoder.decode(syntax: whereSyntax, in: syntaxTree)
+        }
+        let statements = StatementDecoder.decode(syntaxListContainer: forStmnt.body, context: context, in: syntaxTree)
+        let body = CodeBlock(statements: statements)
+        return [ForLoop(identifierPatterns: identifierPatterns, declaredType: declaredType, isTry: isTry, isAwait: isAwait, isNonNilMatch: isNonNilMatch, sequence: sequence, whereGuard: whereGuard, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        let _ = sequence.inferTypes(context: context, expecting: declaredType == .none ? .none : .array(declaredType))
+        var elementTypes = context.elementType(of: sequence.inferredType).tupleTypes(count: identifierPatterns.count)
+        if isNonNilMatch {
+            elementTypes = elementTypes.map { $0.asOptional(false) }
+        }
+        let bodyContext = context.addingIdentifiers(identifierPatterns.map(\.name), types: elementTypes)
+        whereGuard?.inferTypes(context: bodyContext, expecting: .bool)
+        let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        var children: [SyntaxNode] = [sequence]
+        if let whereGuard {
+            children.append(whereGuard)
+        }
+        children.append(body)
+        return children
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return [PrettyPrintTree(root: identifierPatterns.map { $0.name ?? "_" }.joined(separator: ", "))]
+    }
+}
+
+/// `guard ...`
+final class Guard: Statement {
+    let conditions: [Expression]
+    let body: CodeBlock
+
+    init(conditions: [Expression], body: CodeBlock, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.conditions = conditions
+        self.body = body
+        super.init(type: .guard, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .guardStmt, let guardStmnt = syntax.as(GuardStmtSyntax.self) else {
+            return nil
+        }
+        
+        let conditions = guardStmnt.conditions.map { ExpressionDecoder.decode(syntax: $0.condition, in: syntaxTree) }
+        let statements = StatementDecoder.decode(syntaxListContainer: guardStmnt.body, context: context, in: syntaxTree)
+        let body = CodeBlock(statements: statements)
+        return [Guard(conditions: conditions, body: body, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        var conditionsContext = context
+        for condition in conditions {
+            conditionsContext = condition.inferTypes(context: conditionsContext, expecting: .bool)
+            if let bindingExpression = condition as? BindingExpression {
+                conditionsContext = conditionsContext.addingIdentifiers(bindingExpression.bindings)
+            }
+        }
+        let _ = body.inferTypes(context: context, expecting: .none)
+        return conditionsContext
+    }
+
+    override var children: [SyntaxNode] {
+        return conditions + [body]
+    }
+}
+
+/// `#if SYMBOL ... #endif`
+///
+/// - Note: We never instantiate this class. It is only used ot extract the statements from an `#if`.
+final class IfDefined: Statement {
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .ifConfigDecl, let ifConfigDecl = syntax.as(IfConfigDeclSyntax.self) else {
+            return nil
+        }
+
+        let match = extractClause(from: ifConfigDecl, in: syntaxTree)
+        var context = context
+        if match?.ifSkipBlockTypes.contains(.ifSkip) == true {
+            context.isInIfSkipBlock = true
+        }
+
+        var statements = try extractStatements(from: match?.clause, context: context, in: syntaxTree)
+        if let endSyntax = match?.endSyntax, let extras = StatementExtras.decode(syntax: endSyntax) {
+            let (extraStatements, _) = extras.statements(syntax: endSyntax, in: syntaxTree)
+            statements += extraStatements
+            statements.append(Empty(syntax: endSyntax, extras: extras, in: syntaxTree))
+        }
+        if let extras {
+            // Preserve #if leading and trailng trivia
+            if !extras.leadingTrivia.isEmpty {
+                let leadingExtras = StatementExtras(directives: extras.directives, leadingTrivia: extras.leadingTrivia, trailingTrivia: [])
+                statements.insert(Empty(extras: leadingExtras), at: 0)
+            }
+            if !extras.trailingTrivia.isEmpty {
+                let trailingExtras = StatementExtras(directives: [], leadingTrivia: [], trailingTrivia: extras.trailingTrivia)
+                statements.append(Empty(extras: trailingExtras))
+            }
+        }
+        if let ifSkipBlockTypes = match?.ifSkipBlockTypes {
+            for ifSkipBlockType in ifSkipBlockTypes {
+                for statement in statements {
+                    if statement.extras != nil {
+                        statement.extras?.directives.append(.ifSkipBlock(ifSkipBlockType))
+                    } else {
+                        statement.extras = StatementExtras(directives: [.ifSkipBlock(ifSkipBlockType)], leadingTrivia: [], trailingTrivia: [])
+                    }
+                }
+            }
+        }
+        return statements
+    }
+
+    /// Decode an `#if` surrounding a set of switch cases.
+    static func decodeCaseList(syntax: IfConfigDeclSyntax, in syntaxTree: SyntaxTree) -> ([SwitchCase], [Message]) {
+        guard let elements = extractClause(from: syntax, in: syntaxTree)?.clause.elements else {
+            return ([], [])
+        }
+        guard case .switchCases(let caseList) = elements else {
+            return ([], [Message.ifDeclPlacement(syntax, source: syntaxTree.source)])
+        }
+        return Switch.decodeCaseList(syntax: caseList, in: syntaxTree)
+    }
+
+    /// Decode a postfix `#if`.
+    ///
+    /// `View().x()`
+    ///     `#if SYMBOL
+    ///     `.y()`
+    ///     `#else`
+    ///     `.z()`
+    ///     `#endif`
+    static func decodePostfix(syntax: IfConfigDeclSyntax, baseExpression: Expression, in syntaxTree: SyntaxTree) -> Expression? {
+        guard let elements = extractClause(from: syntax, in: syntaxTree)?.clause.elements else {
+            return baseExpression
+        }
+        guard case .postfixExpression(let exprSyntax) = elements else {
+            return nil
+        }
+        let expression = ExpressionDecoder.decode(syntax: exprSyntax, in: syntaxTree)
+        var memberExpression = expression
+        while true {
+            // We only support a chain of member accesses and member function calls. Find the member that is missing a
+            // base expression and install the postfix base
+            if let functionCall = memberExpression as? FunctionCall {
+                memberExpression = functionCall.function
+            } else if let memberAccess = memberExpression as? MemberAccess {
+                if let memberBase = memberAccess.base {
+                    memberExpression = memberBase
+                } else {
+                    memberAccess.base = baseExpression
+                    break
+                }
+            } else {
+                return nil
+            }
+        }
+        return expression
+    }
+
+    private static func extractClause(from syntax: IfConfigDeclSyntax, in syntaxTree: SyntaxTree) -> (clause: IfConfigClauseSyntax, ifSkipBlockTypes: [IfSkipBlockType], endSyntax: SyntaxProtocol)? {
+        // Look for a clause that matches a defined symbol, or an 'else'. Return it along with the pound keyword *after* it,
+        // which we use to look for ending statement extras
+        var trueClause: IfConfigClauseSyntax? = nil
+        var ifSkipBlockTypes: [IfSkipBlockType] = []
+        var hasNotSkipClause = false
+        var hasNotOSAndroidClause = false
+        for ifConfigClause in syntax.clauses {
+            if let trueClause {
+                return (trueClause, ifSkipBlockTypes, ifConfigClause.poundKeyword)
+            }
+            if ifConfigClause.poundKeyword.text == "#else" {
+                // If we reach an else, all previous clauses must have been false
+                trueClause = ifConfigClause
+                if hasNotSkipClause {
+                    ifSkipBlockTypes.append(.ifSkip)
+                } else if hasNotOSAndroidClause {
+                    ifSkipBlockTypes.append(.ifOSAndroid)
+                }
+                continue
+            }
+
+            let clauseSymbol = ifConfigClause.condition?.description ?? ""
+            let (isSupported, isTrue, ifSkipBlocks, negatedIfSkipBlocks) = processConditions(symbol: clauseSymbol, preprocessorSymbols: syntaxTree.preprocessorSymbols)
+            ifSkipBlockTypes = ifSkipBlocks
+            hasNotSkipClause = hasNotSkipClause || negatedIfSkipBlocks.contains(.ifSkip)
+            hasNotOSAndroidClause = hasNotOSAndroidClause || negatedIfSkipBlocks.contains(.ifOSAndroid)
+
+            if !isSupported && !syntaxTree.isBridgeFile {
+                syntaxTree.root.messages.append(.preprocessorTooComplex(ifConfigClause, source: syntaxTree.source))
+                break
+            }
+            if isTrue {
+                trueClause = ifConfigClause
+            }
+        }
+        if let trueClause {
+            return (trueClause, ifSkipBlockTypes, syntax.poundEndif)
+        } else {
+            return nil
+        }
+    }
+
+    private static func processConditions(symbol: String, preprocessorSymbols: Set<String>) -> (isSupported: Bool, isTrue: Bool, ifSkipBlocks: [IfSkipBlockType], negatedIfSkipBlocks: [IfSkipBlockType]) {
+        let symbols = symbol.split(separator: " ", omittingEmptySubsequences: true)
+        var ifSkipBlocks: [IfSkipBlockType] = []
+        var negatedIfSkipBlocks: [IfSkipBlockType] = []
+        var hasTrue: Bool? = nil
+        var hasFalse: Bool? = nil
+        var hasAnd = false
+        var hasOr = false
+        var hasParens = false
+        for var symbol in symbols {
+            if symbol == "&&" {
+                hasAnd = true
+            } else if symbol == "||" {
+                hasOr = true
+            } else {
+                let isNot = symbol.hasPrefix("!")
+                if isNot {
+                    symbol = symbol.dropFirst()
+                } else if symbol.hasPrefix("(") {
+                    hasParens = true
+                    symbol = symbol.dropFirst()
+                } else if symbol.hasSuffix(")") && !symbol.contains("(") {
+                    hasParens = true
+                    symbol = symbol.dropLast()
+                }
+                let ifSkipBlockType: IfSkipBlockType?
+                let negated: Bool
+                let isTrue: Bool
+                if symbol == "SKIP" {
+                    ifSkipBlockType = .ifSkip
+                    negated = isNot
+                    isTrue = !isNot
+                } else if symbol == "os(Android)" {
+                    ifSkipBlockType = .ifOSAndroid
+                    negated = isNot
+                    isTrue = !isNot
+                } else if symbol == "SKIP_BRIDGE" {
+                    ifSkipBlockType = .ifNotSkipBridge
+                    negated = !isNot
+                    isTrue = isNot
+                } else if symbol.hasPrefix("canImport(Skip") {
+                    ifSkipBlockType = .ifCanImportSkipLib
+                    negated = isNot
+                    isTrue = !isNot
+                } else if preprocessorSymbols.contains(String(symbol)) {
+                    ifSkipBlockType = nil
+                    negated = isNot
+                    isTrue = !isNot
+                } else {
+                    // Unrecognized symbol
+                    ifSkipBlockType = nil
+                    negated = isNot
+                    isTrue = isNot
+                }
+                if let ifSkipBlockType {
+                    if negated {
+                        negatedIfSkipBlocks.append(ifSkipBlockType)
+                    } else {
+                        ifSkipBlocks.append(ifSkipBlockType)
+                    }
+                }
+                hasTrue = hasTrue == true || isTrue
+                hasFalse = hasFalse == true || !isTrue
+            }
+        }
+        if ifSkipBlocks.isEmpty && negatedIfSkipBlocks.isEmpty {
+            // Don't process Skip-less preprocessor directives at all
+            return (true, false, [], [])
+        } else if hasParens || (hasAnd && hasOr) {
+            // Unsupported
+            return (false, false, [], [])
+        } else if hasAnd {
+            return (true, hasFalse != true, ifSkipBlocks, negatedIfSkipBlocks)
+        } else if hasOr {
+            return (true, hasTrue == true, [], [])
+        } else {
+            return (true, hasTrue == true, ifSkipBlocks, negatedIfSkipBlocks)
+        }
+    }
+
+    private static func extractStatements(from clause: IfConfigClauseSyntax?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement] {
+        guard let elements = clause?.elements else {
+            return []
+        }
+        switch elements {
+        case .statements(let syntax):
+            return StatementDecoder.decode(syntaxList: syntax, context: context, in: syntaxTree)
+        case .switchCases(let syntax):
+            throw Message.ifDeclPlacement(syntax, source: syntaxTree.source)
+        case .decls(let syntax):
+            return StatementDecoder.decode(syntaxList: syntax, context: context, in: syntaxTree)
+        case .postfixExpression(let syntax):
+            throw Message.ifDeclPlacement(syntax, source: syntaxTree.source)
+        case .attributes(let syntax):
+            throw Message.ifDeclPlacement(syntax, source: syntaxTree.source)
+        }
+    }
+}
+
+/// `label: for/while/etc`
+final class LabeledStatement: Statement {
+    let label: String
+    let target: Statement
+
+    init(label: String, target: Statement, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.label = label
+        self.target = target
+        super.init(type: .labeled, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .labeledStmt, let labeledStmnt = syntax.as(LabeledStmtSyntax.self) else {
+            return nil
+        }
+
+        let label = labeledStmnt.label.text
+        guard let target = StatementDecoder.decode(syntax: labeledStmnt.statement, context: context, in: syntaxTree).first else {
+            throw Message.unsupportedSyntax(labeledStmnt.statement, source: syntaxTree.source)
+        }
+        return [LabeledStatement(label: label, target: target, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source))]
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        return target.inferTypes(context: context, expecting: expecting)
+    }
+
+    override var inferredType: TypeSignature {
+        return target.inferredType
+    }
+
+    override var children: [SyntaxNode] {
+        return [target]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return [PrettyPrintTree(root: label)]
+    }
+}
+
+/// `return ...`
+final class Return: ExpressionStatement {
+    init(expression: Expression? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        super.init(type: .return, expression: expression, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .returnStmt, let returnStmnt = syntax.as(ReturnStmtSyntax.self) else {
+            return nil
+        }
+
+        var expression: Expression? = nil
+        if let expressionSyntax = returnStmnt.expression {
+            expression = ExpressionDecoder.decode(syntax: expressionSyntax, in: syntaxTree)
+        }
+        let statement = Return(expression: expression, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        return [statement]
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        if let expression {
+            expression.inferTypes(context: context, expecting: expecting.or(context.expectedReturn))
+            context.assignLiteralExpressibleType(context.expectedReturn, to: expression)
+        }
+        return context
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return ["return"] + super.prettyPrintAttributes
+    }
+}
+
+/// `throw ...`
+final class Throw: Statement {
+    let error: Expression
+
+    init(error: Expression, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.error = error
+        super.init(type: .throw, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .throwStmt, let throwStmt = syntax.as(ThrowStmtSyntax.self) else {
+            return nil
+        }
+        let error = ExpressionDecoder.decode(syntax: throwStmt.expression, in: syntaxTree)
+        return [Throw(error: error, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)]
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        let _ = error.inferTypes(context: context, expecting: context.expectedThrows)
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        return [error]
+    }
+}
+
+/// `while(conditions) { ... }`
+final class WhileLoop: Statement {
+    let conditions: [Expression]
+    let body: CodeBlock
+    let isRepeatWhile: Bool
+
+    init(conditions: [Expression], body: CodeBlock, isRepeatWhile: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.conditions = conditions
+        self.body = body
+        self.isRepeatWhile = isRepeatWhile
+        super.init(type: .whileLoop, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        if syntax.kind == .whileStmt, let whileStmnt = syntax.as(WhileStmtSyntax.self) {
+            return try [decodeWhile(statement: whileStmnt, extras: extras, context: context, in: syntaxTree)]
+        } else if syntax.kind == .repeatStmt, let repeatStmnt = syntax.as(RepeatStmtSyntax.self) {
+            return [decodeRepeat(statement: repeatStmnt, extras: extras, context: context, in: syntaxTree)]
+        } else {
+            return nil
+        }
+    }
+
+    private static func decodeWhile(statement: WhileStmtSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> WhileLoop {
+        let conditions = statement.conditions.map { ExpressionDecoder.decode(syntax: $0.condition, in: syntaxTree) }
+        let statements = StatementDecoder.decode(syntaxListContainer: statement.body, context: context, in: syntaxTree)
+        let body = CodeBlock(statements: statements)
+        return WhileLoop(conditions: conditions, body: body, syntax: statement, sourceFile: syntaxTree.source.file, sourceRange: statement.range(in: syntaxTree.source), extras: extras)
+    }
+
+    private static func decodeRepeat(statement: RepeatStmtSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> WhileLoop {
+        let condition = ExpressionDecoder.decode(syntax: statement.condition, in: syntaxTree)
+        let statements = StatementDecoder.decode(syntaxListContainer: statement.body, context: context, in: syntaxTree)
+        let body = CodeBlock(statements: statements)
+        return WhileLoop(conditions: [condition], body: body, isRepeatWhile: true, syntax: statement, sourceFile: syntaxTree.source.file, sourceRange: statement.range(in: syntaxTree.source), extras: extras)
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        var conditionsContext = context
+        var bindings: [String: TypeSignature] = [:]
+        for condition in conditions {
+            conditionsContext = condition.inferTypes(context: conditionsContext, expecting: .bool)
+            if let bindingExpression = condition as? BindingExpression {
+                let conditionBindings = bindingExpression.bindings
+                conditionsContext = conditionsContext.addingIdentifiers(conditionBindings)
+                bindings.merge(conditionBindings) { _, new in new }
+            }
+        }
+        // Condition bindings are available to body in a while loop, but not in a repeat while loop
+        if isRepeatWhile {
+            let _ = body.inferTypes(context: context, expecting: .none)
+        } else {
+            let bodyContext = context.pushingBlock(identifiers: bindings)
+            let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        }
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        return conditions + [body]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        return isRepeatWhile ? ["repeat"] : []
+    }
+}
+
+// MARK: - Declarations
+
+/// `case x(Int)`
+final class EnumCaseDeclaration: Statement {
+    let name: String
+    private(set) var associatedValues: [Parameter<Expression>]
+    let rawValue: Expression?
+    let rawValueSwift: String?
+    var attributes: Attributes // Allow additions by transformers
+    private(set) var modifiers: Modifiers
+    var signature: TypeSignature {
+        guard let owningTypeDeclaration else {
+            return .none
+        }
+        guard !associatedValues.isEmpty else {
+            return owningTypeDeclaration.signature
+        }
+        let parameters = associatedValues.map {
+            TypeSignature.Parameter(label: $0.externalLabel, type: $0.declaredType, isInOut: $0.isInOut, isVariadic: $0.isVariadic, hasDefaultValue: $0.defaultValue != nil)
+        }
+        return .function(parameters, owningTypeDeclaration.signature, APIFlags(), nil)
+    }
+
+    init(name: String, associatedValues: [Parameter<Expression>], rawValue: Expression? = nil, rawValueSwift: String? = nil, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.name = name
+        self.associatedValues = associatedValues
+        self.rawValue = rawValue
+        self.rawValueSwift = rawValueSwift
+        self.attributes = attributes
+        self.modifiers = modifiers
+        super.init(type: .enumCaseDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
+        guard syntax.kind == .enumCaseDecl, let enumCaseDecl = syntax.as(EnumCaseDeclSyntax.self) else {
+            return nil
+        }
+        var attributes = Attributes.for(syntax: enumCaseDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras, in: syntaxTree)
+        let modifiers = Modifiers.for(syntax: enumCaseDecl.modifiers)
+        return enumCaseDecl.elements.enumerated().map { (index, element) in
+            let name = element.name.text.removingBacktickEscaping
+            let (associatedValues, messages) = element.parameterClause?.parameters(in: syntaxTree) ?? ([], [])
+            let rawValue = element.rawValue.map { ExpressionDecoder.decode(syntax: $0.value, in: syntaxTree) }
+            let rawValueSwift = element.rawValue?.value.trimmedDescription
+            let statement = EnumCaseDeclaration(name: name, associatedValues: associatedValues, rawValue: rawValue, rawValueSwift: rawValueSwift, attributes: attributes, modifiers: modifiers, syntax: element, sourceFile: syntaxTree.source.file, sourceRange: element.range(in: syntaxTree.source), extras: index == 0 ? extras : nil)
+            statement.messages = messages
+            return statement
+        }
+    }
+
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        // Enum case declarations inherit the visibility of the enum
+        if modifiers.visibility == .default {
+            if let owningTypeDeclaration = parent as? TypeDeclaration {
+                modifiers.visibility = owningTypeDeclaration.modifiers.visibility == .private ? .fileprivate : owningTypeDeclaration.modifiers.visibility
+            } else {
+                modifiers.visibility = .internal
+            }
+        }
+        associatedValues = associatedValues.map { $0.resolvedType(in: self, context: context) }
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        associatedValues.forEach { $0.defaultValue?.inferTypes(context: context, expecting: $0.declaredType) }
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        var children = associatedValues.compactMap { $0.defaultValue }
+        if let rawValue {
+            children.append(rawValue)
+        }
+        return children
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        var attrs = [PrettyPrintTree(root: name)]
+        if !associatedValues.isEmpty {
+            attrs.append(PrettyPrintTree(root: "associatedValues", children: associatedValues.map { $0.prettyPrintTree }))
+        }
+        if !attributes.isEmpty {
+            attrs.append(attributes.prettyPrintTree)
+        }
+        if !modifiers.isEmpty {
+            attrs.append(modifiers.prettyPrintTree)
+        }
+        return attrs
+    }
+}
+
+/// `extension Type { ... }`
+final class ExtensionDeclaration: TypeDeclaration {
+    let extends: TypeSignature
+
+    init(extends: TypeSignature, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.extends = extends
+        let name: String
+        if extends.baseType != .none {
+            name = extends.memberType.name
+        } else {
+            name = extends.name
+        }
+        super.init(type: .extensionDeclaration, name: name, signature: extends, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
+        guard syntax.kind == .extensionDecl, let extensionDecl = syntax.as(ExtensionDeclSyntax.self) else {
+            return nil
+        }
+        let extends = TypeSignature.for(syntax: extensionDecl.extendedType, in: syntaxTree)
+        guard extends != .none else {
+            return nil
+        }
+        let modifiers = Modifiers.for(syntax: extensionDecl.modifiers)
+        var attributes = Attributes.for(syntax: extensionDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras, in: syntaxTree)
+        guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
+            return []
+        }
+        var context = context
+        let decodeFlags: DecodeFlags = attributes.isBridgeMembers ? [.bridgeMembers] : []
+        context.memberOf = (.extensionDeclaration, modifiers, decodeFlags)
+
+        let (inherits, inheritsMessages) = extensionDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
+        let (generics, genericsMessages) = Generics.for(syntax: nil, where: extensionDecl.genericWhereClause, in: syntaxTree)
+        let members = StatementDecoder.decode(syntaxListContainer: extensionDecl.memberBlock, context: context, in: syntaxTree)
+        let statement = ExtensionDeclaration(extends: extends, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        statement.messages = inheritsMessages + genericsMessages
+        return [statement]
+    }
+
+    override var nonExtensionDeclarationType: StatementType? {
+        return _nonExtensionDeclarationType
+    }
+    private(set) var _nonExtensionDeclarationType: StatementType?
+
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        super.resolveAttributes(in: syntaxTree, context: context)
+        _nonExtensionDeclarationType = context.declarationType(forNamed: extends)
+    }
+}
+
+/// `func f() { ... }`
+final class FunctionDeclaration: Statement {
+    let name: String
+    let isOptionalInit: Bool
+    private(set) var returnType: TypeSignature
+    private(set) var parameters: [Parameter<Expression>]
+    private(set) var asyncBehavior: AsyncBehavior
+    private(set) var throwsType: TypeSignature
+    var attributes: Attributes // Allow additions by transformers
+    private(set) var modifiers: Modifiers
+    private(set) var generics: Generics
+    let body: CodeBlock?
+    var functionType: TypeSignature {
+        let apiFlags = APIFlags(
+            isAsync: asyncBehavior != .sync,
+            isConcurrent: attributes.contains(.concurrent),
+            isNonisolatedNonsending: modifiers.isNonisolatedNonsending,
+            throwsType: throwsType
+        )
+        let function: TypeSignature = .function(parameters.map(\.signature), returnType, apiFlags, nil)
+        return attributes.apply(toFunction: function)
+    }
+
+    init(type: StatementType, name: String, isOptionalInit: Bool = false, returnType: TypeSignature = .void, parameters: [Parameter<Expression>] = [], asyncBehavior: AsyncBehavior = .sync, throwsType: TypeSignature = .none, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), body: CodeBlock? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.name = name
+        self.isOptionalInit = isOptionalInit
+        self.returnType = returnType.or(.void)
+        self.parameters = parameters
+        self.asyncBehavior = asyncBehavior
+        self.throwsType = throwsType
+        self.attributes = attributes
+        self.modifiers = modifiers
+        self.generics = generics
+        self.body = body
+        super.init(type: type, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
+        if syntax.kind == .functionDecl, let functionDecl = syntax.as(FunctionDeclSyntax.self) {
+            if let declaration = decodeFunctionDeclaration(functionDecl, extras: extras, context: context, in: syntaxTree) {
+                return [declaration]
+            } else {
+                return []
+            }
+        } else if syntax.kind == .initializerDecl, let initializerDecl = syntax.as(InitializerDeclSyntax.self) {
+            if let declaration = decodeInitializerDeclaration(initializerDecl, extras: extras, context: context, in: syntaxTree) {
+                return [declaration]
+            } else {
+                return []
+            }
+        } else if syntax.kind == .deinitializerDecl, let deinitializerDecl = syntax.as(DeinitializerDeclSyntax.self) {
+            if let declaration = decodeDeinitializerDeclaration(deinitializerDecl, extras: extras, context: context, in: syntaxTree) {
+                return [declaration]
+            } else {
+                return []
+            }
+        } else {
+            return nil
+        }
+    }
+
+    private static func decodeFunctionDeclaration(_ functionDecl: FunctionDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> FunctionDeclaration? {
+        var attributes = Attributes.for(syntax: functionDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras, in: syntaxTree)
+        let modifiers = Modifiers.for(syntax: functionDecl.modifiers)
+        let decodeLevel = decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        guard decodeLevel != .none else {
+            return nil
+        }
+
+        let name = functionDecl.name.text.removingBacktickEscaping
+        let (returnType, parameters, signatureMessges) = functionDecl.signature.typeSignatures(in: syntaxTree)
+        let isAsync = functionDecl.signature.effectSpecifiers?.asyncSpecifier != nil
+        let throwsType = functionDecl.signature.effectSpecifiers?.throwsClause?.typeSignature(in: syntaxTree) ?? .none
+
+        let (generics, genericsMessages) = Generics.for(syntax: functionDecl.genericParameterClause, where: functionDecl.genericWhereClause, in: syntaxTree)
+        var body: CodeBlock? = nil
+        if decodeLevel == .full, let bodySyntax = functionDecl.body {
+            body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, context: context, in: syntaxTree))
+        }
+        let statement = FunctionDeclaration(type: .functionDeclaration, name: name, returnType: returnType, parameters: parameters, asyncBehavior: isAsync ? .async : .sync, throwsType: throwsType, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: functionDecl, sourceFile: syntaxTree.source.file, sourceRange: functionDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = signatureMessges + genericsMessages
+        return statement
+    }
+
+    private static func decodeInitializerDeclaration(_ initializerDecl: InitializerDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> Statement? {
+        var attributes = Attributes.for(syntax: initializerDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras, in: syntaxTree)
+        let modifiers = Modifiers.for(syntax: initializerDecl.modifiers)
+        let decodeLevel = decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        guard decodeLevel != .none else {
+            if syntaxTree.isBridgeFile {
+                // We have to note unbridged constructors because they affect default constructor generation and bridging
+                return UnbridgedMemberDeclaration(member: .constructor, syntax: initializerDecl, extras: extras, in: syntaxTree)
+            } else {
+                return nil
+            }
+        }
+
+        let isOptionalInit = initializerDecl.optionalMark != nil
+        let (_, parameters, signatureMessages) = initializerDecl.signature.typeSignatures(in: syntaxTree)
+        let isAsync = initializerDecl.signature.effectSpecifiers?.asyncSpecifier != nil
+        let throwsType = initializerDecl.signature.effectSpecifiers?.throwsClause?.typeSignature(in: syntaxTree) ?? .none
+        let (generics, genericsMessages) = Generics.for(syntax: initializerDecl.genericParameterClause, where: initializerDecl.genericWhereClause, in: syntaxTree)
+        var body: CodeBlock? = nil
+        if decodeLevel == .full, let bodySyntax = initializerDecl.body {
+            body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, context: context, in: syntaxTree))
+        }
+        let statement = FunctionDeclaration(type: .initDeclaration, name: "init", isOptionalInit: isOptionalInit, returnType: .void, parameters: parameters, asyncBehavior: isAsync ? .async : .sync, throwsType: throwsType, attributes: attributes, modifiers: modifiers, generics: generics, body: body, syntax: initializerDecl, sourceFile: syntaxTree.source.file, sourceRange: initializerDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = signatureMessages + genericsMessages
+        return statement
+    }
+
+    private static func decodeDeinitializerDeclaration(_ deinitializerDecl: DeinitializerDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> FunctionDeclaration? {
+        // Deinit is never bridged, so only use it for transpilation
+        guard !syntaxTree.isBridgeFile || context.isInIfSkipBlock else {
+            return nil
+        }
+        var attributes = Attributes.for(syntax: deinitializerDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras, in: syntaxTree)
+        let modifiers = Modifiers.for(syntax: deinitializerDecl.modifiers)
+        var body: CodeBlock? = nil
+        if let bodySyntax = deinitializerDecl.body {
+            body = CodeBlock(statements: StatementDecoder.decode(syntaxListContainer: bodySyntax, context: context, in: syntaxTree))
+        }
+        let statement = FunctionDeclaration(type: .deinitDeclaration, name: "deinit", returnType: .void, attributes: attributes, modifiers: modifiers, body: body, syntax: deinitializerDecl, sourceFile: syntaxTree.source.file, sourceRange: deinitializerDecl.range(in: syntaxTree.source), extras: extras)
+        return statement
+    }
+
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        if type == .initDeclaration, let owningTypeDeclaration = parent as? TypeDeclaration {
+            returnType = owningTypeDeclaration.signature.asOptional(isOptionalInit)
+        } else {
+            returnType = returnType.resolved(in: self, context: context)
+        }
+        parameters = parameters.map { $0.resolvedType(in: self, context: context) }
+        throwsType = throwsType.resolved(in: self, context: context)
+        // Functions in protocols or extensions inherit the visibility of the protocol or extension
+        if modifiers.visibility == .default {
+            if let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
+                modifiers.visibility = owningTypeDeclaration.modifiers.visibility == .private ? .fileprivate : owningTypeDeclaration.modifiers.visibility
+            } else {
+                modifiers.visibility = .internal
+            }
+        }
+        generics = generics.resolved(in: self, context: context)
+        if asyncBehavior != .actor, type != .initDeclaration, !modifiers.isNonisolated && !modifiers.isStatic, (parent as? TypeDeclaration)?.nonExtensionDeclarationType == .actorDeclaration {
+            asyncBehavior = .actor
+        }
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        for parameter in parameters {
+            if let value = parameter.defaultValue {
+                value.inferTypes(context: context, expecting: parameter.declaredType)
+                context.assignLiteralExpressibleType(parameter.declaredType, to: value)
+            }
+        }
+        if let body {
+            let bodyContext = context.pushing(self)
+            let _ = body.inferTypes(context: bodyContext, expecting: body.statements.count == 1 && bodyContext.expectedReturn != .void ? bodyContext.expectedReturn : .none)
+            if body.statements.count == 1, body.statements[0].type != .return, let expression = (body.statements[0] as? ExpressionStatement)?.expression {
+                bodyContext.assignLiteralExpressibleType(bodyContext.expectedReturn, to: expression)
+            }
+        }
+        if parent?.owningFunctionDeclaration != nil {
+            // Add identifier if local function
+            return context.addingLocalFunction(self)
+        }
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        var children: [SyntaxNode] = parameters.compactMap { $0.defaultValue }
+        if let body {
+            children.append(body)
+        }
+        return children
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        var attrs = [PrettyPrintTree(root: name)]
+        if returnType != .none {
+            attrs.append(PrettyPrintTree(root: returnType.description))
+        }
+        if !parameters.isEmpty {
+            attrs.append(PrettyPrintTree(root: "parameters", children: parameters.map { $0.prettyPrintTree }))
+        }
+        if asyncBehavior != .sync {
+            attrs.append("async")
+        }
+        if throwsType != .none {
+            attrs.append(PrettyPrintTree(root: "throws", children: [PrettyPrintTree(root: throwsType.description)]))
+        }
+        if !attributes.isEmpty {
+            attrs.append(attributes.prettyPrintTree)
+        }
+        if !modifiers.isEmpty {
+            attrs.append(modifiers.prettyPrintTree)
+        }
+        if !generics.isEmpty {
+            attrs.append(generics.prettyPrintTree)
+        }
+        return attrs
+    }
+}
+
+/// `import Module`
+final class ImportDeclaration: Statement {
+    let modulePath: [String]
+    /// Whether the import is marked `@_exported`, meaning Swift will re-export the imported module's API as part of the importing module.
+    let isExported: Bool
+
+    init(modulePath: [String], isExported: Bool = false, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.modulePath = modulePath
+        self.isExported = isExported
+        super.init(type: .importDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
+        guard syntax.kind == .importDecl, let importDecl = syntax.as(ImportDeclSyntax.self) else {
+            return nil
+        }
+        let modulePath = importDecl.path.map { $0.name.text }
+        let isExported = importDecl.attributes.contains(where: { element in
+            guard let attribute = element.as(AttributeSyntax.self) else { return false }
+            return attribute.attributeName.description.trimmingCharacters(in: .whitespaces) == "_exported"
+        })
+        let statement = ImportDeclaration(modulePath: modulePath, isExported: isExported, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        return [statement]
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        var label = modulePath.joined(separator: ".")
+        if isExported {
+            label = "@_exported " + label
+        }
+        return [PrettyPrintTree(root: label)]
+    }
+}
+
+/// `subscript() { ... }`
+final class SubscriptDeclaration: Statement {
+    private(set) var elementType: TypeSignature
+    private(set) var parameters: [Parameter<Expression>]
+    private(set) var asyncBehavior: AsyncBehavior
+    private(set) var throwsType: TypeSignature
+    var attributes: Attributes // Allow additions by transformers
+    private(set) var modifiers: Modifiers
+    private(set) var generics: Generics
+    let getter: Accessor<CodeBlock>?
+    let setter: Accessor<CodeBlock>?
+    var getterType: TypeSignature {
+        let apiFlags = APIFlags(
+            isAsync: asyncBehavior != .sync,
+            isConcurrent: attributes.contains(.concurrent),
+            isNonisolatedNonsending: modifiers.isNonisolatedNonsending,
+            throwsType: throwsType
+        )
+        let function: TypeSignature = .function(parameters.map(\.signature), elementType, apiFlags, nil)
+        return attributes.apply(toFunction: function)
+    }
+    var setterType: TypeSignature {
+        return .function(parameters.map(\.signature), .void, APIFlags(isMainActor: attributes.contains(.mainActor)), nil)
+    }
+
+    init(elementType: TypeSignature, parameters: [Parameter<Expression>], asyncBehavior: AsyncBehavior = .sync, throwsType: TypeSignature = .none, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.elementType = elementType
+        self.parameters = parameters
+        self.asyncBehavior = asyncBehavior
+        self.throwsType = throwsType
+        self.attributes = attributes
+        self.modifiers = modifiers
+        self.generics = generics
+        self.getter = getter
+        self.setter = setter
+        super.init(type: .subscriptDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
+        guard syntax.kind == .subscriptDecl, let subscriptDecl = syntax.as(SubscriptDeclSyntax.self) else {
+            return nil
+        }
+        var attributes = Attributes.for(syntax: subscriptDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras, in: syntaxTree)
+        let modifiers = Modifiers.for(syntax: subscriptDecl.modifiers)
+        let decodeLevel = decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        guard decodeLevel != .none else {
+            return []
+        }
+
+        let elementType = TypeSignature.for(syntax: subscriptDecl.returnClause.type, in: syntaxTree)
+        let (parameters, parametersMessages) = subscriptDecl.parameterClause.parameters(in: syntaxTree)
+        let (generics, genericsMessages) = Generics.for(syntax: subscriptDecl.genericParameterClause, where: subscriptDecl.genericWhereClause, in: syntaxTree)
+        var accessors = Accessors()
+        if let accessor = subscriptDecl.accessorBlock?.accessors {
+            switch accessor {
+            case .accessors(let syntax):
+                accessors = syntax.accessors(decodeBody: decodeLevel == .full, context: context, in: syntaxTree)
+                // Check if setter should be excluded because of lower visibility
+                if decodeLevel == .api && modifiers.setVisibility <= .fileprivate {
+                    accessors.setter = nil
+                }
+            case .getter(let syntax):
+                if decodeLevel != .full {
+                    accessors.getter = Accessor()
+                } else {
+                    let statements = StatementDecoder.decode(syntaxList: syntax, context: context, in: syntaxTree)
+                    accessors.getter = Accessor(body: CodeBlock(statements: statements))
+                }
+            }
+        }
+        let statement = SubscriptDeclaration(elementType: elementType, parameters: parameters, asyncBehavior: accessors.isAsync ? .async : .sync, throwsType: accessors.throwsType, attributes: attributes, modifiers: modifiers, generics: generics, getter: accessors.getter, setter: accessors.setter, sourceFile: syntaxTree.source.file, sourceRange: subscriptDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = accessors.messages + parametersMessages + genericsMessages
+        return [statement]
+    }
+
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        elementType = elementType.resolved(in: self, context: context)
+        parameters = parameters.map { $0.resolvedType(in: self, context: context) }
+        throwsType = throwsType.resolved(in: self, context: context)
+        // Functions in protocols or extensions inherit the visibility of the protocol or extension
+        if modifiers.visibility == .default {
+            if let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
+                modifiers.visibility = owningTypeDeclaration.modifiers.visibility == .private ? .fileprivate : owningTypeDeclaration.modifiers.visibility
+            } else {
+                modifiers.visibility = .internal
+            }
+        }
+        generics = generics.resolved(in: self, context: context)
+        if asyncBehavior != .actor, !modifiers.isNonisolated && !modifiers.isStatic, (parent as? TypeDeclaration)?.nonExtensionDeclarationType == .actorDeclaration {
+            asyncBehavior = .actor
+        }
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        parameters.forEach { $0.defaultValue?.inferTypes(context: context, expecting: $0.declaredType) }
+        if let body = getter?.body {
+            let bodyContext = context.expectingReturn(elementType).expectingThrows(throwsType)
+            let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        }
+        if let body = setter?.body {
+            let bodyContext = context.addingIdentifier(setter?.parameterName ?? "newValue", type: elementType)
+            let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        }
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        var children: [SyntaxNode] = []
+        if let body = getter?.body {
+            children.append(body)
+        }
+        if let body = setter?.body {
+            children.append(body)
+        }
+        return children
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        var attrs: [PrettyPrintTree] = []
+        if elementType != .none {
+            attrs.append(PrettyPrintTree(root: elementType.description))
+        }
+        if asyncBehavior != .sync {
+            attrs.append("async")
+        }
+        if throwsType != .none {
+            attrs.append(PrettyPrintTree(root: "throws", children: [PrettyPrintTree(root: throwsType.description)]))
+        }
+        if !attributes.isEmpty {
+            attrs.append(attributes.prettyPrintTree)
+        }
+        if !modifiers.isEmpty {
+            attrs.append(modifiers.prettyPrintTree)
+        }
+        return attrs
+    }
+}
+
+/// `typealias ...`
+final class TypealiasDeclaration: Statement {
+    let name: String
+    var attributes: Attributes // Allow additions by transformers
+    private(set) var modifiers: Modifiers
+    private(set) var generics: Generics
+    private(set) var aliasedType: TypeSignature
+    var signature: TypeSignature {
+        return _signature ?? .named(name, generics.entries.map(\.namedType))
+    }
+    private var _signature: TypeSignature?
+
+    init(name: String, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), aliasedType: TypeSignature, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.name = name
+        self.attributes = attributes
+        self.modifiers = modifiers
+        self.generics = generics
+        self.aliasedType = aliasedType
+        super.init(type: .typealiasDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
+        guard syntax.kind == .typeAliasDecl, let typealiasDecl = syntax.as(TypeAliasDeclSyntax.self) else {
+            return nil
+        }
+        var attributes = Attributes.for(syntax: typealiasDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras, in: syntaxTree)
+        let modifiers = Modifiers.for(syntax: typealiasDecl.modifiers)
+        guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
+            return []
+        }
+
+        let name = typealiasDecl.name.text.removingBacktickEscaping
+        let (generics, messages) = Generics.for(syntax: typealiasDecl.genericParameterClause, where: typealiasDecl.genericWhereClause, in: syntaxTree)
+        let aliasedType = TypeSignature.for(syntax: typealiasDecl.initializer.value, in: syntaxTree)
+        let statement = TypealiasDeclaration(name: name, attributes: attributes, modifiers: modifiers, generics: generics, aliasedType: aliasedType, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        statement.messages = messages
+        return [statement]
+    }
+
+    override func qualifyTypeDeclaration() {
+        if _signature == nil {
+            _signature = qualifyDeclaredType(signature)
+        }
+    }
+
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        generics = generics.resolved(in: self, context: context)
+        aliasedType = aliasedType.resolved(in: self, context: context)
+        // Aliases in protocols or extensions inherit the visibility of the protocol or extension
+        if modifiers.visibility == .default {
+            if let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
+                modifiers.visibility = owningTypeDeclaration.modifiers.visibility == .private ? .fileprivate : owningTypeDeclaration.modifiers.visibility
+            } else {
+                modifiers.visibility = .internal
+            }
+        }
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        var attrs = [PrettyPrintTree(root: name)]
+        if !modifiers.isEmpty {
+            attrs.append(modifiers.prettyPrintTree)
+        }
+        if !generics.isEmpty {
+            attrs.append(generics.prettyPrintTree)
+        }
+        attrs.append(PrettyPrintTree(root: aliasedType.description))
+        return attrs
+    }
+}
+
+/// `class/struct/enum/protocol Type { ... }`
+class TypeDeclaration: Statement {
+    let name: String
+    private(set) var inherits: [TypeSignature]
+    var attributes: Attributes // Allow additions by transformers
+    private(set) var modifiers: Modifiers
+    private(set) var generics: Generics
+    let members: [Statement]
+    let unbridgedMembers: [UnbridgedMember]
+    var signature: TypeSignature {
+        return _signature ?? TypeSignature.for(name: name, genericTypes: generics.entries.map(\.namedType))
+    }
+    private var _signature: TypeSignature?
+
+    init(type: StatementType, name: String, signature: TypeSignature? = nil, inherits: [TypeSignature] = [], attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), generics: Generics = Generics(), members: [Statement] = [], unbridgedMembers: [UnbridgedMember] = [], syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.name = name
+        _signature = signature
+        self.inherits = inherits
+        self.attributes = attributes
+        self.modifiers = modifiers
+        self.generics = generics
+        self.members = members
+        self.unbridgedMembers = unbridgedMembers
+        super.init(type: type, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
+        if syntax.kind == .classDecl, let classDecl = syntax.as(ClassDeclSyntax.self) {
+            if let declaration = decodeClassDeclaration(classDecl, extras: extras, context: context, in: syntaxTree) {
+                return [declaration]
+            } else {
+                return []
+            }
+        } else if syntax.kind == .structDecl, let structDecl = syntax.as(StructDeclSyntax.self) {
+            if let declaration = decodeStructDeclaration(structDecl, extras: extras, context: context, in: syntaxTree) {
+                return [declaration]
+            } else {
+                return []
+            }
+        } else if syntax.kind == .protocolDecl, let protocolDecl = syntax.as(ProtocolDeclSyntax.self) {
+            if let declaration = decodeProtocolDeclaration(protocolDecl, extras: extras, context: context, in: syntaxTree) {
+                return [declaration]
+            } else {
+                return []
+            }
+        } else if syntax.kind == .enumDecl, let enumDecl = syntax.as(EnumDeclSyntax.self) {
+            if let declaration = decodeEnumDeclaration(enumDecl, extras: extras, context: context, in: syntaxTree) {
+                return [declaration]
+            } else {
+                return []
+            }
+        } else if syntax.kind == .actorDecl, let actorDecl = syntax.as(ActorDeclSyntax.self) {
+            if let declaration = decodeActorDeclaration(actorDecl, extras: extras, context: context, in: syntaxTree) {
+                return [declaration]
+            } else {
+                return []
+            }
+        }
+        return nil
+    }
+
+    private static func decodeClassDeclaration(_ classDecl: ClassDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> Statement? {
+        let name = classDecl.name.text.removingBacktickEscaping
+        let modifiers = Modifiers.for(syntax: classDecl.modifiers)
+        var attributes = Attributes.for(syntax: classDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras, in: syntaxTree)
+        guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
+            if !attributes.isNoBridge, syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, attributes.contains(.observable) {
+                return UnbridgedMemberDeclaration(member: .observableType(name), syntax: classDecl, extras: extras, in: syntaxTree)
+            }
+            return nil
+        }
+        var context = context
+        let decodeFlags: DecodeFlags = attributes.isBridgeMembers ? [.bridgeMembers] : []
+        context.memberOf = (.classDeclaration, modifiers, decodeFlags)
+
+        let (inherits, inheritsMessages) = classDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
+        let (generics, genericsMessages) = Generics.for(syntax: classDecl.genericParameterClause, where: classDecl.genericWhereClause, in: syntaxTree)
+        let (members, unbridgedMembers) = decodeMembers(syntaxListContainer: classDecl.memberBlock, context: context, in: syntaxTree)
+        let statement = TypeDeclaration(type: .classDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, unbridgedMembers: unbridgedMembers, syntax: classDecl, sourceFile: syntaxTree.source.file, sourceRange: classDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = inheritsMessages + genericsMessages
+        return statement
+    }
+
+    private static func decodeStructDeclaration(_ structDecl: StructDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+        let modifiers = Modifiers.for(syntax: structDecl.modifiers)
+        var attributes = Attributes.for(syntax: structDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras, in: syntaxTree)
+        var (inherits, inheritsMessages) = structDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
+        var decodeLevel = self.decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        var decodeFlags: DecodeFlags = []
+        if decodeLevel == .none {
+            // We need to decode native views for adapting to SkipSwiftUI, unless explicitly opted out
+            if !attributes.isNoBridge, syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, let inheritsView = inherits.first(where: { isSwiftUIType($0) }) {
+                decodeLevel = .api
+                decodeFlags.insert(.swiftUIState)
+                // We don't care about other protocols
+                inherits = [inheritsView]
+            } else {
+                // A native SwiftUI view renders only via its generated bridge, so `// SKIP @nobridge` keeps it
+                // from ever appearing. Warn instead of silently producing a view that never renders.
+                if attributes.isNoBridge, syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, inherits.contains(where: { isSwiftUIType($0) }) {
+                    syntaxTree.root.messages.append(.noBridgeView(structDecl, source: syntaxTree.source))
+                }
+                return nil
+            }
+        }
+        if attributes.isBridgeMembers {
+            decodeFlags.insert(.bridgeMembers)
+        }
+        var context = context
+        context.memberOf = (.structDeclaration, modifiers, decodeFlags)
+
+        let name = structDecl.name.text.removingBacktickEscaping
+        let (generics, genericsMessages) = Generics.for(syntax: structDecl.genericParameterClause, where: structDecl.genericWhereClause, in: syntaxTree)
+        let (members, unbridgedMembers) = decodeMembers(syntaxListContainer: structDecl.memberBlock, context: context, in: syntaxTree)
+        let statement = TypeDeclaration(type: .structDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, unbridgedMembers: unbridgedMembers, syntax: structDecl, sourceFile: syntaxTree.source.file, sourceRange: structDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = inheritsMessages + genericsMessages
+        return statement
+    }
+
+    private static func decodeProtocolDeclaration(_ protocolDecl: ProtocolDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+        let modifiers = Modifiers.for(syntax: protocolDecl.modifiers)
+        var attributes = Attributes.for(syntax: protocolDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras, in: syntaxTree)
+        guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
+            return nil
+        }
+        var context = context
+        let decodeFlags: DecodeFlags = attributes.isBridgeMembers ? [.bridgeMembers] : []
+        context.memberOf = (.protocolDeclaration, modifiers, decodeFlags)
+
+        let name = protocolDecl.name.text.removingBacktickEscaping
+        var (inherits, inheritsMessages) = protocolDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
+        let associatedTypeDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind == .associatedTypeDecl ? $0.decl.as(AssociatedTypeDeclSyntax.self) : nil }
+        let memberDecls = protocolDecl.memberBlock.members.compactMap { $0.decl.kind != .associatedTypeDecl ? $0.decl : nil }
+        var (generics, genericsMessages) = Generics.for(syntax: nil, associatedTypeSyntax: associatedTypeDecls, where: protocolDecl.genericWhereClause, in: syntaxTree)
+        // `protocol P where Self: X` is equivalent to `protocol P: X`; don't treat Self as a protocol generic
+        if let selfIndex = generics.entries.firstIndex(where: { $0.name == "Self" && $0.whereEqual == nil }) {
+            inherits += generics.entries.remove(at: selfIndex).inherits
+        }
+        let members = memberDecls.flatMap { StatementDecoder.decode(syntax: $0, context: context, in: syntaxTree) }
+        let statement = TypeDeclaration(type: .protocolDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, syntax: protocolDecl, sourceFile: syntaxTree.source.file, sourceRange: protocolDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = inheritsMessages + genericsMessages
+        return statement
+    }
+
+    private static func decodeEnumDeclaration(_ enumDecl: EnumDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+        let modifiers = Modifiers.for(syntax: enumDecl.modifiers)
+        var attributes = Attributes.for(syntax: enumDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras, in: syntaxTree)
+        var (inherits, inheritsMessages) = enumDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
+        var decodeLevel = self.decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        var decodeFlags: DecodeFlags = []
+        if decodeLevel == .none {
+            // We need to decode native views for adapting to SkipSwiftUI, unless explicitly opted out
+            if !attributes.isNoBridge, syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, let inheritsView = inherits.first(where: { isSwiftUIType($0) }) {
+                decodeLevel = .api
+                decodeFlags.insert(.swiftUIState)
+                // We don't care about other protocols
+                inherits = [inheritsView]
+            } else {
+                // A native SwiftUI view renders only via its generated bridge, so `// SKIP @nobridge` keeps it
+                // from ever appearing. Warn instead of silently producing a view that never renders.
+                if attributes.isNoBridge, syntaxTree.isBridgeFile, syntaxTree.autoBridge != .none, inherits.contains(where: { isSwiftUIType($0) }) {
+                    syntaxTree.root.messages.append(.noBridgeView(enumDecl, source: syntaxTree.source))
+                }
+                return nil
+            }
+        }
+        if attributes.isBridgeMembers {
+            decodeFlags.insert(.bridgeMembers)
+        }
+        var context = context
+        context.memberOf = (.enumDeclaration, modifiers, decodeFlags)
+
+        let name = enumDecl.name.text.removingBacktickEscaping
+        let (generics, genericsMessages) = Generics.for(syntax: enumDecl.genericParameterClause, where: enumDecl.genericWhereClause, in: syntaxTree)
+        let (members, unbridgedMembers) = decodeMembers(syntaxListContainer: enumDecl.memberBlock, context: context, in: syntaxTree)
+        let statement = TypeDeclaration(type: .enumDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, unbridgedMembers: unbridgedMembers, syntax: enumDecl, sourceFile: syntaxTree.source.file, sourceRange: enumDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = inheritsMessages + genericsMessages
+        return statement
+    }
+
+    private static func decodeActorDeclaration(_ actorDecl: ActorDeclSyntax, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> TypeDeclaration? {
+        let modifiers = Modifiers.for(syntax: actorDecl.modifiers)
+        var attributes = Attributes.for(syntax: actorDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras, in: syntaxTree)
+        guard decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree) != .none else {
+            return nil
+        }
+        var context = context
+        let decodeFlags: DecodeFlags = attributes.isBridgeMembers ? [.bridgeMembers] : []
+        context.memberOf = (.actorDeclaration, modifiers, decodeFlags)
+
+        let name = actorDecl.name.text.removingBacktickEscaping
+        let (inherits, inheritsMessages) = actorDecl.inheritanceClause?.inheritedTypes.typeSignatures(in: syntaxTree) ?? ([], [])
+        let (generics, genericsMessages) = Generics.for(syntax: actorDecl.genericParameterClause, where: actorDecl.genericWhereClause, in: syntaxTree)
+        let (members, unbridgedMembers) = decodeMembers(syntaxListContainer: actorDecl.memberBlock, context: context, in: syntaxTree)
+        let statement = TypeDeclaration(type: .actorDeclaration, name: name, inherits: inherits, attributes: attributes, modifiers: modifiers, generics: generics, members: members, unbridgedMembers: unbridgedMembers, syntax: actorDecl, sourceFile: syntaxTree.source.file, sourceRange: actorDecl.range(in: syntaxTree.source), extras: extras)
+        statement.messages = inheritsMessages + genericsMessages
+        return statement
+    }
+
+    private static func decodeMembers<ListContainer: SyntaxListContainer>(syntaxListContainer: ListContainer, context: DecodeContext, in syntaxTree: SyntaxTree) -> ([Statement], [UnbridgedMember]) {
+        let members = StatementDecoder.decode(syntaxListContainer: syntaxListContainer, context: context, in: syntaxTree)
+        var unbridgedMembers: [UnbridgedMember] = []
+        let keptMembers = members.filter {
+            guard let unbridgedMemberDeclaration = $0 as? UnbridgedMemberDeclaration else {
+                return true
+            }
+            unbridgedMembers.append(unbridgedMemberDeclaration.member)
+            return false
+        }
+        return (keptMembers, unbridgedMembers)
+    }
+
+    private static func isSwiftUIType(_ signature: TypeSignature) -> Bool {
+        return signature.isNamed("View", moduleName: "SwiftUI", generics: [])
+            || signature.isNamed("View", moduleName: "SkipSwiftUI", generics: [])
+            || signature.isNamed("ViewModifier", moduleName: "SwiftUI", generics: [])
+            || signature.isNamed("ViewModifier", moduleName: "SkipSwiftUI", generics: [])
+            || signature.isNamed("ToolbarContent", moduleName: "SwiftUI", generics: [])
+            || signature.isNamed("ToolbarContent", moduleName: "SkipSwiftUI", generics: [])
+    }
+
+    var nonExtensionDeclarationType: StatementType? {
+        return type
+    }
+
+    override func qualifyTypeDeclaration() {
+        if _signature == nil {
+            _signature = qualifyDeclaredType(signature)
+        }
+    }
+
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        if parent?.owningFunctionDeclaration != nil {
+            messages.append(.localTypesNotSupported(self, source: syntaxTree.source))
+        }
+        inherits = inherits.map { $0.resolved(in: self, context: context) }
+        if modifiers.visibility == .default {
+            // Types in extensions inherit the visibility of the extension
+            if let owningTypeDeclaration = parent as? TypeDeclaration, owningTypeDeclaration.type == .extensionDeclaration {
+                modifiers.visibility = owningTypeDeclaration.modifiers.visibility == .private ? .fileprivate : owningTypeDeclaration.modifiers.visibility
+            } else {
+                modifiers.visibility = .internal
+            }
+        }
+        generics = generics.resolved(in: self, context: context)
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        let memberContext = context.pushing(self)
+        members.forEach { $0.inferTypes(context: memberContext, expecting: .none) }
+        return context
+    }
+
+    override var children: [SyntaxNode] {
+        return members
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        var attrs = [PrettyPrintTree(root: name)]
+        if !inherits.isEmpty {
+            attrs.append(PrettyPrintTree(root: "inherits", children: inherits.map { PrettyPrintTree(root: $0.description) }))
+        }
+        if !attributes.isEmpty {
+            attrs.append(attributes.prettyPrintTree)
+        }
+        if !modifiers.isEmpty {
+            attrs.append(modifiers.prettyPrintTree)
+        }
+        if !generics.isEmpty {
+            attrs.append(generics.prettyPrintTree)
+        }
+        return attrs
+    }
+}
+
+/// Tracked unbridged members that can affect code transpilation and bridging.
+enum UnbridgedMember: Hashable {
+    case constructor
+    case uninitializedStructProperty
+    case swiftUIStateProperty(String, Attributes, Modifiers) // Name, attributes, modifiers
+    case observableType(String)
+
+    var isSwiftUIStateProperty: Bool {
+        if case .swiftUIStateProperty = self {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    var isObservable: Bool {
+        if case .observableType = self {
+            return true
+        } else {
+            return false
+        }
+    }
+}
+
+extension Array where Element == UnbridgedMember {
+    /// Whether this set contains members that should prevent us from creating bridged constructors.
+    var suppressDefaultConstructorGeneration: Bool {
+        for member in self {
+            switch member {
+            case .constructor:
+                return true
+            case .uninitializedStructProperty:
+                return true
+            default:
+                break
+            }
+        }
+        return false
+    }
+}
+
+/// A member declaration that was not bridged but needs to be recorded because it may affect transpilation and bridging.
+final class UnbridgedMemberDeclaration: Statement {
+    let member: UnbridgedMember
+
+    init(member: UnbridgedMember, syntax: SyntaxProtocol? = nil, range: Source.Range? = nil, extras: StatementExtras? = nil, in syntaxTree: SyntaxTree? = nil) {
+        self.member = member
+        super.init(type: .unbridgedMemberDeclaration, syntax: syntax, sourceFile: syntaxTree?.source.file, sourceRange: range, extras: extras)
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        expectedType = expecting
+        return context
+    }
+
+    private var expectedType: TypeSignature = .none
+
+    override var inferredType: TypeSignature {
+        return expectedType
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
+        return nil
+    }
+}
+
+/// `let/var v ...`
+final class VariableDeclaration: Statement {
+    let names: [String?]
+    var propertyName: String {
+        return (names.first ?? "") ?? ""
+    }
+    var propertyType: TypeSignature {
+        return variableTypes.first ?? .none
+    }
+    private(set) var declaredType: TypeSignature
+    private(set) var constrainedDeclaredType: TypeSignature
+    let isLet: Bool // True for async let local OR async get property
+    private(set) var asyncBehavior: AsyncBehavior
+    private(set) var throwsType: TypeSignature
+    var attributes: Attributes // Allow additions by transformers
+    private(set) var modifiers: Modifiers
+    let value: Expression?
+    let getter: Accessor<CodeBlock>?
+    let setter: Accessor<CodeBlock>?
+    let willSet: Accessor<CodeBlock>?
+    let didSet: Accessor<CodeBlock>?
+    var variableTypes: [TypeSignature] {
+        return declaredType.or(value?.inferredType ?? .none).tupleTypes(count: names.count)
+    }
+    var apiFlags: APIFlags {
+        // Default to assuming that get-only protocol properties are computed
+        let isComputed = getter?.body != nil || (getter != nil && setter == nil)
+        return APIFlags(isAsync: asyncBehavior != .sync, isMainActor: attributes.contains(.mainActor), isSwiftUIBindable: attributes.contains(.bindable) || attributes.contains(.observedObject) || attributes.contains(.state) || attributes.contains(.stateObject) || attributes.contains(.binding) || attributes.contains(.environmentObject) || attributes.environmentAttribute?.tokenTypeSignature != nil || attributes.contains(.focusState) || attributes.contains(.gestureState), isViewBuilder: attributes.contains(.viewBuilder), isComputed: isComputed, isWriteable: !isLet && (getter == nil || setter != nil), isConcurrent: attributes.contains(.concurrent), isNonisolatedNonsending: modifiers.isNonisolatedNonsending, throwsType: throwsType)
+    }
+    var isMutating: Bool {
+        return !isLet && (getter == nil || setter != nil) && !attributes.isNonMutating
+    }
+
+    init(names: [String?], declaredType: TypeSignature = .none, isLet: Bool = false, asyncBehavior: AsyncBehavior = .sync, throwsType: TypeSignature = .none, attributes: Attributes = Attributes(), modifiers: Modifiers = Modifiers(), value: Expression?, getter: Accessor<CodeBlock>? = nil, setter: Accessor<CodeBlock>? = nil, willSet: Accessor<CodeBlock>? = nil, didSet: Accessor<CodeBlock>? = nil, syntax: SyntaxProtocol? = nil, sourceFile: Source.FilePath? = nil, sourceRange: Source.Range? = nil, extras: StatementExtras? = nil) {
+        self.names = names
+        self.declaredType = declaredType
+        self.constrainedDeclaredType = declaredType
+        self.isLet = isLet
+        self.asyncBehavior = asyncBehavior
+        self.throwsType = throwsType
+        self.attributes = attributes
+        self.modifiers = modifiers
+        self.value = value
+        self.getter = getter
+        self.setter = setter
+        self.willSet = willSet
+        self.didSet = didSet
+        super.init(type: .variableDeclaration, syntax: syntax, sourceFile: sourceFile, sourceRange: sourceRange, extras: extras)
+    }
+
+    override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> [Statement]? {
+        guard syntax.kind == .variableDecl, let variableDecl = syntax.as(VariableDeclSyntax.self) else {
+            return nil
+        }
+        var attributes = Attributes.for(syntax: variableDecl.attributes, in: syntaxTree)
+        attributes.addDirectives(from: extras, in: syntaxTree)
+        let modifiers = Modifiers.for(syntax: variableDecl.modifiers)
+        let decodeLevel = decodeLevel(attributes: attributes, visibility: modifiers.visibility, context: context, in: syntaxTree)
+        guard decodeLevel != .none else {
+            if syntaxTree.isBridgeFile, context.memberOf?.type == .structDeclaration, attributes.stateAttribute != nil || attributes.environmentAttribute != nil || attributes.contains(.focusState) || attributes.contains(.gestureState) || attributes.contains(.appStorage), let syntax = variableDecl.bindings.first {
+                // We need to track state in SwiftUI views regardless of visibility
+                guard let optionalName = syntax.pattern.identifierPatterns(in: syntaxTree)?.map(\.name?.removingBacktickEscaping).first, let name = optionalName else {
+                    throw Message.unsupportedSyntax(syntax.pattern, source: syntaxTree.source)
+                }
+                return [UnbridgedMemberDeclaration(member: .swiftUIStateProperty(name, attributes, modifiers), syntax: syntax, extras: extras, in: syntaxTree)]
+            } else if syntaxTree.isBridgeFile, context.memberOf?.type == .structDeclaration, !modifiers.isStatic, variableDecl.bindings.first?.initializer?.value == nil {
+                // We must note unbridged, unintialized struct properties because they affect default constructor
+                // generation and bridging
+                return [UnbridgedMemberDeclaration(member: .uninitializedStructProperty, syntax: syntax, extras: extras, in: syntaxTree)]
+            } else {
+                return []
+            }
+        }
+
+        let isLet = variableDecl.bindingSpecifier.text == "let"
+        let isAsync = variableDecl.modifiers.contains(where: { $0.name.text == "async" })
+        var statements: [Statement] = []
+        let lastTypeSyntax = variableDecl.bindings.last?.typeAnnotation?.type
+        for (index, syntax) in variableDecl.bindings.enumerated() {
+            let bindingExtras = index == 0 ? extras : nil
+            let statement = try decode(syntax: syntax, lastTypeSyntax: lastTypeSyntax, level: decodeLevel, isLet: isLet, asyncBehavior: isAsync ? .async : .sync, attributes: attributes, modifiers: modifiers, extras: bindingExtras, context: context, in: syntaxTree)
+            statements.append(statement)
+        }
+        return statements
+    }
+
+    private static func decode(syntax: PatternBindingSyntax, lastTypeSyntax: TypeSyntax?, level decodeLevel: DecodeLevel, isLet: Bool, asyncBehavior: AsyncBehavior, attributes: Attributes, modifiers: Modifiers, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) throws -> Statement {
+        var declaredType: TypeSignature = .none
+        if let typeSyntax = syntax.typeAnnotation?.type ?? lastTypeSyntax {
+            declaredType = TypeSignature.for(syntax: typeSyntax, in: syntaxTree)
+        }
+        var value: Expression? = nil
+        if let valueSyntax = syntax.initializer?.value {
+            value = ExpressionDecoder.decode(syntax: valueSyntax, in: syntaxTree)
+            // RawExpression indicates an error decoding. Ignore when decoding API only
+            if decodeLevel != .full && value is RawExpression {
+                value = nil
+            }
+        }
+
+        var accessors: Accessors = Accessors()
+        if let accessor = syntax.accessorBlock?.accessors {
+            switch accessor {
+            case .accessors(let syntax):
+                accessors = syntax.accessors(decodeBody: decodeLevel == .full, context: context, in: syntaxTree)
+            case .getter(let syntax):
+                if decodeLevel != .full {
+                    accessors.getter = Accessor()
+                } else {
+                    let statements = StatementDecoder.decode(syntaxList: syntax, context: context, in: syntaxTree)
+                    accessors.getter = Accessor(body: CodeBlock(statements: statements))
+                }
+            }
+        }
+        var attributes = attributes
+        if let accessorsAttributes = accessors.attributes {
+            attributes.attributes += accessorsAttributes.attributes
+        }
+        // Check if setter should be excluded because of lower visibility
+        if decodeLevel == .api && modifiers.setVisibility <= .fileprivate {
+            accessors.setter = nil
+            // We need to add a getter so that the variable does not appear to be writeable
+            if accessors.getter == nil {
+                accessors.getter = Accessor()
+            }
+        }
+
+        guard let names = syntax.pattern.identifierPatterns(in: syntaxTree)?.map(\.name?.removingBacktickEscaping) else {
+            throw Message.unsupportedSyntax(syntax.pattern, source: syntaxTree.source)
+        }
+        let combinedAsyncBehavior = asyncBehavior != .sync ? asyncBehavior : accessors.isAsync ? .async : .sync
+        let declaration = VariableDeclaration(names: names, declaredType: declaredType, isLet: isLet, asyncBehavior: combinedAsyncBehavior, throwsType: accessors.throwsType, attributes: attributes, modifiers: modifiers, value: value, getter: accessors.getter, setter: accessors.setter, willSet: accessors.willSet, didSet: accessors.didSet, syntax: syntax, sourceFile: syntaxTree.source.file, sourceRange: syntax.range(in: syntaxTree.source), extras: extras)
+        declaration.messages = accessors.messages
+        return declaration
+    }
+
+    override func resolveAttributes(in syntaxTree: SyntaxTree, context: TypeResolutionContext) {
+        // If there is no declared type but the @Environment attribute specifies a type, use it
+        if declaredType == .none, let environment = attributes.environmentAttribute, let environmentType = context.resolve(environment: environment) {
+            declaredType = environmentType
+        }
+        declaredType = declaredType.resolved(in: self, context: context)
+        attributes = attributes.resolved(in: self, context: context)
+        // Variables in protocols or extensions inherit the visibility of the protocol or extension
+        if modifiers.visibility == .default {
+            if let owningTypeDeclaration = parent as? TypeDeclaration, (owningTypeDeclaration.type == .protocolDeclaration || owningTypeDeclaration.type == .extensionDeclaration) {
+                modifiers.visibility = owningTypeDeclaration.modifiers.visibility == .private ? .fileprivate : owningTypeDeclaration.modifiers.visibility
+            } else {
+                modifiers.visibility = .internal
+            }
+        }
+        throwsType = throwsType.resolved(in: self, context: context)
+        if asyncBehavior != .actor, !modifiers.isNonisolated && !modifiers.isStatic, !isLet, (parent as? TypeDeclaration)?.nonExtensionDeclarationType == .actorDeclaration {
+            asyncBehavior = .actor
+        }
+    }
+
+    override func inferTypes(context: TypeInferenceContext, expecting: TypeSignature) -> TypeInferenceContext {
+        constrainedDeclaredType = declaredType.constrainedTypeWithGenerics(context.generics)
+        let varContext = modifiers.isStatic ? context.pushingBlock(isStatic: true) : context
+        if let value {
+            value.inferTypes(context: varContext, expecting: declaredType)
+            varContext.assignLiteralExpressibleType(declaredType, to: value)
+        }
+        let type = TypeSignature.for(labels: names, types: variableTypes)
+        if let body = getter?.body {
+            let bodyContext = varContext.expectingReturn(type)
+            let _ = body.inferTypes(context: bodyContext, expecting: body.statements.count == 1 ? bodyContext.expectedReturn : .none)
+            if body.statements.count == 1, body.statements[0].type != .return, let expression = (body.statements[0] as? ExpressionStatement)?.expression {
+                context.assignLiteralExpressibleType(bodyContext.expectedReturn, to: expression)
+            }
+        }
+        if let body = setter?.body {
+            let bodyContext = varContext.addingIdentifier(setter?.parameterName ?? "newValue", type: type)
+            let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        }
+        if let body = willSet?.body {
+            let bodyContext = varContext.addingIdentifier(willSet?.parameterName ?? "newValue", type: type)
+            let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        }
+        if let body = didSet?.body {
+            let bodyContext = varContext.addingIdentifier(didSet?.parameterName ?? "oldValue", type: type)
+            let _ = body.inferTypes(context: bodyContext, expecting: .none)
+        }
+        if parent is TypeDeclaration {
+            return context
+        } else {
+            // Local variable in code block
+            return context.addingIdentifiers(names, types: variableTypes, apiFlags: apiFlags, attributes: attributes)
+        }
+    }
+
+    override var children: [SyntaxNode] {
+        var children: [SyntaxNode] = []
+        if let value {
+            children.append(value)
+        }
+        if let body = getter?.body {
+            children.append(body)
+        }
+        if let body = setter?.body {
+            children.append(body)
+        }
+        if let body = willSet?.body {
+            children.append(body)
+        }
+        if let body = didSet?.body {
+            children.append(body)
+        }
+        return children
+    }
+
+    override var prettyPrintAttributes: [PrettyPrintTree] {
+        var attrs = [PrettyPrintTree(root: names.map { $0 ?? "_" }.joined(separator: ", "))]
+        if declaredType != .none {
+            attrs.append(PrettyPrintTree(root: declaredType.description))
+        }
+        if asyncBehavior != .sync {
+            attrs.append("async")
+        }
+        if throwsType != .none {
+            attrs.append(PrettyPrintTree(root: "throws", children: [PrettyPrintTree(root: throwsType.description)]))
+        }
+        if !attributes.isEmpty {
+            attrs.append(attributes.prettyPrintTree)
+        }
+        if !modifiers.isEmpty {
+            attrs.append(modifiers.prettyPrintTree)
+        }
+        return attrs
+    }
+}

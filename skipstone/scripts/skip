@@ -1,0 +1,6 @@
+#!/bin/bash
+# This script runs the skip tool with the local skipstone checkout
+SKIPDIR=$(dirname $(dirname $(realpath $0)))
+# SKIP_COMMAND_OVERRIDE is used by SkipBridge's skip.yml
+export SKIP_COMMAND_OVERRIDE=${SKIPDIR}/.build/debug/SkipRunner
+swift run --package-path ${SKIPDIR} SkipRunner "${@}"

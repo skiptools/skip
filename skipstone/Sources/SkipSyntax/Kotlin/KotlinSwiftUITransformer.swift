@@ -1,0 +1,875 @@
+// Copyright (c) 2023 - 2026 Skip
+
+/// Translate SwiftUI to syntactically correct Kotlin.
+///
+/// We rely on our UI libraries to provide the implementation of the SwiftUI-like API that this translation will result in.
+final class KotlinSwiftUITransformer: KotlinTransformer {
+    func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {
+        // No need to transpile SwiftUI if not a full build
+        guard translator.codebaseInfo != nil else {
+            return []
+        }
+
+        // Does this file need translation?
+        var needsTranslation = false
+        let isInSkipUI = translator.packageName == "skip.ui"
+        if isInSkipUI {
+            // We need to be able to transpile the views within our own SkipUI package
+            needsTranslation = true
+        } else {
+            for importDeclaration in syntaxTree.root.statements.compactMap({ $0 as? KotlinImportDeclaration }) {
+                if importDeclaration.modulePath.first == "SwiftUI"
+                    || importDeclaration.modulePath.first == "SkipUI"
+                    || importDeclaration.modulePath.first == "SkipFuseUI" {
+                    needsTranslation = true
+                    break
+                }
+            }
+        }
+        if needsTranslation {
+            let visitor = TranslateVisitor(translator: translator)
+            syntaxTree.root.visit(ifSkipBlockContent: syntaxTree.isBridgeFile, perform: visitor.visit)
+            // Add Compose imports to the generated Kotlin for any transpiled SwiftUI, or for bridged files that define
+            // transpiled views. We don't yet support bridging other transpiled SwiftUI constructs
+            if !isInSkipUI && (!syntaxTree.isBridgeFile || visitor.hasSwiftUIViews) {
+                addKotlinComposeDependencies(to: syntaxTree)
+            }
+        }
+        return []
+    }
+
+    /// Return a string of the init parameters needed to construct an `AppStorage` after the `wrappedValue`.
+    static func appStorageAdditionalInitParameters(for variableDeclaration: KotlinVariableDeclaration, codebaseInfo: CodebaseInfo.Context?) -> String {
+        // Parse annotation tokens to transfer into the constructor args: `@AppStorage("prefsKey", store: UserDefaults.standard)`
+        let tokens = variableDeclaration.attributes.of(kind: .appStorage).first?.tokens ?? []
+        let keyName = tokens.first ?? "storageKey"
+        var ret: String
+        if tokens.count == 2, let storeName = tokens.last {
+            ret = "\(keyName), store = \(storeName)"
+        } else {
+            ret = keyName
+        }
+        let propertyType = variableDeclaration.propertyType
+        let rawValueType = codebaseInfo == nil ? .none : propertyType.rawValueType(codebaseInfo: codebaseInfo!)
+        if rawValueType != .none {
+            ret += ", serializer = { it.rawValue }, deserializer = { if (it is \(rawValueType.kotlin)) \(propertyType.kotlin)(rawValue = it) else null }"
+        }
+        return ret
+    }
+
+    /// Return a string of the init parameters needed to construct a `ScaledMetric` after `wrappedValue`.
+    static func scaledMetricAdditionalInitParameters(for variableDeclaration: KotlinVariableDeclaration) -> String {
+        let tokens = variableDeclaration.attributes.of(kind: .scaledMetric).first?.tokens ?? []
+        guard let relativeTo = tokens.first else {
+            return ""
+        }
+        return ", relativeTo = \(relativeTo)"
+    }
+
+    /// If the given variable is the `body` of a `View`, return the parent view.
+    static func viewForBody(_ variableDeclaration: KotlinVariableDeclaration, codebaseInfo: CodebaseInfo.Context?) -> KotlinClassDeclaration? {
+        guard variableDeclaration.role == .property, variableDeclaration.propertyName == "body", !variableDeclaration.isStatic, let classDeclaration = variableDeclaration.parent as? KotlinClassDeclaration else {
+            return nil
+        }
+        guard isSwiftUIType(named: "View", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: codebaseInfo) else {
+            return nil
+        }
+        return classDeclaration
+    }
+
+    /// If the given function is the `body` of a `ViewModifier`, return the parent view modifier.
+    static func viewModifierForBody(_ functionDeclaration: KotlinFunctionDeclaration, codebaseInfo: CodebaseInfo.Context?) -> KotlinClassDeclaration? {
+        guard functionDeclaration.role == .member, functionDeclaration.name == "body", functionDeclaration.parameters.count == 1, functionDeclaration.parameters[0].externalLabel == "content", !functionDeclaration.isStatic, let classDeclaration = functionDeclaration.parent as? KotlinClassDeclaration else {
+            return nil
+        }
+        guard isSwiftUIType(named: "ViewModifier", type: classDeclaration.signature, codebaseInfo: codebaseInfo) else {
+            return nil
+        }
+        return classDeclaration
+    }
+
+    private func addKotlinComposeDependencies(to syntaxTree: KotlinSyntaxTree) {
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.Composable")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.getValue")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.mutableStateOf")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.remember")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.setValue")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.saveable.rememberSaveable")
+        syntaxTree.dependencies.imports.insert("androidx.compose.runtime.saveable.Saver")
+    }
+}
+
+private func isSwiftUIType(named: String, declaration: KotlinClassDeclaration? = nil, type: TypeSignature, codebaseInfo: CodebaseInfo.Context?) -> Bool {
+    if let declaration, declaration.inherits.contains(where: { $0.isNamed(named, moduleName: "SwiftUI", generics: []) }) {
+        return true
+    }
+    guard let codebaseInfo else {
+        return false
+    }
+    return type.isNamedType && codebaseInfo.global.protocolSignatures(forNamed: type)
+            .contains { $0.isNamed(named, moduleName: "SwiftUI") }
+}
+
+private final class TranslateVisitor {
+    private let translator: KotlinTranslator
+
+    init(translator: KotlinTranslator) {
+        self.translator = translator
+    }
+
+    private(set) var hasSwiftUIViews = false
+
+    func visit(_ node: KotlinSyntaxNode) -> VisitResult<KotlinSyntaxNode> {
+        if let classDeclaration = node as? KotlinClassDeclaration {
+            if omitPreviewProvider(classDeclaration) {
+                return .skip
+            } else {
+                translateClassDeclaration(classDeclaration)
+            }
+        } else if let functionDeclaration = node as? KotlinFunctionDeclaration {
+            if functionDeclaration.type == .constructorDeclaration {
+                translateConstructorDeclaration(functionDeclaration)
+            } else {
+                translateFunctionDeclaration(functionDeclaration)
+            }
+        } else if let variableDeclaration = node as? KotlinVariableDeclaration {
+            translateVariableDeclaration(variableDeclaration)
+        } else if let closure = node as? KotlinClosure {
+            translateClosure(closure)
+        } else if let functionCall = node as? KotlinFunctionCall {
+            translateFunctionCall(functionCall)
+        }
+        return .recurse(nil)
+    }
+
+    private func omitPreviewProvider(_ classDeclaration: KotlinClassDeclaration) -> Bool {
+        // The most common thing in a SwiftUI file will be Views, so do a quick exclusion
+        guard !isSwiftUIType(named: "View", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: translator.codebaseInfo) else {
+            return false
+        }
+        guard isSwiftUIType(named: "PreviewProvider", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: translator.codebaseInfo) else {
+            return false
+        }
+        guard let parentStatement = classDeclaration.parent as? KotlinStatement else {
+            return false
+        }
+        parentStatement.remove(statement: classDeclaration)
+        return true
+    }
+
+    private func translateClassDeclaration(_ classDeclaration: KotlinClassDeclaration) {
+        for i in 0..<classDeclaration.inherits.count {
+            if classDeclaration.inherits[i].isNamed("EnvironmentKey", moduleName: "SwiftUI") {
+                translateEnvironmentKey(classDeclaration, inheritsIndex: i)
+                break
+            }
+            if classDeclaration.inherits[i].isNamed("PreferenceKey", moduleName: "SwiftUI") {
+                translatePreferenceKey(classDeclaration, inheritsIndex: i)
+                break
+            }
+        }
+    }
+
+    private func translateEnvironmentKey(_ classDeclaration: KotlinClassDeclaration, inheritsIndex: Int) {
+        guard let defaultValueDeclaration = classDeclaration.members
+            .compactMap({ $0 as? KotlinVariableDeclaration })
+            .first(where: { $0.propertyName == "defaultValue" && $0.isStatic }),
+            defaultValueDeclaration.propertyType != .none else {
+            classDeclaration.messages.append(.kotlinEnvironmentValuesKeyDefault(classDeclaration, source: translator.syntaxTree.source))
+            return
+        }
+        defaultValueDeclaration.modifiers.isOverride = true
+        defaultValueDeclaration.modifiers.visibility = .public
+
+        classDeclaration.addKeepAnnotation()
+        classDeclaration.inherits[inheritsIndex] = .named("EnvironmentKey", [defaultValueDeclaration.propertyType])
+        classDeclaration.companionInherits.append(.interface(.named("EnvironmentKeyCompanion", [defaultValueDeclaration.propertyType])))
+    }
+
+    private func translatePreferenceKey(_ classDeclaration: KotlinClassDeclaration, inheritsIndex: Int) {
+        guard let defaultValueDeclaration = classDeclaration.members
+            .compactMap({ $0 as? KotlinVariableDeclaration })
+            .first(where: { $0.propertyName == "defaultValue" && $0.isStatic }),
+            defaultValueDeclaration.propertyType != .none else {
+            classDeclaration.messages.append(.kotlinPreferenceKeyDefault(classDeclaration, source: translator.syntaxTree.source))
+            return
+        }
+        defaultValueDeclaration.modifiers.isOverride = true
+        defaultValueDeclaration.modifiers.visibility = .public
+
+        if let reduceDeclaration = classDeclaration.members
+            .compactMap({ $0 as? KotlinFunctionDeclaration })
+            .first(where: { $0.name == "reduce" && $0.isStatic && $0.parameters.count == 2 && $0.parameters[0].externalLabel == "value" && $0.parameters[1].externalLabel == "nextValue" }) {
+            reduceDeclaration.modifiers.isOverride = true
+            reduceDeclaration.modifiers.visibility = .public
+        }
+
+        classDeclaration.addKeepAnnotation()
+        classDeclaration.inherits[inheritsIndex] = .named("PreferenceKey", [defaultValueDeclaration.propertyType])
+        classDeclaration.companionInherits.append(.interface(.named("PreferenceKeyCompanion", [defaultValueDeclaration.propertyType])))
+    }
+
+    private func translateConstructorDeclaration(_ functionDeclaration: KotlinFunctionDeclaration) {
+        // Only need to consider Views
+        guard let classDeclaration = functionDeclaration.parent as? KotlinClassDeclaration, isSwiftUIType(named: "View", declaration: classDeclaration, type: classDeclaration.signature, codebaseInfo: translator.codebaseInfo) || isSwiftUIType(named: "ViewModifier", type: classDeclaration.signature, codebaseInfo: translator.codebaseInfo) else {
+            return
+        }
+
+        // Translate any assignment to a state var into an assignment to its property wrapper
+        functionDeclaration.body?.visit { node in
+            if node is KotlinClosure {
+                return .skip
+            } else if node is KotlinFunctionDeclaration {
+                return .skip
+            } else if let binaryOperator = node as? KotlinBinaryOperator, binaryOperator.op.symbol == "=", let propertyWrapper = propertyWrapper(for: binaryOperator.lhs, in: functionDeclaration.parent as? KotlinClassDeclaration) {
+                binaryOperator.lhs = KotlinMemberAccess(base: KotlinIdentifier(name: "self"), member: propertyWrapper.name)
+                binaryOperator.rhs = KotlinFunctionCall(function: KotlinIdentifier(name: propertyWrapper.propertyWrapperTypeName), arguments: [LabeledValue(label: nil, value: binaryOperator.rhs)])
+                binaryOperator.assignParentReferences()
+                return .skip
+            } else {
+                return .recurse(nil)
+            }
+        }
+    }
+
+    /// If the given expression is a reference to a property wrapper type, return the underlying property name.
+    private func propertyWrapper(for expression: KotlinExpression, in classDeclaration: KotlinClassDeclaration?) -> (name: String, propertyWrapperTypeName: String)? {
+        guard let classDeclaration else {
+            return nil
+        }
+        var variableName: String? = nil
+        if let identifier = expression as? KotlinIdentifier {
+            variableName = identifier.name
+        } else if let memberAccess = expression as? KotlinMemberAccess, (memberAccess.base as? KotlinIdentifier)?.name == "self" {
+            variableName = memberAccess.member
+        }
+        guard let variableName else {
+            return nil
+        }
+        for member in classDeclaration.members {
+            if let variable = member as? KotlinVariableDeclaration, variable.propertyName == variableName {
+                if variable.attributes.stateAttribute != nil {
+                    return ("_" + variableName, "skip.ui.State")
+                } else if variable.attributes.contains(.bindable) || variable.attributes.contains(.observedObject) {
+                    return ("_" + variableName, "skip.ui.Bindable")
+                } else if variable.attributes.contains(.environmentObject) || variable.attributes.environmentAttribute?.tokenTypeSignature != nil {
+                    return ("_" + variableName, "skip.ui.Environment")
+                } else if variable.attributes.contains(.focusState) {
+                    return ("_" + variableName, "skip.ui.FocusState")
+                } else if variable.attributes.contains(.scaledMetric) {
+                    return ("_" + variableName, "skip.ui.ScaledMetric")
+                } else {
+                    return nil
+                }
+            }
+        }
+        return nil
+    }
+
+    private func translateFunctionDeclaration(_ functionDeclaration: KotlinFunctionDeclaration) {
+        if let viewModifierDeclaration = KotlinSwiftUITransformer.viewModifierForBody(functionDeclaration, codebaseInfo: translator.codebaseInfo) {
+            functionDeclaration.apiFlags.options.insert(.viewBuilder)
+            // We perform our ViewModifier transformations when we find the body
+            transform(classDeclaration: viewModifierDeclaration, isModifier: true, body: functionDeclaration)
+        } else if !functionDeclaration.apiFlags.options.contains(.viewBuilder) {
+            return
+        }
+        if let body = functionDeclaration.body {
+            functionDeclaration.body = translateViewBuilder(codeBlock: body)
+            functionDeclaration.body?.parent = functionDeclaration
+        }
+    }
+    
+    private func translateClosure(_ closure: KotlinClosure) {
+        guard closure.apiFlags?.options.contains(.viewBuilder) == true else {
+            return
+        }
+        closure.body = translateViewBuilder(codeBlock: closure.body, fromClosure: closure)
+        closure.body.parent = closure
+    }
+    
+    private func translateFunctionCall(_ functionCall: KotlinFunctionCall) {
+        // Translate .environment(\.keyPath, value) calls. The key path will have been transpiled
+        // to a closure that reads the named property, but we want to set it in EnvironmentValues
+        if (functionCall.function as? KotlinMemberAccess)?.member == "environment" || (functionCall.function as? KotlinIdentifier)?.name == "environment", let keyPath = functionCall.arguments[0].value as? KotlinKeyPathLiteral, (functionCall.arguments.count == 2 || (functionCall.arguments.count == 3 && functionCall.arguments[2].label == "affectsEvaluate")) {
+            updateEnvironmentFunctionCallParameters(for: keyPath, in: functionCall)
+            return
+        }
+        // Look for closures passed as ViewBuilder arguments to function calls
+        guard case .function(let parameterTypes, _, _, _) = functionCall.apiMatch?.signature, parameterTypes.count == functionCall.arguments.count else {
+            return
+        }
+        for i in 0..<parameterTypes.count {
+            guard case .function(_, _, let apiFlags, _) = parameterTypes[i].type, apiFlags.options.contains(.viewBuilder), let closure = functionCall.arguments[i].value as? KotlinClosure else {
+                continue
+            }
+            // If the closure is marked as a ViewBuilder, we'll already process it
+            guard closure.apiFlags?.options.contains(.viewBuilder) != true else {
+                continue
+            }
+            closure.body = translateViewBuilder(codeBlock: closure.body, fromClosure: closure)
+            closure.body.parent = closure
+        }
+    }
+    
+    private func translateVariableDeclaration(_ statement: KotlinVariableDeclaration) {
+        var viewBuilder: KotlinCodeBlock? = nil
+        if let viewDeclaration = KotlinSwiftUITransformer.viewForBody(statement, codebaseInfo: translator.codebaseInfo) {
+            statement.apiFlags.options.insert(.viewBuilder)
+            // Re-map e.g. ToolbarContent to base View type, because we always return a ComposeBuiler
+            if !statement.declaredType.isNamed("View", moduleName: "SwiftUI") {
+                statement.declaredType = .named("View", [])
+            }
+            // We perform our View transformations when we find the body
+            transform(classDeclaration: viewDeclaration, body: statement)
+            viewBuilder = statement.getter?.body
+        } else if statement.apiFlags.options.contains(.viewBuilder) {
+            viewBuilder = statement.getter?.body
+        } else if let classDeclaration = statement.parent as? KotlinClassDeclaration, classDeclaration.signature.isNamed("EnvironmentValues", moduleName: "SwiftUI", generics: []), statement.getter != nil {
+            translateEnvironmentValue(statement)
+        } else if statement.extends?.0.isNamed("EnvironmentValues", moduleName: "SwiftUI", generics: []) == true, statement.getter != nil {
+            translateEnvironmentValue(statement)
+        }
+        if let viewBuilder {
+            statement.getter?.body = translateViewBuilder(codeBlock: viewBuilder)
+            statement.getter?.body?.parent = statement
+        }
+    }
+
+    /// Perform `View` and `ViewModifier` transformations.
+    private func transform(classDeclaration: KotlinClassDeclaration, isModifier: Bool = false, body: KotlinStatement) {
+        if !isModifier {
+            hasSwiftUIViews = true
+        }
+        let variableDeclarations = classDeclaration.members.compactMap { $0 as? KotlinVariableDeclaration }
+        let stateVariables = variableDeclarations.filter { $0.attributes.stateAttribute != nil }
+        let focusStateVariables = variableDeclarations.filter { $0.attributes.contains(.focusState) }
+        let environmentVariables = variableDeclarations.filter { $0.attributes.environmentAttribute != nil }
+        let bindingVariables = variableDeclarations.filter { $0.attributes.contains(.binding) }
+        let bindableVariables = variableDeclarations.filter { $0.attributes.contains(.bindable) || $0.attributes.contains(.observedObject) }
+        let appStorageVariables = variableDeclarations.filter { $0.attributes.contains(.appStorage) }
+        let scaledMetricVariables = variableDeclarations.filter { $0.attributes.contains(.scaledMetric) }
+        if !stateVariables.isEmpty || !focusStateVariables.isEmpty || !environmentVariables.isEmpty || !appStorageVariables.isEmpty {
+            let evaluateFunction = synthesizeEvaluateFunction(isModifier: isModifier, stateVariables: stateVariables, focusStateVariables: focusStateVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables)
+            classDeclaration.insert(statements: [evaluateFunction], after: body)
+        }
+
+        for stateVariable in stateVariables {
+            synthesizeStateBacking(variable: stateVariable, propertyWrapperTypeName: "skip.ui.State")
+        }
+        for environmentVariable in environmentVariables {
+            if environmentVariable.attributes.contains(.environmentObject) || environmentVariable.attributes.environmentAttribute?.tokenTypeSignature != nil {
+                synthesizeStateBacking(variable: environmentVariable, propertyWrapperTypeName: "skip.ui.Environment", create: true)
+            }
+        }
+        for focusStateVariable in focusStateVariables {
+            synthesizeFocusStateBacking(variable: focusStateVariable)
+        }
+        for bindingVariable in bindingVariables {
+            synthesizeBindingBacking(variable: bindingVariable)
+        }
+        for bindableVariable in bindableVariables {
+            synthesizeStateBacking(variable: bindableVariable, propertyWrapperTypeName: "skip.ui.Bindable")
+        }
+        for appStorageVariable in appStorageVariables {
+            synthesizeAppStorageBacking(variable: appStorageVariable)
+        }
+        for scaledMetricVariable in scaledMetricVariables {
+            synthesizeScaledMetricBacking(variable: scaledMetricVariable)
+        }
+    }
+
+    /// Create an override of the SkipUI `Evaluate` function on views and modifiers to handle state synchronization, etc.
+    private func synthesizeEvaluateFunction(isModifier: Bool, stateVariables: [KotlinVariableDeclaration], focusStateVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], appStorageVariables: [KotlinVariableDeclaration]) -> KotlinStatement {
+        let evaluateFunction = KotlinFunctionDeclaration(name: "Evaluate")
+        evaluateFunction.modifiers.visibility = .public
+        evaluateFunction.modifiers.isOverride = true
+        evaluateFunction.annotations.append("@Composable")
+        if !stateVariables.isEmpty {
+            evaluateFunction.annotations.append("@Suppress(\"UNCHECKED_CAST\")")
+        }
+        evaluateFunction.returnType = .named("kotlin.collections.List", [.named("Renderable", [])])
+        if isModifier {
+            evaluateFunction.parameters.append(Parameter(externalLabel: "content", declaredType: .named("View", [])))
+        }
+        evaluateFunction.parameters.append(Parameter(externalLabel: "context", declaredType: .named("ComposeContext", [])))
+        evaluateFunction.parameters.append(Parameter(externalLabel: "options", declaredType: .int))
+        evaluateFunction.isGenerated = true
+        evaluateFunction.extras = .singleNewline
+
+        var statements = syncStateStatements(stateVariables: stateVariables, focusStateVariables: focusStateVariables, environmentVariables: environmentVariables, appStorageVariables: appStorageVariables)
+
+        let superInvocation: KotlinStatement
+        if isModifier {
+            superInvocation = KotlinRawStatement(sourceCode: "return super.Evaluate(content, context, options)")
+        } else {
+            superInvocation = KotlinRawStatement(sourceCode: "return super.Evaluate(context, options)")
+        }
+        superInvocation.extras = .singleNewline
+        statements.append(superInvocation)
+
+        let body = KotlinCodeBlock(statements: statements)
+        evaluateFunction.body = body
+        evaluateFunction.assignParentReferences()
+        return evaluateFunction
+    }
+
+    private func syncStateStatements(stateVariables: [KotlinVariableDeclaration], focusStateVariables: [KotlinVariableDeclaration], environmentVariables: [KotlinVariableDeclaration], appStorageVariables: [KotlinVariableDeclaration]) -> [KotlinStatement] {
+        var syncStateStatements: [KotlinStatement] = []
+        for stateVariable in stateVariables {
+            let statements = synthesizeStateSync(variable: stateVariable, propertyWrapperTypeName: "skip.ui.State")
+            if !syncStateStatements.isEmpty {
+                statements[0].extras = .singleNewline
+            }
+            syncStateStatements += statements
+        }
+        for focusStateVariable in focusStateVariables {
+            let statements = synthesizeStateSync(variable: focusStateVariable, propertyWrapperTypeName: "skip.ui.FocusState")
+            if !syncStateStatements.isEmpty {
+                statements[0].extras = .singleNewline
+            }
+            syncStateStatements += statements
+        }
+        for i in 0..<environmentVariables.count {
+            guard let statement = synthesizeEnvironmentSync(variable: environmentVariables[i]) else {
+                continue
+            }
+            if i == 0 && !syncStateStatements.isEmpty {
+                statement.extras = .singleNewline
+            }
+            syncStateStatements.append(statement)
+        }
+        for appStorageVariable in appStorageVariables {
+            let statements = synthesizeStateSync(variable: appStorageVariable, propertyWrapperTypeName: "skip.ui.AppStorage")
+            if !syncStateStatements.isEmpty {
+                statements[0].extras = .singleNewline
+            }
+            syncStateStatements += statements
+        }
+        return syncStateStatements
+    }
+
+    /// Create code to remember and sync a state variable.
+    private func synthesizeStateSync(variable: KotlinVariableDeclaration, propertyWrapperTypeName: String) -> [KotlinStatement] {
+        // We save and restore the State object rather than its wrappedValue so that bindings can mutate the value even if this
+        // view has disappeared from the Compose tree (e.g. is on the back stack). The State object uses a Compose MutableState
+        // internally so that all reads and writes are tracked by Compose, including those from bindings
+        let stateValue = KotlinRawStatement(sourceCode: "val remembered\(variable.propertyName) by rememberSaveable(stateSaver = context.stateSaver as Saver<\(propertyWrapperTypeName)<\(variable.propertyType.kotlin)>, Any>) { mutableStateOf(_\(variable.propertyName)) }")
+        let updateStateValue = KotlinRawStatement(sourceCode: "_\(variable.propertyName) = remembered\(variable.propertyName)")
+        return [stateValue, updateStateValue]
+    }
+
+    /// Create code to initialize an environment variable.
+    private func synthesizeEnvironmentSync(variable: KotlinVariableDeclaration) -> KotlinStatement? {
+        let entry: (key: String, isObject: Bool)
+        if let environment = variable.attributes.environmentAttribute {
+            if let environmentEntry = environmentEntry(for: variable, environment: environment) {
+                entry = environmentEntry
+            } else {
+                variable.messages.append(.kotlinEnvironmentKeyType(variable, source: translator.syntaxTree.source))
+                return nil
+            }
+        } else {
+            return nil
+        }
+
+        // Handle the fact that environment vars do not have an initial value
+        if variable.value == nil {
+            if let defaultValue = variable.declaredType.kotlinDefaultValue {
+                variable.value = KotlinRawExpression(sourceCode: defaultValue)
+            } else if variable.declaredType != .none {
+                variable.declaredType = variable.declaredType.asUnwrappedOptional(true)
+                variable.propertyType = variable.declaredType.asUnwrappedOptional(true)
+            } else {
+                variable.messages.append(.kotlinEnvironmentDeclaredType(variable, source: translator.syntaxTree.source))
+            }
+        }
+
+        var sourceCode: String
+        if entry.key == "self" {
+            sourceCode = "this.\(variable.propertyName) = EnvironmentValues.shared"
+        } else if entry.isObject {
+            sourceCode = "_\(variable.propertyName).wrappedValue = EnvironmentValues.shared.environmentObject(type = \(entry.key))"
+            if variable.declaredType.isOptional == false {
+                sourceCode += "!!"
+            }
+        } else {
+            sourceCode = "this.\(variable.propertyName) = EnvironmentValues.shared.\(entry.key)"
+        }
+        return KotlinRawStatement(sourceCode: sourceCode)
+    }
+
+    /// Given a Swift `@Environment` property wrapper key, return the Kotlin key and the expected value type.
+    private func environmentEntry(for variableDeclaration: KotlinVariableDeclaration, environment: Attribute) -> (key: String, isObject: Bool)? {
+        if let environmentType = environment.tokenTypeSignature {
+            return (environmentType.withGenerics([]).kotlin + "::class", true)
+        } else if let propertyName = environment.environmentValuesProperty {
+            return (propertyName, false)
+        } else if environment.tokens.first?.isEmpty != false {
+            let type = variableDeclaration.declaredType
+            return type == .none ? nil : (type.withGenerics([]).kotlin + "::class", true)
+        } else {
+            return nil
+        }
+    }
+
+    /// Create the additional property synthesized for `@State` and similar variables.
+    private func synthesizeStateBacking(variable: KotlinVariableDeclaration, propertyWrapperTypeName: String, create: Bool = false) {
+        // Tell the @State variable to get and set its value using _variable of type State
+        let storageName = "_\(variable.propertyName)"
+        var storage = KotlinVariableStorage()
+        storage.isSingleStatementAppendable = { _ in true }
+        storage.appendGet = { variable, sref, isSingleStatement, output, indentation in
+            if !isSingleStatement {
+                output.append(indentation).append("return ")
+            }
+            output.append(storageName).append(".wrappedValue")
+            sref()
+            output.append("\n")
+        }
+        storage.appendSet = { variable, value, output, indentation in
+            output.append(indentation).append(storageName).append(".wrappedValue = ")
+            value()
+            output.append("\n")
+        }
+        storage.appendStorage = { variable, output, indentation in
+            let stateType = variable.propertyType.asPropertyWrapper(propertyWrapperTypeName).kotlin
+            output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName)
+            if create {
+                output.append(" = ").append(stateType).append("()")
+            } else {
+                output.append(": ").append(stateType)
+                if let value = variable.value {
+                    output.append(" = \(propertyWrapperTypeName)(")
+                    value.append(to: output, indentation: indentation)
+                    output.append(")")
+                } else if variable.propertyType.isOptional {
+                    output.append(" = \(propertyWrapperTypeName)(null)")
+                }
+            }
+            output.append("\n")
+        }
+        variable.storage = storage
+    }
+
+    /// Create the additional property synthesized for `@FocusState` variables.
+    private func synthesizeFocusStateBacking(variable: KotlinVariableDeclaration) {
+        // Tell the @FocusState variable to get and set its value using _variable of type State
+        let storageName = "_\(variable.propertyName)"
+        var storage = KotlinVariableStorage()
+        storage.isSingleStatementAppendable = { _ in true }
+        storage.appendGet = { variable, sref, isSingleStatement, output, indentation in
+            if !isSingleStatement {
+                output.append(indentation).append("return ")
+            }
+            output.append(storageName).append(".wrappedValue")
+            sref()
+            output.append("\n")
+        }
+        storage.appendSet = { variable, value, output, indentation in
+            output.append(indentation).append(storageName).append(".wrappedValue = ")
+            value()
+            output.append("\n")
+        }
+        storage.appendStorage = { variable, output, indentation in
+            let stateType = variable.propertyType.asPropertyWrapper("skip.ui.FocusState").kotlin
+            output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName)
+            let initialValue = variable.propertyType == .bool ? "false" : "null"
+            output.append(" = ").append(stateType).append("(\(initialValue))")
+            output.append("\n")
+        }
+        variable.storage = storage
+    }
+
+    /// Create the extra property synthesized for `@Binding` variables.
+    private func synthesizeBindingBacking(variable: KotlinVariableDeclaration) {
+        let propertyType = variable.declaredType == .none ? variable.propertyType : variable.declaredType
+        if propertyType == .none {
+            variable.messages.append(.kotlinVariableNeedsTypeDeclaration(variable, source: translator.syntaxTree.source))
+        }
+
+        // Tell the @Binding variable to get and set its value using _variable of type Binding
+        let storageName = "_\(variable.propertyName)"
+        var storage = KotlinVariableStorage()
+        storage.isSingleStatementAppendable = { _ in true }
+        storage.appendGet = { variable, sref, isSingleStatement, output, indentation in
+            if !isSingleStatement {
+                output.append(indentation).append("return ")
+            }
+            output.append(storageName).append(".wrappedValue")
+            sref()
+            output.append("\n")
+        }
+        storage.appendSet = { variable, value, output, indentation in
+            output.append(indentation).append(storageName).append(".wrappedValue = ")
+            value()
+            output.append("\n")
+        }
+        storage.appendStorage = { variable, output, indentation in
+            output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName).append(": ").append(variable.propertyType.asBinding().kotlin).append("\n")
+        }
+        variable.storage = storage
+    }
+
+    /// Create the additional property synthesized for `@AppStorage` variables.
+    private func synthesizeAppStorageBacking(variable: KotlinVariableDeclaration) {
+        if variable.propertyType.isOptional {
+            variable.messages.append(.kotlinSwiftUIAppStorageOptional(variable, source: translator.syntaxTree.source))
+        }
+
+        // Tell the @AppStorage variable to get and set its value using _variable of type AppStorage
+        let storageName = "_\(variable.propertyName)"
+        var storage = KotlinVariableStorage()
+        storage.isSingleStatementAppendable = { _ in true }
+        storage.appendGet = { variable, sref, isSingleStatement, output, indentation in
+            if !isSingleStatement {
+                output.append(indentation).append("return ")
+            }
+            output.append(storageName).append(".wrappedValue")
+            sref()
+            output.append("\n")
+        }
+        storage.appendSet = { variable, value, output, indentation in
+            output.append(indentation).append(storageName).append(".wrappedValue = ")
+            value()
+            output.append("\n")
+        }
+        let codebaseInfo = translator.codebaseInfo
+        storage.appendStorage = { variable, output, indentation in
+            let storageType = variable.propertyType.asPropertyWrapper("skip.ui.AppStorage").kotlin
+            output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName).append(": ").append(storageType)
+            if let value = variable.value {
+                output.append(" = skip.ui.AppStorage(")
+                value.append(to: output, indentation: indentation)
+                output.append(", ")
+                output.append(KotlinSwiftUITransformer.appStorageAdditionalInitParameters(for: variable, codebaseInfo: codebaseInfo))
+                output.append(")")
+            } else if variable.propertyType.isOptional {
+                output.append(" = skip.ui.AppStorage(null, ")
+                output.append(KotlinSwiftUITransformer.appStorageAdditionalInitParameters(for: variable, codebaseInfo: codebaseInfo))
+                output.append(")")
+            }
+            output.append("\n")
+        }
+        variable.storage = storage
+    }
+
+    /// Create the additional property synthesized for `@ScaledMetric` variables.
+    private func synthesizeScaledMetricBacking(variable: KotlinVariableDeclaration) {
+        // Tell the @ScaledMetric variable to get its value using _variable of type ScaledMetric
+        variable.apiFlags.options.remove(.writeable)
+        let storageName = "_\(variable.propertyName)"
+        var storage = KotlinVariableStorage()
+        storage.isSingleStatementAppendable = { _ in true }
+        storage.appendGet = { variable, sref, isSingleStatement, output, indentation in
+            if !isSingleStatement {
+                output.append(indentation).append("return ")
+            }
+            output.append(storageName).append(".wrappedValue")
+            sref()
+            output.append("\n")
+        }
+        storage.appendStorage = { variable, output, indentation in
+            let storageType = variable.propertyType.asPropertyWrapper("skip.ui.ScaledMetric").kotlin
+            output.append(indentation).append(variable.modifiers.kotlinMemberString(isGlobal: false, isOpen: false, suffix: " ")).append("var ").append(storageName).append(": ").append(storageType)
+            if let value = variable.value {
+                output.append(" = skip.ui.ScaledMetric(wrappedValue = ")
+                value.append(to: output, indentation: indentation)
+                output.append(KotlinSwiftUITransformer.scaledMetricAdditionalInitParameters(for: variable))
+                output.append(")")
+            }
+            output.append("\n")
+        }
+        variable.storage = storage
+    }
+
+    private func translateViewBuilder(codeBlock: KotlinCodeBlock, fromClosure closure: KotlinClosure? = nil) -> KotlinCodeBlock {
+        // Add tail calls to compose the views that SwiftUI would build into a TupleView
+        codeBlock.visit { node in
+            if node is KotlinFunctionDeclaration || node is KotlinClosure {
+                // These do not inherit our view builder context and will get processed by the top-level visitation code
+                return .skip
+            } else if let kif = node as? KotlinIf {
+                if kif.nestingClosureFunction != nil {
+                    kif.nestingClosureFunction = "linvokeComposable"
+                }
+                return .recurse(nil)
+            } else if let kwhen = node as? KotlinWhen {
+                if kwhen.nestingClosureFunction != nil {
+                    kwhen.nestingClosureFunction = "linvokeComposable"
+                }
+                return .recurse(nil)
+            } else if let apiCall = node as? APICallExpression {
+                var parent = node.parent
+                if parent is KotlinSRef {
+                    parent = parent?.parent
+                }
+                if let expressionStatement = parent as? KotlinExpressionStatement, !isInAssignmentExpression(expressionStatement, in: codeBlock) {
+                    // Add our compose tail call to expressions that evaluate to Views and are used as statements
+                    if let apiMatch = apiCall.apiMatch {
+                        if isSwiftUIType(named: "View", type: apiMatch.signature, codebaseInfo: translator.codebaseInfo) || isSwiftUIType(named: "View", type: apiMatch.signature.returnType, codebaseInfo: translator.codebaseInfo) {
+                            addComposeTailCall(to: node as! KotlinExpression, statement: expressionStatement)
+                            updateTableColumnFunctionCallParameters(in: node)
+                        }
+                    } else {
+                        node.messages.append(.kotlinSwiftUITypeInference(node, source: translator.syntaxTree.source))
+                    }
+                    return .skip
+                } else {
+                    return .recurse(nil)
+                }
+            } else if let binaryOperator = node as? KotlinBinaryOperator {
+                var parent = node.parent
+                if parent is KotlinSRef {
+                    parent = parent?.parent
+                }
+                // A statement-level operator expression that evaluates to a View — most notably
+                // `Text + Text` concatenation — is built into the TupleView like any other view and
+                // must get a Compose tail call. Wrap it in parentheses so `.Compose` applies to the
+                // whole operator result rather than binding to its right-hand operand.
+                if let expressionStatement = parent as? KotlinExpressionStatement, !isInAssignmentExpression(expressionStatement, in: codeBlock),
+                    isSwiftUIType(named: "View", type: binaryOperator.inferredType, codebaseInfo: translator.codebaseInfo) {
+                    addComposeTailCall(to: KotlinParenthesized(content: binaryOperator), statement: expressionStatement)
+                    return .skip
+                } else {
+                    return .recurse(nil)
+                }
+            } else {
+                return .recurse(nil)
+            }
+        }
+
+        // We may need to use a return label when moving the code block to a closure
+        var needsReturnLabel = false
+        var needsReturnValue = false
+        if codeBlock.updateRemovingSingleStatementReturn() {
+            if let expression = (codeBlock.statements.first as? KotlinExpressionStatement)?.expression {
+                needsReturnValue = expression is KotlinIf || expression is KotlinWhen
+            }
+        } else {
+            if let closure {
+                needsReturnLabel = closure.hasReturnLabel
+            } else {
+                needsReturnLabel = codeBlock.updateWithExpectedReturn(.labelIfPresent(KotlinClosure.returnLabel))
+            }
+            needsReturnValue = true
+        }
+        // Add a final return value if the closure logic may not guarantee one
+        if needsReturnValue {
+            codeBlock.statements.append(KotlinRawStatement(sourceCode: "ComposeResult.ok"))
+        }
+
+        // Wrap the code block in 'return ComposeBuilder { ... }' to return a single view that will compose
+        // when the parent adds its tail call
+        let composingClosure = KotlinClosure(body: codeBlock)
+        composingClosure.parameters = [Parameter(externalLabel: "composectx", declaredType: .named("ComposeContext", []))]
+        composingClosure.hasReturnLabel = needsReturnLabel
+        let composingArgument = LabeledValue<KotlinExpression>(value: composingClosure)
+        let composingFunction = KotlinIdentifier(name: "ComposeBuilder")
+
+        let composingFunctionCall = KotlinFunctionCall(function: composingFunction, arguments: [composingArgument])
+        composingFunctionCall.hasTrailingClosures = true
+
+        let returnStatement: KotlinStatement = closure == nil ? KotlinReturn(expression: composingFunctionCall) : KotlinExpressionStatement(expression: composingFunctionCall)
+        let composingCodeBlock = KotlinCodeBlock(statements: [returnStatement])
+
+        composingCodeBlock.assignParentReferences()
+        return composingCodeBlock
+    }
+
+    private func addComposeTailCall(to expression: KotlinExpression, statement: KotlinExpressionStatement) {
+        let composeMemberAccess = KotlinMemberAccess(base: expression, member: "Compose")
+        let contextArgument = LabeledValue<KotlinExpression>(value: KotlinIdentifier(name: "composectx"))
+        let composeCall = KotlinFunctionCall(function: composeMemberAccess, arguments: [contextArgument])
+        statement.expression = composeCall
+
+        composeCall.parent = statement
+        composeCall.assignParentReferences()
+    }
+
+    private func isInAssignmentExpression(_ statement: KotlinStatement, in codeBlock: KotlinCodeBlock) -> Bool {
+        var node: KotlinSyntaxNode = statement
+        while node !== codeBlock {
+            if let binaryOperator = node as? KotlinBinaryOperator, binaryOperator.op.precedence == .assignment {
+                return true
+            } else if node is KotlinVariableDeclaration {
+                return true
+            }
+            if let parent = node.parent {
+                node = parent
+            } else {
+                break
+            }
+        }
+        return false
+    }
+
+    private func translateEnvironmentValue(_ statement: KotlinVariableDeclaration) {
+        statement.getterAnnotations.append("@Composable")
+        statement.onUpdate = nil
+        guard let setter = statement.setter else {
+            return
+        }
+        statement.setter = nil
+        statement.apiFlags.options.remove(.writeable)
+
+        let setFunction = KotlinFunctionDeclaration(name: "set" + statement.propertyName)
+        setFunction.extends = statement.extends
+        setFunction.modifiers = statement.modifiers
+        setFunction.parameters = [Parameter<KotlinExpression>(externalLabel: setter.parameterName ?? "newValue", declaredType: statement.declaredType)]
+        setFunction.body = setter.body
+
+        (statement.parent as? KotlinStatement)?.insert(statements: [setFunction], after: statement)
+    }
+
+    private func updateEnvironmentFunctionCallParameters(for keyPath: KotlinKeyPathLiteral, in functionCall: KotlinFunctionCall) {
+        guard keyPath.components.count == 1, case .property(let property, _) = keyPath.components[0] else {
+            return
+        }
+
+        let code = "EnvironmentValues.shared.set\(property)(it)"
+        let codeBlock = KotlinCodeBlock(statements: [KotlinRawStatement(sourceCode: code)])
+        let closure = KotlinClosure(body: codeBlock, sourceFile: keyPath.sourceFile, sourceRange: keyPath.sourceRange)
+        closure.implicitParameterCount = 1
+        closure.returnType = .void
+        closure.inferredReturnType = .void
+        closure.parent = functionCall
+        functionCall.arguments[0] = LabeledValue(label: functionCall.arguments[0].label, value: closure)
+
+        guard let memberAccess = functionCall.arguments[1].value as? KotlinMemberAccess, memberAccess.baseType == .none || memberAccess.baseType == .any, let codebaseInfo = translator.codebaseInfo else {
+            return
+        }
+        // Attempt to fill in the base type using the EnvironmentValues property being accessed
+        if let match = codebaseInfo.matchIdentifier(name: property, inConstrained: .named("EnvironmentValues", [])) {
+            memberAccess.baseType = match.signature
+        }
+    }
+
+    private func updateTableColumnFunctionCallParameters(in node: KotlinSyntaxNode) {
+        guard let functionCall = node as? KotlinFunctionCall else {
+            return
+        }
+        // Handle TableColumn(...).width(...) case
+        if let memberAccess = functionCall.function as? KotlinMemberAccess, memberAccess.member == "width", let base = memberAccess.base {
+            updateTableColumnFunctionCallParameters(in: base)
+            return
+        }
+        guard (functionCall.function as? KotlinIdentifier)?.name == "TableColumn", isInSwiftUIElement("Table", node: node) else {
+            return
+        }
+        // The SkipUI framework adds a leading argument to TableColumn that must always be set to the
+        // enclosing Table's content closure argument. See SkipUI.Table
+        functionCall.arguments.insert(LabeledValue(value: KotlinRawExpression(sourceCode: "it")), at: 0)
+    }
+
+    private func isInSwiftUIElement(_ name: String, node: KotlinSyntaxNode) -> Bool {
+        var parent = node.parent
+        while parent != nil {
+            if let functionCall = parent as? KotlinFunctionCall, (functionCall.function as? KotlinIdentifier)?.name == name {
+                return true
+            }
+            parent = parent?.parent
+        }
+        return false
+    }
+}

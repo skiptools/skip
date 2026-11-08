@@ -1,0 +1,375 @@
+// Copyright (c) 2023 - 2026 Skip
+
+import SwiftSyntax
+
+/// Extra directives and trivia derived from the trivia surrounding a statement.
+struct StatementExtras {
+    enum Directive: Hashable {
+        /// A language-specific attribute.
+        case attributes([String])
+        /// Insert directly into the output.
+        case insert(String, [String])
+        /// Replace the syntax with the given output.
+        case replace(String, [String])
+        /// Replace the declaration line with the given output.
+        case declaration(String)
+        /// Mute warnings and errors for this syntax.
+        case nowarn
+        /// Mute only diagnostics with one of the given identifiers for this syntax.
+        case nowarnSpecific(Set<Message.DiagnosticID>)
+        /// Marker for a function that is implemented elsewhere, e.g. in a C library.
+        case external
+        /// Encountered an invalid directive.
+        case invalid(String)
+        /// Marker for a file whose purpose is to provide Swift symbols. Symbols files are not transpiled, and warnings are suppressed.
+        case symbolFile
+        /// Marker for a statement in a `#if SKIP` block.
+        case ifSkipBlock(IfSkipBlockType)
+
+        var isIfSkipBlock: Bool {
+            switch self {
+            case .ifSkipBlock:
+                return true
+            default:
+                return false
+            }
+        }
+    }
+
+    var directives: [Directive]
+    var leadingTrivia: [String]
+    var trailingTrivia: [String]
+
+    /// Extras consisting of a single leading new line, as is commonly used to separate type and function declarations.
+    static let singleNewline = StatementExtras(directives: [], leadingTrivia: ["\n"], trailingTrivia: [])
+
+    /// Decode the trivia on the given syntax to parse extras.
+    static func decode(syntax: SyntaxProtocol) -> StatementExtras? {
+        let trailingTriviaString = processTrailingTrivia(syntax: syntax)
+        var directives: [Directive] = []
+        var directive: Directive? = nil
+        var directiveLines: [String] = []
+        var triviaLines: [String] = []
+        var isMultilineCommentDirective = false
+        var multilineCommentDirectiveIndentation = 0
+        let attributesPrefix = "SKIP @"
+        let attributesPrefixOld = "SKIP ATTRIBUTES:"
+        let insertPrefix = "SKIP INSERT:"
+        let replacePrefix = "SKIP REPLACE:"
+        let declarationPrefix = "SKIP DECLARE:"
+        let noWarnPrefix = "SKIP NOWARN"
+        let externalPrefix = "SKIP EXTERN"
+        let symbolFilePrefix = "SKIP SYMBOLFILE"
+        func endDirective() {
+            guard let currentDirective = directive else {
+                return
+            }
+            let directiveString = directiveLines.joined().trimmingCharacters(in: .whitespacesAndNewlines)
+            switch currentDirective {
+            case .attributes:
+                let attributes = directiveString.components(separatedBy: .whitespaces).map {
+                    $0.hasPrefix("@") ? String($0.dropFirst()) : $0
+                }
+                directives.append(.attributes(attributes))
+            case .insert:
+                directives.append(.insert(directiveString, triviaLines))
+                triviaLines.removeAll()
+            case .replace:
+                directives.append(.replace(directiveString, triviaLines))
+                triviaLines.removeAll()
+            case .declaration:
+                directives.append(.declaration(directiveString))
+            default:
+                break
+            }
+            directive = nil
+            directiveLines = []
+            isMultilineCommentDirective = false
+        }
+
+        var triviaString = syntax.leadingTrivia.description
+        // Drop initial newline that is typically the trailing newline of the preceding statement
+        if triviaString.hasPrefix("\n") {
+            triviaString = String(triviaString.dropFirst())
+        }
+        while !triviaString.isEmpty {
+            // Do our own line splits so that we can differentiate whether the last line had a trailing newline.
+            // We don't want to treat indentation before the statement as a trivia line
+            let line: String
+            let hasNewline: Bool
+            if let nextNewline = triviaString.firstIndex(of: "\n") {
+                line = String(triviaString[..<nextNewline])
+                hasNewline = true
+                triviaString = String(triviaString.dropFirst(line.count + 1))
+            } else {
+                line = triviaString
+                hasNewline = false
+                triviaString = ""
+            }
+
+            var trimmedLine = line.trimmingCharacters(in: .whitespaces)
+            var isDirective = false
+            var isSingleLineDirective = false
+            if isMultilineCommentDirective {
+                if trimmedLine == "*/" {
+                    endDirective()
+                    if hasNewline {
+                        triviaLines.append("\n")
+                    }
+                    continue
+                } else if trimmedLine.isEmpty {
+                    if hasNewline {
+                        directiveLines.append("\n")
+                    }
+                    continue
+                } else {
+                    let firstNonWhitespaceIndex = line.firstIndex(where: { !$0.isWhitespace })!
+                    let leadingWhitespaceCount = line.distance(from: line.startIndex, to: firstNonWhitespaceIndex)
+                    let trailingWhitespaceCount = line.count - trimmedLine.count - leadingWhitespaceCount
+                    trimmedLine = String(line.dropFirst(min(multilineCommentDirectiveIndentation, leadingWhitespaceCount)).dropLast(trailingWhitespaceCount))
+                }
+            } else if trimmedLine.isEmpty {
+                endDirective()
+                if hasNewline {
+                    triviaLines.append("\n")
+                }
+                continue
+            } else {
+                if trimmedLine.hasPrefix("/* SKIP") {
+                    isDirective = true
+                    trimmedLine.removeFirst(3)
+                    if trimmedLine.hasSuffix("*/") {
+                        isSingleLineDirective = true
+                        trimmedLine.removeLast(2)
+                    } else {
+                        isMultilineCommentDirective = true
+                        multilineCommentDirectiveIndentation = line.distance(from: line.startIndex, to: line.firstIndex(of: "/")!)
+                    }
+                } else if trimmedLine.hasPrefix("// SKIP") {
+                    isDirective = true
+                    trimmedLine.removeFirst(3)
+                }
+            }
+
+            if isDirective {
+                endDirective()
+                if trimmedLine.hasPrefix(insertPrefix) {
+                    directive = .insert("", [])
+                    directiveLines.append(String(trimmedLine.dropFirst(insertPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
+                } else if trimmedLine.hasPrefix(replacePrefix) {
+                    directive = .replace("", [])
+                    directiveLines.append(String(trimmedLine.dropFirst(replacePrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
+                } else if trimmedLine.hasPrefix(declarationPrefix) {
+                    directive = .declaration("")
+                    directiveLines.append(String(trimmedLine.dropFirst(declarationPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
+                } else if trimmedLine.hasPrefix(attributesPrefix) {
+                    directive = .attributes([])
+                    directiveLines.append(String(trimmedLine.dropFirst(attributesPrefix.count - 1)).trimmingCharacters(in: .whitespaces) + "\n")
+                } else if trimmedLine.hasPrefix(attributesPrefixOld) {
+                    directive = .attributes([])
+                    directiveLines.append(String(trimmedLine.dropFirst(attributesPrefix.count)).trimmingCharacters(in: .whitespaces) + "\n")
+                } else if trimmedLine == noWarnPrefix {
+                    directives.append(.nowarn)
+                    isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
+                } else if trimmedLine.hasPrefix(noWarnPrefix + "(") {
+                    let argument = String(trimmedLine.dropFirst(noWarnPrefix.count))
+                    if argument.hasSuffix(")") {
+                        let tagString = String(argument.dropFirst().dropLast())
+                        let tags = tagString.split(separator: ",", omittingEmptySubsequences: false).map {
+                            String($0).trimmingCharacters(in: .whitespacesAndNewlines)
+                        }
+                        let diagnosticIDs = tags.compactMap(Message.DiagnosticID.init(rawValue:))
+                        if !tags.isEmpty, !tags.contains(where: \.isEmpty), diagnosticIDs.count == tags.count {
+                            directives.append(.nowarnSpecific(Set(diagnosticIDs)))
+                        } else {
+                            directives.append(.invalid(trimmedLine))
+                        }
+                    } else {
+                        directives.append(.invalid(trimmedLine))
+                    }
+                    isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
+                } else if trimmedLine.hasPrefix(noWarnPrefix) {
+                    directives.append(.invalid(trimmedLine))
+                    isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
+                } else if trimmedLine.hasPrefix(externalPrefix) {
+                    directives.append(.external)
+                    isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
+                } else if trimmedLine.hasPrefix(symbolFilePrefix) {
+                    directives.append(.symbolFile)
+                    isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
+                } else {
+                    directives.append(.invalid(trimmedLine))
+                    isSingleLineDirective = isSingleLineDirective || !isMultilineCommentDirective
+                }
+                if isSingleLineDirective {
+                    endDirective()
+                }
+            } else if directive != nil && (isMultilineCommentDirective || trimmedLine.hasPrefix("// ")) {
+                if trimmedLine.hasPrefix("// ") {
+                    directiveLines.append(trimmedLine.dropFirst(3) + "\n")
+                } else {
+                    directiveLines.append(trimmedLine + "\n")
+                }
+            } else {
+                endDirective()
+                triviaLines.append(trimmedLine + "\n")
+            }
+        }
+        endDirective()
+
+        guard !directives.isEmpty || !triviaLines.isEmpty || !trailingTriviaString.isEmpty else {
+            return nil
+        }
+        return StatementExtras(directives: directives, leadingTrivia: triviaLines, trailingTrivia: [trailingTriviaString])
+    }
+
+    private static func processTrailingTrivia(syntax: SyntaxProtocol) -> String {
+        syntax.trailingTrivia.description.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// All statements contained in our directives.
+    func statements(syntax: SyntaxProtocol, in syntaxTree: SyntaxTree) -> (statements: [Statement], replace: Bool) {
+        var statements: [Statement] = []
+        var replace = false
+        for directive in directives {
+            switch directive {
+            case .insert(let string, let leadingTrivia):
+                let extras = leadingTrivia.isEmpty ? nil : StatementExtras(directives: [], leadingTrivia: leadingTrivia, trailingTrivia: [])
+                statements.append(RawStatement(sourceCode: string, syntax: syntax, extras: extras, in: syntaxTree))
+            case .replace(let string, let leadingTrivia):
+                replace = true
+                let extras = leadingTrivia.isEmpty ? nil : StatementExtras(directives: [], leadingTrivia: leadingTrivia, trailingTrivia: [])
+                statements.append(RawStatement(sourceCode: string, syntax: syntax, extras: extras, in: syntaxTree))
+            case .invalid(let string):
+                let message = Message(kind: .warning, message: "Unrecognized SKIP comment: \(string)", source: syntaxTree.source, sourceRange: syntax.range(in: syntaxTree.source))
+                statements.append(MessageStatement(message: message))
+            default:
+                break
+            }
+        }
+        return (statements, replace)
+    }
+
+    /// String to replace statement's declaration.
+    var declaration: String? {
+        for directive in directives {
+            if case .declaration(let string) = directive {
+                return string
+            }
+        }
+        return nil
+    }
+
+    /// Whether the symbol file directive is present.
+    var isSymbolFile: Bool {
+        for directive in directives {
+            if case .symbolFile = directive {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Whether to suppress the statement's messages.
+    var suppressMessages: Bool {
+        for directive in directives {
+            if case .nowarn = directive {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Whether to suppress a specific message on this statement.
+    func suppresses(_ message: Message) -> Bool {
+        for directive in directives {
+            if case .nowarnSpecific(let diagnosticIDs) = directive,
+               let diagnosticID = message.diagnosticID,
+               diagnosticIDs.contains(diagnosticID) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Whether this block should be marked as being implemented by an external library.
+    var isExternal: Bool {
+        for directive in directives {
+            if case .external = directive {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Whther this begins an `#if SKIP` or `#if os(Android)` block.
+    func isIfSkipBlock(allowOSAndroid: Bool = false) -> Bool {
+        for directive in directives {
+            if case .ifSkipBlock(let blockType) = directive, (blockType == .ifSkip || (allowOSAndroid && blockType == .ifOSAndroid)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Leading trivia string, allowing us to preserve original comments and blank lines.
+    func leadingTrivia(indentation: Indentation) -> String {
+        return join(lines: leadingTrivia, indentation: indentation)
+    }
+
+    /// Trailing trivia string, allowing us to preserve trailing comments.
+    func trailingTrivia(indentation: Indentation) -> String {
+        return join(lines: trailingTrivia, indentation: indentation, indentFirstLine: false)
+    }
+
+    private func join(lines: [String], indentation: Indentation, indentFirstLine: Bool = true) -> String {
+        guard !lines.isEmpty else {
+            return ""
+        }
+        var joined = ""
+        let indentationString = indentation.description
+        for (index, string) in lines.enumerated() {
+            if string == "\n" || (!indentFirstLine && index == 0) {
+                joined.append(string)
+            } else {
+                joined.append(indentationString)
+                joined.append(string)
+            }
+        }
+        return joined
+    }
+
+    /// Detect and extract any header comments on the first statement's extras in each file.
+    mutating func extractHeader(isImportStatement: Bool) -> [String] {
+        guard !leadingTrivia.isEmpty else {
+            return []
+        }
+
+        var nonDocCommentsBeforeNewline: [String] = []
+        var hasTrailingNewline = false
+        var isInMultilineComment = 0
+        for line in leadingTrivia {
+            if line.hasSuffix("*/\n") && isInMultilineComment > 0 {
+                isInMultilineComment -= 1
+            } else if line.hasPrefix("/*") {
+                isInMultilineComment += 1
+            }
+            if line.hasPrefix("///") || (isInMultilineComment == 0 && line == "\n") {
+                hasTrailingNewline = line == "\n"
+                break
+            } else {
+                nonDocCommentsBeforeNewline.append(line)
+            }
+        }
+        guard !nonDocCommentsBeforeNewline.isEmpty else {
+            return []
+        }
+        // Consider any initial non-doc comments before a newline/doc comment or import statement to be a header
+        guard isImportStatement || nonDocCommentsBeforeNewline.count < leadingTrivia.count else {
+            return []
+        }
+
+        leadingTrivia = Array(leadingTrivia.dropFirst(nonDocCommentsBeforeNewline.count + (hasTrailingNewline ? 1 : 0)))
+        return nonDocCommentsBeforeNewline
+    }
+}

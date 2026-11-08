@@ -1,0 +1,361 @@
+name: skipstone CI
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  # the skip CLI compiles SkipDrive from the skip submodule (Sources/SkipDriveExternal),
+  # so a stale pin silently ships SkipDrive that no skip release contains
+  skipdrive-pin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - name: "Check that the skip submodule's SkipDrive matches skip main"
+        run: |
+          git -C skip fetch --depth=1 origin main
+          if ! git -C skip diff --exit-code HEAD FETCH_HEAD -- Sources/SkipDrive; then
+            echo "::error::skip submodule's Sources/SkipDrive is behind skip main; bump it: git -C skip fetch origin main && git -C skip checkout FETCH_HEAD && git add skip"
+            exit 1
+          fi
+
+  build-plugin:
+    timeout-minutes: 45
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        swift:
+          #- '6.3.2'
+          - '6.4.0'
+        os:
+          - 'ubuntu-latest'
+          #- 'macos-latest'
+          - 'macos-26'
+    steps:
+      - name: Checkout skipstone.git
+        uses: actions/checkout@v7
+        with:
+          # skip.git submodule needed for SkipDriveExternal
+          submodules: true
+
+      - uses: Homebrew/actions/setup-homebrew@main
+
+      # we only use Swiftly on Linux to install the specific Swift
+      # because it needs to exactly match the Swift SDK for Android version
+      #
+      # on macOS we *cannot* use the OSS toolchain because we need to
+      # compile using the Xcode toolchain (which handles building
+      # the universal binary)
+      - name: "Install Swift Host Toolchain and Static Linux SDK"
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -y install libcurl4-openssl-dev || (sudo apt-get update && sudo apt-get -y install libcurl4-openssl-dev)
+          brew install swiftly
+          swiftly init --skip-install --assume-yes --quiet-shell-followup
+          swiftly install --assume-yes --use ${{ matrix.swift }}
+          swiftly run swift --version
+
+          # https://download.swift.org/swift-6.4-release/static-sdk/swift-6.4-RELEASE/swift-6.4-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz
+          curl -fsSL --retry 5 -o 'swift-static-linux-sdk.tar.gz' 'https://download.swift.org/swift-${{ matrix.swift }}-release/static-sdk/swift-${{ matrix.swift }}-RELEASE/swift-${{ matrix.swift }}-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz'
+
+          swiftly run swift sdk install 'swift-static-linux-sdk.tar.gz'
+
+          # default to using the Swiftly version of swift
+          echo "$HOME/.local/share/swiftly/bin" >> $GITHUB_PATH
+
+      - run: swift --version
+
+      - run: swift build
+
+      - run: swift test --parallel
+
+      # On Linux the plugin is cross-compiled with the static Linux SDK installed above, and the
+      # compiler that builds it is the one `swiftly install --use ${{ matrix.swift }}` selected in
+      # that step. Keep the `--use`: build_linux_plugin.sh intentionally does not pin a toolchain
+      # of its own, so that the compiler and the SDK cannot drift apart into
+      # "module compiled with Swift X cannot be imported by the Swift Y compiler".
+      - name: "Build ${{ runner.os }} plugin"
+        shell: bash
+        run: |
+          # "macos" or "linux"
+          OSNAME=$(echo $RUNNER_OS | tr '[A-Z]' '[a-z]')
+
+          if [[ "${OSNAME}" == "linux" ]]; then
+            # only build x86 for Linux to improve build time
+            ./scripts/build_${OSNAME}_plugin.sh --arch x86_64
+          else
+            ./scripts/build_${OSNAME}_plugin.sh
+          fi
+
+          BUILD_DIR="${PWD}/.build/artifactbundle-${OSNAME}"
+          SKIP_BIN="${BUILD_DIR}/skip.artifactbundle/bin"
+
+          # set the PATH to include the newly-built `skip` command
+          echo "${SKIP_BIN}" >> $GITHUB_PATH
+
+          # override skip plugin to use the locally built binary
+          echo "SKIP_COMMAND_OVERRIDE=${SKIP_BIN}/skip" >> $GITHUB_ENV
+
+          mkdir artifacts/
+          find "${BUILD_DIR}"
+          cp -av "${BUILD_DIR}"/*.zip artifacts/
+
+      - run: skip welcome
+
+      - name: "Upload Build Artifacts"
+        uses: actions/upload-artifact@v7
+        with:
+          name: skip-plugin-${{ runner.os }}
+          path: artifacts/
+
+  android-ci:
+    needs: build-plugin
+    timeout-minutes: 240
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          # arm64 macOS runners cannot host the Android emulator (no nested
+          # virtualization: HVF fails with HV_UNSUPPORTED), so they run the macOS-only
+          # steps and the host and Robolectric halves. The emulator tests run on Linux
+          # (x86_64 + KVM)
+          - 'ubuntu-24.04'
+          - 'macos-26'
+        swift:
+          - '6.3'
+          - '6.4'
+        android-api:
+          - '28'
+          #- '34'
+        android-arch:
+          - 'x86_64'
+        android-sdk:
+          # blank will use the latest official release (e.g., 6.4)
+          - ''
+          #- '6.3'
+          #- 'nightly-6.3'
+          #- 'nightly-main'
+        android-ndk:
+          # blank will use the default
+          - ''
+          #- 'r27d'
+          #- 'r28c'
+          #- 'r29'
+
+    steps:
+      - uses: Homebrew/actions/setup-homebrew@main
+
+      # The transpiled (Lite) and Fuse framework `swift test` runs execute the Kotlin suite under
+      # Robolectric, and recent Android SDK levels (e.g. SDK 36) require Java 21. The runners default to
+      # Java 17, so without this the Robolectric run fails with:
+      #   "Failed to create a Robolectric sandbox: Android SDK 36 requires Java 21 (have Java 17)".
+      - name: "Set up Java 21 (required by Robolectric for recent Android SDKs)"
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: "Install Host Toolchain prerequisites"
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get -y install libcurl4-openssl-dev || (sudo apt-get update && sudo apt-get -y install libcurl4-openssl-dev)
+
+      - run: brew install swiftly
+
+      - run: swiftly init --skip-install --assume-yes --quiet-shell-followup
+
+      - run: swiftly install --assume-yes --use ${{ matrix.swift }}
+
+      - run: swiftly run swift --version
+
+      - run: swift --version
+
+      - name: "Download skip plugin"
+        uses: actions/download-artifact@v8
+        with:
+          name: skip-plugin-${{ runner.os }}
+          path: skip-artifact
+
+      - name: "Install skip from artifact"
+        shell: bash
+        run: |
+          OSNAME=$(echo $RUNNER_OS | tr '[A-Z]' '[a-z]')
+          cd skip-artifact
+          unzip skip-${OSNAME}.zip
+          SKIP_BIN="${PWD}/skip.artifactbundle/bin"
+          find skip.artifactbundle -type f -name skip -exec chmod +x {} +
+          echo "${SKIP_BIN}" >> $GITHUB_PATH
+          echo "SKIP_COMMAND_OVERRIDE=${SKIP_BIN}/skip" >> $GITHUB_ENV
+
+      - run: which skip
+
+      - run: skip version
+
+      - run: skip doctor
+
+      - name: "Create and export new app"
+        if: runner.os == 'macOS' && runner.arch == 'ARM64'
+        working-directory: ${{ runner.temp }}
+        run: |
+          skip init --transpiled-app --free --appid some.app.id some-app SomeApp SomeAppModel
+          # verify that the project itself is free
+          skip verify --free --project some-app
+          # perform an export of the app
+          skip export --validate-export --show-tree --project some-app
+
+      - name: "Install Swift SDK for Android"
+        run: |
+          sdk_arg=""
+          if [[ "${{ matrix.android-sdk }}" != "" ]]; then
+            sdk_arg="--version ${{ matrix.android-sdk }}"
+          fi
+
+          ndk_arg=""
+          if [[ "${{ matrix.android-ndk }}" != "" ]]; then
+            ndk_arg="--ndk-version ${{ matrix.android-ndk }}"
+          fi
+
+          skip android sdk install ${sdk_arg} ${ndk_arg}
+
+      - run: skip android build --version
+
+      #- run: skip doctor
+
+      #- name: "Create and export new Skip Fuse app project"
+      #  if: runner.os != 'Linux'
+      #  #if: false
+      #  working-directory: ${{ runner.temp }}
+      #  run: |
+      #    skip init --no-build --native-app --appid=some.app.id demo-skip-appfuse DemoSkipApp
+      #    cd demo-skip-appfuse
+      #    skip export --debug --ios-sim
+
+      - run: skip checkup --native
+        if: runner.os == 'macOS' && runner.arch == 'ARM64'
+        # needs to not be in a directory named "skipstone"
+        # https://github.com/skiptools/skipstone/issues/216
+        working-directory: ${{ runner.temp }}
+
+      - name: "Prepare Android emulator environment"
+        if: runner.os == 'Linux'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+          # need to free disk space or the emulator fails to launch sometimes
+          sudo rm -rf /Applications/Xcode_1[45]*.app /Applications/Xcode_16.[0123].app /opt/microsoft /opt/google /opt/az /usr/share/miniconda /usr/share/az* /usr/share/glade* /usr/local/share/chromium /usr/local/share/powershell /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/julia* /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+
+      - name: "Create and Launch Emulator"
+        if: runner.arch != 'ARM64'
+        run: |
+          export ANDROID_USER_HOME=$HOME/.android
+          export ANDROID_EMULATOR_HOME=$ANDROID_USER_HOME
+          export ANDROID_AVD_HOME=$ANDROID_EMULATOR_HOME/avd
+          # AOSP image: the google_apis image's Play services overload the guest (ANRs,
+          # low memory, system_server watchdog restarts), which surfaces as
+          # "Can't find service: package" and similar install failures
+          skip android emulator create --verbose --system-image default
+          skip android emulator list --verbose
+          # watch the logs for errors
+          (sleep 20; ${ANDROID_HOME}/platform-tools/adb logcat) &
+
+          skip android emulator launch --background --android-connect-timeout=900 --verbose -- -memory 4096 -no-snapshot -no-audio
+
+          echo "Waiting for device boot"
+          ${ANDROID_HOME}/platform-tools/adb wait-for-device
+          # slow runners can take over 10 minutes to boot
+          for i in $(seq 180); do
+            [[ "$(${ANDROID_HOME}/platform-tools/adb shell getprop sys.boot_completed | tr -d '\r')" == "1" ]] && break
+            sleep 5
+          done
+          date
+          ${ANDROID_HOME}/platform-tools/adb shell getprop sys.boot_completed
+
+          # skip package verification and animations, which only add guest load
+          for s in verifier_verify_adb_installs package_verifier_enable window_animation_scale transition_animation_scale animator_duration_scale; do
+            ${ANDROID_HOME}/platform-tools/adb shell settings put global $s 0
+          done
+
+      - name: "Test new Swift package on emulator"
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir package-demo
+          cd package-demo
+
+          swift package init --name "PackageDemo"
+          # test on host OS
+          swift test
+
+          if [[ "${RUNNER_ARCH}" != "ARM64" ]]; then
+            # test using shared object file loaded from .apk
+            skip android test --verbose --apk --arch ${{ matrix.android-arch }} --android-connect-timeout 60
+
+            # test using xcrunner binary
+            skip android test --verbose --arch ${{ matrix.android-arch }}
+          fi
+
+          # now add a failing test to make sure it actually fails
+          echo '@Test func shouldFail() { #expect(1+1 == 3, "Test should fail") }' >> Tests/PackageDemoTests/PackageDemoTests.swift
+
+          swift build --build-tests
+          # a bare `! cmd` can't fail the step under `bash -e` unless it is the last command
+          if swift test; then echo "swift test should have failed"; exit 1; fi
+          if [[ "${RUNNER_ARCH}" != "ARM64" ]]; then
+            ! skip android test --apk --arch ${{ matrix.android-arch }}
+          fi
+
+      - name: "Test new Skip Lite framework on emulator"
+        working-directory: ${{ runner.temp }}
+        run: |
+          skip init --no-build --transpiled-model --module-tests demo-lite-framework DemoFramework
+          cd demo-lite-framework
+          # Robolectric test
+          swift test
+          # Emulator test
+          if [[ "${RUNNER_ARCH}" != "ARM64" ]]; then
+            ANDROID_SERIAL=emulator-5554 swift test
+          fi
+
+      - name: "Test new Skip Fuse framework on emulator"
+        working-directory: ${{ runner.temp }}
+        env:
+          # Under swiftbuild a Fuse package graph links SkipLib and SkipUnit statically into more than
+          # one dynamic product, which is an error; dynamic shared products keep it valid (see HostSwiftBuild)
+          SKIP_DYNAMIC_LIBRARIES: '1'
+        run: |
+          skip init --no-build --native-model --bridged --module-tests demo-fuse-framework DemoFramework
+          cd demo-fuse-framework
+          # Robolectric test. Not on Linux, where skip-android-bridge's AndroidBundle can't subclass
+          # swift-corelibs-foundation's Bundle; the macOS leg runs it, and Linux runs the emulator half
+          if [[ "${RUNNER_OS}" != "Linux" ]]; then
+            swift test
+          fi
+          # Emulator test
+          if [[ "${RUNNER_ARCH}" != "ARM64" ]]; then
+            ANDROID_SERIAL=emulator-5554 swift test
+          fi
+
+          # now add a failing test to make sure it actually fails
+          echo '#if os(Android)' >> Tests/DemoFrameworkTests/DemoFrameworkTests.swift
+          echo '@Test func shouldFailOnAndroid() { #expect(1+1 == 3, "Test should fail on Android") }' >> Tests/DemoFrameworkTests/DemoFrameworkTests.swift
+          echo '#endif' >> Tests/DemoFrameworkTests/DemoFrameworkTests.swift
+
+          swift build --build-tests
+          # Robolectric should still pass
+          if [[ "${RUNNER_OS}" != "Linux" ]]; then
+            swift test
+          fi
+          # Emulator test should fail
+          if [[ "${RUNNER_ARCH}" != "ARM64" ]]; then
+            ! ANDROID_SERIAL=emulator-5554 swift test
+          fi
+
