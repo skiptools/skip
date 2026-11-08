@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// A transpilation result.
 public struct Transpilation : Encodable { // Encodable for tool JSON output option
     public var input: Source

@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Update types that conform to the `Error` protocol to extend from `Exception`.
 final class KotlinErrorToExceptionTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {

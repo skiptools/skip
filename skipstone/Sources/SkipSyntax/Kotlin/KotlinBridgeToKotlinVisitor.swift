@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Generate compiled Swift to Kotlin bridging code.
 ///
 /// - Warning: This visitor assumes that the given syntax tree only contains bridged API.

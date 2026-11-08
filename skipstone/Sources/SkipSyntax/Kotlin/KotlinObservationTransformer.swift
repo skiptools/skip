@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Adapts `@Observable` and `ObservableObject` types for use in Combine and SwiftUI.
 final class KotlinObservationTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {

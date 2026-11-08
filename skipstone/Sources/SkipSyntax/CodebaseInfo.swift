@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Information about the codebase used in type inference and translation.
 public final class CodebaseInfo {
     /// The current module name.

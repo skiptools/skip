@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 import SwiftSyntax
 
 /// A node in the syntax tree.

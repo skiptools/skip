@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking

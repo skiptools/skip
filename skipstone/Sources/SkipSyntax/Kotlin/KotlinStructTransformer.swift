@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Give struct semantics to Kotlin classes translated from Swift structs.
 ///
 /// - Seealso: `SkipLib/Struct.kt`

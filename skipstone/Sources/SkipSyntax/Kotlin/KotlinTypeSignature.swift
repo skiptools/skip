@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 extension TypeSignature {
     /// Kotlin description of this type.
     var kotlin: String {

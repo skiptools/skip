@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Consolidate and map import statements to Skip modules.
 final class KotlinImportsTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {

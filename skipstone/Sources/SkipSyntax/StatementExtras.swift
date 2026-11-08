@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 import SwiftSyntax
 
 /// Extra directives and trivia derived from the trivia surrounding a statement.

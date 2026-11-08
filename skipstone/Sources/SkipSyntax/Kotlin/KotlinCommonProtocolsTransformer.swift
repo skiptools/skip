@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Perform synthesis and fixups related to `Equatable`, `Hashable`, `Comparable`, etc implementations.
 ///
 ///   1. Synthesize `equals` and `hashCode` members in cases where the Swift compiler synthesizes `Equatable` and `Hashable`.

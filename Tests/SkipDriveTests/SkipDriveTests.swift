@@ -1,4 +1,3 @@
-// Copyright 2023–2026 Skip
 #if !os(Android)
 import XCTest
 import SkipDrive

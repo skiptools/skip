@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Generate code to support various `Foundation` types bridging to Android.
 public final class KotlinFoundationBridgeTransformer: KotlinTransformer {
     public static let supportFileName = "FoundationBridge_Support.swift"

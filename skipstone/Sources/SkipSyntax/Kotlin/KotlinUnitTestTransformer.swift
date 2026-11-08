@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Convert `XCTestCase` test functions and Swift Testing `@Test` functions to JUnit test functions.
 ///
 /// Handles two styles of test declaration:

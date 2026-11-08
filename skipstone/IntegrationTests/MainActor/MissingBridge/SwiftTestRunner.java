@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 package org.swift.test;
 
 // Calls the generated JNI harness without instrumentation. Its class name must match the JNI

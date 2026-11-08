@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Update variables declared in `if`, `guard`, and `when` statements to prevent shadowing locals and each other.
 ///
 /// - Seealso: ``KotlinIf``, ``KotlinWhen``

@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Generate dynamic object types.
 public final class KotlinDynamicObjectTransformer: KotlinTransformer {
     public static let supportFileName = "AnyDynamicObject_Support.swift"

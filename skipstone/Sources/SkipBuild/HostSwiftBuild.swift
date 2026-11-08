@@ -1,4 +1,3 @@
-// Copyright 2026 Skip
 import Foundation
 
 /// How skip runs the Apple-platform `swift build` / `swift test` invocations it drives itself:

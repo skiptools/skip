@@ -1,5 +1,3 @@
-// Copyright (c) 2026 Skip
-
 import XCTest
 import TSCBasic
 @testable import SkipBuild

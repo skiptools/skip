@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Representation of the Kotlin syntax tree.
 public final class KotlinSyntaxTree {
     let source: Source

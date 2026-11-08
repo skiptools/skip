@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Generate code to support `Bundle` and `Bundle.module` if it is needed within the module.
 public final class KotlinBundleTransformer: KotlinTransformer {
     public static let supportFileName = "Bundle_Support.swift"

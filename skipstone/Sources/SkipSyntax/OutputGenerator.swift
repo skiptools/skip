@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Generate output from a graph of nodes.
 ///
 /// Uses an iterative approach with an explicit work stack to avoid stack overflow

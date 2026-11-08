@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Migrate Swift constructors to Kotlin constructors, include suppressing property side effects.
 final class KotlinConstructorAndSideEffectSupressionTransformer: KotlinTransformer {
     func apply(to syntaxTree: KotlinSyntaxTree, translator: KotlinTranslator) -> [KotlinTransformerOutput] {

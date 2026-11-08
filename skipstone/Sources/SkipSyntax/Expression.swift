@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 import SwiftSyntax
 
 /// An expression in the Swift syntax tree.

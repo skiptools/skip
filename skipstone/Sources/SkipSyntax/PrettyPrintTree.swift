@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Structure for pretty printing tree content.
 public struct PrettyPrintTree {
     let root: String

@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 import SkipBuild
 @testable import SkipSyntax
 import TSCBasic

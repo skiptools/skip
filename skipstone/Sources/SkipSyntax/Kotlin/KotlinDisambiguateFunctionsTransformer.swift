@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Disambiguate Kotlin functions translated from Swift functions that are only differentkated on their parameter labels.
 final class KotlinDisambiguateFunctionsTransformer: KotlinTransformer {
     func prepareForUse(codebaseInfo: CodebaseInfo?) {

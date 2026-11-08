@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Types of Kotlin expressions.
 enum KotlinExpressionType {
     case arrayLiteral

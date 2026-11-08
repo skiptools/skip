@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Indentation helper.
 public struct Indentation: ExpressibleByIntegerLiteral, CustomStringConvertible {
     public static let zero = Indentation(level: 0)

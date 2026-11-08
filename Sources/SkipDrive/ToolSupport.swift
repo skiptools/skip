@@ -1,4 +1,3 @@
-// Copyright 2023–2026 Skip
 #if !SKIP && !os(Android)
 import Foundation
 #if canImport(FoundationXML)

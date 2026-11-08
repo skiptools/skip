@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 // NOTE: this variable is updated by the `scripts/release_skip.sh` script when the version is bumped.
 
 /// The current version of Skip.

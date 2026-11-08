@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 import Foundation
 
 /// Translates a Swift syntax tree to Kotlin code.

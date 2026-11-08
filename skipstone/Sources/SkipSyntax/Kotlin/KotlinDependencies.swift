@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Track additional dependencies needed by transpiled Kotlin code.
 struct KotlinDependencies {
     /// Package names to import, e.g. "kotlin.reflect.\*".

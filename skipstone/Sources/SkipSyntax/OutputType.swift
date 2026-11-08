@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Types of transpiler output.
 public enum OutputType : Encodable { // Encodable for use in Transpilation
     /// Transpilation of source Swift.

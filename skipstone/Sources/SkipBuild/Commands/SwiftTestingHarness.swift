@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 import Foundation
 
 // MARK: - Shared native Swift Testing harness sources

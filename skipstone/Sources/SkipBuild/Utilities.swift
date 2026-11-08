@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 import Foundation
 
 /// Retries the given block with an exponential backoff in between attempts.

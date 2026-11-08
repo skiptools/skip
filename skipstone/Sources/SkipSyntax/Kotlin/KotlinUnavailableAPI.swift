@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Give warnings for common API that we know we do not support in Kotlin.
 public final class KotlinUnavailableAPI: UnavailableAPI {
     public override init() {

@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 @_spi(ExperimentalLanguageFeatures) import SwiftParser
 import SwiftSyntax
 

@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// An entity that may have been parsed or translated from source.
 protocol SourceDerived: AnyObject {
     var sourceFile: Source.FilePath? { get }

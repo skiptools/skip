@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Determines what API is bridged without being explicitly annotated.
 public enum AutoBridge: Int {
     /// Bridge only API with bridge attribute.

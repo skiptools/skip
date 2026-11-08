@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Translate SwiftUI to syntactically correct Kotlin.
 ///
 /// We rely on our UI libraries to provide the implementation of the SwiftUI-like API that this translation will result in.

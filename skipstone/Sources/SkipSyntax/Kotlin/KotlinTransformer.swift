@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// A plugin used to translate a specific facet of Swift code to Kotlin.
 ///
 /// The transformer lifetime is tied to that of the entire transpilation process. This means that a given transformer instance may be applied to multiple syntax trees.

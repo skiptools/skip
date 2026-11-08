@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 import Foundation
 
 /// Determine tuple labels used within the module and generate extension properites to support them.

@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Resolve missing type information such as typealiases, module-qualified type names, and missing generic parameters.
 struct TypeResolutionContext {
     private let codebaseInfo: CodebaseInfo.Context?

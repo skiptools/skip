@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 @testable import SkipBuild
 import SkipSyntax
 import SwiftSyntax

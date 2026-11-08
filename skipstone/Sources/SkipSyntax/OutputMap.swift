@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Map output ranges to source ranges.
 ///
 /// Note that a `Decodable` version of this structure exists as `SkipUnit.SourceMap`.

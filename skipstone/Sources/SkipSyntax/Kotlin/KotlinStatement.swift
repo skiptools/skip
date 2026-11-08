@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// A node in the Kotlin syntax tree.
 class KotlinStatement: KotlinSyntaxNode {
     var type: KotlinStatementType

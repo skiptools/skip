@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 import Foundation
 
 /// Generate transpiled Swift (Kotlin) to compiled Swift bridging code.

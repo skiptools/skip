@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 extension KotlinClassDeclaration {
     /// `RawRepresentable` raw value type.
     var rawValueType: TypeSignature {

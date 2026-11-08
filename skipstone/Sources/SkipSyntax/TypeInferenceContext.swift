@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 /// Contextual information used in type inference.
 struct TypeInferenceContext {
     private let codebaseInfo: CodebaseInfo.Context?

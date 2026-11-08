@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 #if canImport(OSLog)
 import OSLog
 typealias Logger = os.Logger

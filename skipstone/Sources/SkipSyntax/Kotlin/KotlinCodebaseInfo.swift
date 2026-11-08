@@ -1,5 +1,3 @@
-// Copyright (c) 2023 - 2026 Skip
-
 extension CodebaseInfo {
     /// Access Kotlin additions.
     public var kotlin: KotlinCodebaseInfo? {
