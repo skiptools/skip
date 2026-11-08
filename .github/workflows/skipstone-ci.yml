@@ -1,5 +1,9 @@
 name: skipstone CI
 
+# Builds and tests the `skip` tool from the skipstone/ package, then exercises the
+# resulting binary against the Android emulator. The skip plugin package at the
+# repository root is covered by the "skip ci" workflow (ci.yml).
+
 on:
   push:
     branches: [main]
@@ -9,22 +13,6 @@ on:
   pull_request:
 
 jobs:
-  # the skip CLI compiles SkipDrive from the skip submodule (Sources/SkipDriveExternal),
-  # so a stale pin silently ships SkipDrive that no skip release contains
-  skipdrive-pin:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: true
-      - name: "Check that the skip submodule's SkipDrive matches skip main"
-        run: |
-          git -C skip fetch --depth=1 origin main
-          if ! git -C skip diff --exit-code HEAD FETCH_HEAD -- Sources/SkipDrive; then
-            echo "::error::skip submodule's Sources/SkipDrive is behind skip main; bump it: git -C skip fetch origin main && git -C skip checkout FETCH_HEAD && git add skip"
-            exit 1
-          fi
-
   build-plugin:
     timeout-minutes: 45
     runs-on: ${{ matrix.os }}
@@ -38,12 +26,13 @@ jobs:
           - 'ubuntu-latest'
           #- 'macos-latest'
           - 'macos-26'
+    defaults:
+      run:
+        # the skip tool is a separate SwiftPM package in the skipstone/ sub-folder
+        working-directory: skipstone
     steps:
-      - name: Checkout skipstone.git
+      - name: Checkout skip.git
         uses: actions/checkout@v7
-        with:
-          # skip.git submodule needed for SkipDriveExternal
-          submodules: true
 
       - uses: Homebrew/actions/setup-homebrew@main
 
@@ -71,6 +60,10 @@ jobs:
           echo "$HOME/.local/share/swiftly/bin" >> $GITHUB_PATH
 
       - run: swift --version
+
+      # Sources/SkipDriveExternal is a symbolic link to ../../Sources/SkipDrive in the enclosing skip
+      # package; check that it resolves, since without it the tool silently loses the android commands
+      - run: test -f Sources/SkipDriveExternal/GradleDriver.swift
 
       - run: swift build
 
@@ -113,7 +106,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: skip-plugin-${{ runner.os }}
-          path: artifacts/
+          # upload-artifact paths are relative to the workspace, not the job's working-directory
+          path: skipstone/artifacts/
 
   android-ci:
     needs: build-plugin
@@ -358,4 +352,3 @@ jobs:
           if [[ "${RUNNER_ARCH}" != "ARM64" ]]; then
             ! ANDROID_SERIAL=emulator-5554 swift test
           fi
-

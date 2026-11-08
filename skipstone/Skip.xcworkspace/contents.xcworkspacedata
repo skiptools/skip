@@ -5,105 +5,105 @@
       location = "group:">
    </FileRef>
    <FileRef
-      location = "group:../skip">
+      location = "group:..">
    </FileRef>
    <FileRef
-      location = "group:../skip-unit">
+      location = "group:../../skip-unit">
    </FileRef>
    <FileRef
-      location = "group:../skip-lib">
+      location = "group:../../skip-lib">
    </FileRef>
    <FileRef
-      location = "group:../skip-foundation">
+      location = "group:../../skip-foundation">
    </FileRef>
    <FileRef
-      location = "group:../skip-model">
+      location = "group:../../skip-model">
    </FileRef>
    <FileRef
-      location = "group:../skip-ui">
+      location = "group:../../skip-ui">
    </FileRef>
    <FileRef
-      location = "group:../skip-av">
+      location = "group:../../skip-av">
    </FileRef>
    <FileRef
-      location = "group:../skip-web">
+      location = "group:../../skip-web">
    </FileRef>
    <FileRef
-      location = "group:../skip-ffi">
+      location = "group:../../skip-ffi">
    </FileRef>
    <FileRef
-      location = "group:../skip-firebase">
+      location = "group:../../skip-firebase">
    </FileRef>
    <FileRef
-      location = "group:../skip-motion">
+      location = "group:../../skip-motion">
    </FileRef>
    <FileRef
-      location = "group:../swift-android-native">
+      location = "group:../../swift-android-native">
    </FileRef>
    <FileRef
-      location = "group:../swift-jni">
+      location = "group:../../swift-jni">
    </FileRef>
    <FileRef
-      location = "group:../skip-bridge">
+      location = "group:../../skip-bridge">
    </FileRef>
    <FileRef
-      location = "group:../skip-android-bridge">
+      location = "group:../../skip-android-bridge">
    </FileRef>
    <FileRef
-      location = "group:../skip-fuse">
+      location = "group:../../skip-fuse">
    </FileRef>
    <FileRef
-      location = "group:../skip-fuse-ui">
+      location = "group:../../skip-fuse-ui">
    </FileRef>
    <FileRef
-      location = "group:../skip-integ-demo">
+      location = "group:../../skip-integ-demo">
    </FileRef>
    <FileRef
-      location = "group:../skip-kit">
+      location = "group:../../skip-kit">
    </FileRef>
    <FileRef
-      location = "group:../skip-bluetooth">
+      location = "group:../../skip-bluetooth">
    </FileRef>
    <FileRef
-      location = "group:../skip-device">
+      location = "group:../../skip-device">
    </FileRef>
    <FileRef
-      location = "group:../skip-keychain">
+      location = "group:../../skip-keychain">
    </FileRef>
    <FileRef
-      location = "group:../skip-sql">
+      location = "group:../../skip-sql">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-hello/Darwin/HelloSkip.xcodeproj">
+      location = "group:../../skipapp-hello/Darwin/HelloSkip.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-hello-fuse/Darwin/HelloSkipFuse.xcodeproj">
+      location = "group:../../skipapp-hello-fuse/Darwin/HelloSkipFuse.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-notes/Darwin/SkipNotes.xcodeproj">
+      location = "group:../../skipapp-notes/Darwin/SkipNotes.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-hiya/Darwin/HiyaSkip.xcodeproj">
+      location = "group:../../skipapp-hiya/Darwin/HiyaSkip.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-showcase/Darwin/Showcase.xcodeproj">
+      location = "group:../../skipapp-showcase/Darwin/Showcase.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-showcase-fuse/Darwin/ShowcaseFuse.xcodeproj">
+      location = "group:../../skipapp-showcase-fuse/Darwin/ShowcaseFuse.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-bookings/Darwin/TravelBookings.xcodeproj">
+      location = "group:../../skipapp-bookings/Darwin/TravelBookings.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-bookings-fuse/Darwin/TravelBookingsFuse.xcodeproj">
+      location = "group:../../skipapp-bookings-fuse/Darwin/TravelBookingsFuse.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-fireside/Darwin/FireSide.xcodeproj">
+      location = "group:../../skipapp-fireside/Darwin/FireSide.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-fireside-fuse/Darwin/FireSideFuse.xcodeproj">
+      location = "group:../../skipapp-fireside-fuse/Darwin/FireSideFuse.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../skipapp-lottiedemo/Darwin/LottieDemo.xcodeproj">
+      location = "group:../../skipapp-lottiedemo/Darwin/LottieDemo.xcodeproj">
    </FileRef>
 </Workspace>

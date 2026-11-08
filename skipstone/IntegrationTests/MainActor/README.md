@@ -5,10 +5,9 @@ initializer, suspension and resumption, a worker-to-main-actor hop, and a
 DispatchQueue.main callback. It checks both actor isolation and main-thread
 execution without Skip dependencies or platform conditionals.
 
-From the repository root:
+From the `skipstone/` folder of the skip repository:
 
 ```sh
-git submodule update --init
 swift build --product SkipRunner
 swift test --package-path IntegrationTests/MainActor
 .build/debug/SkipRunner android test --apk --testing-library testing \

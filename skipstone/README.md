@@ -1,7 +1,8 @@
 # skipstone
 
-This repository hosts the Skip command-line tool "skip",
-which is distributed as a binary plug-in through the public repo at
+This folder of the [skip](https://github.com/skiptools/skip) repository
+hosts the Skip command-line tool "skip",
+which is distributed as a binary plug-in through the releases at
 [https://github.com/skiptools/skip/releases](https://github.com/skiptools/skip/releases)
 as well as the Homebrew Cask via
 [https://github.com/skiptools/homebrew-skip/blob/main/Casks/skip.rb](https://github.com/skiptools/homebrew-skip/blob/main/Casks/skip.rb).
@@ -10,9 +11,14 @@ The exact same binary is used by both the Xcode/SwiftPM `skipstone` build plugin
 as well as the command-line tool installed via Homebrew's `brew install skip`
 
 > [!NOTE]
-> This repository, https://github.com/skiptools/skipstone.git, vends the `skip` tool,
-> whereas the https://github.com/skiptools/skip.git repository vends the `skipstone` plugin.
-> The names are the reverse of what you might expect.
+> The `skipstone/` folder is a separate SwiftPM package from the `skip` plugin package at
+> the root of the repository, and it is not built as part of it: the plugin normally downloads
+> the pre-built `skip` binary from the releases, and only builds it from these sources when
+> `SKIPLOCAL` is set (see [Local Skip Development](#local-skip-development)).
+> The two packages share the `SkipDrive` sources through the `Sources/SkipDriveExternal`
+> symbolic link, which points to `../../Sources/SkipDrive`.
+> Note the naming inversion: this `skipstone/` package vends the `skip` tool, whereas the
+> `skip` package at the root vends the `skipstone` plugin.
 
 The `skip` tool itself is a stand-alone cross-platform command-line executable that
 contains a plethora of commands that support the
@@ -113,12 +119,16 @@ or the native test harness.
 
 Run `./scripts/skip` to build and run the Skip CLI tool from source. (It runs `swift run SkipRunner`, passing in a `$SKIP_COMMAND_OVERRIDE` environment variable.)
 
-In order to iterate on local changes to the `skipstone` binary that the Skip plugin uses,
+To build the `skip` plugin package at the root of the repository against the tool compiled
+from these sources (rather than the released binary), set the `SKIPLOCAL` environment variable
+when building or testing the root package, e.g. `SKIPLOCAL= swift test` from the repository root
+(an empty value uses this `skipstone/` folder; a path uses that checkout instead).
+This is what the `skip ci` workflow does.
+
+In order to iterate on local changes to the `skipstone` binary that the Skip plugin uses from Xcode,
 create an Xcode workspace that includes a local checkout of 
-[`skipstone.git`](https://github.com/skiptools/skipstone.git)
-and
 [`skip.git`](https://github.com/skiptools/skip.git)
-(or forks of those repositories),
+(or a fork of it),
 along with any Skip apps or frameworks where you want to test the changes.
 
 The key is that the _current working directory for Xcode must be the `skipstone` folder_.
@@ -162,34 +172,38 @@ Skip 1.7.0*: skipstone plugin to: /Users/marc/Library/Developer/Xcode/DerivedDat
 
 ## Releasing Skip
 
-Creating a release of skipstone is done with the
+Releases are made by the
+[`skip release`](../.github/workflows/release.yml)
+GitHub Actions workflow, which runs the
 [`scripts/release_skip.sh`](scripts/release_skip.sh)
-script, which requires that each of these three repositories
-are checked out in peer folders:
+script. Every push and the nightly schedule run the script as a dry run, which builds the
+release artifacts and shows the changes a release would make without committing anything.
+To make an actual release, dispatch the workflow manually from the Actions tab with the
+"dry run" option unchecked, choosing which semantic version component to bump (patch by default).
 
-- https://github.com/skiptools/skipstone.git
-- https://github.com/skiptools/skip.git
-- https://github.com/skiptools/homebrew-skip.git
+The release workflow runs against the repository it is dispatched in, so a fork can rehearse
+the whole process against its own releases. Updating the Homebrew cask in
+[homebrew-skip](https://github.com/skiptools/homebrew-skip) requires a `RELEASE_TOKEN`
+repository secret with write access to that repository; without it the cask update is skipped.
 
 > [!NOTE]
-> You must have write and release permissions for each of these repositories in order to be able to create a release.
+> You must have write and release permissions for the repository in order to be able to create a release.
 
-The release script will build the tool for both macOS and cross-compile it for Linux. So you will need the [`swiftly`](https://www.swift.org/install/macos/swiftly/) tool installed as well as the [static Linux SDK](https://www.swift.org/documentation/articles/static-linux-getting-started.html).
+The script can also be run locally from a checkout of this repository. It builds the tool for both macOS and cross-compiles it for Linux, so you will need the [`swiftly`](https://www.swift.org/install/macos/swiftly/) tool installed as well as the [static Linux SDK](https://www.swift.org/documentation/articles/static-linux-getting-started.html). If a checkout of `homebrew-skip.git` exists in a peer folder of the repository, its cask is updated as well.
 
 > [!TIP]
-> To do a dry run of a release without trying to push or tag any changes, run `DRY_RUN=1 ./scripts/release_skip.sh`
+> To do a dry run of a release without trying to push or tag any changes, run `DRY_RUN=1 ./skipstone/scripts/release_skip.sh` from the repository root.
 
 The release script will do the following:
 
-1. Bump the `skipVersion` in [`Sources/SkipSyntax/Version.swift`](Sources/SkipSyntax/Version.swift). By default this will bump the patch version, but running `SEMVER_BUMP='minor' ./scripts/release_skip.sh` will instead bump the minor version.
+1. Bump the `skipVersion` in both [`Sources/SkipSyntax/Version.swift`](Sources/SkipSyntax/Version.swift) and the plugin's [`Sources/SkipDrive/Version.swift`](../Sources/SkipDrive/Version.swift). By default this will bump the patch version, but running `SEMVER_BUMP='minor' ./skipstone/scripts/release_skip.sh` will instead bump the minor version.
+1. Check that the `skip ci` and `skipstone CI` workflows have passed for the commit being released (override with `SKIP_RELEASE_IGNORE_CI=1`).
 1. Build the universal macOS artifactbundle `skip-macos.zip` with [`scripts/build_macos_plugin.sh`](scripts/build_macos_plugin.sh)
 1. Build the static Linux (MUSL) artifactbundle `skip-linux.zip` with [`scripts/build_linux_plugin.sh`](scripts/build_linux_plugin.sh)
-1. Update the bundle URLs and checksums in the Skip plugin's [`Package.swift`](https://github.com/skiptools/skip/blob/main/Package.swift)
-1. Update the binary URLs and checksums for the Homebrew Cask's [`skip.rb`](https://github.com/skiptools/homebrew-skip/blob/main/Casks/skip.rb)
-1. Commit, tag, and push each of `skipstone.git`, `skip.git`, and `homebrew-skip.git`
-1. Create GitHub releases for each of [`skipstone.git`](https://github.com/skiptools/skipstone/releases) and [`skip.git`](https://github.com/skiptools/skip/releases)
-1. Upgrade Skip on the local machine with `brew upgrade skiptools/skip/skip`
-1. Run `skip welcome`
+1. Update the bundle URLs and checksums in the Skip plugin's [`Package.swift`](../Package.swift)
+1. Commit, tag, and push the repository, and create the [GitHub release](https://github.com/skiptools/skip/releases) with the two artifactbundles attached
+1. Update the version, binary URLs, and checksums for the Homebrew Cask's [`skip.rb`](https://github.com/skiptools/homebrew-skip/blob/main/Casks/skip.rb), and commit, tag, and push `homebrew-skip.git`
+1. When run locally, upgrade Skip on the local machine with `brew upgrade skiptools/skip/skip` and run `skip welcome`
 
 As a post-release step, it is a good idea to make sure that `skip checkup --native` works on the local machine.
 

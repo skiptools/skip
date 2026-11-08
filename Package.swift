@@ -29,9 +29,20 @@ let package = Package(
     ]
 )
 
+// The `skip` tool is normally a pre-built binary downloaded from this repository's releases.
+//
+// For local development, the tool is instead built from the `skipstone/` sub-folder of this
+// repository, which is a separate SwiftPM package containing the transpiler and the CLI.
+// This mode is enabled by setting `SKIPLOCAL` (either to the path of a skipstone checkout, or
+// to an empty string to use the bundled `skipstone/` folder), or by launching from a directory
+// named "skipstone" (which is how Xcode picks up the local build; see skipstone/README.md).
+//
+// It can only be used when this package is the root package: a remote dependency cannot declare
+// a local path dependency, so this must never be enabled automatically based on the presence of
+// the `skipstone/` folder, which is also present in the checkouts of this package's consumers.
 let env = Context.environment
-if (env["SKIPLOCAL"] != nil || env["PWD"]?.hasSuffix("skipstone") == true) {
-    package.dependencies += [.package(path: env["SKIPLOCAL"] ?? "../skipstone")]
+if let skipLocal = env["SKIPLOCAL"] ?? (env["PWD"]?.hasSuffix("skipstone") == true ? "" : nil) {
+    package.dependencies += [.package(path: skipLocal.isEmpty ? "skipstone" : skipLocal)]
     package.targets += [.executableTarget(name: "skip", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
 } else {
     #if os(macOS)
@@ -39,8 +50,7 @@ if (env["SKIPLOCAL"] != nil || env["PWD"]?.hasSuffix("skipstone") == true) {
     #elseif os(Linux)
     package.targets += [.binaryTarget(name: "skip", url: "https://github.com/skiptools/skip/releases/download/1.9.20/skip-linux.zip", checksum: "b98f5de51818c4802d584c2802f96d45fbf1babc7c1c25f94dc6cb6e7b88f57f")]
     #else
-    package.dependencies += [.package(url: "https://github.com/skiptools/skipstone.git", exact: "1.9.20")]
-    package.targets += [.executableTarget(name: "skip", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
+    fatalError("The skip plugin is only supported on macOS and Linux hosts; set SKIPLOCAL to build the skip tool from the skipstone/ sources instead")
     #endif
 }
 

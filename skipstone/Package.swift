@@ -24,9 +24,10 @@ let package = Package(
         .package(url: "https://github.com/marcprux/ELFKit.git", from: "0.2.1"),
     ],
     targets: [
-        // SkipDriveExternal is a link to ../../skip/Sources/SkipDrive
-        // it allows skipstone.git to share code with skip.git, which would otherwise cause
-        // circular package dependecy errors when building the plugin locally
+        // SkipDriveExternal is a symbolic link to ../../Sources/SkipDrive in the enclosing skip package.
+        // It lets the skip tool share the SkipDrive sources with the skip plugin package, which would
+        // otherwise cause circular package dependency errors when building the plugin locally
+        // (skip's SkipDrive target depends on the skip tool, which depends on SkipBuild).
         .target(name: "SkipDriveExternal"),
 
         .target(name: "SkipSyntax", dependencies: [

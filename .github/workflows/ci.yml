@@ -1,5 +1,10 @@
 name: skip ci
 
+# Builds the skip plugin package at the repository root with the `skip` tool compiled from the
+# skipstone/ sub-folder (SKIPLOCAL), and runs the SkipDrive and SkipTest test suites, which
+# create and build real Skip projects with that tool. The skipstone package's own test suite
+# and the emulator tests run in the "skipstone CI" workflow (skipstone-ci.yml).
+
 on:
   push:
     branches: [ main ]
@@ -34,19 +39,9 @@ jobs:
           gradle-version: current
           add-job-summary: never
 
-      - name: Checkout skipstone
-        uses: actions/checkout@v6
-        with:
-          repository: skiptools/skipstone
-          path: skipstone
-          ref: main
-          submodules: true
-
       - name: Checkout skip
         uses: actions/checkout@v6
         with:
-          repository: skiptools/skip
-          path: skip
           # need to fetch tags so we know the most recent version
           fetch-tags: true
 
@@ -66,17 +61,14 @@ jobs:
 
       - name: Setup SKIPLOCAL
         run: |
+          # build the skip tool from the skipstone/ sources rather than downloading the released binary
           echo "SKIPLOCAL=$PWD/skipstone" >> $GITHUB_ENV
           # make projects created by the tests transpile with the skipstone built above, not the released plugin binary
-          echo "SKIP_COMMAND_OVERRIDE=$PWD/skip/.build/debug/skip" >> $GITHUB_ENV
-          echo "PATH=$PWD/skip/.build/plugins/tools/debug:$PWD/skip/.build/debug:$PATH" >> $GITHUB_ENV
+          echo "SKIP_COMMAND_OVERRIDE=$PWD/.build/debug/skip" >> $GITHUB_ENV
+          echo "PATH=$PWD/.build/plugins/tools/debug:$PWD/.build/debug:$PATH" >> $GITHUB_ENV
 
       - name: Build Skip
-        working-directory: skip
         run: swift build
 
       - name: Test Skip
-        working-directory: skip
         run: swift test
-
-
