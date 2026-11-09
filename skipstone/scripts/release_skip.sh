@@ -1,38 +1,39 @@
 #!/bin/bash -ex
 #
-# This script coordinates releasing the Skip tool and plugin from this repository:
+# This script releases the Skip tool and plugin from this repository:
 # https://github.com/skiptools/skip.git
 #
+# It is run by the "skip release" GitHub Actions workflow (.github/workflows/release.yml)
+# when a semantic version tag is pushed:
+#
+#   git push origin HEAD:refs/tags/1.9.21
+#
 # It builds the `skip` command-line tool from the skipstone/ package as a universal
-# macOS binary and as static Linux binaries, and publishes the resulting
-# artifactbundles to the repository's GitHub releases:
+# macOS binary and as static Linux binaries, creates a "Release X.Y.Z" commit on main
+# that bumps the version constants and points the plugin's binary targets at the new
+# artifacts, moves the tag onto that commit, and publishes the artifacts to the GitHub
+# release for the tag:
 # https://github.com/skiptools/skip/releases
 #
-# The repository is tagged with the next semantic version up from its last tag,
-# and the plugin's Package.swift is updated to reference the newly published
-# binaries. If a checkout of https://github.com/skiptools/homebrew-skip.git exists
-# in a peer folder (or at $SKIPBREWDIR), the Homebrew cask is updated as well.
+# If a checkout of https://github.com/skiptools/homebrew-skip.git exists at
+# $SKIPBREWDIR, the Homebrew cask is updated as well.
 #
-# To make a patch release (like 1.0.2 -> 1.0.3), run:
+# Environment:
 #
-#  ./skipstone/scripts/release_skip.sh
+#   SKIP_VERSION             the version to release (the tag name); defaults to the latest
+#                            tag when doing a dry run
+#   DRY_RUN=1                build the artifacts and show the changes a release would make
+#                            without committing, tagging, pushing, or publishing anything
+#   SKIP_RELEASE_IGNORE_CI=1 release even if CI has not passed for the commit
+#   SKIP_GITHUB_REPO         the owner/name of the GitHub repository to release to; defaults
+#                            to $GITHUB_REPOSITORY, then to the `origin` remote, so running the
+#                            script in a fork releases to the fork
+#   SKIPBREWDIR              a checkout of homebrew-skip whose cask should be updated
 #
-# To make a minor release (like 1.0.2 -> 1.1.0):
+# To check the release build locally without releasing anything, run from the
+# repository root:
 #
-#  SEMVER_BUMP='minor' ./skipstone/scripts/release_skip.sh
-#
-# To make a major release (like 1.0.2 -> 2.0.0):
-#
-#  SEMVER_BUMP='major' ./skipstone/scripts/release_skip.sh
-#
-# To do a dry run that builds everything and shows the changes without
-# committing, tagging, pushing, or publishing anything:
-#
-#  DRY_RUN=1 ./skipstone/scripts/release_skip.sh
-#
-# The release is made against the GitHub repository of the `origin` remote
-# (or $GITHUB_REPOSITORY when running in GitHub Actions), so running the script
-# in a fork releases to the fork. Override with SKIP_GITHUB_REPO=owner/name.
+#   DRY_RUN=1 ./skipstone/scripts/release_skip.sh
 
 set -o pipefail
 
@@ -44,18 +45,23 @@ REPODIR=$(dirname "${SKIPSTONEDIR}")
 # the checkout of homebrew-skip whose cask should be updated, if it exists
 SKIPBREWDIR=${SKIPBREWDIR:-"${REPODIR}/../homebrew-skip"}
 
-CONFIGURATION=${CONFIGURATION:-"release"}
+# the build configuration used by the build_*_plugin.sh scripts
+export CONFIGURATION=${CONFIGURATION:-"release"}
+DRY_RUN=${DRY_RUN:-0}
 
-PRODUCT=SkipRunner
 SKIPCMD=skip
 
 # name the artifact the same as the tool
 ARTIFACT=${SKIPCMD}
-ARTIFACTBUNDLE="${ARTIFACT}.artifactbundle"
 PLUGIN_MACOS_ZIP="${ARTIFACT}-macos.zip"
 PLUGIN_LINUX_ZIP="${ARTIFACT}-linux.zip"
 
-RELSTAGING=`mktemp -d`
+# the files that are updated by a release
+SKIPPKG="Package.swift"
+SKIPDRIVE_VERSION_PATH="Sources/SkipDrive/Version.swift"
+SKIPSTONE_VERSION_PATH="skipstone/Sources/SkipSyntax/Version.swift"
+
+RELSTAGING=$(mktemp -d)
 
 cd "${REPODIR}"
 
@@ -65,64 +71,75 @@ if [[ -z "${SKIP_GITHUB_REPO:-}" ]]; then
 fi
 echo "Releasing to GitHub repository: ${SKIP_GITHUB_REPO}"
 
-# get the latest changes (fails harmlessly on a detached HEAD in CI)
-git pull || true
-git fetch --tags --force
+git fetch --tags --force origin main
 
 GITREF="$(git rev-parse HEAD)"
 
-SKIP_VERSION_OLD=$(git tag -l --sort=-version:refname | grep '^[0-9]*\.[0-9]*\.[0-9]*$' | head -n 1)
-
-major=$(echo "${SKIP_VERSION_OLD}" | tr '.' '\n' | head -n 1 | tail -n 1)
-minor=$(echo "${SKIP_VERSION_OLD}" | tr '.' '\n' | head -n 2 | tail -n 1)
-patch=$(echo "${SKIP_VERSION_OLD}" | tr '.' '\n' | head -n 3 | tail -n 1)
-
-case "${SEMVER_BUMP:-patch}" in
-    patch)
-        patch=$((patch+1))
-    ;;
-    minor)
-        patch=0
-        minor=$((minor+1))
-    ;;
-    major)
-        patch=0
-        minor=0
-        major=$((major+1))
-    ;;
-    *)
-        echo "Invalid SEMVER_BUMP component: ${SEMVER_BUMP}"
+if [[ -z "${SKIP_VERSION:-}" ]]; then
+    if [[ "${DRY_RUN}" != "1" ]]; then
+        echo "error: SKIP_VERSION must be set to the version to release (or set DRY_RUN=1)"
         exit 2
-esac
+    fi
+    # a dry run without a version just rebuilds the current version
+    SKIP_VERSION=$(git tag -l --sort=-version:refname | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
+    if [[ -z "${SKIP_VERSION}" ]]; then
+        echo "error: no version tags found in the repository; set SKIP_VERSION for the dry run"
+        exit 2
+    fi
+    echo "Dry run: using current Skip version: ${SKIP_VERSION}"
+fi
+export SKIP_VERSION
 
-if [[ "${DRY_RUN:-'0'}" == "1" ]]; then
-    export SKIP_VERSION="${SKIP_VERSION_OLD}"
-    echo "Dry run: not bumping Skip version from: ${SKIP_VERSION}"
-else
-    export SKIP_VERSION="${major}.${minor}.${patch}"
-    echo "Creating release and tagging new skip version: ${SKIP_VERSION_OLD} -> ${SKIP_VERSION}"
+if ! [[ "${SKIP_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "error: SKIP_VERSION '${SKIP_VERSION}' is not a semantic version like 1.9.21"
+    exit 2
 fi
 
-# the version constants for the plugin (SkipDrive) and the tool (SkipSyntax)
-SKIPDRIVE_VERSION_PATH="Sources/SkipDrive/Version.swift"
-SKIPSTONE_VERSION_PATH="skipstone/Sources/SkipSyntax/Version.swift"
+if [[ "${DRY_RUN}" != "1" ]]; then
+    # the release commit moves the tag onto itself, which re-triggers the workflow when the push is made
+    # with a personal access token; a release commit is recognizable by its binary target URLs
+    if grep -q "/releases/download/${SKIP_VERSION}/" "${SKIPPKG}"; then
+        echo "${GITREF} already references the ${SKIP_VERSION} release artifacts; nothing to do"
+        exit 0
+    fi
 
-sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SKIP_VERSION}'";g' "${SKIPDRIVE_VERSION_PATH}"
-sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'${SKIP_VERSION}'";g' "${SKIPSTONE_VERSION_PATH}"
+    if gh release view -R "${SKIP_GITHUB_REPO}" "${SKIP_VERSION}" >/dev/null 2>&1; then
+        echo "error: release ${SKIP_VERSION} already exists in ${SKIP_GITHUB_REPO}; delete it to release this version again: gh release delete -R ${SKIP_GITHUB_REPO} ${SKIP_VERSION} --cleanup-tag"
+        exit 1
+    fi
 
-# make sure CI passed on exactly what is being released;
-# to ship a fix for a red CI anyway, run: SKIP_RELEASE_IGNORE_CI=1 ./skipstone/scripts/release_skip.sh
-if [[ "${DRY_RUN:-0}" != "1" && "${SKIP_RELEASE_IGNORE_CI:-0}" != "1" ]]; then
-    # ci.yml tests the plugin package with the tool built from skipstone/, and
-    # skipstone-ci.yml tests the skipstone package and the tool on the emulator
-    for WORKFLOW in ci.yml skipstone-ci.yml; do
-        CONCLUSION=$(gh run list -R "${SKIP_GITHUB_REPO}" --workflow "${WORKFLOW}" --commit "${GITREF}" --status completed --limit 1 --json conclusion -q '.[0].conclusion')
-        if [[ "${CONCLUSION}" != "success" ]]; then
-            echo "error: ${WORKFLOW} is '${CONCLUSION:-missing}' for ${GITREF}; not releasing (if flaky: gh run rerun --failed -R ${SKIP_GITHUB_REPO} <run>; to start one: gh workflow run ${WORKFLOW} -R ${SKIP_GITHUB_REPO})"
-            exit 1
-        fi
-    done
+    # the release commit is pushed to main, so the released commit must be on main
+    if ! git merge-base --is-ancestor "${GITREF}" origin/main; then
+        echo "error: ${GITREF} is not on main; releases are made from commits on main"
+        exit 1
+    fi
+
+    if [[ -n "$(git status --porcelain)" ]]; then
+        echo "error: the working tree has uncommitted changes"
+        git status --porcelain
+        exit 1
+    fi
+
+    # make sure CI passed on exactly what is being released;
+    # to ship a fix for a red CI anyway, dispatch the workflow with "ignore_ci" or set SKIP_RELEASE_IGNORE_CI=1
+    if [[ "${SKIP_RELEASE_IGNORE_CI:-0}" != "1" ]]; then
+        # ci.yml tests the plugin package with the tool built from skipstone/, and
+        # skipstone-ci.yml tests the skipstone package and the tool on the emulator
+        for WORKFLOW in ci.yml skipstone-ci.yml; do
+            CONCLUSION=$(gh run list -R "${SKIP_GITHUB_REPO}" --workflow "${WORKFLOW}" --commit "${GITREF}" --status completed --limit 1 --json conclusion -q '.[0].conclusion')
+            if [[ "${CONCLUSION}" != "success" ]]; then
+                echo "error: ${WORKFLOW} is '${CONCLUSION:-missing}' for ${GITREF}; not releasing (if flaky: gh run rerun --failed -R ${SKIP_GITHUB_REPO} <run>; to start one: gh workflow run ${WORKFLOW} -R ${SKIP_GITHUB_REPO})"
+                exit 1
+            fi
+        done
+    fi
 fi
+
+echo "Releasing Skip ${SKIP_VERSION} from ${GITREF}"
+
+# bump the version constants for the plugin (SkipDrive) and the tool (SkipSyntax)
+sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'"${SKIP_VERSION}"'";g' "${SKIPDRIVE_VERSION_PATH}"
+sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'"${SKIP_VERSION}"'";g' "${SKIPSTONE_VERSION_PATH}"
 
 # build the tool from the skipstone package
 cd "${SKIPSTONEDIR}"
@@ -144,8 +161,6 @@ PLUGIN_LINUX_CHECKSUM=$(shasum -a 256 "${RELSTAGING}/${PLUGIN_LINUX_ZIP}" | cut 
 # update the plugin's binary targets to reference the artifacts that will be published
 cd "${REPODIR}"
 
-SKIPPKG="Package.swift"
-
 ARTIFACT_MACOS_URL="https://github.com/${SKIP_GITHUB_REPO}/releases/download/${SKIP_VERSION}/${PLUGIN_MACOS_ZIP}"
 sed -I '' 's;.binaryTarget(name: "'${ARTIFACT}'", url:.*'${PLUGIN_MACOS_ZIP}'.*);.binaryTarget(name: "'${ARTIFACT}'", url: "'${ARTIFACT_MACOS_URL}'", checksum: "'${PLUGIN_MACOS_CHECKSUM}'");g' ${SKIPPKG}
 
@@ -155,24 +170,32 @@ sed -I '' 's;.binaryTarget(name: "'${ARTIFACT}'", url:.*'${PLUGIN_LINUX_ZIP}'.*)
 git --no-pager diff --stat
 git --no-pager diff -- "${SKIPPKG}"
 
-if [[ "${DRY_RUN:-'0'}" == "1" ]]; then
-    echo "DRY RUN: EXITING"
+if [[ "${DRY_RUN}" == "1" ]]; then
+    echo "DRY RUN: built ${RELSTAGING}/${PLUGIN_MACOS_ZIP} and ${RELSTAGING}/${PLUGIN_LINUX_ZIP}; restoring the modified files and exiting"
+    git checkout -- "${SKIPPKG}" "${SKIPDRIVE_VERSION_PATH}" "${SKIPSTONE_VERSION_PATH}"
     exit 0
 fi
 
+# create the release commit, push it to main, and move the tag onto it
 git add "${SKIPPKG}" "${SKIPDRIVE_VERSION_PATH}" "${SKIPSTONE_VERSION_PATH}"
-git commit --allow-empty --allow-empty-message -m "Release ${SKIP_VERSION}"
-git tag "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
-git push --follow-tags
+git commit -m "Release ${SKIP_VERSION}"
+RELEASE_COMMIT=$(git rev-parse HEAD)
+
+if ! git push origin "HEAD:refs/heads/main"; then
+    echo "warning: main has moved since ${GITREF} was tagged; the release commit ${RELEASE_COMMIT} is not on main. Merge the ${SKIP_VERSION} tag into main after the release completes: git merge ${SKIP_VERSION}"
+fi
+
+git tag -f -a "${SKIP_VERSION}" -m "Release ${SKIP_VERSION}"
+git push --force origin "refs/tags/${SKIP_VERSION}"
 
 # need to wait a bit for the tag to show up
 sleep 5
-gh release -R "github.com/${SKIP_GITHUB_REPO}" create --verify-tag --generate-notes "${SKIP_VERSION}" "${RELSTAGING}"/*.zip
+gh release -R "${SKIP_GITHUB_REPO}" create --verify-tag --generate-notes "${SKIP_VERSION}" "${RELSTAGING}"/*.zip
 
-echo "Waiting to download to become available…"
+echo "Waiting for the downloads to become available…"
 sleep 15
 
-# sometimes need to wait briefly for the artifact to become available
+# sometimes need to wait briefly for the artifacts to become available
 curl --location --fail --retry 10 --retry-all-errors --retry-max-time 120 -o /dev/null "${ARTIFACT_MACOS_URL}"
 curl --location --fail --retry 10 --retry-all-errors --retry-max-time 120 -o /dev/null "${ARTIFACT_LINUX_URL}"
 
@@ -202,9 +225,4 @@ else
     echo "warning: no homebrew-skip checkout at ${SKIPBREWDIR}; not updating the Homebrew cask"
 fi
 
-# check that homebrew can install/upgrade and run the tool on a developer machine
-if [[ -z "${CI:-}" && "${SKIP_GITHUB_REPO}" == "skiptools/skip" ]]; then
-    brew remove --formula skip || true
-    HOMEBREW_AUTO_UPDATE_SECS=0 brew upgrade skiptools/skip/skip || brew install skiptools/skip/skip
-    skip welcome
-fi
+echo "Released Skip ${SKIP_VERSION}: https://github.com/${SKIP_GITHUB_REPO}/releases/tag/${SKIP_VERSION}"

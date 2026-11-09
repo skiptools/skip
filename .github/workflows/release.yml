@@ -1,34 +1,35 @@
 name: skip release
 
-# Builds the `skip` tool from skipstone/ for macOS (universal) and Linux (static) and runs the
-# release script. Every push and the nightly schedule perform a dry run, which builds the
-# artifacts and shows the changes a release would make without committing anything.
+# Releases a new version of the skip tool and plugin when a semantic version tag is pushed:
 #
-# An actual release is made by dispatching this workflow manually with "dry run" unchecked.
-# It bumps the version, commits, tags, pushes, and publishes the artifacts to this repository's
-# GitHub releases. If a RELEASE_TOKEN secret with write access to the ${owner}/homebrew-skip
-# repository is present, the Homebrew cask is updated as well; otherwise that step is skipped.
+#   git push origin HEAD:refs/tags/1.9.21
+#
+# The workflow builds the `skip` tool from skipstone/ for macOS (universal) and Linux (static),
+# then creates a "Release 1.9.21" commit on main that bumps the version constants and points the
+# plugin's binary targets at the new artifacts, moves the tag to that commit, publishes the GitHub
+# release with the artifacts attached, and (when a RELEASE_TOKEN secret with write access to the
+# ${owner}/homebrew-skip repository is configured) updates the Homebrew cask.
+#
+# Because the tag is moved onto the release commit, a local copy of the tag made before pushing
+# will be stale afterwards; run `git fetch --tags --force` to update it.
+#
+# The nightly schedule performs a dry run that builds the artifacts and shows the changes a
+# release would make without committing anything. A manual dispatch with a version performs a
+# release of the selected ref exactly as a tag push would; with an empty version it is a dry run.
 #
 # A fork can rehearse the whole process: the release is made against the fork's own GitHub
 # repository and releases, and the binary target URLs written to Package.swift point at it.
 
 on:
   push:
-    #branches: [ main ]
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: 'Dry run: build the release artifacts but do not commit, tag, push, or publish'
-        type: boolean
-        default: true
-      bump:
-        description: 'The semantic version component to bump'
-        type: choice
-        default: 'patch'
-        options:
-          - patch
-          - minor
-          - major
+      version:
+        description: 'Version to release (e.g. 1.9.21); leave empty for a dry run that only builds the artifacts'
+        type: string
+        default: ''
       ignore_ci:
         description: 'Release even if CI has not passed for this commit'
         type: boolean
@@ -37,8 +38,9 @@ on:
     - cron: '0 3 * * *'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # one release at a time, and never cancel one that is in progress
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -46,6 +48,7 @@ permissions:
 jobs:
   skip-release:
     runs-on: macos-26
+    timeout-minutes: 90
     env:
       # the release script uses the gh command to check CI, create the release, and upload the artifacts
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
@@ -55,11 +58,9 @@ jobs:
       - name: Checkout skip
         uses: actions/checkout@v6
         with:
-          # need to fetch tags so we know the most recent version
+          # the release script needs the tags and main to validate the release and push to it
+          fetch-depth: 0
           fetch-tags: true
-          # needed or else trigger from tag will fail
-          # https://github.com/actions/checkout/issues/1467
-          ref: ${{ github.ref }}
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
 
       - name: Checkout homebrew-skip
@@ -94,12 +95,12 @@ jobs:
           # building the static Linux version
           echo "SWIFT_VERSION=${SWIFT_VERSION}" >> $GITHUB_ENV
 
-      - name: Build Skip Release
+      - name: Release Skip
         run: ./skipstone/scripts/release_skip.sh
         env:
-          # only a manual dispatch with "dry run" unchecked performs a release
-          DRY_RUN: ${{ (github.event_name != 'workflow_dispatch' || inputs.dry_run) && '1' || '0' }}
-          SEMVER_BUMP: ${{ inputs.bump || 'patch' }}
+          # the version comes from the pushed tag, or from the dispatch input; empty means dry run
+          SKIP_VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
+          DRY_RUN: ${{ (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.version == '')) && '1' || '0' }}
           SKIP_RELEASE_IGNORE_CI: ${{ inputs.ignore_ci && '1' || '0' }}
           # release to the repository running the workflow, so a fork releases to itself
           SKIP_GITHUB_REPO: ${{ github.repository }}

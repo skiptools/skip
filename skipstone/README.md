@@ -172,38 +172,46 @@ Skip 1.7.0*: skipstone plugin to: /Users/marc/Library/Developer/Xcode/DerivedDat
 
 ## Releasing Skip
 
-Releases are made by the
+A release is made by pushing a semantic version tag for a commit on `main` whose CI has passed:
+
+```console
+git push origin HEAD:refs/tags/1.9.21
+```
+
+This triggers the
 [`skip release`](../.github/workflows/release.yml)
 GitHub Actions workflow, which runs the
 [`scripts/release_skip.sh`](scripts/release_skip.sh)
-script. Every push and the nightly schedule run the script as a dry run, which builds the
-release artifacts and shows the changes a release would make without committing anything.
-To make an actual release, dispatch the workflow manually from the Actions tab with the
-"dry run" option unchecked, choosing which semantic version component to bump (patch by default).
+script to do the following:
 
-The release workflow runs against the repository it is dispatched in, so a fork can rehearse
-the whole process against its own releases. Updating the Homebrew cask in
-[homebrew-skip](https://github.com/skiptools/homebrew-skip) requires a `RELEASE_TOKEN`
-repository secret with write access to that repository; without it the cask update is skipped.
-
-> [!NOTE]
-> You must have write and release permissions for the repository in order to be able to create a release.
-
-The script can also be run locally from a checkout of this repository. It builds the tool for both macOS and cross-compiles it for Linux, so you will need the [`swiftly`](https://www.swift.org/install/macos/swiftly/) tool installed as well as the [static Linux SDK](https://www.swift.org/documentation/articles/static-linux-getting-started.html). If a checkout of `homebrew-skip.git` exists in a peer folder of the repository, its cask is updated as well.
-
-> [!TIP]
-> To do a dry run of a release without trying to push or tag any changes, run `DRY_RUN=1 ./skipstone/scripts/release_skip.sh` from the repository root.
-
-The release script will do the following:
-
-1. Bump the `skipVersion` in both [`Sources/SkipSyntax/Version.swift`](Sources/SkipSyntax/Version.swift) and the plugin's [`Sources/SkipDrive/Version.swift`](../Sources/SkipDrive/Version.swift). By default this will bump the patch version, but running `SEMVER_BUMP='minor' ./skipstone/scripts/release_skip.sh` will instead bump the minor version.
-1. Check that the `skip ci` and `skipstone CI` workflows have passed for the commit being released (override with `SKIP_RELEASE_IGNORE_CI=1`).
+1. Check that the tagged commit is on `main`, that no release of that version exists yet, and that the `skip ci` and `skipstone CI` workflows have passed for the commit (dispatching the workflow manually with the "ignore_ci" option skips the last check).
+1. Bump the `skipVersion` in both [`Sources/SkipSyntax/Version.swift`](Sources/SkipSyntax/Version.swift) and the plugin's [`Sources/SkipDrive/Version.swift`](../Sources/SkipDrive/Version.swift) to the tagged version.
 1. Build the universal macOS artifactbundle `skip-macos.zip` with [`scripts/build_macos_plugin.sh`](scripts/build_macos_plugin.sh)
 1. Build the static Linux (MUSL) artifactbundle `skip-linux.zip` with [`scripts/build_linux_plugin.sh`](scripts/build_linux_plugin.sh)
 1. Update the bundle URLs and checksums in the Skip plugin's [`Package.swift`](../Package.swift)
-1. Commit, tag, and push the repository, and create the [GitHub release](https://github.com/skiptools/skip/releases) with the two artifactbundles attached
+1. Commit these changes as "Release 1.9.21" on `main`, move the tag onto that commit, and create the [GitHub release](https://github.com/skiptools/skip/releases) for the tag with the two artifactbundles attached
 1. Update the version, binary URLs, and checksums for the Homebrew Cask's [`skip.rb`](https://github.com/skiptools/homebrew-skip/blob/main/Casks/skip.rb), and commit, tag, and push `homebrew-skip.git`
-1. When run locally, upgrade Skip on the local machine with `brew upgrade skiptools/skip/skip` and run `skip welcome`
+
+> [!NOTE]
+> The tag ends up on the release commit that the workflow creates, not on the commit that was
+> originally tagged. Pushing the tag with `git push origin HEAD:refs/tags/1.9.21` avoids creating a
+> local tag that would become stale; if you did create one, run `git fetch --tags --force` after the
+> release completes. Then `git pull` to get the release commit.
+
+The workflow runs against the repository the tag was pushed to, so a fork can rehearse the whole
+process against its own releases. Updating the Homebrew cask in
+[homebrew-skip](https://github.com/skiptools/homebrew-skip) requires a `RELEASE_TOKEN` repository
+secret with write access to that repository; without it the cask update is skipped. You must have
+write and release permissions for the repository in order to be able to create a release.
+
+The workflow can also be dispatched manually from the Actions tab: with a version it releases the
+selected ref exactly as a tag push would, and with an empty version it performs a dry run. The
+nightly schedule performs the same dry run, which builds the release artifacts and shows the changes
+a release would make without committing anything, so breakage of the release build is noticed before
+a release is attempted.
+
+> [!TIP]
+> The dry run can also be performed locally with `DRY_RUN=1 ./skipstone/scripts/release_skip.sh` from the repository root. It builds the tool for both macOS and cross-compiles it for Linux, so you will need the [`swiftly`](https://www.swift.org/install/macos/swiftly/) tool installed as well as the [static Linux SDK](https://www.swift.org/documentation/articles/static-linux-getting-started.html).
 
 As a post-release step, it is a good idea to make sure that `skip checkup --native` works on the local machine.
 
