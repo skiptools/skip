@@ -1,4 +1,3 @@
-// Copyright 2023–2026 Skip
 #if !os(Android)
 import XCTest
 import SkipDrive
@@ -306,7 +305,6 @@ class SkipCommandTests : XCTestCase {
         │        │  ├─ title.txt
         │        │  └─ version_whats_new.txt
         │        └─ rating.json
-        ├─ LICENSE.txt
         ├─ Package.swift
         ├─ Project.xcworkspace
         │  └─ contents.xcworkspacedata
@@ -428,7 +426,6 @@ class SkipCommandTests : XCTestCase {
         │        │  ├─ title.txt
         │        │  └─ version_whats_new.txt
         │        └─ rating.json
-        ├─ LICENSE.txt
         ├─ Package.swift
         ├─ Project.xcworkspace
         │  └─ contents.xcworkspacedata
@@ -556,7 +553,6 @@ class SkipCommandTests : XCTestCase {
         │        │  ├─ title.txt
         │        │  └─ version_whats_new.txt
         │        └─ rating.json
-        ├─ LICENSE.txt
         ├─ Package.swift
         ├─ Project.xcworkspace
         │  └─ contents.xcworkspacedata
@@ -701,7 +697,6 @@ class SkipCommandTests : XCTestCase {
         │        │  ├─ title.txt
         │        │  └─ version_whats_new.txt
         │        └─ rating.json
-        ├─ LICENSE.txt
         ├─ Package.swift
         ├─ Project.xcworkspace
         │  └─ contents.xcworkspacedata

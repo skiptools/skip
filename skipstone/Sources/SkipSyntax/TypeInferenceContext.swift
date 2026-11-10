@@ -1,0 +1,685 @@
+/// Contextual information used in type inference.
+struct TypeInferenceContext {
+    private let codebaseInfo: CodebaseInfo.Context?
+    private let unavailableAPI: UnavailableAPI?
+    private var path: [PathEntry] = []
+    private var localIdentifierTypes: [String: (type: TypeSignature, apiFlags: APIFlags, attributes: Attributes?)] = [:]
+    private struct PathEntry {
+        var typeSignature: TypeSignature?
+        var superSignature: TypeSignature?
+        var isStatic = false
+    }
+
+    /// Context source.
+    let source: Source
+
+    /// Create a top-level context for type inference.
+    ///
+    /// - Parameters:
+    ///   - codebaseInfo: Available codebase information.
+    ///   - unavailableAPI: Known unavailable API to use when `codebaseInfo` is not available.
+    ///   - source: Source for this context.
+    init(codebaseInfo: CodebaseInfo.Context? = nil, unavailableAPI: UnavailableAPI?, source: Source) {
+        self.codebaseInfo = codebaseInfo
+        self.unavailableAPI = unavailableAPI
+        self.source = source
+    }
+
+    /// The type we're expecting to return from the current code block.
+    private(set) var expectedReturn: TypeSignature = .none
+
+    /// The type we're expecting to throw from the current code block.
+    private(set) var expectedThrows: TypeSignature = .none
+
+    /// The current generic constraints.
+    private(set) var generics = Generics()
+
+    /// Return a context for evaluating members of the given type.
+    func pushing(_ typeDeclaration: TypeDeclaration) -> TypeInferenceContext {
+        var context = self
+        let typeSignature = typeDeclaration.generics.selfType ?? typeDeclaration.signature
+        context.path.append(PathEntry(typeSignature: typeSignature, superSignature: typeDeclaration.type == .classDeclaration ? typeDeclaration.inherits.first : nil))
+        context.generics = context.generics.merge(overrides: typeDeclaration.generics, addNew: true)
+        return context
+    }
+
+    /// Return a context for evaluating members of the given type.
+    func pushing(_ typeInfo: CodebaseInfo.TypeInfo) -> TypeInferenceContext {
+        var context = self
+        context.path.append(PathEntry(typeSignature: typeInfo.signature, superSignature: typeInfo.declarationType == .classDeclaration ? typeInfo.inherits.first : nil))
+        context.generics = context.generics.merge(overrides: typeInfo.generics, addNew: true)
+        return context
+    }
+
+    /// Return a context for evaluating the code of the given function.
+    func pushing(_ functionDeclaration: FunctionDeclaration) -> TypeInferenceContext {
+        let parameterDictionary = functionDeclaration.parameters.reduce(into: [String: TypeSignature]()) { result, parameter in
+            result[parameter.internalLabel] = parameter.declaredType
+        }
+        var context = addingIdentifiers(parameterDictionary)
+        context.expectedReturn = functionDeclaration.returnType
+        context.expectedThrows = functionDeclaration.throwsType
+        if functionDeclaration.modifiers.isStatic, let lastTypePathIndex = context.path.lastIndex(where: { $0.typeSignature != nil }) {
+            context.path[lastTypePathIndex].isStatic = true
+        }
+        context.generics = context.generics.merge(overrides: functionDeclaration.generics, addNew: true)
+        return context
+    }
+
+    /// Return a context for evaluating the code of the given closure.
+    func pushing(_ closure: Closure) -> TypeInferenceContext {
+        var parameterDictionary: [String: TypeSignature] = [:]
+        // Add captured values to context
+        for (captureType, value) in closure.captureList {
+            var type = value.value.inferredType
+            if captureType == .weak {
+                type = type.asOptional(true)
+            }
+            if let label = value.label {
+                parameterDictionary[label] = type
+            } else if let identifier = value.value as? Identifier {
+                parameterDictionary[identifier.name] = type
+            }
+        }
+        // Add parameters. Use inferred type because we'll already have done our best if the parameter types are not declared
+        if !closure.inferredType.parameters.isEmpty {
+            let declaredParameters = closure.parameters
+            parameterDictionary = closure.inferredType.parameters.enumerated().reduce(into: parameterDictionary) { result, indexedParameter in
+                if declaredParameters.count > indexedParameter.0 {
+                    result[declaredParameters[indexedParameter.0].internalLabel] = indexedParameter.1.type
+                } else {
+                    result["$\(indexedParameter.0)"] = indexedParameter.1.type
+                }
+            }
+        }
+        var context = addingIdentifiers(parameterDictionary)
+        context.expectedReturn = closure.returnType.or(closure.inferredType.returnType)
+        context.expectedThrows = closure.throwsType.or(closure.inferredType.apiFlags.throwsType)
+        return context
+    }
+
+    /// Return a context for evaluating code within a block with the given additional identiifers.
+    func pushingBlock(identifiers: [String: TypeSignature] = [:], isStatic: Bool? = nil) -> TypeInferenceContext {
+        var context = addingIdentifiers(identifiers)
+        if let isStatic {
+            if let lastTypePathIndex = context.path.lastIndex(where: { $0.typeSignature != nil }) {
+                context.path[lastTypePathIndex].isStatic = isStatic
+            }
+        }
+        return context
+    }
+
+    /// Return a context expecting the given type to be returned from the current code block.
+    func expectingReturn(_ returnType: TypeSignature) -> TypeInferenceContext {
+        var context = self
+        context.expectedReturn = returnType
+        return context
+    }
+
+    /// Return a context expecting the given type to be thrown from the current code block.
+    func expectingThrows(_ throwsType: TypeSignature) -> TypeInferenceContext {
+        var context = self
+        context.expectedThrows = throwsType
+        return context
+    }
+
+    /// Return a context that includes the given identifier.
+    func addingIdentifier(_ name: String, type: TypeSignature, apiFlags: APIFlags = APIFlags(), attributes: Attributes? = nil) -> TypeInferenceContext {
+        var context = self
+        context.localIdentifierTypes[name] = (type, apiFlags, attributes)
+        return context
+    }
+
+    /// Return a context that includes the given identifiers.
+    func addingIdentifiers(_ names: [String?], types: [TypeSignature], apiFlags: APIFlags = APIFlags(), attributes: Attributes? = nil) -> TypeInferenceContext {
+        var context = self
+        for nameAndType in zip(names, types) {
+            if let name = nameAndType.0 {
+                context.localIdentifierTypes[name] = (nameAndType.1, apiFlags, attributes)
+            }
+        }
+        return context
+    }
+
+    /// Return a context that includes the given identifiers.
+    func addingIdentifiers(_ identifiers: [String: TypeSignature]) -> TypeInferenceContext {
+        guard !identifiers.isEmpty else {
+            return self
+        }
+        var context = self
+        for (name, type) in identifiers {
+            context.localIdentifierTypes[name] = (type, APIFlags(), nil)
+        }
+        return context
+    }
+
+    /// Return a context that includes the given local function.
+    func addingLocalFunction(_ function: FunctionDeclaration) -> TypeInferenceContext {
+        // Warn for duplicated local functions
+        if localIdentifierTypes[function.name] != nil {
+            function.messages.append(.localFunctionsUniqueIdentifiers(function, source: source))
+        }
+        return addingIdentifier(function.name, type: function.functionType, attributes: function.attributes)
+    }
+
+    /// Return the type of the given identifier.
+    func identifier(_ name: String, messagesNode: SyntaxNode?) -> (TypeSignature, APIMatch)? {
+        var name = name
+        var isProjectedValue = false
+        if name.hasPrefix("$") {
+            let suffix = String(name.dropFirst())
+            // Filter implicit closure arguments: $0, $1, etc
+            if Int(suffix) == nil {
+                name = suffix
+                isProjectedValue = true
+            }
+        }
+
+        // Check local identifiers and bindings
+        if let (identifierType, apiFlags, attributes) = localIdentifierTypes[name] {
+            let signature = identifierType.constrainedTypeWithGenerics(generics)
+            let apiMatch = APIMatch(signature: signature, apiFlags: apiFlags, attributes: attributes)
+            return update((signature, apiMatch), isBindingPath: false, isProjectedValue: isProjectedValue)
+        }
+        if name == "self" || name == "Self" || name == "super" {
+            guard let pathEntry = path.last(where: { $0.typeSignature != nil }), let typeSignature = pathEntry.typeSignature else {
+                return nil
+            }
+            if name == "super" {
+                var superSignature: TypeSignature? = pathEntry.superSignature
+                if superSignature == nil {
+                    superSignature = codebaseInfo?.primaryTypeInfo(forNamed: typeSignature)?.inherits.first
+                }
+                if let superSignature {
+                    let constrainedSuperSignature = superSignature.constrainedTypeWithGenerics(generics)
+                    return (constrainedSuperSignature, APIMatch(signature: constrainedSuperSignature))
+                } else {
+                    return nil
+                }
+            } else {
+                let signature = typeSignature.constrainedTypeWithGenerics(generics).asMetaType(name == "Self" || pathEntry.isStatic)
+                return (signature, APIMatch(signature: signature))
+            }
+        }
+
+        for pathEntry in path.reversed() {
+            guard let typeSignature = pathEntry.typeSignature else {
+                continue
+            }
+            let signature = typeSignature.asMetaType(pathEntry.isStatic)
+            if let codebaseInfo {
+                if let match = codebaseInfo.matchIdentifier(name: name, inConstrained: signature.constrainedTypeWithGenerics(generics)) {
+                    addUnavailableMessages(to: messagesNode, for: [match.availability])
+                    return update((resolveSignature(match: match), match), isBindingPath: false, isProjectedValue: isProjectedValue)
+                }
+            } else if let match = unavailableAPI?.knownUnavailableMember(name, in: signature) {
+                addUnavailableMessages(to: messagesNode, for: [match.availability])
+                return update((resolveSignature(match: match), match), isBindingPath: false, isProjectedValue: isProjectedValue)
+            }
+        }
+        let genericType = generics.constrainedType(of: name)
+        if genericType != .none {
+            return (genericType, APIMatch(signature: genericType))
+        }
+        if let codebaseInfo {
+            if let match = codebaseInfo.matchIdentifier(name: name) {
+                addUnavailableMessages(to: messagesNode, for: [match.availability])
+                return update((resolveSignature(match: match), match), isBindingPath: false, isProjectedValue: isProjectedValue)
+            } else {
+                return nil
+            }
+        } else if let match = unavailableAPI?.knownUnavailableIdentifier(name) {
+            addUnavailableMessages(to: messagesNode, for: [match.availability])
+            return update((resolveSignature(match: match), match), isBindingPath: false, isProjectedValue: isProjectedValue)
+        } else if !isProjectedValue {
+            let signature = TypeSignature.for(name: name, genericTypes: [], allowNamed: false).asMetaType(true)
+            return signature == .none ? nil : (signature, APIMatch(signature: signature))
+        } else {
+            return nil
+        }
+    }
+
+    /// Whether the given name maps to a local identifier or parameter.
+    func isLocalOrSelfIdentifier(_ name: String) -> Bool {
+        if name == "self" {
+            return true
+        }
+        if localIdentifierTypes.keys.contains(name) {
+            return true
+        }
+        return false
+    }
+
+    /// Return the type of the given member.
+    ///
+    /// The returned signature may be different than the returned `APIMatch.signature` due to optional chaining and type aliasing.
+    func member(_ name: String, in type: TypeSignature, messagesNode: SyntaxNode?) -> (TypeSignature, APIMatch)? {
+        var type = type
+        var name = name
+        var isBindingPath = false
+        var isProjectedValue = false
+        if type.isNamed("Binding"), type.generics.count == 1 {
+            isBindingPath = true
+            type = type.generics[0]
+        } else if name.hasPrefix("$") {
+            isProjectedValue = true
+            name = String(name.dropFirst())
+        }
+
+        if type.isOptional {
+            if let match = member(name, inNonOptional: type.asOptional(false), messagesNode: messagesNode) {
+                return update((resolveSignature(match: match).asOptional(true), match), isBindingPath: isBindingPath, isProjectedValue: isProjectedValue)
+            } else {
+                return nil
+            }
+        } else {
+            if let match = member(name, inNonOptional: type, messagesNode: messagesNode) {
+                return update((resolveSignature(match: match), match), isBindingPath: isBindingPath, isProjectedValue: isProjectedValue)
+            } else {
+                return nil
+            }
+        }
+    }
+
+    private func member(_ name: String, inNonOptional type: TypeSignature, messagesNode: SyntaxNode?) -> APIMatch? {
+        if case .tuple(let labels, let types) = type {
+            if let labelIndex = labels.firstIndex(of: name) {
+                return APIMatch(signature: types[labelIndex].constrainedTypeWithGenerics(generics))
+            } else if let index = Int(name) {
+                return APIMatch(signature: types[index].constrainedTypeWithGenerics(generics))
+            }
+        }
+        if name == "self" || name == "Type" {
+            return APIMatch(signature: type.constrainedTypeWithGenerics(generics).asMetaType(true))
+        }
+        guard let codebaseInfo else {
+            return nil
+        }
+        if let match = codebaseInfo.matchIdentifier(name: name, inConstrained: type.constrainedTypeWithGenerics(generics)) {
+            addUnavailableMessages(to: messagesNode, for: [match.availability])
+            return match
+        } else {
+            return nil
+        }
+    }
+
+    /// Return the signatures of the functions matching the given arguments.
+    ///
+    /// The match on the argument types will attempt to allow for unknown types. The returned signature may be different than the returned `APIMatch.signature` due to optional chaining.
+    ///
+    /// - Parameters:
+    ///   - name: The function name, or `nil` if none, as in constructor calls.
+    ///   - type: The function's owning type if this is a member function, or nil if not.
+    func function(_ name: String?, in type: TypeSignature?, arguments: [LabeledValue<Expression>], trailingClosureCount: Int = 0, expectedReturn: TypeSignature, messagesNode: SyntaxNode?) -> (TypeSignature, APIMatch)? {
+        let argumentValues = arguments.enumerated().map { index, argument in
+            LabeledValue(label: argument.label, value: argumentValue(for: argument.value, isFirstTrailingClosure: index == arguments.count - trailingClosureCount))
+        }
+        let matches = function(name, in: type, arguments: argumentValues, trailingClosureCount: trailingClosureCount, messagesNode: messagesNode)
+        if matches.count > 1 {
+            if let unqualifiedArgumentMatch = findUnqualifiedArgumentMatch(in: matches, arguments: arguments) {
+                return unqualifiedArgumentMatch
+            } else {
+                if let messagesNode, !messagesSuppressed {
+                    messagesNode.messages.append(.ambiguousFunctionCall(messagesNode, source: source))
+                }
+                return matches.first { $0.0.returnType == expectedReturn } ?? matches[0]
+            }
+        } else {
+            return matches.first
+        }
+    }
+
+    // Exposed for testing
+    func function(_ name: String?, in type: TypeSignature?, arguments: [LabeledValue<ArgumentValue>], trailingClosureCount: Int = 0, messagesNode: SyntaxNode?) -> [(TypeSignature, APIMatch)] {
+        if let type, type.isOptional {
+            return function(name, inNonOptional: type.asOptional(false), arguments: arguments, messagesNode: messagesNode).map { match in
+                let signature = resolveSignature(match: match)
+                return (.function(signature.parameters, signature.returnType.asOptional(true), signature.apiFlags, signature.additionalAttributes), match)
+            }
+        } else {
+            return function(name, inNonOptional: type, arguments: arguments, messagesNode: messagesNode).map { (resolveSignature(match: $0), $0) }
+        }
+    }
+
+    private func function(_ name: String?, inNonOptional type: TypeSignature?, arguments: [LabeledValue<ArgumentValue>], messagesNode: SyntaxNode?) -> [APIMatch] {
+        let constrainedArguments = arguments.map { argument in
+            var value = argument.value
+            value.type = value.type.constrainedTypeWithGenerics(generics)
+            return LabeledValue(label: argument.label, value: value)
+        }
+        if let type {
+            if let codebaseInfo {
+                let matches = codebaseInfo.matchFunction(name: name, inConstrained: type.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
+                addUnavailableMessages(to: messagesNode, for: matches.map(\.availability))
+                return matches
+            } else if let match = unavailableAPI?.knownUnavailableFunction(name ?? "init", in: type, arguments: arguments) {
+                addUnavailableMessages(to: messagesNode, for: [match.availability])
+                return [match]
+            } else {
+                return []
+            }
+        }
+        guard let name else {
+            return []
+        }
+
+        // Not a known member function. Check functions that can be invoked without a target type
+        if var (localFunction, _, _) = localIdentifierTypes[name], case .function(_, _, _, let attributes) = localFunction {
+            if let codebaseInfo {
+                if let localType = path.last?.typeSignature?.asMetaType(path.last?.isStatic == true).constrainedTypeWithGenerics(generics) {
+                    localFunction = localFunction.resolvingSelf(in: nil, to: localType)
+                }
+                if let callSignature = codebaseInfo.callableSignature(of: localFunction, generics: generics, arguments: constrainedArguments) {
+                    return [APIMatch(signature: callSignature, apiFlags: localFunction.apiFlags, declarationType: .functionDeclaration, attributes: attributes)]
+                }
+            } else {
+                return []
+            }
+        }
+        for pathEntry in path.reversed() {
+            guard let typeSignature = pathEntry.typeSignature else {
+                continue
+            }
+            let signature = typeSignature.asMetaType(pathEntry.isStatic)
+            if let codebaseInfo {
+                let constrainedType = signature.constrainedTypeWithGenerics(generics)
+                let matches = codebaseInfo.matchFunction(name: name, inConstrained: constrainedType, arguments: constrainedArguments)
+                if !matches.isEmpty {
+                    addUnavailableMessages(to: messagesNode, for: matches.map(\.availability))
+                    return matches
+                } else if let match = codebaseInfo.matchIdentifier(name: name, inConstrained: constrainedType), codebaseInfo.callableSignature(of: match.signature, arguments: constrainedArguments) != nil {
+                    addUnavailableMessages(to: messagesNode, for: [match.availability])
+                    return [match]
+                }
+            } else if let match = unavailableAPI?.knownUnavailableFunction(name, in: signature, arguments: arguments) {
+                addUnavailableMessages(to: messagesNode, for: [match.availability])
+                return [match]
+            }
+        }
+        if let codebaseInfo {
+            let matches = codebaseInfo.matchFunction(name: name, arguments: constrainedArguments)
+            if !matches.isEmpty {
+                addUnavailableMessages(to: messagesNode, for: matches.map(\.availability))
+                return matches
+            } else if let match = codebaseInfo.matchIdentifier(name: name), codebaseInfo.callableSignature(of: match.signature, arguments: constrainedArguments) != nil {
+                addUnavailableMessages(to: messagesNode, for: [match.availability])
+                return [match]
+            } else {
+                return []
+            }
+        } else if let match = unavailableAPI?.knownUnavailableFunction(name, in: nil, arguments: arguments) {
+            addUnavailableMessages(to: messagesNode, for: [match.availability])
+            return [match]
+        } else {
+            return []
+        }
+    }
+
+    /// Return the signatures of the subscripts matching the given parameters.
+    ///
+    /// The match on the parameter types will attempt to allow for unknown types. The returned signatures may be different than the returned `APIMatch.signatures` due to optional chaining.
+    ///
+    /// - Parameters:
+    ///   - type: The subscript's owning type.
+    func `subscript`(in type: TypeSignature, arguments: [LabeledValue<Expression>], expectedReturn: TypeSignature, messagesNode: SyntaxNode?) -> (TypeSignature, APIMatch)? {
+        let argumentValues = arguments.map { LabeledValue(label: $0.label, value: argumentValue(for: $0.value)) }
+        let matches = self.subscript(in: type, arguments: argumentValues, messagesNode: messagesNode)
+        if matches.count > 1 {
+            if let match = findUnqualifiedArgumentMatch(in: matches, arguments: arguments) {
+                return match
+            }
+            if let messagesNode, !messagesSuppressed {
+                messagesNode.messages.append(.ambiguousFunctionCall(messagesNode, source: source))
+            }
+        }
+        return matches.first { $0.0.returnType == expectedReturn } ?? matches.first
+    }
+
+    // Exposed for testing
+    func `subscript`(in type: TypeSignature, arguments: [LabeledValue<ArgumentValue>], messagesNode: SyntaxNode?) -> [(TypeSignature, APIMatch)] {
+        if type.isOptional {
+            return self.subscript(inNonOptional: type.asOptional(false), arguments: arguments, messagesNode: messagesNode).map { match in
+                let signature = resolveSignature(match: match)
+                return (.function(signature.parameters, signature.returnType.asOptional(true), signature.apiFlags, signature.additionalAttributes), match)
+            }
+        } else {
+            return self.subscript(inNonOptional: type, arguments: arguments, messagesNode: messagesNode).map { (resolveSignature(match: $0), $0) }
+        }
+    }
+
+    private func `subscript`(inNonOptional type: TypeSignature, arguments: [LabeledValue<ArgumentValue>], messagesNode: SyntaxNode?) -> [APIMatch] {
+        if let codebaseInfo {
+            let constrainedArguments = arguments.map { argument in
+                var value = argument.value
+                value.type = value.type.constrainedTypeWithGenerics(generics)
+                return LabeledValue(label: argument.label, value: value)
+            }
+            let matches = codebaseInfo.matchSubscript(inConstrained: type.constrainedTypeWithGenerics(generics), arguments: constrainedArguments)
+            addUnavailableMessages(to: messagesNode, for: matches.map(\.availability))
+            return matches
+        } else if let match = unavailableAPI?.knownUnavailableFunction("subscript", in: type, arguments: arguments) {
+            addUnavailableMessages(to: messagesNode, for: [match.availability])
+            return [match]
+        } else {
+            return []
+        }
+    }
+
+    /// When a call match is found, set any Expressible types on the literal expressions that will need to build them.
+    func assignLiteralExpressibleType(_ type: TypeSignature, to expression: Expression) {
+        // TODO: Handle other Expressible types
+        switch expression.type {
+        case .numericLiteral:
+            if type.isFloatingPoint {
+                if let numericLiteral = expression as? NumericLiteral {
+                    numericLiteral.isAssignedToFloatingPoint = true
+                }
+            }
+        case .prefixOperator:
+            if type.isFloatingPoint {
+                if let prefixOperator = expression as? PrefixOperator, prefixOperator.operatorSymbol == "-", let numericLiteral = prefixOperator.target as? NumericLiteral {
+                    numericLiteral.isAssignedToFloatingPoint = true
+                }
+            }
+        case .stringLiteral:
+            if type.isNamedType, let stringLiteral = expression as? StringLiteral {
+                if stringLiteral.isInterpolated, let interpolationType = interpolationType(for: type) {
+                    stringLiteral.expressibleByStringInterpolationType = (type, interpolationType)
+                } else {
+                    stringLiteral.expressibleByStringLiteralType = type
+                }
+            }
+        default:
+            break
+        }
+    }
+
+    /// When a call match is found, set any Expressible types on the literal expressions that will need to build them.
+    func assignLiteralExpressibleTypes(_ types: [TypeSignature], to expressions: [Expression]) {
+        guard types.count == expressions.count else {
+            return
+        }
+        for i in 0..<expressions.count {
+            assignLiteralExpressibleType(types[i], to: expressions[i])
+        }
+    }
+
+    private func interpolationType(for expressible: TypeSignature) -> TypeSignature? {
+        // Look for the ExpressibleByStringInterpolation protocol's init(stringInterpolation:) constructor requirement to figure out
+        // the correct interpolation type to instantiate
+        guard let match = codebaseInfo?.matchFunction(name: nil, inConstrained: expressible, arguments: [LabeledValue(label: "stringInterpolation", value: ArgumentValue(type: .none))]) else {
+            return nil
+        }
+        return match.first?.signature.parameters.first?.type
+    }
+
+    /// Determine the element type of the given type, correctly handling custom sequences.
+    func elementType(of type: TypeSignature) -> TypeSignature {
+        let builtinType = type.elementType
+        guard builtinType == .none else {
+            return builtinType
+        }
+        guard let makeIteratorMatch = function("makeIterator", in: type, arguments: [], messagesNode: nil).first ?? function("makeAsyncIterator", in: type, arguments: [], messagesNode: nil).first else {
+            return .none
+        }
+        guard let nextMatch = function("next", in: makeIteratorMatch.0.returnType, arguments: [], messagesNode: nil).first else {
+            return .none
+        }
+        return nextMatch.0.returnType.asOptional(false)
+    }
+
+    /// For an operation on two types, return the probable result type.
+    func operationResult(_ type1: TypeSignature, _ type2: TypeSignature) -> TypeSignature {
+        let type1 = type1.constrainedTypeWithGenerics(generics).asTypealiased(nil).withoutOptionality().withExistentialMode(.none).withModuleName(nil)
+        let type2 = type2.constrainedTypeWithGenerics(generics).asTypealiased(nil).withoutOptionality().withExistentialMode(.none).withModuleName(nil)
+        if type1 == type2 {
+            return type1
+        }
+        if type1 == .none {
+            return type2
+        }
+        if type2 == .none {
+            return type1
+        }
+
+        switch type1 {
+        case .array(let elementType1):
+            if let elementType1 {
+                if case .array(let elementType2) = type2, let elementType2 {
+                    return .array(operationResult(elementType1, elementType2))
+                }
+                if case .set(let elementType2) = type2, let elementType2 {
+                    return .set(operationResult(elementType1, elementType2))
+                }
+            }
+            return type1
+        case .character:
+            return type2.isStringy ? .string : type1
+        case .dictionary(let keyType1, let valueType1):
+            if let keyType1, let valueType1 {
+                if case .dictionary(let keyType2, let valueType2) = type2, let keyType2, let valueType2 {
+                    return .dictionary(operationResult(keyType1, keyType2), operationResult(valueType1, valueType2))
+                }
+            }
+            return type1
+        case .double:
+            return type2.isNumeric ? .double : type1
+        case .float:
+            return type2 == .double ? .double : type1
+        case .int:
+            return type2.isFloatingPoint ? type2 : type1
+        case .int8:
+            return type2.isFloatingPoint ? type2 : type1
+        case .int16:
+            return type2.isFloatingPoint ? type2 : type1
+        case .int32:
+            return type2.isFloatingPoint ? type2 : type1
+        case .int64:
+            return type2.isFloatingPoint ? type2 : type1
+        case .int128:
+            return type2.isFloatingPoint ? type2 : type1
+        case .set(let elementType1):
+            if let elementType1 {
+                if case .array(let elementType2) = type2, let elementType2 {
+                    return .array(operationResult(elementType1, elementType2))
+                }
+                if case .set(let elementType2) = type2, let elementType2 {
+                    return .set(operationResult(elementType1, elementType2))
+                }
+            }
+            return type1
+        case .string:
+            return type2.isStringy ? .string : type1
+        case .uint:
+            return type2.isFloatingPoint ? type2 : type1
+        case .uint8:
+            return type2.isFloatingPoint ? type2 : type1
+        case .uint16:
+            return type2.isFloatingPoint ? type2 : type1
+        case .uint32:
+            return type2.isFloatingPoint ? type2 : type1
+        case .uint64:
+            return type2.isFloatingPoint ? type2 : type1
+        case .uint128:
+            return type2.isFloatingPoint ? type2 : type1
+        default:
+            return type1
+        }
+    }
+
+    /// Suppress warnings and errors when checking for matches.
+    private(set) var messagesSuppressed = false
+
+    /// Suppress warnings and errors when checking for matches.
+    func withMessagesSuppressed(_ value: Bool) -> TypeInferenceContext {
+        var context = self
+        context.messagesSuppressed = value
+        return context
+    }
+
+    private func findUnqualifiedArgumentMatch(in matches: [(TypeSignature, APIMatch)], arguments: [LabeledValue<Expression>]) -> (TypeSignature, APIMatch)? {
+        // Look for arguments that are unqualified member accesses and see if we can match them to members
+        for i in 0..<arguments.count {
+            guard arguments[i].value.inferredType == .none, let memberAccess = arguments[i].value as? MemberAccess, let unqualifiedRootMemberAccess = memberAccess.unqualifiedRootMemberAccess else {
+                continue
+            }
+            for match in matches {
+                let parameters = match.0.parameters
+                if parameters.count > i && parameters[i].type != .none && member(unqualifiedRootMemberAccess.member, in: parameters[i].type.asMetaType(true), messagesNode: nil) != nil {
+                    return match
+                }
+            }
+        }
+        return nil
+    }
+
+    private func argumentValue(for expression: Expression, isFirstTrailingClosure: Bool = false) -> ArgumentValue {
+        let inferredType = expression.inferredType
+        // TODO: Handle other Expressible types
+        switch expression.type {
+        case .stringLiteral:
+            return ArgumentValue(type: inferredType, isLiteral: true, isInterpolated: (expression as! StringLiteral).isInterpolated)
+        default:
+            return ArgumentValue(type: inferredType, isFirstTrailingClosure: isFirstTrailingClosure)
+        }
+    }
+
+    private func resolveSignature(match: APIMatch) -> TypeSignature {
+        return codebaseInfo?.resolveTypealias(for: match.signature) ?? match.signature
+    }
+
+    private func update(_ match: (TypeSignature, APIMatch), isBindingPath: Bool, isProjectedValue: Bool) -> (TypeSignature, APIMatch) {
+        guard isBindingPath || isProjectedValue else {
+            return match
+        }
+        var signature = match.0
+        var apiMatch = match.1
+        if !isBindingPath && apiMatch.attributes?.contains(.published) == true {
+            signature = signature.asPublisher()
+            apiMatch.signature = apiMatch.signature.asPublisher()
+        } else {
+            signature = signature.asBinding()
+            apiMatch.signature = apiMatch.signature.asBinding()
+        }
+        return (signature, apiMatch)
+    }
+
+    private func addUnavailableMessages(to messagesNode: SyntaxNode?, for availability: [Availability]) {
+        guard let messagesNode, !messagesSuppressed, !availability.isEmpty else {
+            return
+        }
+        if availability.allSatisfy({ if case .unavailable = $0 { return true } else { return false } }) {
+            if case .unavailable(let message) = availability[0] {
+                if codebaseInfo != nil {
+                    messagesNode.messages.append(.availabilityUnavailable(message: message, sourceDerived: messagesNode, source: source))
+                } else {
+                    messagesNode.messages.append(.availabilityMaybeUnavailable(message: message, sourceDerived: messagesNode, source: source))
+                }
+            }
+        } else if availability.allSatisfy({ if case .deprecated = $0 { return true } else { return false } }) {
+            if case .deprecated(let message) = availability[0] {
+                messagesNode.messages.append(.availabilityDeprecated(message: message, sourceDerived: messagesNode, source: source))
+            }
+        }
+    }
+}

@@ -1,0 +1,424 @@
+extension TypeSignature {
+    /// Kotlin description of this type.
+    var kotlin: String {
+        var signature = self
+        switch self {
+        case .member, .module, .named:
+            for transformerType in builtinKotlinTransformerTypes {
+                if let signatureTransformer = transformerType as? KotlinTypeSignatureOutputTransformer.Type {
+                    signature = signatureTransformer.outputSignature(for: signature)
+                }
+            }
+        default:
+            break
+        }
+
+        switch signature {
+        case .any:
+            return "Any"
+        case .anyObject:
+            return "Any"
+        case .array(let elementType):
+            if let elementType {
+                return "Array<\(elementType.kotlin)>"
+            } else {
+                return "Array"
+            }
+        case .bool:
+            return "Boolean"
+        case .character:
+            return "Char"
+        case .composition:
+            return "Any"
+        case .dictionary(let keyType, let valueType):
+            if let keyType, let valueType {
+                return "Dictionary<\(keyType.kotlin), \(valueType.kotlin)>"
+            } else {
+                return "Dictionary"
+            }
+        case .double:
+            return "Double"
+        case .existential(_, let type):
+            return type.kotlin
+        case .float:
+            return "Float"
+        case .function(let parameters, let returnType, let apiFlags, let attributes):
+            let composableString = attributes?.attributes.contains(where: { $0.signature == .named("Composable", []) }) == true ? "@Composable " : ""
+            let suspendString = apiFlags.options.contains(.async) ? "suspend " : ""
+            return "\(composableString)\(suspendString)(\(parameters.map { $0.kotlin }.joined(separator: ", "))) -> \(returnType.kotlin)"
+        case .int:
+            return "Int"
+        case .int8:
+            return "Byte"
+        case .int16:
+            return "Short"
+        case .int32:
+            return "Int"
+        case .int64:
+            return "Long"
+        case .int128:
+            return "BigInteger"
+        case .member(let baseType, let type):
+            // Erase generics of outer type because Kotlin inner types do not inherit them
+            return "\(baseType.withGenerics([]).kotlin).\(type.kotlin)"
+        case .metaType(let baseType):
+            if baseType == .any {
+                return "KClass<*>"
+            }
+            return "KClass<\(baseType.kotlin)>"
+        case .module(let module, let type):
+            return "\(KotlinTranslator.packageName(forModule: module)).\(type.kotlin)"
+        case .named(let name, let generics):
+            guard !generics.isEmpty else {
+                return name
+            }
+            return "\(name)<\(generics.map { $0.kotlin }.joined(separator: ", "))>"
+        case .none:
+            return "*" // For when output as part of generic parameters
+        case .optional(let type):
+            switch type {
+            case .function:
+                return "(\(type.kotlin))?"
+            default:
+                return "\(type.kotlin)?"
+            }
+        case .range(let elementType):
+            switch elementType {
+            case .character:
+                return "CharRange"
+            case .int64:
+                return "LongRange"
+            default:
+                return "IntRange"
+            }
+        case .set(let elementType):
+            if let elementType {
+                return "Set<\(elementType.kotlin)>"
+            } else {
+                return "Set"
+            }
+        case .string:
+            return "String"
+        case .tuple(_, let types):
+            if types.isEmpty {
+                return "Unit"
+            }
+            let generics = types.map { $0.kotlin }.joined(separator: ", ")
+            if types.count <= KotlinTupleLiteral.maximumArity {
+                return "Tuple\(types.count)<\(generics)>"
+            } else {
+                return "Any"
+            }
+        case .typealiased(_, let type):
+            return type.kotlin
+        case .uint:
+            return "UInt"
+        case .uint8:
+            return "UByte"
+        case .uint16:
+            return "UShort"
+        case .uint32:
+            return "UInt"
+        case .uint64:
+            return "ULong"
+        case .uint128:
+            return "BigInteger"
+        case .unwrappedOptional(let type):
+            return type.kotlin
+        case .void:
+            return "Unit"
+        }
+    }
+
+    static func kotlinComparable(for type: TypeSignature) -> TypeSignature {
+        return .named("Comparable", [type])
+    }
+
+    /// Add appropriate messages if this type is not supported.
+    func appendKotlinMessages(to node: KotlinSyntaxNode, source: Source) {
+        var messages: [Message] = []
+        visit {
+            switch $0 {
+            case .composition:
+                messages.append(.kotlinComposedTypes(node, source: source))
+            case .named(let name, let generics):
+                if name == "KeyPath" && generics.count == 2 {
+                    messages.append(.kotlinKeyPath(node, source: source))
+                }
+            case .function(_, _, let apiFlags, _):
+                if apiFlags.options.contains(.autoclosure) {
+                    messages.append(.kotlinAutoclosure(node, source: source))
+                }
+            case .tuple(let labels, _):
+                if labels.count > KotlinTupleLiteral.maximumArity {
+                    messages.append(.kotlinTupleArity(node, source: source))
+                }
+            default:
+                break
+            }
+            return .recurse(nil)
+        }
+        node.messages += messages
+    }
+
+    /// Whether this type might represent a shared mutable struct.
+    func kotlinMayBeSharedMutableStruct(codebaseInfo: CodebaseInfo.Context?) -> Bool {
+        switch self {
+        case .any:
+            return true
+        case .anyObject:
+            return false
+        case .array:
+            return true
+        case .bool:
+            return false
+        case .character:
+            return false
+        case .composition(let types):
+            return !types.contains { $0.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo) == false }
+        case .dictionary:
+            return true
+        case .existential(_, let type):
+            return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
+        case .double:
+            return false
+        case .float:
+            return false
+        case .function:
+            return false
+        case .int:
+            return false
+        case .int8:
+            return false
+        case .int16:
+            return false
+        case .int32:
+            return false
+        case .int64:
+            return false
+        case .int128:
+            return false
+        case .member, .module, .named:
+            guard let codebaseInfo else {
+                return true
+            }
+            return codebaseInfo.mayBeMutableStruct(type: self)
+        case .metaType:
+            return false
+        case .none:
+            return true
+        case .optional(let type):
+            return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
+        case .range:
+            return false
+        case .set:
+            return true
+        case .string:
+            return false
+        case .tuple(_, let types):
+            // We consider a tuple with a shared mutable type to itself be a shared mutable type because code may
+            // use destructuring assignment to extract values without copying them, so we have to copy the whole tuple
+            return types.contains { $0.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo) }
+        case .typealiased(_, let type):
+            guard let codebaseInfo else {
+                return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
+            }
+            return codebaseInfo.mayBeMutableStruct(type: self)
+        case .uint:
+            return false
+        case .uint8:
+            return false
+        case .uint16:
+            return false
+        case .uint32:
+            return false
+        case .uint64:
+            return false
+        case .uint128:
+            return false
+        case .unwrappedOptional(let type):
+            return type.kotlinMayBeSharedMutableStruct(codebaseInfo: codebaseInfo)
+        case .void:
+            return false
+        }
+    }
+
+    /// Whether this type is a Kotlin primitive.
+    func kotlinIsNative(primitive: Bool = false) -> Bool {
+        switch self {
+        case .any:
+            return !primitive
+        case .anyObject:
+            return !primitive
+        case .array:
+            return false
+        case .bool:
+            return true
+        case .character:
+            return true
+        case .composition:
+            return false
+        case .dictionary:
+            return false
+        case .double:
+            return true
+        case .existential(_, let type):
+            return type.kotlinIsNative(primitive: primitive)
+        case .float:
+            return true
+        case .function:
+            return false
+        case .int:
+            return true
+        case .int8:
+            return true
+        case .int16:
+            return true
+        case .int32:
+            return true
+        case .int64:
+            return true
+        case .int128:
+            return !primitive
+        case .named:
+            return false
+        case .none:
+            return false
+        case .optional(let type):
+            return type.kotlinIsNative(primitive: primitive)
+        case .member:
+            return false
+        case .metaType(let type):
+            return !primitive && type.kotlinIsNative()
+        case .module(_, let type):
+            return type.kotlinIsNative(primitive: primitive)
+        case .range:
+            return !primitive
+        case .set:
+            return false
+        case .string:
+            return !primitive
+        case .tuple:
+            return false
+        case .typealiased(_, let type):
+            return type.kotlinIsNative(primitive: primitive)
+        case .uint:
+            return true
+        case .uint8:
+            return true
+        case .uint16:
+            return true
+        case .uint32:
+            return true
+        case .uint64:
+            return true
+        case .uint128:
+            return !primitive
+        case .unwrappedOptional(let type):
+            return type.kotlinIsNative(primitive: primitive)
+        case .void:
+            return !primitive
+        }
+    }
+
+    /// Kotlin code representing a default value for this type.
+    var kotlinDefaultValue: String? {
+        if isOptional {
+            return "null"
+        } else if kotlinIsNative(primitive: true) {
+            switch self {
+            case .bool:
+                return "false"
+            case .character:
+                return "' '"
+            case .double:
+                return "0.0"
+            case .float:
+                return "0f"
+            case .int:
+                return "0"
+            case .int64:
+                return "0L"
+            case .uint:
+                return "0U"
+            case .uint64:
+                return "0UL"
+            default:
+                return "\(self.kotlin)(0)"
+            }
+        } else if self == .string {
+            return "\"\""
+        } else if self == .int128 || self == .uint128 {
+            return "\(self.kotlin)(0)"
+        } else {
+            return nil
+        }
+    }
+
+    /// Whether this type represents an enum modeled with sealed classes.
+    func kotlinIsSealedClassesEnum(codebaseInfo: CodebaseInfo.Context?) -> Bool {
+        switch asOptional(false) {
+        case .named, .member, .module:
+            return codebaseInfo?.isSealedClassesEnum(type: self).0 == true
+        case .typealiased(_, let type):
+            return type.kotlinIsSealedClassesEnum(codebaseInfo: codebaseInfo)
+        default:
+            return false
+        }
+    }
+
+    /// Insert any non-standard dependencies required by this type.
+    func insertDependencies(into dependencies: inout KotlinDependencies, isModuleQualified: Bool = false) {
+        visit {
+            switch $0 {
+            case .array:
+                dependencies.insertSkipLibType($0.name)
+            case .metaType:
+                dependencies.insertReflect()
+            case .module(_, let type):
+                type.insertDependencies(into: &dependencies, isModuleQualified: true)
+                return .skip
+            case .named(let name, _):
+                if !isModuleQualified && CodebaseInfo.kotlinSkipLibBuiltinNames.contains(name) {
+                    dependencies.insertSkipLibType(name)
+                }
+            case .set:
+                dependencies.insertSkipLibType($0.name)
+            default:
+                break
+            }
+            return .recurse(nil)
+        }
+    }
+
+    /// Append the parameters of this function as a declaration or function call.
+    func appendParameters(to output: OutputGenerator, isFunctionCall: Bool) {
+        for (i, parameter) in parameters.enumerated() {
+            if i > 0 {
+                output.append(", ")
+            }
+            if let label = parameter.label {
+                output.append(label)
+                if isFunctionCall {
+                    output.append(" = ").append(label)
+                }
+            } else {
+                output.append("p_\(i)")
+            }
+            if !isFunctionCall {
+                output.append(": ").append(parameter.type.kotlin)
+            }
+        }
+    }
+}
+
+extension TypeSignature.Parameter {
+    /// Kotlin description of this parameter.
+    var kotlin: String {
+        if isInOut {
+            return "InOut<\(type.kotlin)>"
+        } else {
+            return type.kotlin
+        }
+    }
+}

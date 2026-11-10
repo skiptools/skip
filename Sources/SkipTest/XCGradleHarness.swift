@@ -1,4 +1,3 @@
-// Copyright 2023–2026 Skip
 #if !SKIP
 #if canImport(SkipDrive)
 import SkipDrive

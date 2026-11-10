@@ -1,4 +1,3 @@
-// Copyright 2023–2026 Skip
 #if !canImport(SkipBuild)
 #error("Should only import SkipBuild for SKIPLOCAL")
 #else

@@ -1,4 +1,3 @@
-// Copyright 2023–2026 Skip
 import XCTest
 @testable import SkipTest
 @testable import SkipDrive

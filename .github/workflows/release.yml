@@ -1,44 +1,81 @@
-name: skip release builds
+name: skip release
+
+# Releases a new version of the skip tool and plugin when a semantic version tag is pushed:
+#
+#   git push origin HEAD:refs/tags/1.9.21
+#
+# The workflow builds the `skip` tool from skipstone/ for macOS (universal) and Linux (static),
+# then creates a "Release 1.9.21" commit on main that bumps the version constants and points the
+# plugin's binary targets at the new artifacts, moves the tag to that commit, publishes the GitHub
+# release with the artifacts attached, and (when a RELEASE_TOKEN secret with write access to the
+# ${owner}/homebrew-skip repository is configured) updates the Homebrew cask.
+#
+# Because the tag is moved onto the release commit, a local copy of the tag made before pushing
+# will be stale afterwards; run `git fetch --tags --force` to update it.
+#
+# The nightly schedule performs a dry run that builds the artifacts and shows the changes a
+# release would make without committing anything. A manual dispatch with a version performs a
+# release of the selected ref exactly as a tag push would; with an empty version it is a dry run.
+#
+# A fork can rehearse the whole process: the release is made against the fork's own GitHub
+# repository and releases, and the binary target URLs written to Package.swift point at it.
 
 on:
   push:
-    #branches: [ main ]
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 1.9.21); leave empty for a dry run that only builds the artifacts'
+        type: string
+        default: ''
+      ignore_ci:
+        description: 'Release even if CI has not passed for this commit'
+        type: boolean
+        default: false
   schedule:
     - cron: '0 3 * * *'
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # one release at a time, and never cancel one that is in progress
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
 
 jobs:
   skip-release:
     runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      # the release script uses the gh command to check CI, create the release, and upload the artifacts
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+      # secrets cannot be tested in a step's `if`, so expose whether the cross-repo token is configured
+      HAS_RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN != '' }}
     steps:
-      - name: Checkout skipstone
-        uses: actions/checkout@v6
-        with:
-          repository: skiptools/skipstone
-          path: skipstone
-          ref: main
-          submodules: true
-
       - name: Checkout skip
         uses: actions/checkout@v6
         with:
-          repository: skiptools/skip
-          path: skip
-          # need to fetch tags so we know the most recent version
+          # the release script needs the tags and main to validate the release and push to it
+          fetch-depth: 0
           fetch-tags: true
-          # needed or else trigger from tag will fail
-          # https://github.com/actions/checkout/issues/1467
-          ref: ${{ github.ref }}
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
 
       - name: Checkout homebrew-skip
+        # a fork without a homebrew-skip fork (or without a RELEASE_TOKEN to push to it) just skips the cask update
+        if: env.HAS_RELEASE_TOKEN == 'true'
         uses: actions/checkout@v6
         with:
-          repository: skiptools/homebrew-skip
+          repository: ${{ github.repository_owner }}/homebrew-skip
           path: homebrew-skip
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config --global user.name "${{ github.actor }}"
+          git config --global user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
 
       - name: Install Dependencies
         run: |
@@ -50,7 +87,7 @@ jobs:
           SWIFT_VERSION=6.4.1
           swiftly install --use ${SWIFT_VERSION}
 
-          curl -fsSL -o swift-static-linux-sdk.tar.gz https://download.swift.org/swift-${SWIFT_VERSION}-release/static-sdk/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz 
+          curl -fsSL -o swift-static-linux-sdk.tar.gz https://download.swift.org/swift-${SWIFT_VERSION}-release/static-sdk/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz
           swift sdk install swift-static-linux-sdk.tar.gz
           swift sdk list
 
@@ -58,9 +95,13 @@ jobs:
           # building the static Linux version
           echo "SWIFT_VERSION=${SWIFT_VERSION}" >> $GITHUB_ENV
 
-      - name: Build Skip Release
-        working-directory: skipstone
-        run: ./scripts/release_skip.sh
-        env: 
-          DRY_RUN: 1
-
+      - name: Release Skip
+        run: ./skipstone/scripts/release_skip.sh
+        env:
+          # the version comes from the pushed tag, or from the dispatch input; empty means dry run
+          SKIP_VERSION: ${{ github.event_name == 'push' && github.ref_name || inputs.version }}
+          DRY_RUN: ${{ (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.version == '')) && '1' || '0' }}
+          SKIP_RELEASE_IGNORE_CI: ${{ inputs.ignore_ci && '1' || '0' }}
+          # release to the repository running the workflow, so a fork releases to itself
+          SKIP_GITHUB_REPO: ${{ github.repository }}
+          SKIPBREWDIR: ${{ github.workspace }}/homebrew-skip
