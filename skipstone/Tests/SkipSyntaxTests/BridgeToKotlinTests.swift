@@ -9310,6 +9310,176 @@ final class BridgeToKotlinTests: XCTestCase {
         """, transformers: transformers)
     }
 
+    func testPrivateStateAndEnvironment() async throws {
+        try await check(swiftBridge: """
+        import SkipFuseUI
+        struct V: View {
+            @State private var count = 0
+            @AppStorage("flag") private var flag = false
+            @Environment(\\.dismiss) fileprivate var dismiss
+            var body: some View {
+                Text("Hello")
+            }
+        }
+        """, kotlin: """
+        internal class V: skip.ui.View, skip.bridge.SwiftPeerBridged, skip.lib.SwiftProjecting {
+            var Swift_peer: skip.bridge.SwiftObjectPointer = skip.bridge.SwiftObjectNil
+
+            constructor(Swift_peer: skip.bridge.SwiftObjectPointer, marker: skip.bridge.SwiftPeerMarker?) {
+                this.Swift_peer = Swift_peer
+            }
+
+            fun finalize() {
+                Swift_release(Swift_peer)
+                Swift_peer = skip.bridge.SwiftObjectNil
+            }
+            private external fun Swift_release(Swift_peer: skip.bridge.SwiftObjectPointer)
+
+            override fun Swift_peer(): skip.bridge.SwiftObjectPointer = Swift_peer
+
+            override fun equals(other: Any?): Boolean {
+                if (other !is skip.bridge.SwiftPeerBridged) return false
+                return Swift_peer == other.Swift_peer()
+            }
+
+            override fun hashCode(): Int = Swift_peer.hashCode()
+
+            @androidx.compose.runtime.Composable
+            override fun Evaluate(context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
+                val rememberedcount = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_count(Swift_peer)) }
+                Swift_syncState_count(Swift_peer, rememberedcount.value)
+                val rememberedflag = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.AppStorageSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_flag(Swift_peer)) }
+                Swift_syncState_flag(Swift_peer, rememberedflag.value)
+                val envkeydismiss = Swift_initEnvironment_dismiss(Swift_peer)
+                val envvaluedismiss = skip.ui.EnvironmentValues.shared.bridged(envkeydismiss)
+                Swift_syncEnvironment_dismiss(Swift_peer, envvaluedismiss)
+                return super.Evaluate(context, options)
+            }
+            private external fun Swift_initState_count(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport
+            private external fun Swift_syncState_count(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.StateSupport)
+            private external fun Swift_initState_flag(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.AppStorageSupport
+            private external fun Swift_syncState_flag(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.AppStorageSupport)
+            private external fun Swift_initEnvironment_dismiss(Swift_peer: skip.bridge.SwiftObjectPointer): String
+            private external fun Swift_syncEnvironment_dismiss(Swift_peer: skip.bridge.SwiftObjectPointer, support: skip.ui.EnvironmentSupport?)
+
+            override fun body(): skip.ui.View {
+                return skip.ui.ComposeBuilder { composectx: skip.ui.ComposeContext -> Swift_composableBody(Swift_peer)?.Compose(composectx) ?: skip.ui.ComposeResult.ok }
+            }
+            private external fun Swift_composableBody(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.View?
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+        }
+        """, swiftBridgeSupport: """
+
+        import SkipFuseUI
+        extension V: BridgedToKotlin, SkipUIBridging, SkipUI.View {
+            nonisolated private static let Java_class = try! JClass(name: "V")
+            nonisolated static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                let ptr = SwiftObjectPointer.peer(of: obj!, options: options)
+                let box: SwiftValueTypeBox<Self> = ptr.pointee()!
+                return box.value
+            }
+            nonisolated func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                let box = SwiftValueTypeBox(self)
+                let Swift_peer = SwiftObjectPointer.pointer(to: box, retain: true)
+                return try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: options, args: [Swift_peer.toJavaParameter(options: options), (nil as JavaObjectPointer?).toJavaParameter(options: options)])
+            }
+            nonisolated private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "(JLskip/bridge/SwiftPeerMarker;)V")!
+            func Java_initState_count() -> SkipUI.StateSupport {
+                return (Java_bridgedProperty(self, "_count") as any BridgedStateProperty<SkipUI.StateSupport>).Java_initStateSupport()
+            }
+            func Java_syncState_count(support: SkipUI.StateSupport) {
+                (Java_bridgedProperty(self, "_count") as any BridgedStateProperty<SkipUI.StateSupport>).Java_syncStateSupport(support)
+            }
+            func Java_initState_flag() -> SkipUI.AppStorageSupport {
+                return (Java_bridgedProperty(self, "_flag") as any BridgedStateProperty<SkipUI.AppStorageSupport>).Java_initStateSupport()
+            }
+            func Java_syncState_flag(support: SkipUI.AppStorageSupport) {
+                (Java_bridgedProperty(self, "_flag") as any BridgedStateProperty<SkipUI.AppStorageSupport>).Java_syncStateSupport(support)
+            }
+            func Java_initEnvironment_dismiss() -> String {
+                return (Java_bridgedProperty(self, "_dismiss") as any EnvironmentSupportSyncable).key
+            }
+            func Java_syncEnvironment_dismiss(support: SkipUI.EnvironmentSupport?) {
+                (Java_bridgedProperty(self, "_dismiss") as any EnvironmentSupportSyncable).Java_syncEnvironmentSupport(support)
+            }
+            nonisolated var Java_view: any SkipUI.View {
+                return self
+            }
+        }
+        @_cdecl("Java_V_Swift_1release")
+        public func V_Swift_release(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) {
+            Swift_peer.release(as: SwiftValueTypeBox<V>.self)
+        }
+        @_cdecl("Java_V_Swift_1projectionImpl")
+        public func V_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = V.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        @_cdecl("Java_V_Swift_1initState_1count")
+        public func V_Swift_initState_count(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer {
+            let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
+            return SkipBridge.assumeMainActorUnchecked {
+                return peer_swift.value.Java_initState_count().toJavaObject(options: [])!
+            }
+        }
+        @_cdecl("Java_V_Swift_1syncState_1count")
+        public func V_Swift_syncState_count(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ support: JavaObjectPointer) {
+            let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
+            let support_sendable = UncheckedSendableBox(support)
+            SkipBridge.assumeMainActorUnchecked {
+                let support = support_sendable.wrappedValue
+                let support_swift = SkipUI.StateSupport.fromJavaObject(support, options: [])
+                peer_swift.value.Java_syncState_count(support: support_swift)
+            }
+        }
+        @_cdecl("Java_V_Swift_1initState_1flag")
+        public func V_Swift_initState_flag(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer {
+            let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
+            return SkipBridge.assumeMainActorUnchecked {
+                return peer_swift.value.Java_initState_flag().toJavaObject(options: [])!
+            }
+        }
+        @_cdecl("Java_V_Swift_1syncState_1flag")
+        public func V_Swift_syncState_flag(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ support: JavaObjectPointer) {
+            let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
+            let support_sendable = UncheckedSendableBox(support)
+            SkipBridge.assumeMainActorUnchecked {
+                let support = support_sendable.wrappedValue
+                let support_swift = SkipUI.AppStorageSupport.fromJavaObject(support, options: [])
+                peer_swift.value.Java_syncState_flag(support: support_swift)
+            }
+        }
+        @_cdecl("Java_V_Swift_1initEnvironment_1dismiss")
+        public func V_Swift_initEnvironment_dismiss(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaString {
+            let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
+            return SkipBridge.assumeMainActorUnchecked {
+                return peer_swift.value.Java_initEnvironment_dismiss().toJavaObject(options: [])!
+            }
+        }
+        @_cdecl("Java_V_Swift_1syncEnvironment_1dismiss")
+        public func V_Swift_syncEnvironment_dismiss(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer, _ support: JavaObjectPointer?) {
+            let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
+            let support_sendable = UncheckedSendableBox(support)
+            SkipBridge.assumeMainActorUnchecked {
+                let support = support_sendable.wrappedValue
+                let support_swift = SkipUI.EnvironmentSupport?.fromJavaObject(support, options: [])
+                peer_swift.value.Java_syncEnvironment_dismiss(support: support_swift)
+            }
+        }
+        @_cdecl("Java_V_Swift_1composableBody")
+        public func V_Swift_composableBody(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ Swift_peer: SwiftObjectPointer) -> JavaObjectPointer? {
+            let peer_swift: SwiftValueTypeBox<V> = Swift_peer.pointee()!
+            return SkipBridge.assumeMainActorUnchecked {
+                let body = peer_swift.value.body
+                return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])
+            }
+        }
+        """, transformers: transformers)
+    }
+
     func testCustomModifier() async throws {
         try await check(swiftBridge: """
         import SkipFuseUI
