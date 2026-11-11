@@ -25,6 +25,8 @@
 #   DRY_RUN=1                build the artifacts and show the changes a release would make
 #                            without committing, tagging, pushing, or publishing anything
 #   SKIP_RELEASE_IGNORE_CI=1 release even if CI has not passed for the commit
+#   SKIP_RELEASE_ALLOW_LOCAL=1 allow a real (non-dry-run) release outside of GitHub Actions, which
+#                            is otherwise refused
 #   SKIP_GITHUB_REPO         the owner/name of the GitHub repository to release to; defaults
 #                            to $GITHUB_REPOSITORY, then to the `origin` remote, so running the
 #                            script in a fork releases to the fork
@@ -96,6 +98,14 @@ if ! [[ "${SKIP_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 
 if [[ "${DRY_RUN}" != "1" ]]; then
+    # releases are made by the "skip release" workflow; a local run would push to main, move the tag,
+    # publish the release, and push whatever homebrew-skip checkout happens to be at $SKIPBREWDIR
+    if [[ "${GITHUB_ACTIONS:-}" != "true" && "${SKIP_RELEASE_ALLOW_LOCAL:-0}" != "1" ]]; then
+        echo "error: releases are made by the skip release workflow: git push origin HEAD:refs/tags/${SKIP_VERSION}"
+        echo "       to check the release build locally, run with DRY_RUN=1; to really release from this machine, set SKIP_RELEASE_ALLOW_LOCAL=1"
+        exit 2
+    fi
+
     # the release commit moves the tag onto itself, which re-triggers the workflow when the push is made
     # with a personal access token; a release commit is recognizable by its binary target URLs
     if grep -q "/releases/download/${SKIP_VERSION}/" "${SKIPPKG}"; then
@@ -140,6 +150,18 @@ echo "Releasing Skip ${SKIP_VERSION} from ${GITREF}"
 # bump the version constants for the plugin (SkipDrive) and the tool (SkipSyntax)
 sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'"${SKIP_VERSION}"'";g' "${SKIPDRIVE_VERSION_PATH}"
 sed -I '' 's;public let skipVersion = .*;public let skipVersion = "'"${SKIP_VERSION}"'";g' "${SKIPSTONE_VERSION_PATH}"
+
+# make sure that the bump took effect: if the declaration's format ever changes so that the sed
+# above no longer matches, the release would otherwise ship with a stale version string
+for VERSION_PATH in "${SKIPDRIVE_VERSION_PATH}" "${SKIPSTONE_VERSION_PATH}"; do
+    VERSION_DECLS=$(grep -c '^public let skipVersion = ' "${VERSION_PATH}" || true)
+    if [[ "${VERSION_DECLS}" != "1" ]] || ! grep -Fxq "public let skipVersion = \"${SKIP_VERSION}\"" "${VERSION_PATH}"; then
+        echo "error: ${VERSION_PATH} must declare exactly one 'public let skipVersion = \"${SKIP_VERSION}\"' after the version bump, but has:"
+        grep -n 'skipVersion' "${VERSION_PATH}" || echo "(no skipVersion declaration)"
+        git checkout -- "${SKIPDRIVE_VERSION_PATH}" "${SKIPSTONE_VERSION_PATH}"
+        exit 1
+    fi
+done
 
 # build the tool from the skipstone package
 cd "${SKIPSTONEDIR}"

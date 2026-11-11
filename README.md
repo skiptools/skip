@@ -155,7 +155,7 @@ See the full module documentation at [skip.dev/docs/modules](https://skip.dev/do
 
 ## Architecture
 
-The [skip](https://github.com/skiptools/skip) repository hosts the Skip SwiftPM build plugin, which integrates with Xcode and Swift Package Manager to drive the Android build alongside your normal iOS build. It works together with [skipstone](skipstone/), the transpiler and build tool that powers both the `skip` CLI and the plugin. The `skipstone/` folder is a separate SwiftPM package that is not built as part of the plugin package: the plugin downloads the pre-built `skip` binary from this repository's [releases](https://github.com/skiptools/skip/releases), and the binary is built from the `skipstone/` sources by the release workflow. See the [skipstone README](skipstone/README.md) for details on building the tool from source.
+The [skip](https://github.com/skiptools/skip) repository hosts the Skip SwiftPM build plugin, which integrates with Xcode and Swift Package Manager to drive the Android build alongside your normal iOS build. It works together with [skipstone](skipstone/), the transpiler and build tool that powers both the `skip` CLI and the plugin. The `skipstone/` folder is a separate SwiftPM package that is not built as part of the plugin package: the plugin downloads the pre-built `skip` binary from this repository's [releases](https://github.com/skiptools/skip/releases), and the binary is built from the `skipstone/` sources by the release workflow. See the [skipstone README](skipstone/README.md) for details on building the tool from source, and [Releasing Skip](skipstone/README.md#releasing-skip) for how maintainers make a new release.
 
 For more on how Skip projects are structured, see:
 
