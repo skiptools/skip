@@ -348,7 +348,7 @@ class SkipBuildPlugin @Inject constructor(private val os: ExecOperations) : Plug
                 return devices
             }
 
-            task("checkDevices") {
+            tasks.register("checkDevices") {
                 doFirst {
                     val devices = invokeADBDevices()
                     if (devices.size == 0) {
@@ -359,7 +359,7 @@ class SkipBuildPlugin @Inject constructor(private val os: ExecOperations) : Plug
 
             // add the "launchDebug" and "launchRelease" commands
             listOf("Debug", "Release").forEach { buildType ->
-                task("launch" + buildType) {
+                tasks.register("launch" + buildType) {
                     dependsOn("checkDevices") // check the devices before install to report when there are no devices
                     dependsOn("install" + buildType) // built-in install task
 
