@@ -424,19 +424,23 @@ func runTests(_ env: JNIEnvironment, _ thisObj: jobject) -> jint {
     }
 
     // Bridge sync → async via DispatchSemaphore
+    // A Sendable box rather than a captured `nonisolated(unsafe) var`: Swift 6 region isolation
+    // rejects sending a closure that captures a local var into Task.init (#727).
+    // The semaphore orders the write before the read.
+    final class ResultBox: @unchecked Sendable { var value = false }
     let semaphore = DispatchSemaphore(value: 0)
-    nonisolated(unsafe) var testSuccess = false
+    let testSuccess = ResultBox()
     Task {
         defer { semaphore.signal() }
         do {
-            testSuccess = try await entryPoint(nil, recordHandler)
+            testSuccess.value = try await entryPoint(nil, recordHandler)
         } catch {
             androidLog(ANDROID_LOG_ERROR, "SwiftTest", "Entry point threw error: \\(error)")
         }
     }
     semaphore.wait()
 
-    let exitCode: Int32 = testSuccess ? 0 : 1
+    let exitCode: Int32 = testSuccess.value ? 0 : 1
     return jint(exitCode)
 }
 
@@ -579,15 +583,17 @@ public func runTests(_ env: UnsafeMutableRawPointer?, _ thisObj: UnsafeMutableRa
         if let eventsFile { fputs(json + "\\n", eventsFile); fflush(eventsFile) }
         fputs("SwiftTest: " + json + "\\n", stderr)
     }
+    // Sendable box instead of a captured local var, which Swift 6 rejects in Task.init (#727).
+    final class ResultBox: @unchecked Sendable { var value = false }
     let semaphore = DispatchSemaphore(value: 0)
-    nonisolated(unsafe) var success = false
+    let success = ResultBox()
     Task {
         defer { semaphore.signal() }
-        success = (try? await entryPoint(nil, recordHandler)) ?? false
+        success.value = (try? await entryPoint(nil, recordHandler)) ?? false
     }
     semaphore.wait()
     if let eventsFile { fclose(eventsFile) }
-    return success ? 0 : 1
+    return success.value ? 0 : 1
 }
 """
 }
