@@ -1604,13 +1604,14 @@ extension FileManager {
         // Skip dot-files by name rather than with `.skipsHiddenFiles`: on Darwin that option also
         // skips files carrying the BSD `UF_HIDDEN` flag, which iCloud Drive sets on every file
         // under a synced ~/Documents, so the sources would silently disappear (#739).
-        if let fileURLs = self.enumerator(at: resolvedFolderURL, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey], options: [.skipsPackageDescendants]) {
+        if let fileURLs = self.enumerator(at: resolvedFolderURL, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey, .isDirectoryKey], options: [.skipsPackageDescendants]) {
             for case let fileURL as URL in fileURLs {
+                let attrs = try fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .isDirectoryKey])
                 if fileURL.lastPathComponent.hasPrefix(".") {
-                    fileURLs.skipDescendants()
+                    // Only for directories: on Darwin, skipDescendants() after a file skips the rest of its parent.
+                    if attrs.isDirectory == true { fileURLs.skipDescendants() }
                     continue
                 }
-                let attrs = try fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
                 if attrs.isRegularFile == true || attrs.isSymbolicLink == true {
                     childFileURLs.append(Self.enumeratedURL(fileURL, from: resolvedFolderURL, under: folderURL))
                 }
