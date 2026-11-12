@@ -1601,9 +1601,17 @@ extension FileManager {
         // A mirrored target can itself be a symlink. Enumerate its destination,
         // but keep the caller's paths for source hashes and generated-file mappings.
         let resolvedFolderURL = folderURL.resolvingSymlinksInPath()
-        if let fileURLs = self.enumerator(at: resolvedFolderURL, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles, .skipsPackageDescendants]) {
+        // Skip dot-files by name rather than with `.skipsHiddenFiles`: on Darwin that option also
+        // skips files carrying the BSD `UF_HIDDEN` flag, which iCloud Drive sets on every file
+        // under a synced ~/Documents, so the sources would silently disappear (#739).
+        if let fileURLs = self.enumerator(at: resolvedFolderURL, includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey, .isDirectoryKey], options: [.skipsPackageDescendants]) {
             for case let fileURL as URL in fileURLs {
-                let attrs = try fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+                let attrs = try fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .isDirectoryKey])
+                if fileURL.lastPathComponent.hasPrefix(".") {
+                    // Only for directories: on Darwin, skipDescendants() after a file skips the rest of its parent.
+                    if attrs.isDirectory == true { fileURLs.skipDescendants() }
+                    continue
+                }
                 if attrs.isRegularFile == true || attrs.isSymbolicLink == true {
                     childFileURLs.append(Self.enumeratedURL(fileURL, from: resolvedFolderURL, under: folderURL))
                 }
