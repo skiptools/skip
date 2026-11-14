@@ -124,9 +124,11 @@ if [[ "${DRY_RUN}" != "1" ]]; then
         exit 1
     fi
 
-    if [[ -n "$(git status --porcelain)" ]]; then
+    # untracked files are ignored: the release workflow itself creates some (the homebrew-skip
+    # checkout, the downloaded SDK), and the release commit only adds the files it modifies
+    if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
         echo "error: the working tree has uncommitted changes"
-        git status --porcelain
+        git status --porcelain --untracked-files=no
         exit 1
     fi
 
