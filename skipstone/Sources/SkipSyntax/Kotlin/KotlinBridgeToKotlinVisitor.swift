@@ -1841,8 +1841,10 @@ final class KotlinBridgeToKotlinVisitor {
             }
         }
         cdeclSource.append("return SkipBridge.assumeMainActorUnchecked {")
-        cdeclSource.append(1, bodyInvocation)
-        cdeclSource.append(1, "return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])")
+        cdeclSource.append(1, "return Java_withBodyObservationTracking {")
+        cdeclSource.append(2, bodyInvocation)
+        cdeclSource.append(2, "return ((body as? SkipUIBridging)?.Java_view as? JConvertible)?.toJavaObject(options: [])")
+        cdeclSource.append(1, "}")
         cdeclSource.append("}")
         let cdeclFunction = CDeclFunction(name: cdeclName, cdecl: cdecl, signature: cdeclSignature, body: cdeclSource)
 
