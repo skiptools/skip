@@ -1034,6 +1034,7 @@ final class ExtensionDeclaration: TypeDeclaration {
 final class FunctionDeclaration: Statement {
     let name: String
     let isOptionalInit: Bool
+    var testArgumentsProviderName: String?
     private(set) var returnType: TypeSignature
     private(set) var parameters: [Parameter<Expression>]
     private(set) var asyncBehavior: AsyncBehavior
@@ -1070,7 +1071,8 @@ final class FunctionDeclaration: Statement {
     override class func decode(syntax: SyntaxProtocol, extras: StatementExtras?, context: DecodeContext, in syntaxTree: SyntaxTree) -> [Statement]? {
         if syntax.kind == .functionDecl, let functionDecl = syntax.as(FunctionDeclSyntax.self) {
             if let declaration = decodeFunctionDeclaration(functionDecl, extras: extras, context: context, in: syntaxTree) {
-                return [declaration]
+                let provider = SwiftTestingArguments.provider(for: declaration, syntax: functionDecl, context: context, in: syntaxTree)
+                return [declaration] + (provider.map { [$0] } ?? [])
             } else {
                 return []
             }

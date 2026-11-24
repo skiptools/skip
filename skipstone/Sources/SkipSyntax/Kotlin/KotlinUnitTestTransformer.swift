@@ -77,7 +77,9 @@ final class KotlinUnitTestTransformer: KotlinTransformer {
                 let isSwiftTesting = testFuncNames.contains(functionDeclaration.name)
 
                 if isXCTest || isSwiftTesting {
-                    if functionDeclaration.apiFlags.options.contains(.async) {
+                    if functionDeclaration.testArgumentsProviderName != nil {
+                        transformParameterizedTest(functionDeclaration, owningClass: owningClass, importPackages: &importPackages)
+                    } else if functionDeclaration.apiFlags.options.contains(.async) {
                         transformAsyncTest(functionDeclaration: functionDeclaration, owningClass: owningClass, importPackages: &importPackages)
                     } else {
                         functionDeclaration.annotations += ["@Test"]
@@ -138,17 +140,102 @@ final class KotlinUnitTestTransformer: KotlinTransformer {
         if let index = codeBlock.statements.firstIndex(where: { $0 === functionDeclaration }) {
             functionDeclaration.role = .member
             functionDeclaration.extras = nil
-            if functionDeclaration.apiFlags.options.contains(.async) {
+            classDeclaration.members = [functionDeclaration]
+            functionDeclaration.parent = classDeclaration
+            if functionDeclaration.testArgumentsProviderName != nil {
+                transformParameterizedTest(functionDeclaration, owningClass: classDeclaration, globalProvider: true, importPackages: &importPackages)
+            } else if functionDeclaration.apiFlags.options.contains(.async) {
                 transformAsyncTest(functionDeclaration: functionDeclaration, owningClass: classDeclaration, importPackages: &importPackages)
             } else {
                 functionDeclaration.annotations += ["@Test"]
             }
-            classDeclaration.members = [functionDeclaration]
-            functionDeclaration.parent = classDeclaration
 
             codeBlock.statements[index] = classDeclaration
             classDeclaration.parent = codeBlock
             classDeclaration.assignParentReferences()
+        }
+    }
+
+    /// Keeps the typed Swift test as a helper and exposes one injectable case to JUnit.
+    /// The runner creates a new suite instance for each case, including async tests.
+    private func transformParameterizedTest(
+        _ function: KotlinFunctionDeclaration,
+        owningClass: KotlinClassDeclaration,
+        globalProvider: Bool = false,
+        importPackages: inout Set<String>
+    ) {
+        guard let providerName = function.testArgumentsProviderName else {
+            return
+        }
+
+        // Select the parameterized runner without replacing a custom runner
+        let runner = "@org.junit.runner.RunWith(skip.unit.SkipParameterizedTestRunner::class)"
+        owningClass.annotations.removeAll { $0 == KotlinClassDeclaration.testRunnerAnnotation }
+
+        if owningClass.annotations.contains(where: {
+            $0.hasPrefix("@RunWith(") || $0.hasPrefix("@org.junit.runner.RunWith(") && $0 != runner
+        }) {
+            function.messages.append(Message(
+                kind: .error,
+                message: "Parameterized Swift tests cannot be combined with a custom @RunWith runner.",
+                sourceDerived: function
+            ))
+            return
+        }
+
+        if !owningClass.annotations.contains(runner) {
+            owningClass.annotations.append(runner)
+        }
+
+        // Create the argument provider for the generated JUnit test
+        let providerClass = providerName + "Provider"
+        let callProvider = globalProvider ? providerName : "\(owningClass.name).\(providerName)"
+        let provider = KotlinRawStatement(sourceCode: """
+        class \(providerClass): skip.unit.SkipTestArgumentsProvider() {
+            override fun arguments(): List<List<Any?>> =
+                \(callProvider)().map { it.kotlin(nocopy = true) }
+                    .kotlin(nocopy = true) as List<List<Any?>>
+        }
+        """)
+
+        // Call the original test with its typed arguments
+        let callArguments = function.parameters.enumerated().map { index, parameter in
+            "arguments[\(index)] as \(parameter.declaredType.kotlin)"
+        }.joined(separator: ", ")
+        let invocation = "\(function.name)(\(callArguments))"
+        var lines = ["if (arguments == null) throw org.junit.AssumptionViolatedException(\"No test arguments\")"]
+        let isAsync = function.apiFlags.options.contains(.async)
+
+        if isAsync {
+            importPackages.formUnion(["kotlinx.coroutines.*", "kotlinx.coroutines.test.*"])
+            lines += [
+                "val dispatcher = StandardTestDispatcher()",
+                "Dispatchers.setMain(dispatcher)",
+                "try {",
+                "    runTest { withContext(Dispatchers.Main) { \(invocation) } }",
+                "} finally {",
+                "    Dispatchers.resetMain()",
+                "}"
+            ]
+        } else {
+            lines.append(invocation)
+        }
+
+        // Create the injectable wrapper and insert it before the original test
+        let wrapper = KotlinRawStatement(sourceCode: """
+        \(isAsync ? "@OptIn(ExperimentalCoroutinesApi::class)\n" : "")@Test
+        fun \(providerName)_test(
+            @com.google.testing.junit.testparameterinjector.TestParameter(valuesProvider = \(providerClass)::class)
+            arguments: List<Any?>?
+        ) {
+        \(lines.map { "    " + $0 }.joined(separator: "\n"))
+        }
+        """)
+
+        if let index = owningClass.members.firstIndex(where: { $0 === function }) {
+            owningClass.members.insert(contentsOf: [provider, wrapper], at: index)
+            provider.parent = owningClass
+            wrapper.parent = owningClass
         }
     }
 

@@ -1807,6 +1807,7 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
     var hasAsyncExplicitReturn = false
     var suppressSideEffects = false
     var isGenerated = false
+    var testArgumentsProviderName: String?
     var functionType: TypeSignature {
         return attributes.apply(toFunction: .function(parameters.map(\.signature), returnType, apiFlags, nil))
     }
@@ -1879,6 +1880,7 @@ final class KotlinFunctionDeclaration: KotlinStatement, KotlinMemberDeclaration 
 
     static func translate(statement: FunctionDeclaration, translator: KotlinTranslator) -> KotlinFunctionDeclaration {
         let kstatement = KotlinFunctionDeclaration(statement: statement)
+        kstatement.testArgumentsProviderName = statement.testArgumentsProviderName
         kstatement.isOptionalInit = statement.isOptionalInit
         kstatement.modifiers = statement.modifiers
         kstatement.generics = statement.generics.resolvingSelf(in: statement)
