@@ -45,7 +45,7 @@ jobs:
       - name: "Install Swift Host Toolchain and Static Linux SDK"
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get -y install libcurl4-openssl-dev || (sudo apt-get update && sudo apt-get -y install libcurl4-openssl-dev)
+          sudo apt-get -y install libcurl4-openssl-dev binutils-gold || (sudo apt-get update && sudo apt-get -y install libcurl4-openssl-dev binutils-gold)
           brew install swiftly
           swiftly init --skip-install --assume-yes --quiet-shell-followup
           swiftly install --assume-yes --use ${{ matrix.swift }}
@@ -160,7 +160,7 @@ jobs:
       - name: "Install Host Toolchain prerequisites"
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get -y install libcurl4-openssl-dev || (sudo apt-get update && sudo apt-get -y install libcurl4-openssl-dev)
+          sudo apt-get -y install libcurl4-openssl-dev binutils-gold || (sudo apt-get update && sudo apt-get -y install libcurl4-openssl-dev binutils-gold)
 
       - run: brew install swiftly
 
