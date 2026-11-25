@@ -46,9 +46,9 @@ if let skipLocal = env["SKIPLOCAL"] ?? (env["PWD"]?.hasSuffix("skipstone") == tr
     package.targets += [.executableTarget(name: "skip", dependencies: [.product(name: "SkipBuild", package: "skipstone")])]
 } else {
     #if os(macOS)
-    package.targets += [.binaryTarget(name: "skip", url: "https://github.com/skiptools/skip/releases/download/1.9.21/skip-macos.zip", checksum: "1143f4c604a429f0130f4e48a02a1cf830ca1a2db9b0ba318362c67407e53ad9")]
+    package.targets += [.binaryTarget(name: "skip", url: "https://github.com/skiptools/skip/releases/download/1.9.23/skip-macos.zip", checksum: "2a68e9cb6f4491b7f94e6c13b93cbae2736053980f3126e71345c6d8f15f5c9f")]
     #elseif os(Linux)
-    package.targets += [.binaryTarget(name: "skip", url: "https://github.com/skiptools/skip/releases/download/1.9.21/skip-linux.zip", checksum: "b1367e51651ada77b7e34af829818ad62974af4e51677dcfa7bb8e0ac69fc4af")]
+    package.targets += [.binaryTarget(name: "skip", url: "https://github.com/skiptools/skip/releases/download/1.9.23/skip-linux.zip", checksum: "1a49e071d052413be0d21e224be4b22d8159b55abdda8fba0372ba4c2ae3245d")]
     #else
     fatalError("The skip plugin is only supported on macOS and Linux hosts; set SKIPLOCAL to build the skip tool from the skipstone/ sources instead")
     #endif
