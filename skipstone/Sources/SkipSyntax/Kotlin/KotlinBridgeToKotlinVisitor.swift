@@ -1611,10 +1611,6 @@ final class KotlinBridgeToKotlinVisitor {
             guard case .swiftUIStateProperty(let name, let attributes, let modifiers) = unbridged else {
                 return nil
             }
-            guard modifiers.visibility >= .default else {
-                classDeclaration.messages.append(.kotlinBridgeStatePrivate(classDeclaration, property: name, source: syntaxTree.source))
-                return nil
-            }
             return (name, attributes, modifiers)
         }
         if !stateVariables.isEmpty {
@@ -1692,6 +1688,14 @@ final class KotlinBridgeToKotlinVisitor {
         return [functionDeclaration]
     }
 
+    private func swiftUIStateReceiver(_ name: String, boxName: String, supportTypeName: String, modifiers: Modifiers) -> String {
+        return modifiers.visibility < .default ? "(Java_bridgedProperty(self, \"_\(name)\") as any BridgedStateProperty<SkipUI.\(supportTypeName)>)" : "$\(name).\(boxName)!"
+    }
+
+    private func swiftUIEnvironmentReceiver(_ name: String, modifiers: Modifiers) -> String {
+        return modifiers.visibility < .default ? "(Java_bridgedProperty(self, \"_\(name)\") as any EnvironmentSupportSyncable)" : "$\(name)"
+    }
+
     private func swiftUIInitState(_ swiftUIType: TypeSignature.SwiftUIType, for name: String, in classDeclaration: KotlinClassDeclaration, supportTypeName: String, boxName: String, attributes: Attributes, modifiers: Modifiers) -> (statements: [KotlinStatement], swift: [String], cdeclFunctions: [CDeclFunction]) {
         let classType = ClassType(classDeclaration)
         let externalName = "Swift_initState_\(name)"
@@ -1702,7 +1706,7 @@ final class KotlinBridgeToKotlinVisitor {
         var source: [String] = []
         let isolationString = modifiers.isNonisolated ? "nonisolated " : ""
         source.append("\(isolationString)func Java_initState_\(name)() -> SkipUI.\(supportTypeName) {")
-        source.append(1, "return $\(name).\(boxName)!.Java_initStateSupport()")
+        source.append(1, "return \(swiftUIStateReceiver(name, boxName: boxName, supportTypeName: supportTypeName, modifiers: modifiers)).Java_initStateSupport()")
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
@@ -1725,7 +1729,7 @@ final class KotlinBridgeToKotlinVisitor {
         var source: [String] = []
         let isolationString = modifiers.isNonisolated ? "nonisolated " : ""
         source.append("\(isolationString)func Java_syncState_\(name)(support: SkipUI.\(supportTypeName)) {")
-        source.append(1, "$\(name).\(boxName)!.Java_syncStateSupport(support)")
+        source.append(1, "\(swiftUIStateReceiver(name, boxName: boxName, supportTypeName: supportTypeName, modifiers: modifiers)).Java_syncStateSupport(support)")
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
@@ -1750,7 +1754,7 @@ final class KotlinBridgeToKotlinVisitor {
         var source: [String] = []
         let isolationString = modifiers.isNonisolated ? "nonisolated " : ""
         source.append("\(isolationString)func Java_initEnvironment_\(name)() -> String {")
-        source.append(1, "return $\(name).key")
+        source.append(1, "return \(swiftUIEnvironmentReceiver(name, modifiers: modifiers)).key")
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
@@ -1773,7 +1777,7 @@ final class KotlinBridgeToKotlinVisitor {
         var source: [String] = []
         let isolationString = modifiers.isNonisolated ? "nonisolated " : ""
         source.append("\(isolationString)func Java_syncEnvironment_\(name)(support: SkipUI.EnvironmentSupport?) {")
-        source.append(1, "$\(name).Java_syncEnvironmentSupport(support)")
+        source.append(1, "\(swiftUIEnvironmentReceiver(name, modifiers: modifiers)).Java_syncEnvironmentSupport(support)")
         source.append("}")
 
         let (cdecl, cdeclName) = CDeclFunction.declaration(for: externalFunctionDeclaration, isCompanion: false, name: externalName, translator: translator)
