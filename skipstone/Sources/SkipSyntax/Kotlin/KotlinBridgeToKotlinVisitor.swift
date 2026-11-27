@@ -1675,8 +1675,12 @@ final class KotlinBridgeToKotlinVisitor {
         for (name, attributes, _) in stateVariables {
             if attributes.stateAttribute != nil || attributes.contains(.focusState) || attributes.contains(.gestureState) || attributes.contains(.appStorage) {
                 let supportTypeName = attributes.contains(.appStorage) ? "AppStorageSupport" : "StateSupport"
-                bodyKotlin.append("val remembered\(name) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.\(supportTypeName), Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_\(name)(\(classType.peerExternalArgument))) }")
-                bodyKotlin.append("Swift_syncState_\(name)(\(classType.peerExternalArgument), remembered\(name).value)")
+                let rememberedState = "remembered\(name)"
+                let initState = "Swift_initState_\(name)(\(classType.peerExternalArgument))"
+                // A missing restored value can leave the MutableState present with a null value.
+                bodyKotlin.append("val \(rememberedState) = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.\(supportTypeName)?, Any>) { androidx.compose.runtime.mutableStateOf(\(initState)) }")
+                bodyKotlin.append("val support\(name) = \(rememberedState).value ?: \(initState).also { \(rememberedState).value = it }")
+                bodyKotlin.append("Swift_syncState_\(name)(\(classType.peerExternalArgument), support\(name))")
             } else if attributes.environmentAttribute != nil {
                 bodyKotlin.append("val envkey\(name) = Swift_initEnvironment_\(name)(\(classType.peerExternalArgument))")
                 bodyKotlin.append("val envvalue\(name) = skip.ui.EnvironmentValues.shared.bridged(envkey\(name))")
