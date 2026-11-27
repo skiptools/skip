@@ -24,6 +24,25 @@ final class SourceEnumerationTests: XCTestCase {
         }
     }
 
+    func testDotFilesSkippedButHiddenFlagIgnored() throws {
+        let manager = FileManager.default
+        let root = manager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try manager.createDirectory(at: root.appendingPathComponent(".git"), withIntermediateDirectories: true)
+        try manager.createDirectory(at: root.appendingPathComponent("Nested"), withIntermediateDirectories: true)
+        defer { try? manager.removeItem(at: root) }
+        try "git".write(to: root.appendingPathComponent(".git/Ignored.swift"), atomically: true, encoding: .utf8)
+        var flagged = root.appendingPathComponent("Nested/Flagged.swift")
+        try "flagged".write(to: flagged, atomically: true, encoding: .utf8)
+        #if os(macOS)
+        // Mimic iCloud Drive, which sets UF_HIDDEN on files under a synced ~/Documents (#739).
+        var values = URLResourceValues()
+        values.isHidden = true
+        try flagged.setResourceValues(values)
+        XCTAssertEqual(try flagged.resourceValues(forKeys: [.isHiddenKey]).isHidden, true)
+        #endif
+        XCTAssertEqual(try manager.enumeratedURLs(of: root), [root.appendingPathComponent("Nested/Flagged.swift")])
+    }
+
     func testDarwinTemporaryDirectoryAliasesPreserveRequestedPaths() throws {
         #if os(macOS)
         let manager = FileManager.default
