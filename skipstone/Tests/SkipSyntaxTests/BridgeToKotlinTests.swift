@@ -8411,8 +8411,9 @@ final class BridgeToKotlinTests: XCTestCase {
 
             @androidx.compose.runtime.Composable
             override fun Evaluate(context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
-                val rememberedcount = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_count(Swift_peer)) }
-                Swift_syncState_count(Swift_peer, rememberedcount.value)
+                val rememberedcount = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport?, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_count(Swift_peer)) }
+                val supportcount = rememberedcount.value ?: Swift_initState_count(Swift_peer).also { rememberedcount.value = it }
+                Swift_syncState_count(Swift_peer, supportcount)
                 return super.Evaluate(context, options)
             }
             private external fun Swift_initState_count(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport
@@ -8572,8 +8573,9 @@ final class BridgeToKotlinTests: XCTestCase {
 
             @androidx.compose.runtime.Composable
             override fun Evaluate(context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
-                val rememberedt = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_t(Swift_peer)) }
-                Swift_syncState_t(Swift_peer, rememberedt.value)
+                val rememberedt = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport?, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_t(Swift_peer)) }
+                val supportt = rememberedt.value ?: Swift_initState_t(Swift_peer).also { rememberedt.value = it }
+                Swift_syncState_t(Swift_peer, supportt)
                 return super.Evaluate(context, options)
             }
             private external fun Swift_initState_t(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport
@@ -8705,8 +8707,9 @@ final class BridgeToKotlinTests: XCTestCase {
 
             @androidx.compose.runtime.Composable
             override fun Evaluate(context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
-                val rememberedi = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_i(Swift_peer)) }
-                Swift_syncState_i(Swift_peer, rememberedi.value)
+                val rememberedi = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport?, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_i(Swift_peer)) }
+                val supporti = rememberedi.value ?: Swift_initState_i(Swift_peer).also { rememberedi.value = it }
+                Swift_syncState_i(Swift_peer, supporti)
                 return super.Evaluate(context, options)
             }
             private external fun Swift_initState_i(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport
@@ -9005,8 +9008,9 @@ final class BridgeToKotlinTests: XCTestCase {
 
             @androidx.compose.runtime.Composable
             override fun Evaluate(context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
-                val rememberedfocused = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_focused(Swift_peer)) }
-                Swift_syncState_focused(Swift_peer, rememberedfocused.value)
+                val rememberedfocused = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport?, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_focused(Swift_peer)) }
+                val supportfocused = rememberedfocused.value ?: Swift_initState_focused(Swift_peer).also { rememberedfocused.value = it }
+                Swift_syncState_focused(Swift_peer, supportfocused)
                 return super.Evaluate(context, options)
             }
             private external fun Swift_initState_focused(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport
@@ -9118,8 +9122,9 @@ final class BridgeToKotlinTests: XCTestCase {
 
             @androidx.compose.runtime.Composable
             override fun Evaluate(context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
-                val rememberedi = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_i(Swift_peer)) }
-                Swift_syncState_i(Swift_peer, rememberedi.value)
+                val rememberedi = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport?, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_i(Swift_peer)) }
+                val supporti = rememberedi.value ?: Swift_initState_i(Swift_peer).also { rememberedi.value = it }
+                Swift_syncState_i(Swift_peer, supporti)
                 return super.Evaluate(context, options)
             }
             private external fun Swift_initState_i(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport
@@ -9231,8 +9236,9 @@ final class BridgeToKotlinTests: XCTestCase {
 
             @androidx.compose.runtime.Composable
             override fun Evaluate(context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
-                val rememberedvalue = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.AppStorageSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_value(Swift_peer)) }
-                Swift_syncState_value(Swift_peer, rememberedvalue.value)
+                val rememberedvalue = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.AppStorageSupport?, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_value(Swift_peer)) }
+                val supportvalue = rememberedvalue.value ?: Swift_initState_value(Swift_peer).also { rememberedvalue.value = it }
+                Swift_syncState_value(Swift_peer, supportvalue)
                 return super.Evaluate(context, options)
             }
             private external fun Swift_initState_value(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.AppStorageSupport
@@ -9356,8 +9362,9 @@ final class BridgeToKotlinTests: XCTestCase {
 
             @androidx.compose.runtime.Composable
             override fun Evaluate(content: skip.ui.View, context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
-                val rememberedcount = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_count(Swift_peer)) }
-                Swift_syncState_count(Swift_peer, rememberedcount.value)
+                val rememberedcount = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport?, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_count(Swift_peer)) }
+                val supportcount = rememberedcount.value ?: Swift_initState_count(Swift_peer).also { rememberedcount.value = it }
+                Swift_syncState_count(Swift_peer, supportcount)
                 return super.Evaluate(content, context, options)
             }
             private external fun Swift_initState_count(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport
@@ -9535,8 +9542,9 @@ final class BridgeToKotlinTests: XCTestCase {
 
             @androidx.compose.runtime.Composable
             override fun Evaluate(content: skip.ui.View, context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
-                val rememberedt = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_t(Swift_peer)) }
-                Swift_syncState_t(Swift_peer, rememberedt.value)
+                val rememberedt = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport?, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_t(Swift_peer)) }
+                val supportt = rememberedt.value ?: Swift_initState_t(Swift_peer).also { rememberedt.value = it }
+                Swift_syncState_t(Swift_peer, supportt)
                 return super.Evaluate(content, context, options)
             }
             private external fun Swift_initState_t(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport
@@ -9669,8 +9677,9 @@ final class BridgeToKotlinTests: XCTestCase {
 
             @androidx.compose.runtime.Composable
             override fun Evaluate(context: skip.ui.ComposeContext, options: Int): kotlin.collections.List<Renderable> {
-                val rememberedcount = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_count(Swift_peer)) }
-                Swift_syncState_count(Swift_peer, rememberedcount.value)
+                val rememberedcount = androidx.compose.runtime.saveable.rememberSaveable(stateSaver = context.stateSaver as androidx.compose.runtime.saveable.Saver<skip.ui.StateSupport?, Any>) { androidx.compose.runtime.mutableStateOf(Swift_initState_count(Swift_peer)) }
+                val supportcount = rememberedcount.value ?: Swift_initState_count(Swift_peer).also { rememberedcount.value = it }
+                Swift_syncState_count(Swift_peer, supportcount)
                 return super.Evaluate(context, options)
             }
             private external fun Swift_initState_count(Swift_peer: skip.bridge.SwiftObjectPointer): skip.ui.StateSupport
