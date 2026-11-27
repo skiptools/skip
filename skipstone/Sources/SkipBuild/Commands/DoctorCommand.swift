@@ -139,10 +139,15 @@ extension ToolOptionsCommand where Self : StreamingCommand {
         try await checkVersion(title: "Swift version", cmd: ["swift", "-version"], min: Version("5.9.0"), pattern: "Swift version ([0-9.]+)")
         try await checkVersion(title: "Swiftly version", cmd: ["swiftly", "--version"], min: Version("1.0.0"), pattern: "([0-9.]+)")
         #if os(macOS)
-        // TODO: add advice to run `xcode-select -s /Applications/Xcode.app/Contents/Developer` to work around https://github.com/skiptools/skip/issues/18
+        // Homebrew installs and selects the Command Line Tools, where xcodebuild fails (#609).
+        // xcode-select stores its selection in this symlink; DEVELOPER_DIR overrides it.
+        let developerDir = ProcessInfo.processInfo.environment["DEVELOPER_DIR"] ?? (try? FileManager.default.destinationOfSymbolicLink(atPath: "/var/db/xcode_select_link"))
+        let xcodeHint = developerDir?.contains("CommandLineTools") == true
+            ? " (the Command Line Tools are selected; select Xcode with: sudo xcode-select --switch /Applications/Xcode.app)"
+            : " (install from: https://developer.apple.com/xcode/)"
         // Xcode 27's MacOSX27 SDK emits `-target-arch-variant`, which Swift 6.3 rejects when
         // compiling host plugins/manifests. Require the 6.4 Android toolchain in that pairing.
-        let xcodeVersion = try await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)", hint: " (install from: https://developer.apple.com/xcode/)")
+        let xcodeVersion = try await checkVersion(title: "Xcode version", cmd: ["xcodebuild", "-version"], min: Version("15.0.0"), pattern: "Xcode ([0-9.]+)", hint: xcodeHint)
         #endif
         if checkNative {
             var androidSDKMin = Version("6.1.0")
