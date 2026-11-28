@@ -1116,17 +1116,42 @@ extension KotlinVariableDeclaration {
     }
 
     /// Return the annotation necessary to prevent the Kotlin compiler from mangling the name of this variable.
-    func preventJVMNameManglingAnnotation(name: String? = nil, isFunction: Bool = false) -> String? {
+    ///
+    /// - Parameter isMember: Whether this is a type member that compiled Swift accesses by its JVM name.
+    func preventJVMNameManglingAnnotation(name: String? = nil, isFunction: Bool = false, isMember: Bool = false) -> String? {
+        let isWriteable = apiFlags.options.contains(.writeable)
         // The Kotlin compiler appends a hash to the names of functions using unsigned parameters
-        guard propertyType.isUnsigned, apiFlags.options.contains(.writeable) && (modifiers.setVisibility == .default || modifiers.setVisibility >= .public) else {
+        var isSetterMangled = propertyType.isUnsigned && isWriteable && (modifiers.setVisibility == .default || modifiers.setVisibility >= .public)
+        var isGetterMangled = false
+        if isMember && !isFunction {
+            // ...and the module name to the names of the accessors of internal members
+            isGetterMangled = modifiers.visibility.isKotlinInternalMember
+            let setVisibility = modifiers.setVisibility == .default ? modifiers.visibility : modifiers.setVisibility
+            isSetterMangled = isSetterMangled || (isWriteable && setVisibility.isKotlinInternalMember)
+        }
+        guard isGetterMangled || isSetterMangled else {
             return nil
         }
         // Interface members and their overrides need to suppress INAPPLICABLE_JVM_NAME, so do for all
         if isFunction {
             return "@Suppress(\"INAPPLICABLE_JVM_NAME\") @JvmName(\"\(name ?? propertyName.setterName)\")"
-        } else {
-            return "@Suppress(\"INAPPLICABLE_JVM_NAME\") @set:JvmName(\"\(name ?? propertyName.setterName)\")"
         }
+        var annotations = ["@Suppress(\"INAPPLICABLE_JVM_NAME\")"]
+        if isGetterMangled {
+            annotations.append("@get:JvmName(\"\(propertyName.getterName)\")")
+        }
+        if isSetterMangled {
+            annotations.append("@set:JvmName(\"\(name ?? propertyName.setterName)\")")
+        }
+        return annotations.joined(separator: " ")
+    }
+}
+
+extension Modifiers.Visibility {
+    /// Whether a type member with this visibility is `internal` in Kotlin, which makes the Kotlin compiler append the
+    /// module name to its JVM name. See `Modifiers.kotlinMemberString`.
+    var isKotlinInternalMember: Bool {
+        return self == .default || self == .internal || self == .fileprivate
     }
 }
 
@@ -1207,9 +1232,12 @@ extension KotlinFunctionDeclaration {
     }
 
     /// Return the annotation necessary to prevent the Kotlin compiler from mangling the name of this function.
-    func preventJVMNameManglingAnnotation(name: String? = nil) -> String? {
-        // The Kotlin compiler appends a hash to the names of functions using unsigned parameters
-        guard parameters.contains(where: { $0.declaredType.isUnsigned }) else {
+    ///
+    /// - Parameter isMember: Whether this is a type member that compiled Swift calls by its JVM name.
+    func preventJVMNameManglingAnnotation(name: String? = nil, isMember: Bool = false) -> String? {
+        // The Kotlin compiler appends a hash to the names of functions using unsigned parameters, and the module name
+        // to the names of internal members
+        guard parameters.contains(where: { $0.declaredType.isUnsigned }) || (isMember && modifiers.visibility.isKotlinInternalMember) else {
             return nil
         }
         let name = name ?? self.name

@@ -211,7 +211,7 @@ final class KotlinBridgeToSwiftVisitor {
         guard !addConstantDefinition(for: variableDeclaration, type: bridgable.type, modifiers: modifiers, to: &swiftDefinitions) else {
             return false
         }
-        if let annotation = variableDeclaration.preventJVMNameManglingAnnotation() {
+        if let annotation = variableDeclaration.preventJVMNameManglingAnnotation(isMember: true) {
             variableDeclaration.annotations.append(annotation)
         }
         Self.appendCallbackFunction(for: variableDeclaration, bridgable: bridgable, modifiers: modifiers)
@@ -524,7 +524,7 @@ final class KotlinBridgeToSwiftVisitor {
         guard info != nil || parentStatement.type != .interfaceDeclaration else {
             return true
         }
-        if let annotation = functionDeclaration.preventJVMNameManglingAnnotation() {
+        if let annotation = functionDeclaration.preventJVMNameManglingAnnotation(isMember: true) {
             functionDeclaration.annotations.append(annotation)
         }
 

@@ -9867,6 +9867,7 @@ final class BridgeToKotlinTests: XCTestCase {
         #endif
         """, kotlin: """
         internal open class C: skip.lib.SwiftProjecting {
+            @Suppress("INAPPLICABLE_JVM_NAME") @get:JvmName("getI")
             internal val i: Int
 
             internal constructor(i: Int) {
@@ -9875,6 +9876,7 @@ final class BridgeToKotlinTests: XCTestCase {
 
             open fun finalize(): Unit = doSomething()
 
+            @Suppress("INAPPLICABLE_JVM_NAME") @JvmName("f")
             internal open fun f(): Unit = doSomething()
 
             override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
@@ -9926,6 +9928,90 @@ final class BridgeToKotlinTests: XCTestCase {
         @_cdecl("Java_C_Swift_1projectionImpl")
         public func C_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
             let projection = C.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
+            let factory: () -> Any = { projection }
+            return SwiftClosure0.javaObject(for: factory, options: [])!
+        }
+        """, transformers: transformers)
+    }
+
+    func testIfSkipBlockStaticMembers() async throws {
+        // Kotlin appends the module name to the JVM names of internal members, including those of companion objects,
+        // so compiled Swift can't find them by name without @JvmName
+        try await check(swiftBridge: """
+        #if SKIP
+        final class Platform {
+            static var count = 0
+
+            static func start(onEvent: @escaping (Int) -> Void) {
+                onEvent(count)
+            }
+        }
+        #endif
+        """, kotlin: """
+        internal class Platform: skip.lib.SwiftProjecting {
+
+            override fun Swift_projection(options: Int): () -> Any = Swift_projectionImpl(options)
+            private external fun Swift_projectionImpl(options: Int): () -> Any
+
+            companion object {
+                @Suppress("INAPPLICABLE_JVM_NAME") @get:JvmName("getCount") @set:JvmName("setCount")
+                internal var count = 0
+
+                @Suppress("INAPPLICABLE_JVM_NAME") @JvmName("start")
+                internal fun start(onEvent: (Int) -> Unit): Unit = onEvent(count)
+            }
+        }
+        """, swiftBridgeSupport: """
+        final class Platform: BridgedFromKotlin, BridgedFinalClass {
+            nonisolated private static let Java_class = try! JClass(name: "Platform")
+            nonisolated let Java_peer: JObject
+            nonisolated required init(Java_ptr: JavaObjectPointer) {
+                Java_peer = JObject(Java_ptr)
+            }
+            init() {
+                Java_peer = jniContext {
+                    let ptr = try! Self.Java_class.create(ctor: Self.Java_constructor_methodID, options: [], args: [])
+                    return JObject(ptr)
+                }
+            }
+            nonisolated private static let Java_constructor_methodID = Java_class.getMethodID(name: "<init>", sig: "()V")!
+            nonisolated private static let Java_Companion_class = try! JClass(name: "Platform$Companion")
+            nonisolated private static let Java_Companion = JObject(Java_class.getStatic(field: Java_class.getStaticFieldID(name: "Companion", sig: "LPlatform$Companion;")!, options: []))
+            nonisolated static func fromJavaObject(_ obj: JavaObjectPointer?, options: JConvertibleOptions) -> Self {
+                return .init(Java_ptr: obj!)
+            }
+            nonisolated func toJavaObject(options: JConvertibleOptions) -> JavaObjectPointer? {
+                return Java_peer.safePointer()
+            }
+
+            static var count: Int {
+                get {
+                    return jniContext {
+                        let value_java: Int32 = try! Java_Companion.call(method: Java_Companion_get_count_methodID, options: [], args: [])
+                        return Int(value_java)
+                    }
+                }
+                set {
+                    jniContext {
+                        let value_java = Int32(newValue).toJavaParameter(options: [])
+                        try! Java_Companion.call(method: Java_Companion_set_count_methodID, options: [], args: [value_java])
+                    }
+                }
+            }
+            nonisolated private static let Java_Companion_get_count_methodID = Java_Companion_class.getMethodID(name: "getCount", sig: "()I")!
+            nonisolated private static let Java_Companion_set_count_methodID = Java_Companion_class.getMethodID(name: "setCount", sig: "(I)V")!
+
+            static func start(onEvent p_0: @escaping (Int) -> Void) {
+                jniContext {
+                    let p_0_java = SwiftClosure1.javaObject(for: p_0, options: [])!.toJavaParameter(options: [])
+                    try! Java_Companion.call(method: Java_Companion_start_0_methodID, options: [], args: [p_0_java])
+                }
+            }
+            nonisolated private static let Java_Companion_start_0_methodID = Java_Companion_class.getMethodID(name: "start", sig: "(Lkotlin/jvm/functions/Function1;)V")!
+        }
+        @_cdecl("Java_Platform_Swift_1projectionImpl")
+        public func Platform_Swift_projectionImpl(_ Java_env: JNIEnvPointer, _ Java_target: JavaObjectPointer, _ options: Int32) -> JavaObjectPointer {
+            let projection = Platform.fromJavaObject(Java_target, options: JConvertibleOptions(rawValue: Int(options)))
             let factory: () -> Any = { projection }
             return SwiftClosure0.javaObject(for: factory, options: [])!
         }
@@ -9986,6 +10072,7 @@ final class BridgeToKotlinTests: XCTestCase {
             private external fun Swift_projectionImpl(options: Int): () -> Any
         }
         internal class HelloComposer: ContentComposer, skip.lib.SwiftProjecting {
+            @Suppress("INAPPLICABLE_JVM_NAME") @get:JvmName("getMessage")
             internal val message: String
 
             @Composable
@@ -10137,6 +10224,7 @@ final class BridgeToKotlinTests: XCTestCase {
             private external fun Swift_projectionImpl(options: Int): () -> Any
         }
         internal class HelloView: View, skip.lib.SwiftProjecting {
+            @Suppress("INAPPLICABLE_JVM_NAME") @get:JvmName("getCount") @set:JvmName("setCount")
             internal var count: Int
                 get() = _count.wrappedValue
                 set(newValue) {
